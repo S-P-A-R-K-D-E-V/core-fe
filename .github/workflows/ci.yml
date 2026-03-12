@@ -26,12 +26,14 @@ jobs:
 
   deploy:
     runs-on: self-hosted
-    needs: build-and-push
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy Frontend
+      - name: Login DockerHub
+        run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Deploy frontend
         working-directory: docker
         run: |
           docker compose -f docker-compose.frontend.yml pull
