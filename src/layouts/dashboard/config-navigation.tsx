@@ -174,7 +174,15 @@ export function useNavData() {
               { title: t('myRequests'), path: paths.dashboard.shiftSwap.myRequests },
               { title: t('pendingApproval'), path: paths.dashboard.shiftSwap.pending },
             ],
-          }
+          },
+
+          // NOTIFICATION CONFIG (Admin only)
+          {
+            title: 'Cấu hình thông báo',
+            path: paths.dashboard.notificationConfig.root,
+            icon: ICONS.mail,
+            roles: ['Admin'],
+          },
         ],
       },
     ],

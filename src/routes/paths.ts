@@ -172,6 +172,12 @@ export const paths = {
       root: `${ROOTS.DASHBOARD}/shift-cash`,
       dashboard: `${ROOTS.DASHBOARD}/shift-cash`,
     },
+    checkinFace: {
+      root: `${ROOTS.DASHBOARD}/checkin-face`,
+    },
+    notificationConfig: {
+      root: `${ROOTS.DASHBOARD}/notification-config`,
+    },
     general: {
       app: `${ROOTS.DASHBOARD}/app`,
       ecommerce: `${ROOTS.DASHBOARD}/ecommerce`,

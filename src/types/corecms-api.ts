@@ -997,3 +997,57 @@ export interface IUnregisterShiftRequest {
   shiftScheduleId: string;
   date: string;
 }
+
+// ── Checkin Face ──
+
+export interface ICheckinFaceRequest {
+  candidateId?: number;
+  candidateName: string;
+  imageBase64: string;
+  lat?: number;
+  lng?: number;
+  deviceName?: string;
+  time?: string;
+}
+
+export interface ICheckinFaceResponse {
+  id: string;
+  candidateId?: number;
+  candidateName: string;
+  latitude?: number;
+  longitude?: number;
+  deviceName?: string;
+  checkinTime: string;
+  notificationSent: boolean;
+  createdAt: string;
+}
+
+// ── Notification Config ──
+
+export type NotificationType = 'telegram' | 'zalo';
+
+export interface INotificationConfig {
+  id: string;
+  type: NotificationType;
+  token: string;
+  chatId: string;
+  name?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ICreateNotificationConfigRequest {
+  type: string;
+  token: string;
+  chatId: string;
+  name?: string;
+  isActive?: boolean;
+}
+
+export interface IUpdateNotificationConfigRequest {
+  token?: string;
+  chatId?: string;
+  name?: string;
+  isActive?: boolean;
+}

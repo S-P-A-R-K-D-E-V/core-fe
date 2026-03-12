@@ -199,5 +199,13 @@ export const endpoints = {
     list: '/shift-registrations/range',
     myRegistrations: '/shift-registrations/my-registrations',
   },
+  checkinFace: {
+    face: '/checkin/face',
+  },
+  notificationConfig: {
+    list: '/notification/config',
+    create: '/notification/config',
+    update: (id: string) => `/notification/config/${id}`,
+  },
 };
 
