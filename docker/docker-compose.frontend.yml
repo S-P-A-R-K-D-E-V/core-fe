@@ -1,22 +1,21 @@
 services:
 
-  api-1:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-    image: core-api:latest
-    container_name: core-api-1
+  web:
+    image: satthuno99/core-fe:latest
+    container_name: core-web
     restart: always
     networks:
       - core-network
 
-  api-2:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-    image: core-api:latest
-    container_name: core-api-2
-    restart: always
+  nginx:
+    image: nginx:alpine
+    container_name: core-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - web
     networks:
       - core-network
 
