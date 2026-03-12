@@ -1,0 +1,24 @@
+  Γû▓ Next.js 14.2.35
+  - Environments: .env.local, .env.production
+
+   Creating an optimized production build ...
+ Γ£ô Compiled successfully
+   Linting and checking validity of types ...
+
+ ΓÜá The Next.js plugin was not detected in your ESLint configuration. See https://nextjs.org/docs/basic-features/eslint#migrating-existing-config
+Failed to compile.
+
+./src/sections/_examples/extra/map-view/change-theme/index.tsx:23:8
+Type error: Type '{ children: Element; config?: { [key: string]: ConfigSpecification; } | undefined; light?: LightSpecification | undefined; transformRequest?: RequestTransformFunction | undefined; ... 116 more ...; reuseMaps?: boolean | undefined; }' is not assignable to type '{ zoom?: number | undefined; bearing?: number | undefined; pitch?: number | undefined; maxZoom?: number | undefined; minZoom?: number | undefined; interactive?: boolean | undefined; ... 37 more ...; worldview?: string | undefined; }'.
+  Types of property 'projection' are incompatible.
+    Type 'string | ProjectionSpecification | undefined' is not assignable to type 'ProjectionSpecification | undefined'.
+      Type 'string' is not assignable to type 'ProjectionSpecification'.
+
+  21 |   return (
+  22 |     <>
+> 23 |       <Map
+     |        ^
+  24 |         initialViewState={{
+  25 |           latitude: 37.785164,
+  26 |           longitude: -100,
+Next.js build worker exited with code: 1 and signal: null

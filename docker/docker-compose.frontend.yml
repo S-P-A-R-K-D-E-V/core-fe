@@ -1,0 +1,25 @@
+services:
+
+  api-1:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: core-api:latest
+    container_name: core-api-1
+    restart: always
+    networks:
+      - core-network
+
+  api-2:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: core-api:latest
+    container_name: core-api-2
+    restart: always
+    networks:
+      - core-network
+
+networks:
+  core-network:
+    external: true
