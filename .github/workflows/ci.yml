@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy API
+      - name: Deploy Frontend
         working-directory: docker
         run: |
-          docker compose -f docker-compose.backend.yml up -d --build
+          docker compose -f docker-compose.frontend.yml up -d --build
