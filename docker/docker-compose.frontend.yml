@@ -34,4 +34,4 @@ services:
 
 networks:
   core-network:
-    external: bridge
+    driver: bridge
