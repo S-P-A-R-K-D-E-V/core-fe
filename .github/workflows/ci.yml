@@ -40,4 +40,4 @@ jobs:
         working-directory: docker
         run: |
           docker compose -f docker-compose.frontend.yml pull
-          docker compose -f docker-compose.frontend.yml up -d
+          docker compose -f docker-compose.frontend.yml up -d --force-recreate
