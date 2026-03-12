@@ -998,6 +998,15 @@ export interface IUnregisterShiftRequest {
   date: string;
 }
 
+export interface IBulkRegisterShiftRequest {
+  staffIds: string[];
+  shiftScheduleId: string;
+  fromDate: string;
+  toDate: string;
+  filterDays?: number;
+  note?: string;
+}
+
 // ── Checkin Face ──
 
 export interface ICheckinFaceRequest {

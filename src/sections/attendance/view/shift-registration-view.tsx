@@ -23,6 +23,10 @@ import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import Checkbox from '@mui/material/Checkbox';
+import FormGroup from '@mui/material/FormGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import { useTheme, alpha } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
@@ -35,7 +39,7 @@ import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
-import { IShiftSchedule, IShiftRegistration } from 'src/types/corecms-api';
+import { IShiftSchedule, IShiftRegistration, IUser } from 'src/types/corecms-api';
 import { ICalendarView, ICalendarScheduleEvent } from 'src/types/calendar';
 import { getShiftSchedulesByDateRange } from 'src/api/attendance';
 import {
@@ -43,7 +47,9 @@ import {
   unregisterShift,
   getMyShiftRegistrations,
   getShiftRegistrations,
+  bulkRegisterShift,
 } from 'src/api/shiftRegistration';
+import { getAllUsers } from 'src/api/users';
 import { useAuthContext } from 'src/auth/hooks';
 
 import { StyledCalendar } from '../../calendar/styles';
@@ -51,12 +57,23 @@ import CalendarToolbar from '../../calendar/calendar-toolbar';
 
 // ----------------------------------------------------------------------
 
+const WEEKDAYS = [
+  { value: 1, label: 'Thứ 2', short: 'T2' },
+  { value: 2, label: 'Thứ 3', short: 'T3' },
+  { value: 4, label: 'Thứ 4', short: 'T4' },
+  { value: 8, label: 'Thứ 5', short: 'T5' },
+  { value: 16, label: 'Thứ 6', short: 'T6' },
+  { value: 32, label: 'Thứ 7', short: 'T7' },
+  { value: 64, label: 'Chủ nhật', short: 'CN' },
+];
+
 export default function ShiftRegistrationView() {
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
   const settings = useSettingsContext();
   const smUp = useResponsive('up', 'sm');
   const detailDialog = useBoolean();
+  const bulkDialog = useBoolean();
   const calendarRef = useRef<any>(null);
   const { user: authUser } = useAuthContext();
 
@@ -92,6 +109,16 @@ export default function ShiftRegistrationView() {
 
   const [registering, setRegistering] = useState(false);
   const [registerNote, setRegisterNote] = useState('');
+
+  // Bulk registration state
+  const [users, setUsers] = useState<IUser[]>([]);
+  const [bulkScheduleId, setBulkScheduleId] = useState('');
+  const [bulkFromDate, setBulkFromDate] = useState(fromDate);
+  const [bulkToDate, setBulkToDate] = useState(toDate);
+  const [bulkStaffIds, setBulkStaffIds] = useState<string[]>([]);
+  const [bulkFilterDays, setBulkFilterDays] = useState<number[]>([1, 2, 4, 8, 16]);
+  const [bulkNote, setBulkNote] = useState('');
+  const [bulkRegistering, setBulkRegistering] = useState(false);
 
   const currentUserId = authUser?.id;
   const isAdmin =
@@ -134,6 +161,20 @@ export default function ShiftRegistrationView() {
   useEffect(() => {
     fetchRegistrations();
   }, [fetchRegistrations]);
+
+  // Fetch users for bulk registration (admin only)
+  useEffect(() => {
+    if (!isAdmin) return;
+    const loadUsers = async () => {
+      try {
+        const data = await getAllUsers();
+        setUsers(data);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    loadUsers();
+  }, [isAdmin]);
 
   // Transform schedules to calendar events with registration info
   const events = useMemo(() => {
@@ -313,6 +354,45 @@ export default function ShiftRegistrationView() {
     }
   };
 
+  // Bulk registration handlers
+  const toggleBulkStaff = (staffId: string) => {
+    setBulkStaffIds((prev) =>
+      prev.includes(staffId) ? prev.filter((id) => id !== staffId) : [...prev, staffId]
+    );
+  };
+
+  const toggleBulkDay = (day: number) => {
+    setBulkFilterDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  };
+
+  const handleBulkRegister = async () => {
+    try {
+      setBulkRegistering(true);
+      const result = await bulkRegisterShift({
+        staffIds: bulkStaffIds,
+        shiftScheduleId: bulkScheduleId,
+        fromDate: bulkFromDate,
+        toDate: bulkToDate,
+        filterDays: bulkFilterDays.length > 0 ? bulkFilterDays.reduce((a, b) => a | b, 0) : undefined,
+        note: bulkNote || undefined,
+      });
+      enqueueSnackbar(`Đã đăng ký ${result.count} ca thành công!`, { variant: 'success' });
+      bulkDialog.onFalse();
+      setBulkStaffIds([]);
+      setBulkScheduleId('');
+      setBulkNote('');
+      setBulkFilterDays([1, 2, 4, 8, 16]);
+      await fetchRegistrations();
+    } catch (error: any) {
+      const msg = error?.title || error?.message || 'Đăng ký hàng loạt thất bại!';
+      enqueueSnackbar(msg, { variant: 'error' });
+    } finally {
+      setBulkRegistering(false);
+    }
+  };
+
   return (
     <>
       <Container maxWidth={settings.themeStretch ? false : 'xl'}>
@@ -352,6 +432,15 @@ export default function ShiftRegistrationView() {
               variant="outlined"
               color="info"
             />
+            {isAdmin && (
+              <Button
+                variant="contained"
+                startIcon={<Iconify icon="solar:calendar-add-bold-duotone" />}
+                onClick={bulkDialog.onTrue}
+              >
+                Đăng ký hàng loạt
+              </Button>
+            )}
           </Stack>
         </Card>
 
@@ -600,6 +689,137 @@ export default function ShiftRegistrationView() {
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      {/* Bulk Registration Dialog */}
+      <Dialog
+        open={bulkDialog.value}
+        onClose={bulkDialog.onFalse}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2 } }}
+      >
+        <DialogTitle>Đăng ký ca hàng loạt</DialogTitle>
+        <DialogContent>
+          <Stack spacing={3} sx={{ mt: 1 }}>
+            <TextField
+              select
+              fullWidth
+              label="Lịch ca (Schedule)"
+              value={bulkScheduleId}
+              onChange={(e) => setBulkScheduleId(e.target.value)}
+            >
+              {schedules.map((s) => (
+                <MenuItem key={s.id} value={s.id}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        bgcolor: s.color,
+                        borderRadius: '50%',
+                      }}
+                    />
+                    <span>
+                      {s.templateName} ({s.startTime} - {s.endTime})
+                    </span>
+                  </Stack>
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <Stack direction="row" spacing={2}>
+              <TextField
+                fullWidth
+                label="Từ ngày"
+                type="date"
+                value={bulkFromDate}
+                onChange={(e) => setBulkFromDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                fullWidth
+                label="Đến ngày"
+                type="date"
+                value={bulkToDate}
+                onChange={(e) => setBulkToDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Stack>
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Chọn các ngày trong tuần
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                {WEEKDAYS.map((day) => (
+                  <Chip
+                    key={day.value}
+                    label={day.short}
+                    onClick={() => toggleBulkDay(day.value)}
+                    color={bulkFilterDays.includes(day.value) ? 'primary' : 'default'}
+                    variant={bulkFilterDays.includes(day.value) ? 'filled' : 'outlined'}
+                  />
+                ))}
+              </Stack>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Chọn nhân viên ({bulkStaffIds.length} đã chọn)
+              </Typography>
+              <Box
+                sx={{
+                  maxHeight: 300,
+                  overflowY: 'auto',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  p: 1,
+                }}
+              >
+                <FormGroup>
+                  {users.map((user) => (
+                    <FormControlLabel
+                      key={user.id}
+                      control={
+                        <Checkbox
+                          checked={bulkStaffIds.includes(user.id)}
+                          onChange={() => toggleBulkStaff(user.id)}
+                        />
+                      }
+                      label={`${user.fullName} (${user.email})`}
+                    />
+                  ))}
+                </FormGroup>
+              </Box>
+            </Box>
+
+            <TextField
+              fullWidth
+              label="Ghi chú (tùy chọn)"
+              value={bulkNote}
+              onChange={(e) => setBulkNote(e.target.value)}
+              multiline
+              rows={2}
+              placeholder="Nhập ghi chú nếu cần..."
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="outlined" onClick={bulkDialog.onFalse}>
+            Hủy
+          </Button>
+          <LoadingButton
+            variant="contained"
+            onClick={handleBulkRegister}
+            loading={bulkRegistering}
+            disabled={!bulkScheduleId || bulkStaffIds.length === 0 || !bulkFromDate || !bulkToDate}
+            startIcon={<Iconify icon="solar:check-circle-bold" />}
+          >
+            Đăng ký {bulkStaffIds.length} nhân viên
+          </LoadingButton>
+        </DialogActions>
       </Dialog>
     </>
   );

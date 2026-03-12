@@ -135,7 +135,7 @@ export default function CheckinFaceView() {
       return;
     }
     if (!candidateName.trim()) {
-      enqueueSnackbar('Vui lòng nhập tên thí sinh', { variant: 'warning' });
+      enqueueSnackbar('Vui lòng nhập tên Nhân viên', { variant: 'warning' });
       return;
     }
 
@@ -194,14 +194,14 @@ export default function CheckinFaceView() {
           <Card sx={{ p: 3 }}>
             <Stack spacing={2}>
               <TextField
-                label="Tên thí sinh *"
+                label="Tên Nhân viên *"
                 value={candidateName}
                 onChange={(e) => setCandidateName(e.target.value)}
                 fullWidth
               />
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <TextField
-                  label="Mã thí sinh"
+                  label="Mã Nhân viên"
                   value={candidateId}
                   onChange={(e) => setCandidateId(e.target.value)}
                   sx={{ flex: 1 }}

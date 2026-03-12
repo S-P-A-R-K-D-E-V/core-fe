@@ -196,6 +196,7 @@ export const endpoints = {
   shiftRegistrations: {
     register: '/shift-registrations/register',
     unregister: '/shift-registrations/unregister',
+    bulkRegister: '/shift-registrations/bulk-register',
     list: '/shift-registrations/range',
     myRegistrations: '/shift-registrations/my-registrations',
   },

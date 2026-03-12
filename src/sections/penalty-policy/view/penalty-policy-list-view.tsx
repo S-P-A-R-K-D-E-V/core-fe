@@ -88,6 +88,7 @@ export default function PenaltyPolicyListView() {
     penaltyValue: 0,
     hourlyCoefficient: undefined as number | undefined,
     minMinutes: 5,
+    isActive: true,
     description: '',
   });
 
@@ -118,6 +119,7 @@ export default function PenaltyPolicyListView() {
         penaltyValue: policy.penaltyValue,
         hourlyCoefficient: policy.hourlyCoefficient,
         minMinutes: policy.minMinutes,
+        isActive: policy.isActive,
         description: policy.description || '',
       });
     } else {
@@ -129,6 +131,7 @@ export default function PenaltyPolicyListView() {
         penaltyValue: 0,
         hourlyCoefficient: undefined,
         minMinutes: 5,
+        isActive: true,
         description: '',
       });
     }

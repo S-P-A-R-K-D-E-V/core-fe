@@ -3,6 +3,7 @@ import {
   IShiftRegistration,
   IRegisterShiftRequest,
   IUnregisterShiftRequest,
+  IBulkRegisterShiftRequest,
 } from 'src/types/corecms-api';
 
 // ======================================================================
@@ -16,6 +17,16 @@ export async function registerShift(data: IRegisterShiftRequest): Promise<IShift
 
 export async function unregisterShift(data: IUnregisterShiftRequest): Promise<void> {
   await axios.post(endpoints.shiftRegistrations.unregister, data);
+}
+
+export async function bulkRegisterShift(
+  data: IBulkRegisterShiftRequest
+): Promise<{ count: number; registrations: IShiftRegistration[] }> {
+  const response = await axios.post<{ count: number; registrations: IShiftRegistration[] }>(
+    endpoints.shiftRegistrations.bulkRegister,
+    data
+  );
+  return response.data;
 }
 
 export async function getShiftRegistrations(
