@@ -1,21 +1,34 @@
 services:
 
-  web:
+  web-1:
     image: satthuno99/core-fe:latest
-    container_name: core-web
+    container_name: core-web-1
     restart: always
+    expose:
+      - "3000"
+    networks:
+      - core-network
+
+  web-2:
+    image: satthuno99/core-fe:latest
+    container_name: core-web-2
+    restart: always
+    expose:
+      - "3000"
     networks:
       - core-network
 
   nginx:
     image: nginx:alpine
     container_name: core-nginx
+    restart: always
     ports:
       - "80:80"
     volumes:
-      - ../docker/nginx.conf:/etc/nginx/nginx.conf
+      - ../docker/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - web
+      - web-1
+      - web-2
     networks:
       - core-network
 
