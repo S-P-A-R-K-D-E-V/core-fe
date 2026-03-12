@@ -48,6 +48,7 @@ export default function AttendanceCheckinView() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [geoLocation, setGeoLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoAddress, setGeoAddress] = useState<string | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
 
   // Face capture dialog state
@@ -87,6 +88,20 @@ export default function AttendanceCheckinView() {
       setGeoError('Trình duyệt không hỗ trợ GPS.');
     }
   }, []);
+
+  // Reverse geocode to get address
+  useEffect(() => {
+    if (!geoLocation) return;
+    fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${geoLocation.lat}&lon=${geoLocation.lng}&format=json`,
+      { headers: { 'User-Agent': 'CoreCms/1.0' } }
+    )
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.display_name) setGeoAddress(data.display_name);
+      })
+      .catch((err) => console.error('Reverse geocode failed:', err));
+  }, [geoLocation]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -153,24 +168,29 @@ export default function AttendanceCheckinView() {
 
     ctx.drawImage(video, 0, 0);
 
-    // Overlay: time + location
+    // Overlay: time + location + address
     const now = new Date();
     const timeStr = now.toLocaleString('vi-VN');
     const locStr = geoLocation
       ? `${geoLocation.lat.toFixed(4)}, ${geoLocation.lng.toFixed(4)}`
       : 'N/A';
 
+    const overlayHeight = geoAddress ? 80 : 60;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
+    ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
     ctx.fillStyle = '#fff';
     ctx.font = '14px Arial';
-    ctx.fillText(`⏰ ${timeStr}`, 10, canvas.height - 38);
-    ctx.fillText(`📍 ${locStr}`, 10, canvas.height - 16);
+    ctx.fillText(`⏰ ${timeStr}`, 10, canvas.height - overlayHeight + 18);
+    ctx.fillText(`📍 ${locStr}`, 10, canvas.height - overlayHeight + 38);
+    if (geoAddress) {
+      const truncated = geoAddress.length > 60 ? `${geoAddress.slice(0, 60)}…` : geoAddress;
+      ctx.fillText(`🏠 ${truncated}`, 10, canvas.height - overlayHeight + 58);
+    }
 
     const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
     setCapturedImage(imageBase64);
     stopCamera();
-  }, [geoLocation, stopCamera]);
+  }, [geoLocation, geoAddress, stopCamera]);
 
   // ── Dialog open / close ──
 
@@ -578,6 +598,11 @@ export default function AttendanceCheckinView() {
                         ? `${geoLocation.lat.toFixed(4)}, ${geoLocation.lng.toFixed(4)}`
                         : 'Đang lấy vị trí...'}
                     </Typography>
+                    {geoAddress && (
+                      <Typography variant="caption" display="block" sx={{ opacity: 0.85 }}>
+                        🏠 {geoAddress}
+                      </Typography>
+                    )}
                   </Box>
                 )}
               </Box>
