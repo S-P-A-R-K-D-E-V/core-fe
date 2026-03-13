@@ -209,5 +209,59 @@ export const endpoints = {
     create: '/notification/config',
     update: (id: string) => `/notification/config/${id}`,
   },
+  // POS / Inventory
+  categories: {
+    list: '/categories',
+    create: '/categories',
+    update: (id: string) => `/categories/${id}`,
+    delete: (id: string) => `/categories/${id}`,
+  },
+  unitOfMeasures: {
+    list: '/unit-of-measures',
+    create: '/unit-of-measures',
+    update: (id: string) => `/unit-of-measures/${id}`,
+    delete: (id: string) => `/unit-of-measures/${id}`,
+  },
+  variantAttributes: {
+    list: '/variant-attributes',
+    create: '/variant-attributes',
+    update: (id: string) => `/variant-attributes/${id}`,
+    delete: (id: string) => `/variant-attributes/${id}`,
+  },
+  products: {
+    list: '/products',
+    details: (id: string) => `/products/${id}`,
+    create: '/products',
+    update: (id: string) => `/products/${id}`,
+    delete: (id: string) => `/products/${id}`,
+  },
+  warehouses: {
+    list: '/warehouses',
+    create: '/warehouses',
+    update: (id: string) => `/warehouses/${id}`,
+    delete: (id: string) => `/warehouses/${id}`,
+  },
+  inventory: {
+    list: '/inventory',
+    lowStock: '/inventory/low-stock',
+    transactions: '/inventory/transactions',
+    adjust: '/inventory/adjust',
+  },
+  // Purchasing
+  suppliers: {
+    list: '/suppliers',
+    create: '/suppliers',
+    update: (id: string) => `/suppliers/${id}`,
+    delete: (id: string) => `/suppliers/${id}`,
+  },
+  purchaseOrders: {
+    list: '/purchase-orders',
+    details: (id: string) => `/purchase-orders/${id}`,
+    create: '/purchase-orders',
+    update: (id: string) => `/purchase-orders/${id}`,
+    confirm: (id: string) => `/purchase-orders/${id}/confirm`,
+    receive: (id: string) => `/purchase-orders/${id}/receive`,
+    cancel: (id: string) => `/purchase-orders/${id}/cancel`,
+  },
 };
 

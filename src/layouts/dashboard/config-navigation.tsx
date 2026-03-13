@@ -185,6 +185,83 @@ export function useNavData() {
           },
         ],
       },
+      // POS / INVENTORY
+      // ----------------------------------------------------------------------
+      {
+        subheader: 'Quản lý kho & hàng hóa',
+        items: [
+          {
+            title: 'Sản phẩm',
+            path: paths.dashboard.pos.product.root,
+            icon: ICONS.product,
+            roles: ['Admin', 'Manager'],
+            children: [
+              { title: 'Danh sách', path: paths.dashboard.pos.product.list },
+              { title: 'Thêm mới', path: paths.dashboard.pos.product.new },
+            ],
+          },
+          {
+            title: 'Danh mục',
+            path: paths.dashboard.pos.category.root,
+            icon: ICONS.folder,
+            roles: ['Admin', 'Manager'],
+            children: [
+              { title: 'Danh sách', path: paths.dashboard.pos.category.list },
+              { title: 'Thêm mới', path: paths.dashboard.pos.category.new },
+            ],
+          },
+          {
+            title: 'Tồn kho',
+            path: paths.dashboard.pos.inventory.root,
+            icon: ICONS.ecommerce,
+            roles: ['Admin', 'Manager', 'Staff'],
+            children: [
+              { title: 'Danh sách', path: paths.dashboard.pos.inventory.list },
+              { title: 'Sắp hết hàng', path: paths.dashboard.pos.inventory.lowStock },
+              { title: 'Lịch sử nhập xuất', path: paths.dashboard.pos.inventory.transactions },
+            ],
+          },
+          {
+            title: 'Kho hàng',
+            path: paths.dashboard.pos.warehouse.root,
+            icon: ICONS.banking,
+            roles: ['Admin', 'Manager'],
+            children: [
+              { title: 'Danh sách', path: paths.dashboard.pos.warehouse.list },
+            ],
+          },
+          {
+            title: 'Cấu hình',
+            path: paths.dashboard.pos.unitOfMeasure.root,
+            icon: ICONS.label,
+            roles: ['Admin', 'Manager'],
+            children: [
+              { title: 'Đơn vị tính', path: paths.dashboard.pos.unitOfMeasure.list },
+              { title: 'Thuộc tính biến thể', path: paths.dashboard.pos.variantAttribute.list },
+            ],
+          },
+          {
+            title: 'Nhà cung cấp',
+            path: paths.dashboard.pos.supplier.root,
+            icon: ICONS.user,
+            roles: ['Admin', 'Manager'],
+            children: [
+              { title: 'Danh sách', path: paths.dashboard.pos.supplier.list },
+              { title: 'Thêm mới', path: paths.dashboard.pos.supplier.new },
+            ],
+          },
+          {
+            title: 'Đơn nhập hàng',
+            path: paths.dashboard.pos.purchaseOrder.root,
+            icon: ICONS.order,
+            roles: ['Admin', 'Manager'],
+            children: [
+              { title: 'Danh sách', path: paths.dashboard.pos.purchaseOrder.list },
+              { title: 'Tạo đơn', path: paths.dashboard.pos.purchaseOrder.new },
+            ],
+          },
+        ],
+      },
     ],
     [t]
   );

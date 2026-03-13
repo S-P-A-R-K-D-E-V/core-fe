@@ -945,6 +945,242 @@ export interface IKiotVietInvoiceDetailResponse {
   createdDate: string;
   products: IKiotVietInvoiceDetailProduct[];
   payments: IKiotVietInvoicePayment[];
+}
+
+// ==================== POS / INVENTORY ====================
+
+// --- Category ---
+export interface ICategory {
+  id: string;
+  name: string;
+  description?: string;
+  parentCategoryId?: string;
+  parentCategoryName?: string;
+  sortOrder: number;
+  isActive: boolean;
+  imageUrl?: string;
+  createdAt: string;
+  subCategories?: ICategory[];
+}
+
+export interface ICreateCategoryRequest {
+  name: string;
+  description?: string;
+  parentCategoryId?: string;
+  sortOrder?: number;
+  imageUrl?: string;
+}
+
+export interface IUpdateCategoryRequest {
+  name: string;
+  description?: string;
+  parentCategoryId?: string;
+  sortOrder?: number;
+  imageUrl?: string;
+  isActive?: boolean;
+}
+
+// --- Unit of Measure ---
+export interface IUnitOfMeasure {
+  id: string;
+  name: string;
+  abbreviation: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface ICreateUnitOfMeasureRequest {
+  name: string;
+  abbreviation: string;
+}
+
+export interface IUpdateUnitOfMeasureRequest {
+  name: string;
+  abbreviation: string;
+  isActive?: boolean;
+}
+
+// --- Variant Attribute ---
+export interface IVariantAttribute {
+  id: string;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+  values: IVariantAttributeValue[];
+}
+
+export interface IVariantAttributeValue {
+  id: string;
+  value: string;
+  sortOrder: number;
+}
+
+export interface ICreateVariantAttributeRequest {
+  name: string;
+  sortOrder?: number;
+  values?: string[];
+}
+
+export interface IUpdateVariantAttributeRequest {
+  name: string;
+  sortOrder?: number;
+}
+
+// --- Product ---
+export interface IProduct {
+  id: string;
+  name: string;
+  sku: string;
+  barcode?: string;
+  description?: string;
+  categoryId: string;
+  categoryName: string;
+  unitOfMeasureId: string;
+  unitOfMeasureName: string;
+  costPrice: number;
+  sellingPrice: number;
+  vatRate: number;
+  imageUrl?: string;
+  isActive: boolean;
+  hasVariants: boolean;
+  lowStockThreshold: number;
+  createdAt: string;
+  updatedAt?: string;
+  variants?: IProductVariant[];
+  totalStock: number;
+}
+
+export interface IProductVariant {
+  id: string;
+  productId: string;
+  sku: string;
+  barcode?: string;
+  name: string;
+  costPrice?: number;
+  sellingPrice?: number;
+  imageUrl?: string;
+  isActive: boolean;
+  createdAt: string;
+  combinations: IVariantCombination[];
+  totalStock: number;
+}
+
+export interface IVariantCombination {
+  attributeId: string;
+  attributeName: string;
+  valueId: string;
+  valueName: string;
+}
+
+export interface ICreateProductVariantRequest {
+  sku: string;
+  barcode?: string;
+  name: string;
+  costPrice?: number;
+  sellingPrice?: number;
+  imageUrl?: string;
+  attributeValueIds: string[];
+}
+
+export interface ICreateProductRequest {
+  name: string;
+  sku: string;
+  barcode?: string;
+  description?: string;
+  categoryId: string;
+  unitOfMeasureId: string;
+  costPrice: number;
+  sellingPrice: number;
+  vatRate?: number;
+  imageUrl?: string;
+  hasVariants?: boolean;
+  lowStockThreshold?: number;
+  variants?: ICreateProductVariantRequest[];
+}
+
+export interface IUpdateProductRequest {
+  name: string;
+  sku: string;
+  barcode?: string;
+  description?: string;
+  categoryId: string;
+  unitOfMeasureId: string;
+  costPrice: number;
+  sellingPrice: number;
+  vatRate?: number;
+  imageUrl?: string;
+  isActive?: boolean;
+  hasVariants?: boolean;
+  lowStockThreshold?: number;
+}
+
+// --- Warehouse ---
+export interface IWarehouse {
+  id: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  isDefault: boolean;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface ICreateWarehouseRequest {
+  name: string;
+  address?: string;
+  phone?: string;
+  isDefault?: boolean;
+}
+
+export interface IUpdateWarehouseRequest {
+  name: string;
+  address?: string;
+  phone?: string;
+  isDefault?: boolean;
+  isActive?: boolean;
+}
+
+// --- Inventory ---
+export interface IInventoryItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  productVariantId?: string;
+  productVariantName?: string;
+  warehouseId: string;
+  warehouseName: string;
+  categoryName: string;
+  unitOfMeasureName: string;
+  quantity: number;
+  lowStockThreshold: number;
+  isLowStock: boolean;
+  createdAt: string;
+}
+
+export interface IInventoryTransaction {
+  id: string;
+  productId: string;
+  productName: string;
+  productVariantId?: string;
+  productVariantName?: string;
+  warehouseId: string;
+  warehouseName: string;
+  transactionType: string;
+  quantity: number;
+  referenceType?: string;
+  referenceId?: string;
+  note?: string;
+  createdByName: string;
+  createdAt: string;
+}
+
+export interface IAdjustInventoryRequest {
+  productId: string;
+  productVariantId?: string;
+  warehouseId: string;
+  quantity: number;
+  note?: string;
   surcharges: IKiotVietInvoiceSurcharge[];
 }
 
@@ -1059,4 +1295,129 @@ export interface IUpdateNotificationConfigRequest {
   chatId?: string;
   name?: string;
   isActive?: boolean;
+}
+
+// ======================================================================
+// Purchasing Types (Phase 2)
+// ======================================================================
+
+// --- Supplier ---
+export interface ISupplier {
+  id: string;
+  name: string;
+  code?: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  taxCode?: string;
+  bankAccount?: string;
+  bankName?: string;
+  note?: string;
+  isActive: boolean;
+  createdAt: string;
+  totalOrders: number;
+}
+
+export interface ICreateSupplierRequest {
+  name: string;
+  code?: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  taxCode?: string;
+  bankAccount?: string;
+  bankName?: string;
+  note?: string;
+}
+
+export interface IUpdateSupplierRequest {
+  name: string;
+  code?: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  taxCode?: string;
+  bankAccount?: string;
+  bankName?: string;
+  note?: string;
+  isActive: boolean;
+}
+
+// --- Purchase Order ---
+export interface IPurchaseOrder {
+  id: string;
+  orderNumber: string;
+  supplierId: string;
+  supplierName: string;
+  warehouseId: string;
+  warehouseName: string;
+  status: string;
+  subTotal: number;
+  vatAmount: number;
+  discountAmount: number;
+  totalAmount: number;
+  note?: string;
+  expectedDate?: string;
+  receivedDate?: string;
+  createdByName: string;
+  approvedByName?: string;
+  createdAt: string;
+  updatedAt?: string;
+  items: IPurchaseOrderItem[];
+}
+
+export interface IPurchaseOrderItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productSKU: string;
+  productVariantId?: string;
+  variantName?: string;
+  quantity: number;
+  receivedQuantity: number;
+  unitPrice: number;
+  vatRate: number;
+  discountAmount: number;
+  totalPrice: number;
+  note?: string;
+}
+
+export interface ICreatePurchaseOrderRequest {
+  supplierId: string;
+  warehouseId: string;
+  note?: string;
+  expectedDate?: string;
+  discountAmount: number;
+  items: ICreatePurchaseOrderItemRequest[];
+}
+
+export interface ICreatePurchaseOrderItemRequest {
+  productId: string;
+  productVariantId?: string;
+  quantity: number;
+  unitPrice: number;
+  vatRate: number;
+  discountAmount: number;
+  note?: string;
+}
+
+export interface IUpdatePurchaseOrderRequest {
+  supplierId: string;
+  warehouseId: string;
+  note?: string;
+  expectedDate?: string;
+  discountAmount: number;
+  items: ICreatePurchaseOrderItemRequest[];
+}
+
+export interface IReceivePurchaseOrderRequest {
+  items: IReceiveItemRequest[];
+}
+
+export interface IReceiveItemRequest {
+  purchaseOrderItemId: string;
+  receivedQuantity: number;
 }

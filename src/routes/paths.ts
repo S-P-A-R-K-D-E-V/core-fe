@@ -178,6 +178,54 @@ export const paths = {
     notificationConfig: {
       root: `${ROOTS.DASHBOARD}/notification-config`,
     },
+    // POS / Inventory
+    pos: {
+      root: `${ROOTS.DASHBOARD}/pos`,
+      category: {
+        root: `${ROOTS.DASHBOARD}/pos/category`,
+        list: `${ROOTS.DASHBOARD}/pos/category/list`,
+        new: `${ROOTS.DASHBOARD}/pos/category/new`,
+        edit: (id: string) => `${ROOTS.DASHBOARD}/pos/category/${id}/edit`,
+      },
+      product: {
+        root: `${ROOTS.DASHBOARD}/pos/product`,
+        list: `${ROOTS.DASHBOARD}/pos/product/list`,
+        new: `${ROOTS.DASHBOARD}/pos/product/new`,
+        edit: (id: string) => `${ROOTS.DASHBOARD}/pos/product/${id}/edit`,
+      },
+      warehouse: {
+        root: `${ROOTS.DASHBOARD}/pos/warehouse`,
+        list: `${ROOTS.DASHBOARD}/pos/warehouse/list`,
+        new: `${ROOTS.DASHBOARD}/pos/warehouse/new`,
+        edit: (id: string) => `${ROOTS.DASHBOARD}/pos/warehouse/${id}/edit`,
+      },
+      unitOfMeasure: {
+        root: `${ROOTS.DASHBOARD}/pos/unit-of-measure`,
+        list: `${ROOTS.DASHBOARD}/pos/unit-of-measure/list`,
+      },
+      variantAttribute: {
+        root: `${ROOTS.DASHBOARD}/pos/variant-attribute`,
+        list: `${ROOTS.DASHBOARD}/pos/variant-attribute/list`,
+      },
+      inventory: {
+        root: `${ROOTS.DASHBOARD}/pos/inventory`,
+        list: `${ROOTS.DASHBOARD}/pos/inventory/list`,
+        lowStock: `${ROOTS.DASHBOARD}/pos/inventory/low-stock`,
+        transactions: `${ROOTS.DASHBOARD}/pos/inventory/transactions`,
+      },
+      supplier: {
+        root: `${ROOTS.DASHBOARD}/pos/supplier`,
+        list: `${ROOTS.DASHBOARD}/pos/supplier/list`,
+        new: `${ROOTS.DASHBOARD}/pos/supplier/new`,
+        edit: (id: string) => `${ROOTS.DASHBOARD}/pos/supplier/${id}/edit`,
+      },
+      purchaseOrder: {
+        root: `${ROOTS.DASHBOARD}/pos/purchase-order`,
+        list: `${ROOTS.DASHBOARD}/pos/purchase-order/list`,
+        new: `${ROOTS.DASHBOARD}/pos/purchase-order/new`,
+        details: (id: string) => `${ROOTS.DASHBOARD}/pos/purchase-order/${id}`,
+      },
+    },
     general: {
       app: `${ROOTS.DASHBOARD}/app`,
       ecommerce: `${ROOTS.DASHBOARD}/ecommerce`,
