@@ -45,6 +45,8 @@ import Label from 'src/components/label';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 import {
   IShiftCashSummary,
   IShiftCashTransaction,
@@ -87,6 +89,7 @@ export default function ShiftCashDashboardView() {
   const theme = useTheme();
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
+  const { user } = useAuthContext();
   const txDialog = useBoolean();
   const confirmDelete = useBoolean();
 
@@ -140,6 +143,8 @@ export default function ShiftCashDashboardView() {
   })();
 
   const isToday = currentDate === todayDate;
+  const isAdmin = user?.roles?.includes('Admin') || user?.role === 'Admin';
+  const canEdit = isToday || isAdmin;
   const hasOpenedToday = (summary?.denominations ?? []).length > 0;
 
   const fetchData = useCallback(async () => {
@@ -502,6 +507,17 @@ export default function ShiftCashDashboardView() {
           </Stack>
         </Card>
 
+        {!isToday && !isAdmin && (
+          <Card sx={{ mb: 2, p: 2, bgcolor: alpha(theme.palette.warning.main, 0.08), border: `1px solid ${alpha(theme.palette.warning.main, 0.24)}` }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Iconify icon="solar:lock-keyhole-bold" width={20} sx={{ color: 'warning.main' }} />
+              <Typography variant="body2" color="warning.dark">
+                Bạn đang xem ngày cũ. Chỉ Admin mới có quyền chỉnh sửa dữ liệu ngày cũ.
+              </Typography>
+            </Stack>
+          </Card>
+        )}
+
         {loading ? (
           <Box display="flex" justifyContent="center" py={6}>
             <CircularProgress />
@@ -530,25 +546,35 @@ export default function ShiftCashDashboardView() {
                   </Stack>
                   <Stack direction="row" spacing={1}>
                     {!hasOpenedToday ? (
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        size="small"
-                        startIcon={<Iconify icon="solar:shop-bold" />}
-                        onClick={handleOpenCounter}
-                      >
-                        Mở Quầy
-                      </Button>
+                      <Tooltip title={!canEdit ? 'Chỉ Admin mới có quyền chỉnh sửa ngày cũ' : ''}>
+                        <span>
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            size="small"
+                            startIcon={<Iconify icon="solar:shop-bold" />}
+                            onClick={handleOpenCounter}
+                            disabled={!canEdit}
+                          >
+                            Mở Quầy
+                          </Button>
+                        </span>
+                      </Tooltip>
                     ) : !denomEditing ? (
-                      <Button
-                        variant="contained"
-                        color="warning"
-                        size="small"
-                        startIcon={<Iconify icon="solar:lock-keyhole-unlocked-bold" />}
-                        onClick={() => setDenomEditing(true)}
-                      >
-                        Chốt tiền
-                      </Button>
+                      <Tooltip title={!canEdit ? 'Chỉ Admin mới có quyền chỉnh sửa ngày cũ' : ''}>
+                        <span>
+                          <Button
+                            variant="contained"
+                            color="warning"
+                            size="small"
+                            startIcon={<Iconify icon="solar:lock-keyhole-unlocked-bold" />}
+                            onClick={() => setDenomEditing(true)}
+                            disabled={!canEdit}
+                          >
+                            Chốt tiền
+                          </Button>
+                        </span>
+                      </Tooltip>
                     ) : (
                       <>
                         <Button
@@ -839,6 +865,7 @@ export default function ShiftCashDashboardView() {
                         size="small"
                         startIcon={<Iconify icon="mingcute:add-line" />}
                         onClick={() => handleOpenAddTx('Thu')}
+                        disabled={!canEdit}
                       >
                         Thêm thu
                       </Button>
@@ -848,6 +875,7 @@ export default function ShiftCashDashboardView() {
                         size="small"
                         startIcon={<Iconify icon="mingcute:add-line" />}
                         onClick={() => handleOpenAddTx('Chi')}
+                        disabled={!canEdit}
                       >
                         Thêm chi
                       </Button>
@@ -909,22 +937,26 @@ export default function ShiftCashDashboardView() {
                                   </Typography>
                                 </TableCell>
                                 <TableCell align="right">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleOpenEditTx(tx)}
-                                  >
-                                    <Iconify icon="solar:pen-bold" width={18} />
-                                  </IconButton>
-                                  <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => {
-                                      setDeleteId(tx.id);
-                                      confirmDelete.onTrue();
-                                    }}
-                                  >
-                                    <Iconify icon="solar:trash-bin-trash-bold" width={18} />
-                                  </IconButton>
+                                  {canEdit && (
+                                    <>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => handleOpenEditTx(tx)}
+                                      >
+                                        <Iconify icon="solar:pen-bold" width={18} />
+                                      </IconButton>
+                                      <IconButton
+                                        size="small"
+                                        color="error"
+                                        onClick={() => {
+                                          setDeleteId(tx.id);
+                                          confirmDelete.onTrue();
+                                        }}
+                                      >
+                                        <Iconify icon="solar:trash-bin-trash-bold" width={18} />
+                                      </IconButton>
+                                    </>
+                                  )}
                                 </TableCell>
                               </TableRow>
                             ))}

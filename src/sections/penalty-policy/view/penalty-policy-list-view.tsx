@@ -10,8 +10,10 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -367,6 +369,16 @@ export default function PenaltyPolicyListView() {
               onChange={(e) => setFormData({ ...formData, minMinutes: Number(e.target.value) })}
               helperText="Ví dụ: Đi trễ 5 phút trở lên sẽ bị phạt"
               fullWidth
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                />
+              }
+              label="Kích hoạt"
             />
 
             <TextField
