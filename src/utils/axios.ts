@@ -263,5 +263,18 @@ export const endpoints = {
     receive: (id: string) => `/purchase-orders/${id}/receive`,
     cancel: (id: string) => `/purchase-orders/${id}/cancel`,
   },
+  customers: {
+    list: '/customers',
+    create: '/customers',
+    update: (id: string) => `/customers/${id}`,
+    delete: (id: string) => `/customers/${id}`,
+  },
+  salesOrders: {
+    list: '/sales-orders',
+    details: (id: string) => `/sales-orders/${id}`,
+    create: '/sales-orders',
+    cancel: (id: string) => `/sales-orders/${id}/cancel`,
+    payment: (id: string) => `/sales-orders/${id}/payment`,
+  },
 };
 

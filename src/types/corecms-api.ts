@@ -1421,3 +1421,118 @@ export interface IReceiveItemRequest {
   purchaseOrderItemId: string;
   receivedQuantity: number;
 }
+
+// ==================== Customer ====================
+export interface ICustomer {
+  id: string;
+  name: string;
+  code?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  taxCode?: string;
+  note?: string;
+  totalSpent: number;
+  totalOrders: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface ICreateCustomerRequest {
+  name: string;
+  code?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  taxCode?: string;
+  note?: string;
+}
+
+export interface IUpdateCustomerRequest {
+  name: string;
+  code?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  taxCode?: string;
+  note?: string;
+  isActive: boolean;
+}
+
+// ==================== SalesOrder ====================
+export interface ISalesOrder {
+  id: string;
+  orderNumber: string;
+  customerId?: string;
+  customerName?: string;
+  warehouseId: string;
+  warehouseName: string;
+  status: string;
+  paymentStatus: string;
+  subTotal: number;
+  vatAmount: number;
+  discountAmount: number;
+  totalAmount: number;
+  paidAmount: number;
+  note?: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt?: string;
+  items: ISalesOrderItem[];
+  payments: IPayment[];
+}
+
+export interface ISalesOrderItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productSKU: string;
+  productVariantId?: string;
+  quantity: number;
+  unitPrice: number;
+  vatRate: number;
+  discountAmount: number;
+  totalPrice: number;
+}
+
+export interface IPayment {
+  id: string;
+  method: string;
+  amount: number;
+  transactionRef?: string;
+  note?: string;
+  createdByName: string;
+  createdAt: string;
+}
+
+export interface ICreateSalesOrderRequest {
+  customerId?: string;
+  warehouseId: string;
+  note?: string;
+  discountAmount: number;
+  items: ICreateSalesOrderItemRequest[];
+  payments?: ICreatePaymentRequest[];
+}
+
+export interface ICreateSalesOrderItemRequest {
+  productId: string;
+  productVariantId?: string;
+  quantity: number;
+  unitPrice: number;
+  vatRate: number;
+  discountAmount: number;
+}
+
+export interface ICreatePaymentRequest {
+  method: string;
+  amount: number;
+  transactionRef?: string;
+  note?: string;
+}
+
+export interface IAddPaymentRequest {
+  method: string;
+  amount: number;
+  transactionRef?: string;
+  note?: string;
+}

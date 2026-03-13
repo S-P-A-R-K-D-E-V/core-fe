@@ -260,6 +260,24 @@ export function useNavData() {
               { title: 'Tạo đơn', path: paths.dashboard.pos.purchaseOrder.new },
             ],
           },
+          {
+            title: 'Khách hàng',
+            path: paths.dashboard.pos.customer.root,
+            icon: ICONS.user,
+            children: [
+              { title: 'Danh sách', path: paths.dashboard.pos.customer.list },
+              { title: 'Thêm mới', path: paths.dashboard.pos.customer.new },
+            ],
+          },
+          {
+            title: 'Bán hàng',
+            path: paths.dashboard.pos.salesOrder.root,
+            icon: ICONS.banking,
+            children: [
+              { title: 'Danh sách', path: paths.dashboard.pos.salesOrder.list },
+              { title: 'Tạo đơn', path: paths.dashboard.pos.salesOrder.new },
+            ],
+          },
         ],
       },
     ],
