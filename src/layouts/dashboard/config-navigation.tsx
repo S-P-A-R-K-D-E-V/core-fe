@@ -270,7 +270,12 @@ export function useNavData() {
             ],
           },
           {
-            title: 'Bán hàng',
+            title: 'POS Bán hàng',
+            path: paths.dashboard.pos.sale.root,
+            icon: ICONS.ecommerce,
+          },
+          {
+            title: 'Đơn bán hàng',
             path: paths.dashboard.pos.salesOrder.root,
             icon: ICONS.banking,
             children: [
