@@ -70,6 +70,7 @@ import {
   getKiotVietInvoiceDetail,
   getKiotVietBankAccounts,
   getVietQRBanks,
+  exportKiotVietExcel,
 } from 'src/api/shiftCash';
 
 // ======================================================================
@@ -951,7 +952,7 @@ export default function ShiftCashDashboardView() {
                     ) : (
                       <>
                         {/* KiotViet Summary Bar */}
-                        <Stack direction="row" spacing={2} sx={{ mb: 2 }} flexWrap="wrap">
+                        <Stack direction="row" spacing={2} sx={{ mb: 2 }} flexWrap="wrap" alignItems="center">
                           <Chip
                             icon={<Iconify icon="solar:bill-list-bold" width={16} />}
                             label={`${kiotData.totalInvoices} đơn`}
@@ -992,6 +993,25 @@ export default function ShiftCashDashboardView() {
                               size="small"
                             />
                           )}
+
+                          <Box sx={{ flexGrow: 1 }} />
+
+                          <LoadingButton
+                            variant="outlined"
+                            size="small"
+                            startIcon={<Iconify icon="solar:download-minimalistic-bold" />}
+                            onClick={async () => {
+                              try {
+                                await exportKiotVietExcel(currentDate);
+                                enqueueSnackbar('Đã tải xuống báo cáo Excel');
+                              } catch (err) {
+                                console.error(err);
+                                enqueueSnackbar('Tải xuống thất bại', { variant: 'error' });
+                              }
+                            }}
+                          >
+                            Tải Excel
+                          </LoadingButton>
                         </Stack>
 
                         {/* KiotViet sub-tabs */}

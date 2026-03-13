@@ -192,6 +192,7 @@ export const endpoints = {
     dailySummary: '/kiotviet/daily-summary',
     invoiceDetail: (id: number) => `/kiotviet/invoices/${id}`,
     bankAccounts: '/kiotviet/bank-accounts',
+    exportExcel: '/kiotviet/export-excel',
   },
   shiftRegistrations: {
     register: '/shift-registrations/register',

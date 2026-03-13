@@ -109,6 +109,21 @@ export async function getKiotVietBankAccounts(): Promise<IKiotVietBankAccount[]>
   return res.data;
 }
 
+export async function exportKiotVietExcel(date: string): Promise<void> {
+  const res = await axios.get(endpoints.kiotViet.exportExcel, {
+    params: { date },
+    responseType: 'blob',
+  });
+  const url = window.URL.createObjectURL(new Blob([res.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `KiotViet_${date}.xlsx`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 export async function getVietQRBanks(): Promise<IVietQRBank[]> {
   const res = await fetch('https://api.vietqr.io/v2/banks');
   const json = await res.json();
