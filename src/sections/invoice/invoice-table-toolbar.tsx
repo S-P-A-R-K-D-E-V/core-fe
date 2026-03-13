@@ -111,6 +111,7 @@ export default function InvoiceTableToolbar({
           label="Start date"
           value={filters.startDate}
           onChange={handleFilterStartDate}
+          format="dd/MM/yyyy"
           slotProps={{ textField: { fullWidth: true } }}
           sx={{
             maxWidth: { md: 180 },
@@ -121,6 +122,7 @@ export default function InvoiceTableToolbar({
           label="End date"
           value={filters.endDate}
           onChange={handleFilterEndDate}
+          format="dd/MM/yyyy"
           slotProps={{
             textField: {
               fullWidth: true,

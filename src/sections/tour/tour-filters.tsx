@@ -128,12 +128,13 @@ export default function TourFilters({
         Durations
       </Typography>
       <Stack spacing={2.5}>
-        <DatePicker label="Start date" value={filters.startDate} onChange={handleFilterStartDate} />
+        <DatePicker label="Start date" value={filters.startDate} onChange={handleFilterStartDate} format="dd/MM/yyyy" />
 
         <DatePicker
           label="End date"
           value={filters.endDate}
           onChange={handleFilterEndDate}
+          format="dd/MM/yyyy"
           slotProps={{
             textField: {
               error: dateError,

@@ -119,12 +119,13 @@ export default function CalendarFilters({
       <Typography variant="subtitle2">Range</Typography>
 
       <Stack spacing={2}>
-        <DatePicker label="Start date" value={filters.startDate} onChange={handleFilterStartDate} />
+        <DatePicker label="Start date" value={filters.startDate} onChange={handleFilterStartDate} format="dd/MM/yyyy" />
 
         <DatePicker
           label="End date"
           value={filters.endDate}
           onChange={handleFilterEndDate}
+          format="dd/MM/yyyy"
           slotProps={{
             textField: {
               error: dateError,
@@ -178,12 +179,12 @@ export default function CalendarFilters({
                   sx={{ fontSize: 11, color: 'text.disabled' }}
                 >
                   {event.allDay ? (
-                    fDateTime(event.start, 'dd MMM yy')
+                    fDateTime(event.start, 'dd/MM/yy')
                   ) : (
                     <>
-                      {`${fDateTime(event.start, 'dd MMM yy p')} - ${fDateTime(
+                      {`${fDateTime(event.start, 'dd/MM/yy HH:mm')} - ${fDateTime(
                         event.end,
-                        'dd MMM yy p'
+                        'dd/MM/yy HH:mm'
                       )}`}
                     </>
                   )}

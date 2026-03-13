@@ -50,6 +50,7 @@ export default function InvoiceNewEditStatusDate() {
             onChange={(newValue) => {
               field.onChange(newValue);
             }}
+            format="dd/MM/yyyy"
             slotProps={{
               textField: {
                 fullWidth: true,
@@ -71,6 +72,7 @@ export default function InvoiceNewEditStatusDate() {
             onChange={(newValue) => {
               field.onChange(newValue);
             }}
+            format="dd/MM/yyyy"
             slotProps={{
               textField: {
                 fullWidth: true,

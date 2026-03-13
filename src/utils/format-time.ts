@@ -1,25 +1,26 @@
 import { format, getTime, formatDistanceToNow } from 'date-fns';
+import { vi as viLocale } from 'date-fns/locale';
 
 // ----------------------------------------------------------------------
 
 type InputValue = Date | string | number | null | undefined;
 
 export function fDate(date: InputValue, newFormat?: string) {
-  const fm = newFormat || 'dd MMM yyyy';
+  const fm = newFormat || 'dd/MM/yyyy';
 
-  return date ? format(new Date(date), fm) : '';
+  return date ? format(new Date(date), fm, { locale: viLocale }) : '';
 }
 
 export function fTime(date: InputValue, newFormat?: string) {
-  const fm = newFormat || 'p';
+  const fm = newFormat || 'HH:mm';
 
-  return date ? format(new Date(date), fm) : '';
+  return date ? format(new Date(date), fm, { locale: viLocale }) : '';
 }
 
 export function fDateTime(date: InputValue, newFormat?: string) {
-  const fm = newFormat || 'dd MMM yyyy p';
+  const fm = newFormat || 'dd/MM/yyyy HH:mm';
 
-  return date ? format(new Date(date), fm) : '';
+  return date ? format(new Date(date), fm, { locale: viLocale }) : '';
 }
 
 export function fTimestamp(date: InputValue) {
@@ -30,6 +31,7 @@ export function fToNow(date: InputValue) {
   return date
     ? formatDistanceToNow(new Date(date), {
         addSuffix: true,
+        locale: viLocale,
       })
     : '';
 }

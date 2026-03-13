@@ -90,9 +90,9 @@ export default function CustomDateRangePicker({
             </>
           ) : (
             <>
-              <DatePicker label="Start date" value={startDate} onChange={onChangeStartDate} />
+              <DatePicker label="Start date" value={startDate} onChange={onChangeStartDate} format="dd/MM/yyyy" />
 
-              <DatePicker label="End date" value={endDate} onChange={onChangeEndDate} />
+              <DatePicker label="End date" value={endDate} onChange={onChangeEndDate} format="dd/MM/yyyy" />
             </>
           )}
         </Stack>

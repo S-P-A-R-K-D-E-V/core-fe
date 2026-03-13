@@ -64,6 +64,7 @@ export default function OrderTableToolbar({ filters, onFilters, dateError }: Pro
           label="Start date"
           value={filters.startDate}
           onChange={handleFilterStartDate}
+          format="dd/MM/yyyy"
           slotProps={{
             textField: {
               fullWidth: true,
@@ -78,6 +79,7 @@ export default function OrderTableToolbar({ filters, onFilters, dateError }: Pro
           label="End date"
           value={filters.endDate}
           onChange={handleFilterEndDate}
+          format="dd/MM/yyyy"
           slotProps={{
             textField: {
               fullWidth: true,
