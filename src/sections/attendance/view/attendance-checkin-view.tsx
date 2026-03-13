@@ -245,7 +245,7 @@ export default function AttendanceCheckinView() {
 
       enqueueSnackbar(
         pendingCheckin.isOvertime
-          ? 'Check-in tăng ca thành công!'
+          ? 'Check-in ngoài giờ thành công!'
           : 'Check-in thành công!',
         { variant: 'success' }
       );
@@ -346,10 +346,10 @@ export default function AttendanceCheckinView() {
             <Stack direction="row" alignItems="center" justifyContent="space-between">
               <Box>
                 <Typography variant="h6" color="warning.darker">
-                  Check In Tăng Ca
+                  Check In Ngoài giờ
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Làm việc ngoài ca (tính lương tăng ca 1.5x)
+                  Làm việc ngoài giờ 
                 </Typography>
               </Box>
 
@@ -364,7 +364,7 @@ export default function AttendanceCheckinView() {
                     <Iconify icon="mdi:clock-plus-outline" />
                   )
                 }
-                onClick={() => openFaceDialog('', true, 'Tăng ca')}
+                onClick={() => openFaceDialog('', true, 'Ngoài giờ')}
                 disabled={!!actionLoading}
               >
                 Chụp ảnh & Check In
@@ -504,10 +504,10 @@ export default function AttendanceCheckinView() {
             <Stack direction="row" alignItems="center" justifyContent="space-between">
               <Box>
                 <Typography variant="h6" color="warning.darker">
-                  Check In Tăng Ca
+                  Check In ngoài giờ
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Làm việc ngoài ca (tính lương tăng ca 1.5x)
+                  Làm việc ngoài ca 
                 </Typography>
               </Box>
 
@@ -522,7 +522,7 @@ export default function AttendanceCheckinView() {
                     <Iconify icon="mdi:clock-plus-outline" />
                   )
                 }
-                onClick={() => openFaceDialog('', true, 'Tăng ca')}
+                onClick={() => openFaceDialog('', true, 'Ngoài giờ')}
                 disabled={!!actionLoading}
               >
                 Chụp ảnh & Check In

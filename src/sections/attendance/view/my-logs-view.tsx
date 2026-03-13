@@ -401,7 +401,7 @@ export default function MyLogsView() {
                 {otCount}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Tăng ca
+                Ngoài giờ
               </Typography>
             </Card>
           </Grid>
@@ -413,7 +413,7 @@ export default function MyLogsView() {
                   {report.overtimeHours.toFixed(1)}h
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Giờ tăng ca
+                  Giờ Ngoài giờ
                 </Typography>
               </Card>
             </Grid>
@@ -635,7 +635,7 @@ export default function MyLogsView() {
         }}
       >
         <DialogTitle>
-          {selectedOtLogs.length > 0 ? `Tăng ca ngày ${selectedOtDate ? formatDate(selectedOtDate) : ''}` : 'Chi tiết ca làm việc'}
+          {selectedOtLogs.length > 0 ? `Ngoài giờ ngày ${selectedOtDate ? formatDate(selectedOtDate) : ''}` : 'Chi tiết ca làm việc'}
         </DialogTitle>
         <DialogContent>
           {/* Assignment detail */}
