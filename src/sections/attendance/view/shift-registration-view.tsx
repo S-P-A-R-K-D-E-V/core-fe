@@ -52,6 +52,10 @@ import {
 import { getAllUsers } from 'src/api/users';
 import { useAuthContext } from 'src/auth/hooks';
 
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+
+import { parseDateStr, toDateStr } from 'src/utils/format-time';
+
 import { StyledCalendar } from '../../calendar/styles';
 import CalendarToolbar from '../../calendar/calendar-toolbar';
 
@@ -409,21 +413,19 @@ export default function ShiftRegistrationView() {
         {/* Filters */}
         <Card sx={{ mb: 3, p: 2.5 }}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
-            <TextField
+            <DatePicker
               label="Từ ngày"
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              sx={{ width: { xs: 1, md: 180 } }}
+              value={parseDateStr(fromDate)}
+              onChange={(val) => setFromDate(toDateStr(val))}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { sx: { width: { xs: 1, md: 180 } } } }}
             />
-            <TextField
+            <DatePicker
               label="Đến ngày"
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              sx={{ width: { xs: 1, md: 180 } }}
+              value={parseDateStr(toDate)}
+              onChange={(val) => setToDate(toDateStr(val))}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { sx: { width: { xs: 1, md: 180 } } } }}
             />
             <Box sx={{ flexGrow: 1 }} />
             <Chip
@@ -729,21 +731,19 @@ export default function ShiftRegistrationView() {
             </TextField>
 
             <Stack direction="row" spacing={2}>
-              <TextField
-                fullWidth
+              <DatePicker
                 label="Từ ngày"
-                type="date"
-                value={bulkFromDate}
-                onChange={(e) => setBulkFromDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                value={parseDateStr(bulkFromDate)}
+                onChange={(val) => setBulkFromDate(toDateStr(val))}
+                format="dd/MM/yyyy"
+                slotProps={{ textField: { fullWidth: true } }}
               />
-              <TextField
-                fullWidth
+              <DatePicker
                 label="Đến ngày"
-                type="date"
-                value={bulkToDate}
-                onChange={(e) => setBulkToDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                value={parseDateStr(bulkToDate)}
+                onChange={(val) => setBulkToDate(toDateStr(val))}
+                format="dd/MM/yyyy"
+                slotProps={{ textField: { fullWidth: true } }}
               />
             </Stack>
 

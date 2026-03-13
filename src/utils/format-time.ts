@@ -52,3 +52,15 @@ export function isAfter(startDate: Date | null, endDate: Date | null) {
 
   return results;
 }
+
+// Helpers for DatePicker ↔ string (yyyy-MM-dd) conversion
+export function parseDateStr(dateStr: string | null | undefined): Date | null {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function toDateStr(date: Date | null): string {
+  if (!date || Number.isNaN(date.getTime())) return '';
+  return format(date, 'yyyy-MM-dd');
+}

@@ -59,6 +59,10 @@ import {
 } from 'src/api/attendance';
 import { getAllUsers } from 'src/api/users';
 
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+
+import { parseDateStr, toDateStr } from 'src/utils/format-time';
+
 import { StyledCalendar } from '../../calendar/styles';
 import CalendarToolbar from '../../calendar/calendar-toolbar';
 import { useTheme } from '@mui/material';
@@ -465,21 +469,19 @@ export default function AttendanceAdjustView() {
                 {/* Filters */}
                 <Card sx={{ mb: 3, p: 2.5 }}>
                     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
-                        <TextField
+                        <DatePicker
                             label="Từ ngày"
-                            type="date"
-                            value={fromDate}
-                            onChange={(e) => setFromDate(e.target.value)}
-                            InputLabelProps={{ shrink: true }}
-                            sx={{ width: { xs: 1, md: 180 } }}
+                            value={parseDateStr(fromDate)}
+                            onChange={(val) => setFromDate(toDateStr(val))}
+                            format="dd/MM/yyyy"
+                            slotProps={{ textField: { sx: { width: { xs: 1, md: 180 } } } }}
                         />
-                        <TextField
+                        <DatePicker
                             label="Đến ngày"
-                            type="date"
-                            value={toDate}
-                            onChange={(e) => setToDate(e.target.value)}
-                            InputLabelProps={{ shrink: true }}
-                            sx={{ width: { xs: 1, md: 180 } }}
+                            value={parseDateStr(toDate)}
+                            onChange={(val) => setToDate(toDateStr(val))}
+                            format="dd/MM/yyyy"
+                            slotProps={{ textField: { sx: { width: { xs: 1, md: 180 } } } }}
                         />
                         <TextField
                             select

@@ -54,6 +54,10 @@ import {
 } from 'src/api/attendance';
 import { getAllUsers } from 'src/api/users';
 
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+
+import { parseDateStr, toDateStr } from 'src/utils/format-time';
+
 import { StyledCalendar } from '../../calendar/styles';
 
 // ----------------------------------------------------------------------
@@ -641,13 +645,12 @@ export default function AttendanceAssignmentsWeeklyView() {
               ))}
             </TextField>
 
-            <TextField
-              fullWidth
+            <DatePicker
               label="Ngày"
-              type="date"
-              value={newDate}
-              onChange={(e) => setNewDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              value={parseDateStr(newDate)}
+              onChange={(val) => setNewDate(toDateStr(val))}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { fullWidth: true } }}
             />
 
             <TextField
@@ -708,21 +711,19 @@ export default function AttendanceAssignmentsWeeklyView() {
             </TextField>
 
             <Stack direction="row" spacing={2}>
-              <TextField
-                fullWidth
+              <DatePicker
                 label="Từ ngày"
-                type="date"
-                value={bulkFromDate}
-                onChange={(e) => setBulkFromDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                value={parseDateStr(bulkFromDate)}
+                onChange={(val) => setBulkFromDate(toDateStr(val))}
+                format="dd/MM/yyyy"
+                slotProps={{ textField: { fullWidth: true } }}
               />
-              <TextField
-                fullWidth
+              <DatePicker
                 label="Đến ngày"
-                type="date"
-                value={bulkToDate}
-                onChange={(e) => setBulkToDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                value={parseDateStr(bulkToDate)}
+                onChange={(val) => setBulkToDate(toDateStr(val))}
+                format="dd/MM/yyyy"
+                slotProps={{ textField: { fullWidth: true } }}
               />
             </Stack>
 

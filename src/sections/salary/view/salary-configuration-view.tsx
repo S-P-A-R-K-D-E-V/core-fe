@@ -45,6 +45,10 @@ import {
 } from 'src/api/salary';
 import { getAllUsers } from 'src/api/users';
 
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+
+import { parseDateStr, toDateStr } from 'src/utils/format-time';
+
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
@@ -350,22 +354,20 @@ export default function SalaryConfigurationView() {
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
             />
 
-            <TextField
-              fullWidth
-              type="date"
+            <DatePicker
               label="Hiệu lực từ ngày"
-              value={formData.effectiveFrom}
-              onChange={(e) => setFormData({ ...formData, effectiveFrom: e.target.value })}
-              InputLabelProps={{ shrink: true }}
+              value={parseDateStr(formData.effectiveFrom)}
+              onChange={(val) => setFormData({ ...formData, effectiveFrom: toDateStr(val) })}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { fullWidth: true } }}
             />
 
-            <TextField
-              fullWidth
-              type="date"
+            <DatePicker
               label="Hiệu lực đến ngày (tuỳ chọn)"
-              value={formData.effectiveTo}
-              onChange={(e) => setFormData({ ...formData, effectiveTo: e.target.value })}
-              InputLabelProps={{ shrink: true }}
+              value={parseDateStr(formData.effectiveTo)}
+              onChange={(val) => setFormData({ ...formData, effectiveTo: toDateStr(val) })}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { fullWidth: true } }}
             />
 
             <TextField
@@ -417,22 +419,20 @@ export default function SalaryConfigurationView() {
               onChange={(e) => setEditFormData({ ...editFormData, amount: e.target.value })}
             />
 
-            <TextField
-              fullWidth
-              type="date"
+            <DatePicker
               label="Hiệu lực từ ngày"
-              value={editFormData.effectiveFrom}
-              onChange={(e) => setEditFormData({ ...editFormData, effectiveFrom: e.target.value })}
-              InputLabelProps={{ shrink: true }}
+              value={parseDateStr(editFormData.effectiveFrom)}
+              onChange={(val) => setEditFormData({ ...editFormData, effectiveFrom: toDateStr(val) })}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { fullWidth: true } }}
             />
 
-            <TextField
-              fullWidth
-              type="date"
+            <DatePicker
               label="Hiệu lực đến ngày (tuỳ chọn)"
-              value={editFormData.effectiveTo}
-              onChange={(e) => setEditFormData({ ...editFormData, effectiveTo: e.target.value })}
-              InputLabelProps={{ shrink: true }}
+              value={parseDateStr(editFormData.effectiveTo)}
+              onChange={(val) => setEditFormData({ ...editFormData, effectiveTo: toDateStr(val) })}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { fullWidth: true } }}
             />
 
             <TextField

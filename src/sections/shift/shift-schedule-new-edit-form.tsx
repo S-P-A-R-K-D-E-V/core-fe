@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import * as Yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 
@@ -21,6 +21,8 @@ import { useRouter } from 'src/routes/hooks';
 
 import { useSnackbar } from 'src/components/snackbar';
 import FormProvider, { RHFTextField, RHFSelect } from 'src/components/hook-form';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 import { IShiftSchedule, IShiftTemplate } from 'src/types/corecms-api';
 import {
@@ -178,18 +180,44 @@ export default function ShiftScheduleNewEditForm({ currentSchedule }: Props) {
                 InputLabelProps={{ shrink: true }}
               />
 
-              <RHFTextField
+              <Controller
                 name="fromDate"
-                label="From Date"
-                type="date"
-                InputLabelProps={{ shrink: true }}
+                control={methods.control}
+                render={({ field, fieldState: { error } }) => (
+                  <DatePicker
+                    label="From Date"
+                    value={parseDateStr(field.value)}
+                    onChange={(val) => field.onChange(toDateStr(val))}
+                    format="dd/MM/yyyy"
+                    slotProps={{
+                      textField: {
+                        fullWidth: true,
+                        error: !!error,
+                        helperText: error?.message,
+                      },
+                    }}
+                  />
+                )}
               />
 
-              <RHFTextField
+              <Controller
                 name="toDate"
-                label="To Date (Optional)"
-                type="date"
-                InputLabelProps={{ shrink: true }}
+                control={methods.control}
+                render={({ field, fieldState: { error } }) => (
+                  <DatePicker
+                    label="To Date (Optional)"
+                    value={parseDateStr(field.value)}
+                    onChange={(val) => field.onChange(toDateStr(val))}
+                    format="dd/MM/yyyy"
+                    slotProps={{
+                      textField: {
+                        fullWidth: true,
+                        error: !!error,
+                        helperText: error?.message,
+                      },
+                    }}
+                  />
+                )}
               />
 
               <RHFTextField

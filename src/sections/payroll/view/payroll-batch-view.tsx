@@ -64,6 +64,10 @@ import {
 } from 'src/api/payroll';
 import { getAllPayrollCycles } from 'src/api/payrollCycle';
 
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+
+import { parseDateStr, toDateStr } from 'src/utils/format-time';
+
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
@@ -603,21 +607,19 @@ export default function PayrollBatchView() {
               value={periodName}
               onChange={(e) => setPeriodName(e.target.value)}
             />
-            <TextField
-              fullWidth
+            <DatePicker
               label="Từ ngày"
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              value={parseDateStr(fromDate)}
+              onChange={(val) => setFromDate(toDateStr(val))}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { fullWidth: true } }}
             />
-            <TextField
-              fullWidth
+            <DatePicker
               label="Đến ngày"
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              value={parseDateStr(toDate)}
+              onChange={(val) => setToDate(toDateStr(val))}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { fullWidth: true } }}
             />
 
             <Box sx={{ p: 2, bgcolor: 'background.neutral', borderRadius: 1 }}>

@@ -9,7 +9,8 @@ import Container from '@mui/material/Container';
 import TableBody from '@mui/material/TableBody';
 import TableContainer from '@mui/material/TableContainer';
 import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
@@ -135,21 +136,19 @@ export default function ShiftScheduleListView() {
 
         <Card sx={{ mb: 3, p: 2 }}>
           <Stack direction="row" spacing={2}>
-            <TextField
+            <DatePicker
               label="From Date"
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              size="small"
+              value={parseDateStr(fromDate)}
+              onChange={(val) => setFromDate(toDateStr(val))}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { size: 'small' } }}
             />
-            <TextField
+            <DatePicker
               label="To Date"
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              size="small"
+              value={parseDateStr(toDate)}
+              onChange={(val) => setToDate(toDateStr(val))}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { size: 'small' } }}
             />
             <Button variant="contained" onClick={fetchSchedules} disabled={loading}>
               Search

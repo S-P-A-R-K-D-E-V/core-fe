@@ -42,6 +42,8 @@ import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Label from 'src/components/label';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 import {
   IShiftCashSummary,
@@ -471,13 +473,12 @@ export default function ShiftCashDashboardView() {
         {/* Date picker */}
         <Card sx={{ mb: 3, p: 2.5 }}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <TextField
+            <DatePicker
               label="Ngày"
-              type="date"
-              value={currentDate}
-              onChange={(e) => setCurrentDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              sx={{ width: 200 }}
+              value={parseDateStr(currentDate)}
+              onChange={(val) => setCurrentDate(toDateStr(val))}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { sx: { width: 200 } } }}
             />
             {isToday ? (
               <Button
