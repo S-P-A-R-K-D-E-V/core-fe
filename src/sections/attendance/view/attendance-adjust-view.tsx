@@ -60,8 +60,9 @@ import {
 import { getAllUsers } from 'src/api/users';
 
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 
-import { parseDateStr, toDateStr } from 'src/utils/format-time';
+import { parseDateStr, toDateStr, parseDatetimeLocalStr, toDatetimeLocalStr } from 'src/utils/format-time';
 
 import { StyledCalendar } from '../../calendar/styles';
 import CalendarToolbar from '../../calendar/calendar-toolbar';
@@ -810,13 +811,12 @@ export default function AttendanceAdjustView() {
 
                             <Box>
                                 <Stack direction="row" spacing={1} alignItems="center">
-                                    <TextField
+                                    <DateTimePicker
                                         label="Giờ vào"
-                                        type="datetime-local"
-                                        value={checkInValue}
-                                        onChange={(e) => setCheckInValue(e.target.value)}
-                                        InputLabelProps={{ shrink: true }}
-                                        fullWidth
+                                        value={parseDatetimeLocalStr(checkInValue)}
+                                        onChange={(val) => setCheckInValue(toDatetimeLocalStr(val))}
+                                        format="dd/MM/yyyy HH:mm"
+                                        slotProps={{ textField: { fullWidth: true } }}
                                     />
                                     <Tooltip title="Đặt giờ bắt đầu ca">
                                         <IconButton color="primary" onClick={handleSetCheckInToShiftStart}>
@@ -828,13 +828,12 @@ export default function AttendanceAdjustView() {
 
                             <Box>
                                 <Stack direction="row" spacing={1} alignItems="center">
-                                    <TextField
+                                    <DateTimePicker
                                         label="Giờ ra"
-                                        type="datetime-local"
-                                        value={checkOutValue}
-                                        onChange={(e) => setCheckOutValue(e.target.value)}
-                                        InputLabelProps={{ shrink: true }}
-                                        fullWidth
+                                        value={parseDatetimeLocalStr(checkOutValue)}
+                                        onChange={(val) => setCheckOutValue(toDatetimeLocalStr(val))}
+                                        format="dd/MM/yyyy HH:mm"
+                                        slotProps={{ textField: { fullWidth: true } }}
                                     />
                                     <Tooltip title="Đặt giờ kết thúc ca">
                                         <IconButton color="primary" onClick={handleSetCheckOutToShiftEnd}>

@@ -64,3 +64,15 @@ export function toDateStr(date: Date | null): string {
   if (!date || Number.isNaN(date.getTime())) return '';
   return format(date, 'yyyy-MM-dd');
 }
+
+// Helpers for DateTimePicker ↔ datetime-local string (yyyy-MM-dd'T'HH:mm) conversion
+export function parseDatetimeLocalStr(str: string | null | undefined): Date | null {
+  if (!str) return null;
+  const d = new Date(str);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function toDatetimeLocalStr(date: Date | null): string {
+  if (!date || Number.isNaN(date.getTime())) return '';
+  return format(date, "yyyy-MM-dd'T'HH:mm");
+}

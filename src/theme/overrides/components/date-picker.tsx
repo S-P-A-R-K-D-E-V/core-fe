@@ -37,6 +37,7 @@ const desktopTypes = dateList.reduce((result: Record<string, any>, currentValue)
         rightArrowIcon: rightIcon,
         switchViewIcon: switchIcon,
       },
+      dayOfWeekFormatter: (day: string) => day,
     },
   };
 
