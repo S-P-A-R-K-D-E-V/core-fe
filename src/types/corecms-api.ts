@@ -1536,3 +1536,105 @@ export interface IAddPaymentRequest {
   transactionRef?: string;
   note?: string;
 }
+
+// ==================== Reports ====================
+export interface IDashboardSummary {
+  todayRevenue: number;
+  todayOrders: number;
+  monthRevenue: number;
+  monthOrders: number;
+  totalProducts: number;
+  totalCustomers: number;
+  lowStockCount: number;
+  topSellingProducts: ITopSellingProduct[];
+  recentOrders: IRecentOrder[];
+}
+
+export interface ITopSellingProduct {
+  productId: string;
+  productName: string;
+  productSKU: string;
+  quantitySold: number;
+  revenue: number;
+}
+
+export interface IRecentOrder {
+  id: string;
+  orderNumber: string;
+  customerName?: string;
+  totalAmount: number;
+  status: string;
+  paymentStatus: string;
+  createdAt: string;
+}
+
+export interface IRevenueReport {
+  totalRevenue: number;
+  totalCost: number;
+  grossProfit: number;
+  totalOrders: number;
+  totalItemsSold: number;
+  averageOrderValue: number;
+  periods: IRevenuePeriod[];
+}
+
+export interface IRevenuePeriod {
+  period: string;
+  revenue: number;
+  cost: number;
+  profit: number;
+  orderCount: number;
+  itemsSold: number;
+}
+
+export interface IProductSalesReport {
+  productId: string;
+  productName: string;
+  productSKU: string;
+  barcode?: string;
+  categoryName: string;
+  quantitySold: number;
+  totalRevenue: number;
+  totalCost: number;
+  profit: number;
+}
+
+export interface ICustomerReport {
+  customerId: string;
+  customerName: string;
+  phone?: string;
+  totalOrders: number;
+  totalSpent: number;
+  averageOrderValue: number;
+  lastOrderDate?: string;
+}
+
+export interface IInventoryReport {
+  productId: string;
+  productName: string;
+  productSKU: string;
+  barcode?: string;
+  categoryName: string;
+  warehouseName: string;
+  currentStock: number;
+  lowStockThreshold: number;
+  isLowStock: boolean;
+  stockValue: number;
+}
+
+export interface IPaymentMethodReport {
+  method: string;
+  count: number;
+  totalAmount: number;
+  percentage: number;
+}
+
+export interface IBarcodeLookup {
+  productId: string;
+  productName: string;
+  productSKU: string;
+  barcode?: string;
+  sellingPrice: number;
+  vatRate: number;
+  availableStock: number;
+}

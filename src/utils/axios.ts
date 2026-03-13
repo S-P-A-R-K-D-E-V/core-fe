@@ -276,5 +276,19 @@ export const endpoints = {
     cancel: (id: string) => `/sales-orders/${id}/cancel`,
     payment: (id: string) => `/sales-orders/${id}/payment`,
   },
+  reports: {
+    dashboard: '/reports/dashboard',
+    revenue: '/reports/revenue',
+    revenueExport: '/reports/revenue/export',
+    productSales: '/reports/product-sales',
+    productSalesExport: '/reports/product-sales/export',
+    customers: '/reports/customers',
+    customersExport: '/reports/customers/export',
+    inventory: '/reports/inventory',
+    inventoryExport: '/reports/inventory/export',
+    paymentMethods: '/reports/payment-methods',
+    salesOrdersExport: '/reports/sales-orders/export',
+    barcodeLookup: (barcode: string) => `/reports/barcode/${barcode}`,
+  },
 };
 

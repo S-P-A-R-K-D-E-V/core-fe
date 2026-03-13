@@ -237,6 +237,14 @@ export const paths = {
         new: `${ROOTS.DASHBOARD}/pos/sales-order/new`,
         details: (id: string) => `${ROOTS.DASHBOARD}/pos/sales-order/${id}`,
       },
+      report: {
+        root: `${ROOTS.DASHBOARD}/pos/report`,
+        dashboard: `${ROOTS.DASHBOARD}/pos/report/dashboard`,
+        revenue: `${ROOTS.DASHBOARD}/pos/report/revenue`,
+        productSales: `${ROOTS.DASHBOARD}/pos/report/product-sales`,
+        customers: `${ROOTS.DASHBOARD}/pos/report/customers`,
+        inventory: `${ROOTS.DASHBOARD}/pos/report/inventory`,
+      },
     },
     general: {
       app: `${ROOTS.DASHBOARD}/app`,

@@ -30,11 +30,12 @@ import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 import FormProvider, { RHFTextField, RHFSelect } from 'src/components/hook-form';
 
-import { ICustomer, IWarehouse, IProduct } from 'src/types/corecms-api';
+import { ICustomer, IWarehouse, IProduct, IBarcodeLookup } from 'src/types/corecms-api';
 import { createSalesOrder } from 'src/api/sales-orders';
 import { getAllCustomers } from 'src/api/customers';
 import { getAllWarehouses } from 'src/api/warehouses';
 import { getAllProducts } from 'src/api/products';
+import BarcodeLookupField from './barcode-lookup-field';
 
 // ----------------------------------------------------------------------
 
@@ -119,6 +120,28 @@ export default function SalesOrderNewForm() {
     }
   }, [products, setValue]);
 
+  // Barcode lookup: add or increment product
+  const handleBarcodeFound = useCallback((result: IBarcodeLookup) => {
+    const currentItems = watch('items') || [];
+    const existingIndex = currentItems.findIndex((item) => item.productId === result.productId);
+
+    if (existingIndex >= 0) {
+      setValue(`items.${existingIndex}.quantity`, (currentItems[existingIndex].quantity || 0) + 1);
+    } else {
+      const product = products.find((p) => p.id === result.productId);
+      appendItem({
+        productId: result.productId,
+        productVariantId: '',
+        quantity: 1,
+        unitPrice: product?.sellingPrice || 0,
+        vatRate: product?.vatRate || 0,
+        discountAmount: 0,
+      });
+    }
+  }, [watch, setValue, products, appendItem]);
+
+  const watchWarehouseId = watch('warehouseId');
+
   const onSubmit = handleSubmit(async (data) => {
     try {
       await createSalesOrder({
@@ -184,6 +207,10 @@ export default function SalesOrderNewForm() {
                 Thêm dòng
               </Button>
             </Stack>
+
+            <Box sx={{ mb: 2, maxWidth: 400 }}>
+              <BarcodeLookupField onProductFound={handleBarcodeFound} warehouseId={watchWarehouseId} />
+            </Box>
 
             <Table size="small">
               <TableHead>
