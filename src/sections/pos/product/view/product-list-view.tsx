@@ -31,23 +31,25 @@ import {
 } from 'src/components/table';
 
 import { IProduct, ICategory } from 'src/types/corecms-api';
-import { getAllProducts, deleteProduct } from 'src/api/products';
+import { getAllProducts, deleteProduct, getProductById } from 'src/api/products';
 import { getAllCategories } from 'src/api/categories';
 import ProductTableToolbar from '../product-table-toolbar';
 import ProductTableRow from '../product-table-row';
+import ProductQuickView from '../product-quick-view';
 
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
   { id: 'name', label: 'Tên sản phẩm' },
-  { id: 'sku', label: 'SKU', width: 140 },
-  { id: 'category', label: 'Danh mục', width: 160 },
-  { id: 'costPrice', label: 'Giá nhập', width: 130, align: 'right' as const },
-  { id: 'sellingPrice', label: 'Giá bán', width: 130, align: 'right' as const },
-  { id: 'stock', label: 'Tồn kho', width: 100, align: 'center' as const },
+  { id: 'sku', label: 'SKU', width: 120 },
+  { id: 'category', label: 'Danh mục', width: 140 },
+  { id: 'unit', label: 'Đơn vị', width: 100 },
+  { id: 'costPrice', label: 'Giá nhập', width: 120, align: 'right' as const },
+  { id: 'sellingPrice', label: 'Giá bán', width: 120, align: 'right' as const },
+  { id: 'stock', label: 'Tồn kho', width: 90, align: 'center' as const },
   { id: 'status', label: 'Trạng thái', width: 160 },
-  { id: 'createdAt', label: 'Ngày tạo', width: 120 },
-  { id: '', width: 88 },
+  { id: 'createdAt', label: 'Ngày tạo', width: 110 },
+  { id: '', width: 100 },
 ];
 
 // ----------------------------------------------------------------------
@@ -57,11 +59,13 @@ export default function ProductListView() {
   const table = useTable();
   const router = useRouter();
   const confirm = useBoolean();
+  const quickView = useBoolean();
 
   const [tableData, setTableData] = useState<IProduct[]>([]);
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [filterName, setFilterName] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<IProduct | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -119,6 +123,19 @@ export default function ProductListView() {
     router.push(paths.dashboard.pos.product.edit(id));
   }, [router]);
 
+  const handleQuickView = useCallback(async (product: IProduct) => {
+    try {
+      // Fetch full details with variants
+      const fullProduct = await getProductById(product.id);
+      setSelectedProduct(fullProduct);
+      quickView.onTrue();
+    } catch (error) {
+      // Fallback to list data
+      setSelectedProduct(product);
+      quickView.onTrue();
+    }
+  }, [quickView]);
+
   return (
     <>
       <Container maxWidth="lg">
@@ -154,7 +171,7 @@ export default function ProductListView() {
               action={<Button color="error" onClick={confirm.onTrue}>Xóa</Button>}
             />
             <Scrollbar>
-              <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 1080 }}>
+              <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 1200 }}>
                 <TableHeadCustom
                   order={table.order}
                   orderBy={table.orderBy}
@@ -165,7 +182,7 @@ export default function ProductListView() {
                   onSelectAllRows={(checked) => table.onSelectAllRows(checked, dataFiltered.map((row) => row.id))}
                 />
                 <TableBody>
-                  {dataFiltered.slice(table.page * table.rowsPerPage, table.page * table.rowsPerPage + table.rowsPerPage).map((row) => (
+                  {dataInPage.map((row) => (
                     <ProductTableRow
                       key={row.id}
                       row={row}
@@ -173,6 +190,7 @@ export default function ProductListView() {
                       onSelectRow={() => table.onSelectRow(row.id)}
                       onDeleteRow={() => handleDeleteRow(row.id)}
                       onEditRow={() => handleEditRow(row.id)}
+                      onQuickView={() => handleQuickView(row)}
                     />
                   ))}
                   <TableEmptyRows height={table.dense ? 56 : 76} emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)} />
@@ -192,6 +210,14 @@ export default function ProductListView() {
           />
         </Card>
       </Container>
+
+      {/* Quick View Drawer */}
+      <ProductQuickView
+        product={selectedProduct}
+        open={quickView.value}
+        onClose={quickView.onFalse}
+        onEdit={handleEditRow}
+      />
 
       <ConfirmDialog
         open={confirm.value}
