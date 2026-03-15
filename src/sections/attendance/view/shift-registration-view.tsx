@@ -23,10 +23,15 @@ import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
-import MenuItem from '@mui/material/MenuItem';
 import Checkbox from '@mui/material/Checkbox';
-import FormGroup from '@mui/material/FormGroup';
-import FormControlLabel from '@mui/material/FormControlLabel';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import { useTheme, alpha } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
@@ -39,7 +44,7 @@ import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
-import { IShiftSchedule, IShiftRegistration, IUser } from 'src/types/corecms-api';
+import { IShiftSchedule, IShiftRegistration } from 'src/types/corecms-api';
 import { ICalendarView, ICalendarScheduleEvent } from 'src/types/calendar';
 import { getShiftSchedulesByDateRange } from 'src/api/attendance';
 import {
@@ -47,9 +52,7 @@ import {
   unregisterShift,
   getMyShiftRegistrations,
   getShiftRegistrations,
-  bulkRegisterShift,
 } from 'src/api/shiftRegistration';
-import { getAllUsers } from 'src/api/users';
 import { useAuthContext } from 'src/auth/hooks';
 
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -61,15 +64,25 @@ import CalendarToolbar from '../../calendar/calendar-toolbar';
 
 // ----------------------------------------------------------------------
 
-const WEEKDAYS = [
-  { value: 1, label: 'Thứ 2', short: 'T2' },
-  { value: 2, label: 'Thứ 3', short: 'T3' },
-  { value: 4, label: 'Thứ 4', short: 'T4' },
-  { value: 8, label: 'Thứ 5', short: 'T5' },
-  { value: 16, label: 'Thứ 6', short: 'T6' },
-  { value: 32, label: 'Thứ 7', short: 'T7' },
-  { value: 64, label: 'Chủ nhật', short: 'CN' },
-];
+const WEEKDAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const DAY_BITMASK = [64, 1, 2, 4, 8, 16, 32]; // getDay(): Sun=0→64, Mon=1→1, ..., Sat=6→32
+
+function getMonday(d: Date): Date {
+  const result = new Date(d);
+  const day = result.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  result.setDate(result.getDate() + diff);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+function isScheduleOnDate(schedule: IShiftSchedule, d: Date): boolean {
+  const dateStr = d.toISOString().split('T')[0];
+  const schedStart = schedule.fromDate.split('T')[0];
+  const schedEnd = schedule.toDate ? schedule.toDate.split('T')[0] : '9999-12-31';
+  if (dateStr < schedStart || dateStr > schedEnd) return false;
+  return (schedule.repeatDays & DAY_BITMASK[d.getDay()]) !== 0;
+}
 
 export default function ShiftRegistrationView() {
   const theme = useTheme();
@@ -77,7 +90,7 @@ export default function ShiftRegistrationView() {
   const settings = useSettingsContext();
   const smUp = useResponsive('up', 'sm');
   const detailDialog = useBoolean();
-  const bulkDialog = useBoolean();
+  const weeklyDialog = useBoolean();
   const calendarRef = useRef<any>(null);
   const { user: authUser } = useAuthContext();
 
@@ -114,15 +127,11 @@ export default function ShiftRegistrationView() {
   const [registering, setRegistering] = useState(false);
   const [registerNote, setRegisterNote] = useState('');
 
-  // Bulk registration state
-  const [users, setUsers] = useState<IUser[]>([]);
-  const [bulkScheduleId, setBulkScheduleId] = useState('');
-  const [bulkFromDate, setBulkFromDate] = useState(fromDate);
-  const [bulkToDate, setBulkToDate] = useState(toDate);
-  const [bulkStaffIds, setBulkStaffIds] = useState<string[]>([]);
-  const [bulkFilterDays, setBulkFilterDays] = useState<number[]>([1, 2, 4, 8, 16]);
-  const [bulkNote, setBulkNote] = useState('');
-  const [bulkRegistering, setBulkRegistering] = useState(false);
+  // Weekly registration state
+  const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
+  const [weekSelections, setWeekSelections] = useState<Record<string, boolean>>({});
+  const [weekNote, setWeekNote] = useState('');
+  const [weeklyRegistering, setWeeklyRegistering] = useState(false);
 
   const currentUserId = authUser?.id;
   const isAdmin =
@@ -166,19 +175,110 @@ export default function ShiftRegistrationView() {
     fetchRegistrations();
   }, [fetchRegistrations]);
 
-  // Fetch users for bulk registration (admin only)
-  useEffect(() => {
-    if (!isAdmin) return;
-    const loadUsers = async () => {
-      try {
-        const data = await getAllUsers();
-        setUsers(data);
-      } catch (error) {
-        console.error(error);
+  // Weekly dialog helpers
+  const weekDays = useMemo(() => {
+    const days: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      days.push(d);
+    }
+    return days;
+  }, [weekStart]);
+
+  const weekSchedules = useMemo(
+    () =>
+      schedules.filter((s) => {
+        const schedStart = new Date(s.fromDate);
+        const schedEnd = s.toDate ? new Date(s.toDate) : new Date('9999-12-31');
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        return schedStart <= weekEnd && schedEnd >= weekStart && s.isActive;
+      }),
+    [schedules, weekStart]
+  );
+
+  // Build set of already-registered keys for current user in the selected week
+  const myRegisteredKeys = useMemo(() => {
+    const keys = new Set<string>();
+    registrations.forEach((reg) => {
+      if (reg.staffId === currentUserId) {
+        const dateStr = reg.date.split('T')[0];
+        keys.add(`${reg.shiftScheduleId}_${dateStr}`);
       }
-    };
-    loadUsers();
-  }, [isAdmin]);
+    });
+    return keys;
+  }, [registrations, currentUserId]);
+
+  const openWeeklyDialog = useCallback(() => {
+    // Pre-populate selections from existing registrations
+    const initial: Record<string, boolean> = {};
+    weekDays.forEach((d) => {
+      const dateStr = d.toISOString().split('T')[0];
+      weekSchedules.forEach((s) => {
+        const key = `${s.id}_${dateStr}`;
+        if (isScheduleOnDate(s, d) && myRegisteredKeys.has(key)) {
+          initial[key] = true;
+        }
+      });
+    });
+    setWeekSelections(initial);
+    setWeekNote('');
+    weeklyDialog.onTrue();
+  }, [weekDays, weekSchedules, myRegisteredKeys, weeklyDialog]);
+
+  const toggleWeekCell = useCallback((key: string) => {
+    setWeekSelections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const handleWeeklySubmit = async () => {
+    setWeeklyRegistering(true);
+    try {
+      const toRegister: { shiftScheduleId: string; date: string }[] = [];
+      const toUnregister: { shiftScheduleId: string; date: string }[] = [];
+
+      weekDays.forEach((d) => {
+        const dateStr = d.toISOString().split('T')[0];
+        weekSchedules.forEach((s) => {
+          if (!isScheduleOnDate(s, d)) return;
+          const key = `${s.id}_${dateStr}`;
+          const isSelected = !!weekSelections[key];
+          const wasRegistered = myRegisteredKeys.has(key);
+
+          if (isSelected && !wasRegistered) {
+            toRegister.push({ shiftScheduleId: s.id, date: dateStr });
+          } else if (!isSelected && wasRegistered) {
+            toUnregister.push({ shiftScheduleId: s.id, date: dateStr });
+          }
+        });
+      });
+
+      const promises: Promise<any>[] = [];
+      toRegister.forEach((r) =>
+        promises.push(registerShift({ ...r, note: weekNote || undefined }))
+      );
+      toUnregister.forEach((r) => promises.push(unregisterShift(r)));
+
+      await Promise.all(promises);
+
+      const total = toRegister.length + toUnregister.length;
+      if (total > 0) {
+        enqueueSnackbar(
+          `Đã cập nhật ${total} ca (${toRegister.length} đăng ký, ${toUnregister.length} hủy)`,
+          { variant: 'success' }
+        );
+      } else {
+        enqueueSnackbar('Không có thay đổi nào', { variant: 'info' });
+      }
+      await fetchRegistrations();
+      weeklyDialog.onFalse();
+    } catch (error: any) {
+      const msg = error?.title || error?.message || 'Đăng ký thất bại!';
+      enqueueSnackbar(msg, { variant: 'error' });
+    } finally {
+      setWeeklyRegistering(false);
+    }
+  };
 
   // Transform schedules to calendar events with registration info
   const events = useMemo(() => {
@@ -358,44 +458,7 @@ export default function ShiftRegistrationView() {
     }
   };
 
-  // Bulk registration handlers
-  const toggleBulkStaff = (staffId: string) => {
-    setBulkStaffIds((prev) =>
-      prev.includes(staffId) ? prev.filter((id) => id !== staffId) : [...prev, staffId]
-    );
-  };
 
-  const toggleBulkDay = (day: number) => {
-    setBulkFilterDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-    );
-  };
-
-  const handleBulkRegister = async () => {
-    try {
-      setBulkRegistering(true);
-      const result = await bulkRegisterShift({
-        staffIds: bulkStaffIds,
-        shiftScheduleId: bulkScheduleId,
-        fromDate: bulkFromDate,
-        toDate: bulkToDate,
-        filterDays: bulkFilterDays.length > 0 ? bulkFilterDays.reduce((a, b) => a | b, 0) : undefined,
-        note: bulkNote || undefined,
-      });
-      enqueueSnackbar(`Đã đăng ký ${result.count} ca thành công!`, { variant: 'success' });
-      bulkDialog.onFalse();
-      setBulkStaffIds([]);
-      setBulkScheduleId('');
-      setBulkNote('');
-      setBulkFilterDays([1, 2, 4, 8, 16]);
-      await fetchRegistrations();
-    } catch (error: any) {
-      const msg = error?.title || error?.message || 'Đăng ký hàng loạt thất bại!';
-      enqueueSnackbar(msg, { variant: 'error' });
-    } finally {
-      setBulkRegistering(false);
-    }
-  };
 
   return (
     <>
@@ -434,15 +497,13 @@ export default function ShiftRegistrationView() {
               variant="outlined"
               color="info"
             />
-            {isAdmin && (
-              <Button
-                variant="contained"
-                startIcon={<Iconify icon="solar:calendar-add-bold-duotone" />}
-                onClick={bulkDialog.onTrue}
-              >
-                Đăng ký hàng loạt
-              </Button>
-            )}
+            <Button
+              variant="contained"
+              startIcon={<Iconify icon="solar:calendar-add-bold-duotone" />}
+              onClick={openWeeklyDialog}
+            >
+              Đăng ký lịch tuần
+            </Button>
           </Stack>
         </Card>
 
@@ -693,131 +754,178 @@ export default function ShiftRegistrationView() {
         )}
       </Dialog>
 
-      {/* Bulk Registration Dialog */}
+      {/* Weekly Registration Dialog */}
       <Dialog
-        open={bulkDialog.value}
-        onClose={bulkDialog.onFalse}
+        open={weeklyDialog.value}
+        onClose={weeklyDialog.onFalse}
         maxWidth="md"
         fullWidth
         PaperProps={{ sx: { borderRadius: 2 } }}
       >
-        <DialogTitle>Đăng ký ca hàng loạt</DialogTitle>
-        <DialogContent>
-          <Stack spacing={3} sx={{ mt: 1 }}>
-            <TextField
-              select
-              fullWidth
-              label="Lịch ca (Schedule)"
-              value={bulkScheduleId}
-              onChange={(e) => setBulkScheduleId(e.target.value)}
-            >
-              {schedules.map((s) => (
-                <MenuItem key={s.id} value={s.id}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Box
-                      sx={{
-                        width: 12,
-                        height: 12,
-                        bgcolor: s.color,
-                        borderRadius: '50%',
-                      }}
-                    />
-                    <span>
-                      {s.templateName} ({s.startTime} - {s.endTime})
-                    </span>
-                  </Stack>
-                </MenuItem>
-              ))}
-            </TextField>
+        <DialogTitle>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Typography variant="h6">Đăng ký lịch tuần</Typography>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Tooltip title="Tuần trước">
+                <IconButton
+                  onClick={() => {
+                    const prev = new Date(weekStart);
+                    prev.setDate(prev.getDate() - 7);
+                    setWeekStart(prev);
+                  }}
+                >
+                  <Iconify icon="eva:arrow-ios-back-fill" />
+                </IconButton>
+              </Tooltip>
+              <Typography variant="subtitle2" sx={{ minWidth: 180, textAlign: 'center' }}>
+                {weekDays[0].toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                {' - '}
+                {weekDays[6].toLocaleDateString('vi-VN', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                })}
+              </Typography>
+              <Tooltip title="Tuần sau">
+                <IconButton
+                  onClick={() => {
+                    const next = new Date(weekStart);
+                    next.setDate(next.getDate() + 7);
+                    setWeekStart(next);
+                  }}
+                >
+                  <Iconify icon="eva:arrow-ios-forward-fill" />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          </Stack>
+        </DialogTitle>
 
-            <Stack direction="row" spacing={2}>
-              <DatePicker
-                label="Từ ngày"
-                value={parseDateStr(bulkFromDate)}
-                onChange={(val) => setBulkFromDate(toDateStr(val))}
-                format="dd/MM/yyyy"
-                slotProps={{ textField: { fullWidth: true } }}
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {weekSchedules.length === 0 ? (
+              <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                Không có ca làm nào trong tuần này
+              </Typography>
+            ) : (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700, minWidth: 140 }}>Ca làm</TableCell>
+                      {weekDays.map((d, i) => (
+                        <TableCell key={i} align="center" sx={{ fontWeight: 700, px: 0.5 }}>
+                          <Typography variant="caption" display="block">
+                            {WEEKDAY_LABELS[i]}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                          </Typography>
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {weekSchedules.map((schedule) => (
+                      <TableRow key={schedule.id}>
+                        <TableCell>
+                          <Stack direction="row" alignItems="center" spacing={1}>
+                            <Box
+                              sx={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: '50%',
+                                bgcolor: schedule.color,
+                                flexShrink: 0,
+                              }}
+                            />
+                            <Box>
+                              <Typography variant="body2" fontWeight={600} noWrap>
+                                {schedule.templateName}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {schedule.startTime} - {schedule.endTime}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        </TableCell>
+                        {weekDays.map((d, i) => {
+                          const dateStr = d.toISOString().split('T')[0];
+                          const key = `${schedule.id}_${dateStr}`;
+                          const available = isScheduleOnDate(schedule, d);
+                          const isSelected = !!weekSelections[key];
+                          const wasRegistered = myRegisteredKeys.has(key);
+
+                          return (
+                            <TableCell key={i} align="center" sx={{ px: 0.5 }}>
+                              {available ? (
+                                <Checkbox
+                                  checked={isSelected}
+                                  onChange={() => toggleWeekCell(key)}
+                                  sx={{
+                                    color: schedule.color,
+                                    '&.Mui-checked': { color: schedule.color },
+                                    ...(wasRegistered &&
+                                      isSelected && {
+                                        opacity: 0.6,
+                                      }),
+                                  }}
+                                />
+                              ) : (
+                                <Typography variant="caption" color="text.disabled">
+                                  —
+                                </Typography>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+
+            <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+              <Chip
+                size="small"
+                icon={<Iconify icon="solar:check-circle-bold" />}
+                label="Đã đăng ký"
+                color="success"
+                variant="outlined"
               />
-              <DatePicker
-                label="Đến ngày"
-                value={parseDateStr(bulkToDate)}
-                onChange={(val) => setBulkToDate(toDateStr(val))}
-                format="dd/MM/yyyy"
-                slotProps={{ textField: { fullWidth: true } }}
+              <Chip
+                size="small"
+                icon={<Iconify icon="solar:add-circle-bold" />}
+                label="Mới chọn"
+                color="primary"
+                variant="outlined"
               />
             </Stack>
-
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Chọn các ngày trong tuần
-              </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap">
-                {WEEKDAYS.map((day) => (
-                  <Chip
-                    key={day.value}
-                    label={day.short}
-                    onClick={() => toggleBulkDay(day.value)}
-                    color={bulkFilterDays.includes(day.value) ? 'primary' : 'default'}
-                    variant={bulkFilterDays.includes(day.value) ? 'filled' : 'outlined'}
-                  />
-                ))}
-              </Stack>
-            </Box>
-
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Chọn nhân viên ({bulkStaffIds.length} đã chọn)
-              </Typography>
-              <Box
-                sx={{
-                  maxHeight: 300,
-                  overflowY: 'auto',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  p: 1,
-                }}
-              >
-                <FormGroup>
-                  {users.map((user) => (
-                    <FormControlLabel
-                      key={user.id}
-                      control={
-                        <Checkbox
-                          checked={bulkStaffIds.includes(user.id)}
-                          onChange={() => toggleBulkStaff(user.id)}
-                        />
-                      }
-                      label={`${user.fullName} (${user.email})`}
-                    />
-                  ))}
-                </FormGroup>
-              </Box>
-            </Box>
 
             <TextField
               fullWidth
               label="Ghi chú (tùy chọn)"
-              value={bulkNote}
-              onChange={(e) => setBulkNote(e.target.value)}
+              value={weekNote}
+              onChange={(e) => setWeekNote(e.target.value)}
               multiline
               rows={2}
               placeholder="Nhập ghi chú nếu cần..."
             />
           </Stack>
         </DialogContent>
+
         <DialogActions>
-          <Button variant="outlined" onClick={bulkDialog.onFalse}>
+          <Button variant="outlined" onClick={weeklyDialog.onFalse}>
             Hủy
           </Button>
           <LoadingButton
             variant="contained"
-            onClick={handleBulkRegister}
-            loading={bulkRegistering}
-            disabled={!bulkScheduleId || bulkStaffIds.length === 0 || !bulkFromDate || !bulkToDate}
+            onClick={handleWeeklySubmit}
+            loading={weeklyRegistering}
             startIcon={<Iconify icon="solar:check-circle-bold" />}
           >
-            Đăng ký {bulkStaffIds.length} nhân viên
+            Xác nhận đăng ký
           </LoadingButton>
         </DialogActions>
       </Dialog>
