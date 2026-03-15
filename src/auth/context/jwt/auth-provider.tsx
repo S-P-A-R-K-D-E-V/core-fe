@@ -91,8 +91,21 @@ type Props = {
   children: React.ReactNode;
 };
 
+function jwtDecode(token: string) {
+  const base64Url = token.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const jsonPayload = decodeURIComponent(
+    window
+      .atob(base64)
+      .split('')
+      .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+      .join('')
+  );
+  return JSON.parse(jsonPayload);
+}
+
 function buildUserFromToken(accessToken: string) {
-  const tokenData = JSON.parse(atob(accessToken.split('.')[1]));
+  const tokenData = jwtDecode(accessToken);
   const rolesClaim =
     tokenData['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ||
     tokenData.role ||
@@ -100,17 +113,23 @@ function buildUserFromToken(accessToken: string) {
   const roles = Array.isArray(rolesClaim) ? rolesClaim : [rolesClaim];
   const permissionsClaim = tokenData.permission || [];
   const permissions = Array.isArray(permissionsClaim) ? permissionsClaim : [permissionsClaim];
+
+  const firstName = tokenData.given_name || tokenData.firstName || '';
+  const lastName = tokenData.family_name || tokenData.lastName || '';
+  const displayName =
+    tokenData.name ||
+    tokenData['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] ||
+    `${firstName} ${lastName}`.trim() ||
+    'User';
+
   return {
     id: tokenData.sub || tokenData.id || tokenData.userId,
     email:
       tokenData.email ||
       tokenData['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'],
-    displayName:
-      tokenData.name ||
-      tokenData['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] ||
-      'User',
-    firstName: tokenData.given_name || tokenData.firstName || '',
-    lastName: tokenData.family_name || tokenData.lastName || '',
+    displayName,
+    firstName,
+    lastName,
     role: roles[0] || 'User',
     roles,
     permissions,

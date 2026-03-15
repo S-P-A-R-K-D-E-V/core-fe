@@ -61,6 +61,7 @@ export default function AttendanceCheckinView() {
   const [cameraActive, setCameraActive] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -131,10 +132,16 @@ export default function AttendanceCheckinView() {
 
   // ── Camera helpers ──
 
-  const startCamera = useCallback(async () => {
+  const startCamera = useCallback(async (mode?: 'user' | 'environment') => {
+    // Stop existing stream first
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    const useMode = mode ?? facingMode;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        video: { facingMode: useMode, width: { ideal: 640 }, height: { ideal: 480 } },
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -145,7 +152,15 @@ export default function AttendanceCheckinView() {
     } catch {
       enqueueSnackbar('Không thể mở camera. Vui lòng cấp quyền.', { variant: 'error' });
     }
-  }, [enqueueSnackbar]);
+  }, [enqueueSnackbar, facingMode]);
+
+  const toggleCamera = useCallback(() => {
+    const newMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newMode);
+    if (cameraActive) {
+      startCamera(newMode);
+    }
+  }, [facingMode, cameraActive, startCamera]);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -166,7 +181,14 @@ export default function AttendanceCheckinView() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Flip canvas horizontally for front camera so the saved image is natural
+    if (facingMode === 'user') {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
     ctx.drawImage(video, 0, 0);
+    // Reset transform before drawing overlay text
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     // Overlay: time + location + address
     const now = new Date();
@@ -574,7 +596,12 @@ export default function AttendanceCheckinView() {
                   autoPlay
                   playsInline
                   muted
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+                  }}
                 />
                 {/* Live overlay */}
                 {cameraActive && (
@@ -608,22 +635,32 @@ export default function AttendanceCheckinView() {
               </Box>
 
               {cameraActive ? (
-                <Button
-                  variant="contained"
-                  size="large"
-                  color="primary"
-                  startIcon={<Iconify icon="mdi:camera" />}
-                  onClick={capturePhoto}
-                  fullWidth
-                >
-                  Chụp ảnh
-                </Button>
+                <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    color="primary"
+                    startIcon={<Iconify icon="mdi:camera" />}
+                    onClick={capturePhoto}
+                    sx={{ flex: 1 }}
+                  >
+                    Chụp ảnh
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    onClick={toggleCamera}
+                    sx={{ minWidth: 'auto', px: 2 }}
+                  >
+                    <Iconify icon="mdi:camera-flip-outline" width={24} />
+                  </Button>
+                </Stack>
               ) : (
                 <Button
                   variant="outlined"
                   size="large"
                   startIcon={<Iconify icon="mdi:camera" />}
-                  onClick={startCamera}
+                  onClick={() => startCamera()}
                   fullWidth
                 >
                   Mở Camera
