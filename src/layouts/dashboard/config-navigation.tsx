@@ -64,6 +64,44 @@ export function useNavData() {
           },
         ]
       },
+      {
+        subheader: "Cá nhân",
+        items: [
+          // MY ATTENDANCE (Staff, and also available to Admin/Manager)
+          {
+            title: t('checkInOut'),
+            path: paths.dashboard.attendance.checkin,
+            icon: ICONS.job,
+            roles: ['Admin', 'Manager', 'Staff'],
+          },
+          {
+            title: t('mySchedule'),
+            path: paths.dashboard.attendance.mySchedule,
+            icon: ICONS.calendar,
+            roles: ['Admin', 'Manager', 'Staff'],
+          },
+          // {
+          //   title: t('myLogs'),
+          //   path: paths.dashboard.attendance.myLogs,
+          //   icon: ICONS.booking,
+          //   roles: ['Admin', 'Manager', 'Staff'],
+          // },
+          {
+            title: t('shiftRegistration'),
+            path: paths.dashboard.attendance.shiftRegistration,
+            icon: ICONS.label,
+            roles: ['Admin', 'Manager', 'Staff'],
+          },
+          // MY PAYROLL (Staff, and also available to Admin/Manager)
+          {
+            title: t('myPayroll'),
+            path: paths.dashboard.payroll.myPayroll,
+            icon: ICONS.banking,
+            roles: ['Admin', 'Manager', 'Staff'],
+          },
+        ]
+      },
+      
       // MANAGEMENT
       // ----------------------------------------------------------------------
       {
@@ -125,20 +163,7 @@ export function useNavData() {
 
             ],
           },
-
-          // MY ATTENDANCE (Staff, and also available to Admin/Manager)
-          {
-            title: t('myAttendance'),
-            path: paths.dashboard.attendance.checkin,
-            icon: ICONS.job,
-            roles: ['Admin', 'Manager', 'Staff'],
-            children: [
-              { title: t('checkInOut'), path: paths.dashboard.attendance.checkin },
-              { title: t('mySchedule'), path: paths.dashboard.attendance.mySchedule },
-              { title: t('myLogs'), path: paths.dashboard.attendance.myLogs },
-              { title: t('shiftRegistration'), path: paths.dashboard.attendance.shiftRegistration },
-            ],
-          },
+          
 
           // SALARY MANAGEMENT (Admin/Manager)
           {
@@ -155,26 +180,19 @@ export function useNavData() {
               { title: t('payrollBatch'), path: paths.dashboard.payroll.batch },
             ],
           },
-
-          // MY PAYROLL (Staff, and also available to Admin/Manager)
-          {
-            title: t('myPayroll'),
-            path: paths.dashboard.payroll.myPayroll,
-            icon: ICONS.banking,
-            roles: ['Admin', 'Manager', 'Staff'],
-          },
+          
 
           // SHIFT SWAP REQUESTS
-          {
-            title: t('shiftSwap'),
-            path: paths.dashboard.shiftSwap.root,
-            icon: ICONS.job,
-            roles: ['Admin', 'Manager', 'Staff'],
-            children: [
-              { title: t('myRequests'), path: paths.dashboard.shiftSwap.myRequests },
-              { title: t('pendingApproval'), path: paths.dashboard.shiftSwap.pending },
-            ],
-          },
+          // {
+          //   title: t('shiftSwap'),
+          //   path: paths.dashboard.shiftSwap.root,
+          //   icon: ICONS.job,
+          //   roles: ['Admin', 'Manager', 'Staff'],
+          //   children: [
+          //     { title: t('myRequests'), path: paths.dashboard.shiftSwap.myRequests },
+          //     { title: t('pendingApproval'), path: paths.dashboard.shiftSwap.pending },
+          //   ],
+          // },
 
           // NOTIFICATION CONFIG (Admin only)
           {
@@ -189,12 +207,13 @@ export function useNavData() {
       // ----------------------------------------------------------------------
       {
         subheader: 'Quản lý kho & hàng hóa',
+        roles: ['Admin'],
         items: [
           {
             title: 'Sản phẩm',
             path: paths.dashboard.pos.product.root,
             icon: ICONS.product,
-            roles: ['Admin', 'Manager'],
+            roles: ['Admin'],
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.product.list },
               { title: 'Thêm mới', path: paths.dashboard.pos.product.new },
@@ -204,7 +223,7 @@ export function useNavData() {
             title: 'Danh mục',
             path: paths.dashboard.pos.category.root,
             icon: ICONS.folder,
-            roles: ['Admin', 'Manager'],
+            roles: ['Admin'],
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.category.list },
               { title: 'Thêm mới', path: paths.dashboard.pos.category.new },
@@ -214,7 +233,7 @@ export function useNavData() {
             title: 'Tồn kho',
             path: paths.dashboard.pos.inventory.root,
             icon: ICONS.ecommerce,
-            roles: ['Admin', 'Manager', 'Staff'],
+            roles: ['Admin'],
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.inventory.list },
               { title: 'Sắp hết hàng', path: paths.dashboard.pos.inventory.lowStock },
@@ -225,7 +244,7 @@ export function useNavData() {
             title: 'Kho hàng',
             path: paths.dashboard.pos.warehouse.root,
             icon: ICONS.banking,
-            roles: ['Admin', 'Manager'],
+            roles: ['Admin'],
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.warehouse.list },
             ],
@@ -234,7 +253,7 @@ export function useNavData() {
             title: 'Cấu hình',
             path: paths.dashboard.pos.unitOfMeasure.root,
             icon: ICONS.label,
-            roles: ['Admin', 'Manager'],
+            roles: ['Admin'],
             children: [
               { title: 'Đơn vị tính', path: paths.dashboard.pos.unitOfMeasure.list },
               { title: 'Thuộc tính biến thể', path: paths.dashboard.pos.variantAttribute.list },
@@ -244,7 +263,7 @@ export function useNavData() {
             title: 'Nhà cung cấp',
             path: paths.dashboard.pos.supplier.root,
             icon: ICONS.user,
-            roles: ['Admin', 'Manager'],
+            roles: ['Admin'],
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.supplier.list },
               { title: 'Thêm mới', path: paths.dashboard.pos.supplier.new },
@@ -254,7 +273,7 @@ export function useNavData() {
             title: 'Đơn nhập hàng',
             path: paths.dashboard.pos.purchaseOrder.root,
             icon: ICONS.order,
-            roles: ['Admin', 'Manager'],
+            roles: ['Admin'],
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.purchaseOrder.list },
               { title: 'Tạo đơn', path: paths.dashboard.pos.purchaseOrder.new },
@@ -264,6 +283,7 @@ export function useNavData() {
             title: 'Khách hàng',
             path: paths.dashboard.pos.customer.root,
             icon: ICONS.user,
+            roles: ['Admin'],
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.customer.list },
               { title: 'Thêm mới', path: paths.dashboard.pos.customer.new },
@@ -273,11 +293,13 @@ export function useNavData() {
             title: 'POS Bán hàng',
             path: paths.dashboard.pos.sale.root,
             icon: ICONS.ecommerce,
+            roles: ['Admin'],
           },
           {
             title: 'Đơn bán hàng',
             path: paths.dashboard.pos.salesOrder.root,
             icon: ICONS.banking,
+            roles: ['Admin'],
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.salesOrder.list },
               { title: 'Tạo đơn', path: paths.dashboard.pos.salesOrder.new },
@@ -287,7 +309,7 @@ export function useNavData() {
             title: 'Báo cáo',
             path: paths.dashboard.pos.report.root,
             icon: ICONS.analytics,
-            roles: ['Admin', 'Manager'],
+            roles: ['Admin'],
             children: [
               { title: 'Tổng quan', path: paths.dashboard.pos.report.dashboard },
               { title: 'Doanh thu', path: paths.dashboard.pos.report.revenue },

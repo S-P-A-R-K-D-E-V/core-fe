@@ -18,6 +18,7 @@ import DialogActions from '@mui/material/DialogActions';
 import IconButton from '@mui/material/IconButton';
 
 import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
 
 import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
@@ -42,6 +43,7 @@ export default function AttendanceCheckinView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
   const { user } = useAuthContext();
+  const router = useRouter();
 
   const [todayAssignments, setTodayAssignments] = useState<IShiftAssignment[]>([]);
   const [todayLogs, setTodayLogs] = useState<IAttendanceLog[]>([]);
@@ -322,6 +324,15 @@ export default function AttendanceCheckinView() {
           { name: 'Attendance' },
           { name: 'Check In/Out' },
         ]}
+        action={
+          <Button
+            variant="outlined"
+            startIcon={<Iconify icon="mdi:calendar-account" />}
+            onClick={() => router.push(paths.dashboard.attendance.mySchedule)}
+          >
+            Lịch làm cá nhân
+          </Button>
+        }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 

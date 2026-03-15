@@ -1333,14 +1333,25 @@ export default function AttendanceAssignmentsView() {
                                 >
                                   {schedule.startTime}–{schedule.endTime}
                                 </Typography>
-                                {assignedStaff.length > 0 && (
+                                {/* {assignedStaff.length > 0 && (
                                   <Typography
                                     variant="caption"
                                     sx={{ display: 'block', fontSize: 10, mt: 0.25, color: 'text.secondary' }}
                                   >
                                     👤 {assignedStaff.length} người
                                   </Typography>
-                                )}
+                                )} */}
+                                {
+                                  assignedStaff.map((name) => (
+                                    <Typography
+                                      key={name}
+                                      variant="caption"
+                                      sx={{ display: 'block', fontSize: 10, mt: 0.25, color: 'text.secondary' }}
+                                    > 
+                                      👤 {name}
+                                    </Typography>
+                                  ))
+                                }
                               </Box>
                             </Tooltip>
                           );

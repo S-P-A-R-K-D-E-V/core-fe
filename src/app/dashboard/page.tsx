@@ -1,3 +1,4 @@
+import AttendanceCheckinView from 'src/sections/attendance/view/attendance-checkin-view';
 import { OverviewAppView } from 'src/sections/overview/app/view';
 
 // ----------------------------------------------------------------------
@@ -7,5 +8,5 @@ export const metadata = {
 };
 
 export default function OverviewAppPage() {
-  return <OverviewAppView />;
+  return <AttendanceCheckinView />;
 }
