@@ -168,6 +168,8 @@ export default function CalendarView() {
               droppable
               selectable
               rerenderDelay={10}
+              locale="vi"
+              firstDay={1}
               allDayMaintainDuration
               eventResizableFromStart
               ref={calendarRef}

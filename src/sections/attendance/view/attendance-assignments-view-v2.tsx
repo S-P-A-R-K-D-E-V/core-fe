@@ -796,6 +796,7 @@ export default function AttendanceAssignmentsView() {
               />
               <Calendar
                 selectable
+                locale="vi"
                 firstDay={1}
                 slotMinTime="08:00:00"
                 editable={false}

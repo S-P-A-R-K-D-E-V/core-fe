@@ -258,6 +258,8 @@ export default function MyScheduleView() {
                 editable={false}
                 droppable={false}
                 rerenderDelay={10}
+                locale="vi"
+                firstDay={1}
                 allDayMaintainDuration
                 ref={calendarRef}
                 initialDate={date}

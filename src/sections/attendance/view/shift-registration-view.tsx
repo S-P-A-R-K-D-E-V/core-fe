@@ -188,13 +188,15 @@ export default function ShiftRegistrationView() {
 
   const weekSchedules = useMemo(
     () =>
-      schedules.filter((s) => {
-        const schedStart = new Date(s.fromDate);
-        const schedEnd = s.toDate ? new Date(s.toDate) : new Date('9999-12-31');
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
-        return schedStart <= weekEnd && schedEnd >= weekStart && s.isActive;
-      }),
+      schedules
+        .filter((s) => {
+          const schedStart = new Date(s.fromDate);
+          const schedEnd = s.toDate ? new Date(s.toDate) : new Date('9999-12-31');
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
+          return schedStart <= weekEnd && schedEnd >= weekStart && s.isActive;
+        })
+        .sort((a, b) => a.startTime.localeCompare(b.startTime)),
     [schedules, weekStart]
   );
 
@@ -525,6 +527,8 @@ export default function ShiftRegistrationView() {
               editable={false}
               droppable={false}
               rerenderDelay={10}
+              locale="vi"
+              firstDay={1}
               allDayMaintainDuration
               ref={calendarRef}
               initialDate={date}

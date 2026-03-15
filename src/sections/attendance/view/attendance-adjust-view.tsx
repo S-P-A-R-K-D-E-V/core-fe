@@ -536,6 +536,7 @@ export default function AttendanceAdjustView() {
                                 onOpenFilters={() => { }}
                             />
                             <Calendar
+                                locale="vi"
                                 firstDay={1}
                                 slotMinTime="06:00:00"
                                 editable={false}
