@@ -23,13 +23,6 @@ import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
-import Checkbox from '@mui/material/Checkbox';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import { useTheme, alpha } from '@mui/material/styles';
@@ -67,6 +60,13 @@ import CalendarToolbar from '../../calendar/calendar-toolbar';
 const WEEKDAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const DAY_BITMASK = [64, 1, 2, 4, 8, 16, 32]; // getDay(): Sun=0→64, Mon=1→1, ..., Sat=6→32
 
+function toLocalDateStr(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function getMonday(d: Date): Date {
   const result = new Date(d);
   const day = result.getDay();
@@ -77,7 +77,7 @@ function getMonday(d: Date): Date {
 }
 
 function isScheduleOnDate(schedule: IShiftSchedule, d: Date): boolean {
-  const dateStr = d.toISOString().split('T')[0];
+  const dateStr = toLocalDateStr(d);
   const schedStart = schedule.fromDate.split('T')[0];
   const schedEnd = schedule.toDate ? schedule.toDate.split('T')[0] : '9999-12-31';
   if (dateStr < schedStart || dateStr > schedEnd) return false;
@@ -212,11 +212,12 @@ export default function ShiftRegistrationView() {
     return keys;
   }, [registrations, currentUserId]);
 
-  const openWeeklyDialog = useCallback(() => {
-    // Pre-populate selections from existing registrations
+  // Re-populate selections when week changes inside dialog
+  useEffect(() => {
+    if (!weeklyDialog.value) return;
     const initial: Record<string, boolean> = {};
     weekDays.forEach((d) => {
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = toLocalDateStr(d);
       weekSchedules.forEach((s) => {
         const key = `${s.id}_${dateStr}`;
         if (isScheduleOnDate(s, d) && myRegisteredKeys.has(key)) {
@@ -225,9 +226,12 @@ export default function ShiftRegistrationView() {
       });
     });
     setWeekSelections(initial);
+  }, [weekDays, weekSchedules, myRegisteredKeys, weeklyDialog.value]);
+
+  const openWeeklyDialog = useCallback(() => {
     setWeekNote('');
     weeklyDialog.onTrue();
-  }, [weekDays, weekSchedules, myRegisteredKeys, weeklyDialog]);
+  }, [weeklyDialog]);
 
   const toggleWeekCell = useCallback((key: string) => {
     setWeekSelections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -240,7 +244,7 @@ export default function ShiftRegistrationView() {
       const toUnregister: { shiftScheduleId: string; date: string }[] = [];
 
       weekDays.forEach((d) => {
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = toLocalDateStr(d);
         weekSchedules.forEach((s) => {
           if (!isScheduleOnDate(s, d)) return;
           const key = `${s.id}_${dateStr}`;
@@ -805,107 +809,142 @@ export default function ShiftRegistrationView() {
           </Stack>
         </DialogTitle>
 
-        <DialogContent>
+        <DialogContent sx={{ px: 2 }}>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {weekSchedules.length === 0 ? (
               <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
                 Không có ca làm nào trong tuần này
               </Typography>
             ) : (
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 700, minWidth: 140 }}>Ca làm</TableCell>
-                      {weekDays.map((d, i) => (
-                        <TableCell key={i} align="center" sx={{ fontWeight: 700, px: 0.5 }}>
-                          <Typography variant="caption" display="block">
-                            {WEEKDAY_LABELS[i]}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
-                          </Typography>
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {weekSchedules.map((schedule) => (
-                      <TableRow key={schedule.id}>
-                        <TableCell>
-                          <Stack direction="row" alignItems="center" spacing={1}>
-                            <Box
-                              sx={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: '50%',
-                                bgcolor: schedule.color,
-                                flexShrink: 0,
-                              }}
-                            />
-                            <Box>
-                              <Typography variant="body2" fontWeight={600} noWrap>
-                                {schedule.templateName}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {schedule.startTime} - {schedule.endTime}
-                              </Typography>
-                            </Box>
-                          </Stack>
-                        </TableCell>
-                        {weekDays.map((d, i) => {
-                          const dateStr = d.toISOString().split('T')[0];
-                          const key = `${schedule.id}_${dateStr}`;
-                          const available = isScheduleOnDate(schedule, d);
-                          const isSelected = !!weekSelections[key];
-                          const wasRegistered = myRegisteredKeys.has(key);
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
+                  gap: 0,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Day headers */}
+                {weekDays.map((d, i) => {
+                  const isToday = toLocalDateStr(d) === toLocalDateStr(new Date());
+                  return (
+                    <Box
+                      key={i}
+                      sx={{
+                        py: 1,
+                        textAlign: 'center',
+                        borderBottom: '1px solid',
+                        borderRight: i < 6 ? '1px solid' : 'none',
+                        borderColor: 'divider',
+                        bgcolor: 'background.neutral',
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        fontWeight={700}
+                        display="block"
+                        color={i >= 5 ? 'error.main' : 'text.primary'}
+                      >
+                        {WEEKDAY_LABELS[i]}
+                      </Typography>
+                      <Box
+                        sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 28,
+                          height: 28,
+                          borderRadius: '50%',
+                          ...(isToday && {
+                            bgcolor: 'info.main',
+                            color: 'info.contrastText',
+                          }),
+                        }}
+                      >
+                        <Typography variant="body2" fontWeight={isToday ? 700 : 400}>
+                          {d.getDate()}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  );
+                })}
 
-                          return (
-                            <TableCell key={i} align="center" sx={{ px: 0.5 }}>
-                              {available ? (
-                                <Checkbox
-                                  checked={isSelected}
-                                  onChange={() => toggleWeekCell(key)}
-                                  sx={{
-                                    color: schedule.color,
-                                    '&.Mui-checked': { color: schedule.color },
-                                    ...(wasRegistered &&
-                                      isSelected && {
-                                        opacity: 0.6,
-                                      }),
-                                  }}
-                                />
-                              ) : (
-                                <Typography variant="caption" color="text.disabled">
-                                  —
-                                </Typography>
-                              )}
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                {/* Shift cards grid */}
+                {weekDays.map((d, dayIdx) => (
+                  <Box
+                    key={dayIdx}
+                    sx={{
+                      p: 0.5,
+                      borderRight: dayIdx < 6 ? '1px solid' : 'none',
+                      borderColor: 'divider',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 0.5,
+                      minHeight: 100,
+                    }}
+                  >
+                    {weekSchedules.map((schedule) => {
+                      const dateStr = toLocalDateStr(d);
+                      const key = `${schedule.id}_${dateStr}`;
+                      const available = isScheduleOnDate(schedule, d);
+                      if (!available) return null;
+
+                      const isSelected = !!weekSelections[key];
+                      const wasRegistered = myRegisteredKeys.has(key);
+                      const color = schedule.color;
+
+                      return (
+                        <Box
+                          key={schedule.id}
+                          onClick={() => toggleWeekCell(key)}
+                          sx={{
+                            px: 1,
+                            py: 0.75,
+                            borderRadius: 1,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                            userSelect: 'none',
+                            ...(isSelected
+                              ? {
+                                  bgcolor: alpha(color, wasRegistered ? 0.18 : 0.22),
+                                  border: `2px solid ${color}`,
+                                  boxShadow: `0 0 0 1px ${alpha(color, 0.3)}`,
+                                }
+                              : {
+                                  bgcolor: alpha(color, 0.06),
+                                  border: '2px solid transparent',
+                                  '&:hover': {
+                                    bgcolor: alpha(color, 0.12),
+                                    border: `2px dashed ${alpha(color, 0.4)}`,
+                                  },
+                                }),
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            fontWeight={700}
+                            display="block"
+                            sx={{ color, lineHeight: 1.3 }}
+                          >
+                            {schedule.templateName}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            display="block"
+                            sx={{ color, opacity: 0.7, lineHeight: 1.3, fontSize: 10 }}
+                          >
+                            {schedule.startTime}-{schedule.endTime}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                ))}
+              </Box>
             )}
-
-            <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
-              <Chip
-                size="small"
-                icon={<Iconify icon="solar:check-circle-bold" />}
-                label="Đã đăng ký"
-                color="success"
-                variant="outlined"
-              />
-              <Chip
-                size="small"
-                icon={<Iconify icon="solar:add-circle-bold" />}
-                label="Mới chọn"
-                color="primary"
-                variant="outlined"
-              />
-            </Stack>
 
             <TextField
               fullWidth
