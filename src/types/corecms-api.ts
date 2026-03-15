@@ -1030,7 +1030,7 @@ export interface IUpdateVariantAttributeRequest {
 export interface IProduct {
   id: string;
   name: string;
-  sku: string;
+  sku?: string;
   barcode?: string;
   description?: string;
   categoryId: string;
@@ -1044,9 +1044,15 @@ export interface IProduct {
   isActive: boolean;
   hasVariants: boolean;
   lowStockThreshold: number;
+  highStockThreshold: number;
+  isLoyaltyPoints: boolean;
+  weight?: number;
+  weightUnit?: string;
+  location?: string;
   createdAt: string;
   updatedAt?: string;
   variants?: IProductVariant[];
+  unitConversions?: IProductUnitConversion[];
   totalStock: number;
 }
 
@@ -1072,6 +1078,27 @@ export interface IVariantCombination {
   valueName: string;
 }
 
+export interface IProductUnitConversion {
+  id: string;
+  productId: string;
+  unitOfMeasureId: string;
+  unitOfMeasureName: string;
+  unitOfMeasureAbbreviation?: string;
+  conversionRate: number;
+  costPrice?: number;
+  sellingPrice?: number;
+  barcode?: string;
+  createdAt: string;
+}
+
+export interface ICreateProductUnitConversionRequest {
+  unitOfMeasureId: string;
+  conversionRate: number;
+  costPrice?: number;
+  sellingPrice?: number;
+  barcode?: string;
+}
+
 export interface ICreateProductVariantRequest {
   sku: string;
   barcode?: string;
@@ -1084,7 +1111,7 @@ export interface ICreateProductVariantRequest {
 
 export interface ICreateProductRequest {
   name: string;
-  sku: string;
+  sku?: string;
   barcode?: string;
   description?: string;
   categoryId: string;
@@ -1095,12 +1122,18 @@ export interface ICreateProductRequest {
   imageUrl?: string;
   hasVariants?: boolean;
   lowStockThreshold?: number;
+  highStockThreshold?: number;
+  isLoyaltyPoints?: boolean;
+  weight?: number;
+  weightUnit?: string;
+  location?: string;
   variants?: ICreateProductVariantRequest[];
+  unitConversions?: ICreateProductUnitConversionRequest[];
 }
 
 export interface IUpdateProductRequest {
   name: string;
-  sku: string;
+  sku?: string;
   barcode?: string;
   description?: string;
   categoryId: string;
@@ -1112,6 +1145,13 @@ export interface IUpdateProductRequest {
   isActive?: boolean;
   hasVariants?: boolean;
   lowStockThreshold?: number;
+  highStockThreshold?: number;
+  isLoyaltyPoints?: boolean;
+  weight?: number;
+  weightUnit?: string;
+  location?: string;
+  variants?: ICreateProductVariantRequest[];
+  unitConversions?: ICreateProductUnitConversionRequest[];
 }
 
 // --- Warehouse ---

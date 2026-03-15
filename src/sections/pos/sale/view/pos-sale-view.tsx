@@ -144,7 +144,7 @@ export default function PosSaleView() {
     return products.filter(
       (p) =>
         p.name.toLowerCase().includes(keyword) ||
-        p.sku.toLowerCase().includes(keyword) ||
+        (p.sku && p.sku.toLowerCase().includes(keyword)) ||
         (p.barcode && p.barcode.toLowerCase().includes(keyword))
     );
   }, [products, productSearch]);
@@ -174,7 +174,7 @@ export default function PosSaleView() {
             {
               productId: product.id,
               name: product.name,
-              sku: product.sku,
+              sku: product.sku || '',
               quantity: 1,
               unitPrice: product.sellingPrice,
               vatRate: product.vatRate,

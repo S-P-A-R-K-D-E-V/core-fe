@@ -107,6 +107,8 @@ export default function PurchaseOrderQuickCreateProduct({ open, onClose, onCreat
         isActive: true,
         hasVariants: false,
         lowStockThreshold: 0,
+        highStockThreshold: 999999999,
+        isLoyaltyPoints: false,
         createdAt: new Date().toISOString(),
         variants: [],
         totalStock: 0,

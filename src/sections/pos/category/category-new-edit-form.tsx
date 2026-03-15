@@ -27,6 +27,21 @@ type Props = {
   currentCategory?: ICategory;
 };
 
+// Build flat list with depth info for tree display
+function buildTree(
+  items: ICategory[],
+  excludeId?: string,
+  parentId: string | null = null,
+  depth = 0
+): { item: ICategory; depth: number }[] {
+  return items
+    .filter((c) => (c.parentCategoryId || null) === parentId && c.id !== excludeId)
+    .flatMap((c) => [
+      { item: c, depth },
+      ...buildTree(items, excludeId, c.id, depth + 1),
+    ]);
+}
+
 export default function CategoryNewEditForm({ currentCategory }: Props) {
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
@@ -96,11 +111,16 @@ export default function CategoryNewEditForm({ currentCategory }: Props) {
               <RHFTextField name="sortOrder" label="Thứ tự" type="number" />
               <RHFSelect name="parentCategoryId" label="Danh mục cha">
                 <MenuItem value="">— Không —</MenuItem>
-                {categories
-                  .filter((c) => c.id !== currentCategory?.id)
-                  .map((c) => (
-                    <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
-                  ))}
+                {buildTree(categories, currentCategory?.id).map(({ item, depth }) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {depth > 0 && (
+                      <span style={{ marginRight: 4, opacity: 0.4 }}>
+                        {'│  '.repeat(depth - 1)}{'└─ '}
+                      </span>
+                    )}
+                    {item.name}
+                  </MenuItem>
+                ))}
               </RHFSelect>
               <RHFTextField name="imageUrl" label="URL hình ảnh" />
             </Box>
