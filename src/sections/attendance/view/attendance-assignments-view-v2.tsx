@@ -38,7 +38,10 @@ import Tab from '@mui/material/Tab';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormGroup from '@mui/material/FormGroup';
-import { useTheme } from '@mui/material/styles';
+import Tooltip from '@mui/material/Tooltip';
+import { useTheme, alpha } from '@mui/material/styles';
+
+import Chart, { useChart } from 'src/components/chart';
 
 import { paths } from 'src/routes/paths';
 
@@ -219,6 +222,8 @@ export default function AttendanceAssignmentsView() {
   });
   const [bulkSelectedSlots, setBulkSelectedSlots] = useState<{ scheduleId: string; date: string }[]>([]);
   const [bulkAssigning, setBulkAssigning] = useState(false);
+  const [bulkWeekAssignments, setBulkWeekAssignments] = useState<IShiftAssignment[]>([]);
+  const [bulkTab, setBulkTab] = useState(0);
 
   const fetchAssignments = useCallback(async () => {
     try {
@@ -257,6 +262,43 @@ export default function AttendanceAssignmentsView() {
     };
     loadMeta();
   }, [fromDate, toDate]);
+
+  // Fetch assignments for the bulk dialog's visible week
+  useEffect(() => {
+    if (!bulkDialog.value) return;
+    const weekEnd = new Date(bulkWeekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const from = toLocalDateStr(bulkWeekStart);
+    const to = toLocalDateStr(weekEnd);
+    getShiftAssignments(from, to)
+      .then((data) => setBulkWeekAssignments(data))
+      .catch(() => setBulkWeekAssignments([]));
+  }, [bulkWeekStart, bulkDialog.value]);
+
+  // Map: "scheduleId_date" → assigned staff names (for tooltip)
+  const bulkSlotStaffMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    bulkWeekAssignments.forEach((a) => {
+      const dateStr = a.date.split('T')[0];
+      const key = `${a.shiftScheduleId}_${dateStr}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(a.staffName);
+    });
+    return map;
+  }, [bulkWeekAssignments]);
+
+  // Chart data: staff assignment counts for the bulk dialog week
+  const bulkChartData = useMemo(() => {
+    const countMap = new Map<string, number>();
+    bulkWeekAssignments.forEach((a) => {
+      countMap.set(a.staffName, (countMap.get(a.staffName) || 0) + 1);
+    });
+    const entries = Array.from(countMap.entries()).sort((a, b) => b[1] - a[1]);
+    return {
+      categories: entries.map(([name]) => name),
+      series: entries.map(([, count]) => count),
+    };
+  }, [bulkWeekAssignments]);
 
   // Transform assignments to calendar events
   const events = useMemo(() => {
@@ -1025,10 +1067,41 @@ export default function AttendanceAssignmentsView() {
       </Dialog>
 
       {/* Bulk Assign Dialog */}
-      <Dialog open={assignMode === 'bulk' && bulkDialog.value} onClose={bulkDialog.onFalse} maxWidth="lg" fullWidth>
-        <DialogTitle sx={{ pb: 1 }}>Phân công hàng loạt</DialogTitle>
+      <Dialog open={assignMode === 'bulk' && bulkDialog.value} onClose={bulkDialog.onFalse} maxWidth="lg" fullWidth fullScreen={!smUp}>
+        <DialogTitle sx={{ pb: 1, px: { xs: 2, sm: 3 } }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Typography variant="h6">Phân công hàng loạt</Typography>
+            {!smUp && (
+              <IconButton onClick={bulkDialog.onFalse} edge="end">
+                <Iconify icon="mingcute:close-line" />
+              </IconButton>
+            )}
+          </Stack>
+          {!smUp && (
+            <Tabs
+              value={bulkTab}
+              onChange={(_, v) => setBulkTab(v)}
+              sx={{ mt: 1 }}
+            >
+              <Tab
+                label={`Nhân viên (${bulkStaffIds.length})`}
+                icon={<Iconify icon="solar:users-group-rounded-bold" width={18} />}
+                iconPosition="start"
+                sx={{ minHeight: 40, fontSize: 13 }}
+              />
+              <Tab
+                label="Lịch tuần"
+                icon={<Iconify icon="solar:calendar-bold" width={18} />}
+                iconPosition="start"
+                sx={{ minHeight: 40, fontSize: 13 }}
+              />
+            </Tabs>
+          )}
+        </DialogTitle>
         <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
-          <Stack direction="row" sx={{ height: 560 }}>
+          {smUp ? (
+          /* ===== Desktop: side-by-side layout ===== */
+          <Stack direction="row" sx={{ height: 700 }}>
             {/* ===== Left: Staff List ===== */}
             <Box
               sx={{
@@ -1210,47 +1283,66 @@ export default function AttendanceAssignmentsView() {
                     return (
                       <Box key={dateStr} sx={{ minHeight: 80 }}>
                         {daySchedules.map((schedule) => {
+                          const slotKey = `${schedule.id}_${dateStr}`;
                           const isSelected = bulkSelectedSlots.some(
                             (s) => s.scheduleId === schedule.id && s.date === dateStr
                           );
+                          const assignedStaff = bulkSlotStaffMap.get(slotKey) || [];
+                          const tooltipTitle = assignedStaff.length > 0
+                            ? `Đã phân công (${assignedStaff.length}):\n${assignedStaff.join(', ')}`
+                            : 'Chưa có nhân viên';
                           return (
-                            <Box
+                            <Tooltip
                               key={schedule.id}
-                              onClick={() => toggleBulkSlot(schedule.id, dateStr)}
-                              sx={{
-                                mb: 0.5,
-                                p: 0.75,
-                                borderRadius: 1,
-                                cursor: 'pointer',
-                                bgcolor: isSelected
-                                  ? `${schedule.color}35`
-                                  : `${schedule.color}12`,
-                                border: '2px solid',
-                                borderColor: isSelected ? schedule.color : 'transparent',
-                                transition: 'all 0.15s',
-                                '&:hover': {
-                                  bgcolor: `${schedule.color}25`,
-                                  borderColor: `${schedule.color}80`,
-                                },
-                              }}
+                              title={tooltipTitle}
+                              arrow
+                              placement="top"
                             >
-                              <Typography
-                                variant="caption"
-                                fontWeight={600}
-                                noWrap
-                                sx={{ color: schedule.color, display: 'block' }}
+                              <Box
+                                onClick={() => toggleBulkSlot(schedule.id, dateStr)}
+                                sx={{
+                                  mb: 0.5,
+                                  p: 0.75,
+                                  borderRadius: 1,
+                                  cursor: 'pointer',
+                                  bgcolor: isSelected
+                                    ? alpha(schedule.color, 0.22)
+                                    : alpha(schedule.color, 0.07),
+                                  border: '2px solid',
+                                  borderColor: isSelected ? schedule.color : 'transparent',
+                                  transition: 'all 0.15s',
+                                  '&:hover': {
+                                    bgcolor: alpha(schedule.color, 0.15),
+                                    borderColor: alpha(schedule.color, 0.5),
+                                  },
+                                }}
                               >
-                                {schedule.templateName}
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                noWrap
-                                sx={{ display: 'block' }}
-                              >
-                                {schedule.startTime}–{schedule.endTime}
-                              </Typography>
-                            </Box>
+                                <Typography
+                                  variant="caption"
+                                  fontWeight={600}
+                                  noWrap
+                                  sx={{ color: schedule.color, display: 'block' }}
+                                >
+                                  {schedule.templateName}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  noWrap
+                                  sx={{ display: 'block' }}
+                                >
+                                  {schedule.startTime}–{schedule.endTime}
+                                </Typography>
+                                {assignedStaff.length > 0 && (
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ display: 'block', fontSize: 10, mt: 0.25, color: 'text.secondary' }}
+                                  >
+                                    👤 {assignedStaff.length} người
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Tooltip>
                           );
                         })}
                         {daySchedules.length === 0 && (
@@ -1266,9 +1358,287 @@ export default function AttendanceAssignmentsView() {
                     );
                   })}
                 </Box>
+
+                {/* Bar chart: staff assignment counts */}
+                {bulkChartData.categories.length > 0 && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      Số ca đã phân công trong tuần
+                    </Typography>
+                    <Chart
+                      type="bar"
+                      series={[{ name: 'Số ca', data: bulkChartData.series }]}
+                      options={{
+                        chart: { toolbar: { show: false }, zoom: { enabled: false } },
+                        plotOptions: {
+                          bar: {
+                            horizontal: true,
+                            borderRadius: 4,
+                            barHeight: '60%',
+                          },
+                        },
+                        xaxis: {
+                          categories: bulkChartData.categories,
+                          labels: { style: { fontSize: '11px' } },
+                        },
+                        yaxis: {
+                          labels: { style: { fontSize: '12px' } },
+                        },
+                        tooltip: {
+                          y: { formatter: (val: number) => `${val} ca` },
+                        },
+                        dataLabels: { enabled: true, style: { fontSize: '11px' } },
+                        colors: [theme.palette.primary.main],
+                        grid: { borderColor: theme.palette.divider, strokeDashArray: 3 },
+                      }}
+                      height={Math.max(180, bulkChartData.categories.length * 36)}
+                    />
+                  </Box>
+                )}
               </Box>
             </Box>
           </Stack>
+          ) : (
+          /* ===== Mobile: tab-based layout ===== */
+          <Box sx={{ flex: 1, overflow: 'auto' }}>
+            {/* Tab 0: Staff list */}
+            {bulkTab === 0 && (
+              <Box sx={{ p: 1.5 }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                  <Typography variant="subtitle2">
+                    Nhân viên ({bulkStaffIds.length}/{users.length})
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() =>
+                      setBulkStaffIds(
+                        bulkStaffIds.length === users.length ? [] : users.map((u) => u.id)
+                      )
+                    }
+                  >
+                    {bulkStaffIds.length === users.length ? 'Bỏ chọn' : 'Chọn tất cả'}
+                  </Button>
+                </Stack>
+                <FormGroup>
+                  {users.map((user) => (
+                    <FormControlLabel
+                      key={user.id}
+                      control={
+                        <Checkbox
+                          checked={bulkStaffIds.includes(user.id)}
+                          onChange={() => toggleBulkStaff(user.id)}
+                          size="small"
+                        />
+                      }
+                      label={
+                        <Typography variant="body2" noWrap>
+                          {user.fullName}
+                        </Typography>
+                      }
+                      sx={{ mx: 0, my: 0.25 }}
+                    />
+                  ))}
+                </FormGroup>
+              </Box>
+            )}
+
+            {/* Tab 1: Week calendar */}
+            {bulkTab === 1 && (
+              <Box sx={{ p: 1.5 }}>
+                {/* Week navigation */}
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="center"
+                  spacing={0.5}
+                  sx={{ mb: 1.5 }}
+                >
+                  <IconButton
+                    size="small"
+                    onClick={() =>
+                      setBulkWeekStart((prev) => {
+                        const d = new Date(prev);
+                        d.setDate(d.getDate() - 7);
+                        return d;
+                      })
+                    }
+                  >
+                    <Iconify icon="eva:arrow-ios-back-fill" />
+                  </IconButton>
+                  <Typography variant="subtitle2" sx={{ fontSize: 13, textAlign: 'center', minWidth: 140 }}>
+                    {bulkWeekStart.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                    {' \u2014 '}
+                    {(() => {
+                      const end = new Date(bulkWeekStart);
+                      end.setDate(end.getDate() + 6);
+                      return end.toLocaleDateString('vi-VN', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      });
+                    })()}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() =>
+                      setBulkWeekStart((prev) => {
+                        const d = new Date(prev);
+                        d.setDate(d.getDate() + 7);
+                        return d;
+                      })
+                    }
+                  >
+                    <Iconify icon="eva:arrow-ios-forward-fill" />
+                  </IconButton>
+                </Stack>
+
+                {bulkSelectedSlots.length > 0 && (
+                  <Chip
+                    size="small"
+                    label={`${bulkSelectedSlots.length} ca đã chọn`}
+                    color="primary"
+                    onDelete={() => setBulkSelectedSlots([])}
+                    sx={{ mb: 1.5 }}
+                  />
+                )}
+
+                {/* Mobile: vertical day-by-day */}
+                <Stack spacing={1.5}>
+                  {Array.from({ length: 7 }, (_, i) => {
+                    const d = new Date(bulkWeekStart);
+                    d.setDate(d.getDate() + i);
+                    const dateStr = toLocalDateStr(d);
+                    const isToday = dateStr === toLocalDateStr(new Date());
+                    const DAY_NAMES_M = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+                    const daySchedules = schedules
+                      .filter((s) => {
+                        if (!s.isActive) return false;
+                        const from = s.fromDate.split('T')[0];
+                        const to = s.toDate ? s.toDate.split('T')[0] : null;
+                        return dateStr >= from && (to === null || dateStr <= to);
+                      })
+                      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    if (daySchedules.length === 0) return null;
+                    return (
+                      <Box key={i}>
+                        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.75 }}>
+                          <Box
+                            sx={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              ...(isToday
+                                ? { bgcolor: 'primary.main', color: 'primary.contrastText' }
+                                : { bgcolor: 'background.neutral' }),
+                            }}
+                          >
+                            <Typography variant="caption" fontWeight={700}>
+                              {d.getDate()}
+                            </Typography>
+                          </Box>
+                          <Typography variant="subtitle2" color={i >= 5 ? 'error.main' : 'text.primary'}>
+                            {DAY_NAMES_M[d.getDay()]},{' '}
+                            {d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                          </Typography>
+                        </Stack>
+
+                        <Stack direction="row" spacing={1} sx={{ pl: 0.5 }}>
+                          {daySchedules.map((schedule) => {
+                            const slotKey = `${schedule.id}_${dateStr}`;
+                            const isSelected = bulkSelectedSlots.some(
+                              (s) => s.scheduleId === schedule.id && s.date === dateStr
+                            );
+                            const assignedStaff = bulkSlotStaffMap.get(slotKey) || [];
+                            return (
+                              <Box
+                                key={schedule.id}
+                                onClick={() => toggleBulkSlot(schedule.id, dateStr)}
+                                sx={{
+                                  flex: 1,
+                                  minWidth: 0,
+                                  px: 1.5,
+                                  py: 1,
+                                  borderRadius: 1,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s',
+                                  userSelect: 'none',
+                                  textAlign: 'center',
+                                  bgcolor: isSelected
+                                    ? alpha(schedule.color, 0.22)
+                                    : alpha(schedule.color, 0.07),
+                                  border: '2px solid',
+                                  borderColor: isSelected ? schedule.color : 'transparent',
+                                }}
+                              >
+                                <Typography
+                                  variant="caption"
+                                  fontWeight={700}
+                                  display="block"
+                                  sx={{ color: schedule.color, lineHeight: 1.4 }}
+                                >
+                                  {schedule.templateName}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  display="block"
+                                  sx={{ color: schedule.color, opacity: 0.7, lineHeight: 1.3, fontSize: 11 }}
+                                >
+                                  {schedule.startTime}–{schedule.endTime}
+                                </Typography>
+                                {assignedStaff.length > 0 && (
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ display: 'block', fontSize: 10, mt: 0.25, color: 'text.secondary' }}
+                                  >
+                                    👤 {assignedStaff.length}
+                                  </Typography>
+                                )}
+                              </Box>
+                            );
+                          })}
+                        </Stack>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+
+                {/* Bar chart */}
+                {bulkChartData.categories.length > 0 && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      Số ca đã phân công trong tuần
+                    </Typography>
+                    <Chart
+                      type="bar"
+                      series={[{ name: 'Số ca', data: bulkChartData.series }]}
+                      options={{
+                        chart: { toolbar: { show: false }, zoom: { enabled: false } },
+                        plotOptions: {
+                          bar: { horizontal: true, borderRadius: 4, barHeight: '60%' },
+                        },
+                        xaxis: {
+                          categories: bulkChartData.categories,
+                          labels: { style: { fontSize: '10px' } },
+                        },
+                        yaxis: { labels: { style: { fontSize: '11px' } } },
+                        tooltip: { y: { formatter: (val: number) => `${val} ca` } },
+                        dataLabels: { enabled: true, style: { fontSize: '10px' } },
+                        colors: [theme.palette.primary.main],
+                        grid: { borderColor: theme.palette.divider, strokeDashArray: 3 },
+                      }}
+                      height={Math.max(160, bulkChartData.categories.length * 32)}
+                    />
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button variant="outlined" onClick={bulkDialog.onFalse}>

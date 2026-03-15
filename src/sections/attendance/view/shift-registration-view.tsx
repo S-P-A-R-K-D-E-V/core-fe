@@ -24,7 +24,6 @@ import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
 import { useTheme, alpha } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
@@ -373,6 +372,16 @@ export default function ShiftRegistrationView() {
     return Array.from(map.values());
   }, [schedules, registrations, fromDate, toDate, currentUserId]);
 
+  // Auto-switch view when breakpoint changes
+  useEffect(() => {
+    if (calendarRef.current) {
+      const newView = smUp ? 'dayGridMonth' : 'listWeek';
+      const calendarApi = calendarRef.current.getApi();
+      calendarApi.changeView(newView);
+      setView(newView as ICalendarView);
+    }
+  }, [smUp]);
+
   // Calendar handlers
   const handleChangeView = useCallback((newView: ICalendarView) => {
     if (calendarRef.current) {
@@ -480,30 +489,35 @@ export default function ShiftRegistrationView() {
         />
 
         {/* Filters */}
-        <Card sx={{ mb: 3, p: 2.5 }}>
+        <Card sx={{ mb: 3, p: { xs: 1.5, md: 2.5 } }}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
-            <DatePicker
-              label="Từ ngày"
-              value={parseDateStr(fromDate)}
-              onChange={(val) => setFromDate(toDateStr(val))}
-              format="dd/MM/yyyy"
-              slotProps={{ textField: { sx: { width: { xs: 1, md: 180 } } } }}
-            />
-            <DatePicker
-              label="Đến ngày"
-              value={parseDateStr(toDate)}
-              onChange={(val) => setToDate(toDateStr(val))}
-              format="dd/MM/yyyy"
-              slotProps={{ textField: { sx: { width: { xs: 1, md: 180 } } } }}
-            />
-            <Box sx={{ flexGrow: 1 }} />
-            <Chip
-              icon={<Iconify icon="solar:info-circle-bold" />}
-              label="Nhấn vào ca trên lịch để đăng ký / hủy đăng ký"
-              variant="outlined"
-              color="info"
-            />
+            <Stack direction="row" spacing={1} sx={{ width: { xs: 1, md: 'auto' } }}>
+              <DatePicker
+                label="Từ ngày"
+                value={parseDateStr(fromDate)}
+                onChange={(val) => setFromDate(toDateStr(val))}
+                format="dd/MM/yyyy"
+                slotProps={{ textField: { size: smUp ? 'medium' : 'small', sx: { flex: 1, minWidth: 0 } } }}
+              />
+              <DatePicker
+                label="Đến ngày"
+                value={parseDateStr(toDate)}
+                onChange={(val) => setToDate(toDateStr(val))}
+                format="dd/MM/yyyy"
+                slotProps={{ textField: { size: smUp ? 'medium' : 'small', sx: { flex: 1, minWidth: 0 } } }}
+              />
+            </Stack>
+            <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'block' } }} />
+            {smUp && (
+              <Chip
+                icon={<Iconify icon="solar:info-circle-bold" />}
+                label="Nhấn vào ca trên lịch để đăng ký / hủy đăng ký"
+                variant="outlined"
+                color="info"
+              />
+            )}
             <Button
+              fullWidth={!smUp}
               variant="contained"
               startIcon={<Iconify icon="solar:calendar-add-bold-duotone" />}
               onClick={openWeeklyDialog}
@@ -768,54 +782,62 @@ export default function ShiftRegistrationView() {
         onClose={weeklyDialog.onFalse}
         maxWidth="md"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 2 } }}
+        fullScreen={!smUp}
+        PaperProps={{ sx: { borderRadius: smUp ? 2 : 0 } }}
       >
-        <DialogTitle>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <DialogTitle sx={{ px: { xs: 2, sm: 3 }, py: { xs: 1.5, sm: 2 } }}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            justifyContent="space-between"
+            spacing={1}
+          >
             <Typography variant="h6">Đăng ký lịch tuần</Typography>
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <Tooltip title="Tuần trước">
-                <IconButton
-                  onClick={() => {
-                    const prev = new Date(weekStart);
-                    prev.setDate(prev.getDate() - 7);
-                    setWeekStart(prev);
-                  }}
-                >
-                  <Iconify icon="eva:arrow-ios-back-fill" />
-                </IconButton>
-              </Tooltip>
-              <Typography variant="subtitle2" sx={{ minWidth: 180, textAlign: 'center' }}>
+            <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.5}>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  const prev = new Date(weekStart);
+                  prev.setDate(prev.getDate() - 7);
+                  setWeekStart(prev);
+                }}
+              >
+                <Iconify icon="eva:arrow-ios-back-fill" />
+              </IconButton>
+              <Typography
+                variant="subtitle2"
+                sx={{ minWidth: { xs: 140, sm: 180 }, textAlign: 'center', fontSize: { xs: 13, sm: 14 } }}
+              >
                 {weekDays[0].toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
-                {' - '}
+                {' \u2014 '}
                 {weekDays[6].toLocaleDateString('vi-VN', {
                   day: '2-digit',
                   month: '2-digit',
                   year: 'numeric',
                 })}
               </Typography>
-              <Tooltip title="Tuần sau">
-                <IconButton
-                  onClick={() => {
-                    const next = new Date(weekStart);
-                    next.setDate(next.getDate() + 7);
-                    setWeekStart(next);
-                  }}
-                >
-                  <Iconify icon="eva:arrow-ios-forward-fill" />
-                </IconButton>
-              </Tooltip>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  const next = new Date(weekStart);
+                  next.setDate(next.getDate() + 7);
+                  setWeekStart(next);
+                }}
+              >
+                <Iconify icon="eva:arrow-ios-forward-fill" />
+              </IconButton>
             </Stack>
           </Stack>
         </DialogTitle>
 
-        <DialogContent sx={{ px: 2 }}>
+        <DialogContent sx={{ px: { xs: 1.5, sm: 2 } }}>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {weekSchedules.length === 0 ? (
               <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
                 Không có ca làm nào trong tuần này
               </Typography>
-            ) : (
+            ) : smUp ? (
+              /* Desktop: 7-column grid */
               <Box
                 sx={{
                   display: 'grid',
@@ -944,6 +966,107 @@ export default function ShiftRegistrationView() {
                   </Box>
                 ))}
               </Box>
+            ) : (
+              /* Mobile: vertical day-by-day list */
+              <Stack spacing={1.5}>
+                {weekDays.map((d, i) => {
+                  const dateStr = toLocalDateStr(d);
+                  const isToday = dateStr === toLocalDateStr(new Date());
+                  const dayShifts = weekSchedules.filter((s) => isScheduleOnDate(s, d));
+                  if (dayShifts.length === 0) return null;
+
+                  return (
+                    <Box key={i}>
+                      {/* Day header */}
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={1}
+                        sx={{ mb: 0.75 }}
+                      >
+                        <Box
+                          sx={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            ...(isToday
+                              ? { bgcolor: 'info.main', color: 'info.contrastText' }
+                              : { bgcolor: 'background.neutral' }),
+                          }}
+                        >
+                          <Typography variant="caption" fontWeight={700}>
+                            {d.getDate()}
+                          </Typography>
+                        </Box>
+                        <Typography
+                          variant="subtitle2"
+                          color={i >= 5 ? 'error.main' : 'text.primary'}
+                        >
+                          {WEEKDAY_LABELS[i]},{' '}
+                          {d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                        </Typography>
+                      </Stack>
+
+                      {/* Shift cards row */}
+                      <Stack direction="row" spacing={1} sx={{ pl: 0.5 }}>
+                        {dayShifts.map((schedule) => {
+                          const key = `${schedule.id}_${dateStr}`;
+                          const isSelected = !!weekSelections[key];
+                          const wasRegistered = myRegisteredKeys.has(key);
+                          const color = schedule.color;
+
+                          return (
+                            <Box
+                              key={schedule.id}
+                              onClick={() => toggleWeekCell(key)}
+                              sx={{
+                                flex: 1,
+                                px: 1.5,
+                                py: 1,
+                                borderRadius: 1,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s',
+                                userSelect: 'none',
+                                textAlign: 'center',
+                                ...(isSelected
+                                  ? {
+                                      bgcolor: alpha(color, wasRegistered ? 0.18 : 0.22),
+                                      border: `2px solid ${color}`,
+                                      boxShadow: `0 0 0 1px ${alpha(color, 0.3)}`,
+                                    }
+                                  : {
+                                      bgcolor: alpha(color, 0.06),
+                                      border: '2px solid transparent',
+                                    }),
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                fontWeight={700}
+                                display="block"
+                                sx={{ color, lineHeight: 1.4 }}
+                              >
+                                {schedule.templateName}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                display="block"
+                                sx={{ color, opacity: 0.7, lineHeight: 1.3, fontSize: 11 }}
+                              >
+                                {schedule.startTime}-{schedule.endTime}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Stack>
+                    </Box>
+                  );
+                })}
+              </Stack>
             )}
 
             <TextField
