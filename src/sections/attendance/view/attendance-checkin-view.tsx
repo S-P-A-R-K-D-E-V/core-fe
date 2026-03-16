@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -16,6 +16,12 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Divider from '@mui/material/Divider';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
@@ -27,6 +33,9 @@ import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
 
 import { useAuthContext } from 'src/auth/hooks';
+
+import { usePageTours } from 'src/hooks/use-tour';
+import type { TourDefinition } from 'src/hooks/use-tour';
 
 import { IShiftAssignment, IAttendanceLog } from 'src/types/corecms-api';
 import {
@@ -68,6 +77,10 @@ export default function AttendanceCheckinView() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Tour state
+  const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
+  const tourDialogRef = useRef(false); // flag: dialog opened by tour
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -315,6 +328,158 @@ export default function AttendanceCheckinView() {
     []
   );
 
+  // ── Tour definitions ──
+
+  const openTourDialog = useCallback(() => {
+    tourDialogRef.current = true;
+    setFaceDialogOpen(true);
+    setCapturedImage(null);
+  }, []);
+
+  const closeTourDialog = useCallback(() => {
+    if (tourDialogRef.current) {
+      tourDialogRef.current = false;
+      stopCamera();
+      setFaceDialogOpen(false);
+      setPendingCheckin(null);
+      setCapturedImage(null);
+    }
+  }, [stopCamera]);
+
+  const CHECKIN_TOURS: TourDefinition[] = useMemo(
+    () => [
+      {
+        tourKey: 'attendance-checkin-overview',
+        label: 'Tổng quan Check-in',
+        steps: [
+          {
+            element: '#tour-gps-status',
+            popover: {
+              title: 'Trạng thái GPS',
+              description:
+                'Hệ thống tự động lấy vị trí GPS của bạn khi mở trang. Vị trí này sẽ được ghi nhận khi check-in/check-out. Nếu có lỗi GPS, hãy kiểm tra lại quyền trình duyệt hoặc thử load lại trang để có thông báo yêu cầu cấp quyền.',
+              side: 'bottom' as const,
+              align: 'start' as const,
+            },
+          },
+          {
+            element: '#tour-current-time',
+            popover: {
+              title: 'Thời gian hiện tại',
+              description:
+                'Hiển thị ngày và giờ hiện tại. Thời gian check-in sẽ được ghi nhận chính xác theo giờ server.',
+              side: 'bottom' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            element: '#tour-shift-list',
+            popover: {
+              title: 'Danh sách ca làm',
+              description:
+                'Hiển thị các ca làm hôm nay của bạn. Mỗi ca có nút "Chụp ảnh & Check In" để bắt đầu và "Check Out" khi kết thúc ca.',
+              side: 'top' as const,
+              align: 'start' as const,
+            },
+          },
+          {
+            element: '#tour-overtime-checkin',
+            popover: {
+              title: 'Check-in ngoài giờ',
+              description:
+                'Nếu bạn không có ca được phân hoặc cần làm thêm ngoài giờ, nhấn nút này để check-in ngoài ca. Hệ thống sẽ ghi nhận giờ OT.',
+              side: 'top' as const,
+              align: 'start' as const,
+            },
+          },
+        ],
+      },
+      {
+        tourKey: 'attendance-checkin-face',
+        label: 'Chụp ảnh Check-in',
+        steps: [
+          {
+            element: '#tour-face-dialog',
+            popover: {
+              title: 'Cửa sổ chụp ảnh',
+              description:
+                'Khi nhấn "Chụp ảnh & Check In", cửa sổ này sẽ mở ra. Camera sẽ tự bật để bạn chụp ảnh xác nhận.',
+              side: 'top' as const,
+              align: 'center' as const,
+            },
+            onHighlightStarted: () => {
+              openTourDialog();
+            },
+          },
+          {
+            element: '#tour-camera-view',
+            popover: {
+              title: 'Khung camera',
+              description:
+                'Hướng camera về phía khuôn mặt. Phía dưới hiển thị thời gian, vị trí GPS và địa chỉ sẽ được chụp kèm ảnh.',
+              side: 'top' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            element: '#tour-capture-btn',
+            popover: {
+              title: 'Chụp ảnh',
+              description:
+                'Nhấn "Chụp ảnh" để chụp. Bạn có thể nhấn nút lật camera 🔄 bên cạnh để đổi camera trước/sau.',
+              side: 'top' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            element: '#tour-confirm-btn',
+            popover: {
+              title: 'Xác nhận Check-in',
+              description:
+                'Sau khi chụp ảnh, xem lại và nhấn "Xác nhận Check-in" để hoàn tất. Nếu ảnh chưa rõ, nhấn "Chụp lại".',
+              side: 'top' as const,
+              align: 'end' as const,
+            },
+            onDeselected: () => {
+              closeTourDialog();
+            },
+          },
+        ],
+      },
+      {
+        tourKey: 'attendance-checkin-schedule',
+        label: 'Lịch làm cá nhân',
+        steps: [
+          {
+            element: '#tour-my-schedule-btn',
+            popover: {
+              title: 'Xem lịch làm cá nhân',
+              description:
+                'Nhấn vào đây để xem toàn bộ lịch làm việc của bạn trong tuần/tháng. Giúp bạn biết được ca nào đã được phân.',
+              side: 'bottom' as const,
+              align: 'end' as const,
+            },
+          },
+          {
+            popover: {
+              title: 'Hoàn thành hướng dẫn! 🎉',
+              description:
+                'Bạn đã nắm được cách check-in/check-out. Nhấn nút ❓ ở góc trên bất kỳ lúc nào để xem lại hướng dẫn.',
+            },
+          },
+        ],
+      },
+    ],
+    [openTourDialog, closeTourDialog]
+  );
+
+  const {
+    startTour,
+    resetAndRestartAll,
+    completedMap,
+    tours: tourList,
+  } = usePageTours({ tours: CHECKIN_TOURS });
+
   return (
     <Container maxWidth={settings.themeStretch ? false : 'lg'}>
       <CustomBreadcrumbs
@@ -325,13 +490,58 @@ export default function AttendanceCheckinView() {
           { name: 'Check In/Out' },
         ]}
         action={
-          <Button
-            variant="outlined"
-            startIcon={<Iconify icon="mdi:calendar-account" />}
-            onClick={() => router.push(paths.dashboard.attendance.mySchedule)}
-          >
-            Lịch làm cá nhân
-          </Button>
+          <>
+            <Tooltip title="Hướng dẫn sử dụng">
+              <IconButton onClick={(e) => setTourMenuAnchor(e.currentTarget)}>
+                <Iconify icon="solar:question-circle-bold" width={24} />
+              </IconButton>
+            </Tooltip>
+            <Menu
+              anchorEl={tourMenuAnchor}
+              open={Boolean(tourMenuAnchor)}
+              onClose={() => setTourMenuAnchor(null)}
+              slotProps={{ paper: { sx: { minWidth: 220 } } }}
+            >
+              {tourList.map((t) => (
+                <MenuItem
+                  key={t.tourKey}
+                  onClick={() => {
+                    setTourMenuAnchor(null);
+                    startTour(t.tourKey);
+                  }}
+                >
+                  <ListItemIcon>
+                    <Iconify
+                      icon={completedMap[t.tourKey] ? 'solar:check-circle-bold' : 'solar:play-circle-bold'}
+                      width={20}
+                      sx={{ color: completedMap[t.tourKey] ? 'success.main' : 'text.secondary' }}
+                    />
+                  </ListItemIcon>
+                  <ListItemText primary={t.label} />
+                </MenuItem>
+              ))}
+              <Divider />
+              <MenuItem
+                onClick={() => {
+                  setTourMenuAnchor(null);
+                  resetAndRestartAll();
+                }}
+              >
+                <ListItemIcon>
+                  <Iconify icon="solar:restart-bold" width={20} />
+                </ListItemIcon>
+                <ListItemText primary="Xem lại tất cả" />
+              </MenuItem>
+            </Menu>
+            <Button
+              id="tour-my-schedule-btn"
+              variant="outlined"
+              startIcon={<Iconify icon="mdi:calendar-account" />}
+              onClick={() => router.push(paths.dashboard.attendance.mySchedule)}
+            >
+              Lịch làm cá nhân
+            </Button>
+          </>
         }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
@@ -344,13 +554,20 @@ export default function AttendanceCheckinView() {
       )}
 
       {geoLocation && (
-        <Alert severity="info" sx={{ mb: 2 }} icon={<Iconify icon="mdi:map-marker" />}>
+        <Alert id="tour-gps-status" severity="info" sx={{ mb: 2 }} icon={<Iconify icon="mdi:map-marker" />}>
           GPS: {geoLocation.lat.toFixed(6)}, {geoLocation.lng.toFixed(6)}
         </Alert>
       )}
 
+      {/* GPS fallback for tour when there is no location yet */}
+      {!geoLocation && !geoError && (
+        <Alert id="tour-gps-status" severity="info" sx={{ mb: 2 }} icon={<Iconify icon="mdi:map-marker" />}>
+          Đang lấy vị trí GPS...
+        </Alert>
+      )}
+
       {/* Current Time */}
-      <Card sx={{ p: 3, mb: 3, textAlign: 'center' }}>
+      <Card id="tour-current-time" sx={{ p: 3, mb: 3, textAlign: 'center' }}>
         <Typography variant="h4">
           {new Date().toLocaleDateString('vi-VN', {
             weekday: 'long',
@@ -371,11 +588,11 @@ export default function AttendanceCheckinView() {
       )}
 
       {!loading && todayAssignments.length === 0 && (
-        <Stack spacing={2}>
+        <Stack id="tour-shift-list" spacing={2}>
           <Alert severity="info">Hôm nay bạn không có ca làm nào.</Alert>
 
           {/* Overtime Check-in */}
-          <Card sx={{ p: 3, bgcolor: 'warning.lighter' }}>
+          <Card id="tour-overtime-checkin" sx={{ p: 3, bgcolor: 'warning.lighter' }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between">
               <Box>
                 <Typography variant="h6" color="warning.darker">
@@ -408,7 +625,7 @@ export default function AttendanceCheckinView() {
       )}
 
       {!loading && todayAssignments.length > 0 && (
-        <Stack spacing={3}>
+        <Stack id="tour-shift-list" spacing={3}>
           {todayAssignments.map((assignment) => {
             const openLog = getLogForAssignment(assignment.assignmentId);
             const completedLogs = getCompletedLogs(assignment.assignmentId);
@@ -533,7 +750,7 @@ export default function AttendanceCheckinView() {
           })}
 
           {/* Overtime Check-in - Always available */}
-          <Card sx={{ p: 3, bgcolor: 'warning.lighter' }}>
+          <Card id="tour-overtime-checkin" sx={{ p: 3, bgcolor: 'warning.lighter' }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between">
               <Box>
                 <Typography variant="h6" color="warning.darker">
@@ -568,10 +785,10 @@ export default function AttendanceCheckinView() {
       {/* ── Face Capture Dialog ── */}
       <Dialog
         open={faceDialogOpen}
-        onClose={closeFaceDialog}
+        onClose={tourDialogRef.current ? closeTourDialog : closeFaceDialog}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { overflow: 'visible' } }}
+        PaperProps={{ sx: { overflow: 'visible' }, id: 'tour-face-dialog' }}
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Stack direction="row" alignItems="center" spacing={1}>
@@ -593,6 +810,7 @@ export default function AttendanceCheckinView() {
           {!capturedImage ? (
             <Stack spacing={2} alignItems="center">
               <Box
+                id="tour-camera-view"
                 sx={{
                   width: '100%',
                   aspectRatio: '4/3',
@@ -646,7 +864,7 @@ export default function AttendanceCheckinView() {
               </Box>
 
               {cameraActive ? (
-                <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
+                <Stack id="tour-capture-btn" direction="row" spacing={1} sx={{ width: '100%' }}>
                   <Button
                     variant="contained"
                     size="large"
@@ -706,10 +924,11 @@ export default function AttendanceCheckinView() {
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={closeFaceDialog} color="inherit">
+          <Button onClick={tourDialogRef.current ? closeTourDialog : closeFaceDialog} color="inherit">
             Hủy
           </Button>
           <Button
+            id="tour-confirm-btn"
             variant="contained"
             color="success"
             disabled={!capturedImage || submitting}

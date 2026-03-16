@@ -17,6 +17,13 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Divider from '@mui/material/Divider';
 import { useTheme } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
@@ -30,6 +37,9 @@ import Label from 'src/components/label';
 import { IShiftSchedule, IShiftAssignment, IAttendanceLog } from 'src/types/corecms-api';
 import { ICalendarEvent, ICalendarView } from 'src/types/calendar';
 import { getMySchedule, getMyAttendanceLogs, getShiftSchedulesByDateRange } from 'src/api/attendance';
+
+import { usePageTours } from 'src/hooks/use-tour';
+import type { TourDefinition } from 'src/hooks/use-tour';
 
 import { StyledCalendar } from '../../calendar/styles';
 import CalendarToolbar from '../../calendar/calendar-toolbar';
@@ -127,6 +137,9 @@ export default function MyScheduleView() {
   const [selectedEvent, setSelectedEvent] = useState<IAssignmentWithDetails | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
 
+  // Tour state
+  const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
+
   const monthInfo = getMonthRange(monthOffset);
 
   const fetchSchedule = useCallback(async () => {
@@ -221,6 +234,64 @@ export default function MyScheduleView() {
     setSelectedEvent(null);
   }, []);
 
+  // ── Tour definitions ──
+
+  const SCHEDULE_TOURS: TourDefinition[] = useMemo(
+    () => [
+      {
+        tourKey: 'my-schedule-overview',
+        label: 'Tổng quan lịch làm',
+        steps: [
+          {
+            element: '#tour-calendar-toolbar',
+            popover: {
+              title: 'Điều hướng lịch',
+              description:
+                'Dùng các nút mũi tên để chuyển tháng, nút "Hôm nay" để về tháng hiện tại. Bạn cũng có thể chuyển chế độ xem: Tháng / Tuần / Danh sách.',
+              side: 'bottom' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            element: '#tour-calendar-body',
+            popover: {
+              title: 'Lịch ca làm việc',
+              description:
+                'Hiển thị các ca được phân của bạn. Màu sắc thể hiện trạng thái chấm công:\n\n\u2B1C Xám = Chưa chấm công\n\ud83d\udfe6 Xanh dương = Đã check-in (chưa check-out)\n\ud83d\udfe7 Cam = Đi muộn\n\ud83d\udfe9 Xanh lá = Hoàn thành (check-in & check-out)\n\nNhấn vào ca bất kỳ để xem chi tiết.',
+              side: 'top' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            element: '#tour-month-summary',
+            popover: {
+              title: 'Tổng quan tháng',
+              description:
+                'Hiển thị thống kê nhanh: tổng số ca, số ca đã check-in, hoàn thành, đi muộn và chưa chấm công trong tháng.',
+              side: 'top' as const,
+              align: 'start' as const,
+            },
+          },
+          {
+            popover: {
+              title: 'Hoàn thành hướng dẫn! \ud83c\udf89',
+              description:
+                'Bạn đã nắm được cách xem lịch làm việc cá nhân. Nhấn nút \u2753 \u1edf góc trên bất kỳ lúc nào để xem lại.',
+            },
+          },
+        ],
+      },
+    ],
+    []
+  );
+
+  const {
+    startTour,
+    resetAndRestartAll,
+    completedMap,
+    tours: tourList,
+  } = usePageTours({ tours: SCHEDULE_TOURS });
+
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
       <CustomBreadcrumbs
@@ -230,8 +301,54 @@ export default function MyScheduleView() {
           { name: 'Attendance', href: paths.dashboard.attendance.root },
           { name: 'Lịch làm việc' },
         ]}
-        sx={{ mb: { xs: 3, md: 5 } }}
-      />
+          action={
+            <Tooltip title="Hướng dẫn sử dụng">
+              <IconButton onClick={(e) => setTourMenuAnchor(e.currentTarget)}>
+                <Iconify icon="solar:question-circle-bold" width={24} />
+              </IconButton>
+            </Tooltip>
+          }
+          sx={{ mb: { xs: 3, md: 5 } }}
+        />
+
+      {/* Tour help menu */}
+      <Menu
+        anchorEl={tourMenuAnchor}
+        open={Boolean(tourMenuAnchor)}
+        onClose={() => setTourMenuAnchor(null)}
+        slotProps={{ paper: { sx: { minWidth: 220 } } }}
+      >
+        {tourList.map((t) => (
+          <MenuItem
+            key={t.tourKey}
+            onClick={() => {
+              setTourMenuAnchor(null);
+              startTour(t.tourKey);
+            }}
+          >
+            <ListItemIcon>
+              <Iconify
+                icon={completedMap[t.tourKey] ? 'solar:check-circle-bold' : 'solar:play-circle-bold'}
+                width={20}
+                sx={{ color: completedMap[t.tourKey] ? 'success.main' : 'text.secondary' }}
+              />
+            </ListItemIcon>
+            <ListItemText primary={t.label} />
+          </MenuItem>
+        ))}
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            setTourMenuAnchor(null);
+            resetAndRestartAll();
+          }}
+        >
+          <ListItemIcon>
+            <Iconify icon="solar:restart-bold" width={20} />
+          </ListItemIcon>
+          <ListItemText primary="Xem lại tất cả" />
+        </MenuItem>
+      </Menu>
 
       {loading ? (
         <Box display="flex" justifyContent="center" py={6}>
@@ -241,6 +358,7 @@ export default function MyScheduleView() {
         <>
           <Card>
             <StyledCalendar>
+              <Box id="tour-calendar-toolbar">
               <CalendarToolbar
                 date={date}
                 view={view}
@@ -251,7 +369,9 @@ export default function MyScheduleView() {
                 onChangeView={handleChangeView}
                 onOpenFilters={() => {}}
               />
+              </Box>
 
+              <Box id="tour-calendar-body">
               <Calendar
                 weekends
                 selectable={false}
@@ -301,12 +421,13 @@ export default function MyScheduleView() {
                     );
                   }}
               />
+              </Box>
             </StyledCalendar>
           </Card>
 
           {/* Summary */}
           {assignments.length > 0 && (
-            <Card sx={{ p: 3, mt: 3 }}>
+            <Card id="tour-month-summary" sx={{ p: 3, mt: 3 }}>
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Tổng quan tháng này
               </Typography>

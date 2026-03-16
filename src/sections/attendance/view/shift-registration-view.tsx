@@ -24,6 +24,11 @@ import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import { useTheme, alpha } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
@@ -46,6 +51,9 @@ import {
   getShiftRegistrations,
 } from 'src/api/shiftRegistration';
 import { useAuthContext } from 'src/auth/hooks';
+
+import { usePageTours } from 'src/hooks/use-tour';
+import type { TourDefinition } from 'src/hooks/use-tour';
 
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 
@@ -131,6 +139,10 @@ export default function ShiftRegistrationView() {
   const [weekSelections, setWeekSelections] = useState<Record<string, boolean>>({});
   const [weekNote, setWeekNote] = useState('');
   const [weeklyRegistering, setWeeklyRegistering] = useState(false);
+
+  // Tour state
+  const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
+  const tourWeeklyDialogRef = useRef(false);
 
   const currentUserId = authUser?.id;
   const isAdmin =
@@ -230,6 +242,21 @@ export default function ShiftRegistrationView() {
   const openWeeklyDialog = useCallback(() => {
     setWeekNote('');
     weeklyDialog.onTrue();
+  }, [weeklyDialog]);
+
+  // ── Tour helpers ──
+
+  const openTourWeeklyDialog = useCallback(() => {
+    tourWeeklyDialogRef.current = true;
+    setWeekNote('');
+    weeklyDialog.onTrue();
+  }, [weeklyDialog]);
+
+  const closeTourWeeklyDialog = useCallback(() => {
+    if (tourWeeklyDialogRef.current) {
+      tourWeeklyDialogRef.current = false;
+      weeklyDialog.onFalse();
+    }
   }, [weeklyDialog]);
 
   const toggleWeekCell = useCallback((key: string) => {
@@ -475,6 +502,132 @@ export default function ShiftRegistrationView() {
 
 
 
+  // ── Tour definitions ──
+
+  const REGISTRATION_TOURS: TourDefinition[] = useMemo(
+    () => [
+      {
+        tourKey: 'shift-registration-overview',
+        label: 'Tổng quan',
+        steps: [
+          {
+            element: '#tour-date-filter',
+            popover: {
+              title: 'Bộ lọc ngày',
+              description:
+                'Chọn khoảng thời gian bạn muốn xem lịch ca. Mặc định hiển thị tháng hiện tại.',
+              side: 'bottom' as const,
+              align: 'start' as const,
+            },
+          },
+          {
+            element: '#tour-calendar-view',
+            popover: {
+              title: 'Lịch ca làm việc',
+              description:
+                'Hiển thị tất cả ca làm trong khoảng thời gian đã chọn. Ca có viền đậm & "Đã ĐK" là ca bạn đã đăng ký. Nhấn vào ca bất kỳ để xem chi tiết và đăng ký / hủy đăng ký.',
+              side: 'top' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            element: '#tour-weekly-register-btn',
+            popover: {
+              title: 'Đăng ký lịch tuần',
+              description:
+                'Nhấn nút này để mở bảng đăng ký nhanh theo tuần — tiện hơn khi cần đăng ký nhiều ca cùng lúc.',
+              side: 'bottom' as const,
+              align: 'end' as const,
+            },
+          },
+        ],
+      },
+      {
+        tourKey: 'shift-registration-weekly',
+        label: 'Đăng ký theo tuần',
+        steps: [
+          {
+            element: '#tour-weekly-dialog',
+            popover: {
+              title: 'Bảng đăng ký tuần',
+              description:
+                'Đây là bảng đăng ký nhanh theo tuần. Bạn có thể chọn / bỏ chọn nhiều ca cùng lúc rồi xác nhận một lần.',
+              side: 'top' as const,
+              align: 'center' as const,
+            },
+            onHighlightStarted: () => {
+              openTourWeeklyDialog();
+            },
+          },
+          {
+            element: '#tour-week-navigator',
+            popover: {
+              title: 'Chuyển tuần',
+              description:
+                'Nhấn mũi tên trái/phải để xem và đăng ký ca ở tuần khác.',
+              side: 'bottom' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            element: '#tour-week-grid',
+            popover: {
+              title: 'Bảng ca theo ngày',
+              description:
+                'Nhấn vào ô ca để chọn (viền đậm = đã chọn). Ca đã đăng ký trước đó sẽ được tô sẵn. Bỏ chọn ca đã đăng ký sẽ hủy đăng ký khi xác nhận.',
+              side: 'top' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            element: '#tour-week-confirm-btn',
+            popover: {
+              title: 'Xác nhận đăng ký',
+              description:
+                'Sau khi chọn xong, nhấn "Xác nhận đăng ký" để lưu. Hệ thống sẽ tự đăng ký ca mới và hủy ca bạn bỏ chọn.',
+              side: 'top' as const,
+              align: 'end' as const,
+            },
+            onDeselected: () => {
+              closeTourWeeklyDialog();
+            },
+          },
+        ],
+      },
+      {
+        tourKey: 'shift-registration-detail',
+        label: 'Đăng ký từng ca',
+        steps: [
+          {
+            element: '#tour-calendar-view',
+            popover: {
+              title: 'Chọn ca trên lịch',
+              description:
+                'Nhấn vào bất kỳ ca nào trên lịch để mở chi tiết. Tại đó bạn có thể xem ai đã đăng ký, và đăng ký / hủy đăng ký ca đó.',
+              side: 'top' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            popover: {
+              title: 'Hoàn thành hướng dẫn! 🎉',
+              description:
+                'Bạn đã nắm được cách đăng ký ca làm việc. Nhấn nút ❓ ở góc trên bất kỳ lúc nào để xem lại hướng dẫn.',
+            },
+          },
+        ],
+      },
+    ],
+    [openTourWeeklyDialog, closeTourWeeklyDialog]
+  );
+
+  const {
+    startTour,
+    resetAndRestartAll,
+    completedMap,
+    tours: tourList,
+  } = usePageTours({ tours: REGISTRATION_TOURS });
+
   return (
     <>
       <Container maxWidth={settings.themeStretch ? false : 'xl'}>
@@ -485,11 +638,57 @@ export default function ShiftRegistrationView() {
             { name: 'Attendance', href: paths.dashboard.attendance.root },
             { name: 'Đăng ký ca' },
           ]}
+          action={
+            <Tooltip title="Hướng dẫn sử dụng">
+              <IconButton onClick={(e) => setTourMenuAnchor(e.currentTarget)}>
+                <Iconify icon="solar:question-circle-bold" width={24} />
+              </IconButton>
+            </Tooltip>
+          }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
 
+        {/* Tour help menu */}
+        <Menu
+          anchorEl={tourMenuAnchor}
+          open={Boolean(tourMenuAnchor)}
+          onClose={() => setTourMenuAnchor(null)}
+          slotProps={{ paper: { sx: { minWidth: 220 } } }}
+        >
+          {tourList.map((t) => (
+            <MenuItem
+              key={t.tourKey}
+              onClick={() => {
+                setTourMenuAnchor(null);
+                startTour(t.tourKey);
+              }}
+            >
+              <ListItemIcon>
+                <Iconify
+                  icon={completedMap[t.tourKey] ? 'solar:check-circle-bold' : 'solar:play-circle-bold'}
+                  width={20}
+                  sx={{ color: completedMap[t.tourKey] ? 'success.main' : 'text.secondary' }}
+                />
+              </ListItemIcon>
+              <ListItemText primary={t.label} />
+            </MenuItem>
+          ))}
+          <Divider />
+          <MenuItem
+            onClick={() => {
+              setTourMenuAnchor(null);
+              resetAndRestartAll();
+            }}
+          >
+            <ListItemIcon>
+              <Iconify icon="solar:restart-bold" width={20} />
+            </ListItemIcon>
+            <ListItemText primary="Xem lại tất cả" />
+          </MenuItem>
+        </Menu>
+
         {/* Filters */}
-        <Card sx={{ mb: 3, p: { xs: 1.5, md: 2.5 } }}>
+        <Card id="tour-date-filter" sx={{ mb: 3, p: { xs: 1.5, md: 2.5 } }}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
             <Stack direction="row" spacing={1} sx={{ width: { xs: 1, md: 'auto' } }}>
               <DatePicker
@@ -517,6 +716,7 @@ export default function ShiftRegistrationView() {
               />
             )}
             <Button
+              id="tour-weekly-register-btn"
               fullWidth={!smUp}
               variant="contained"
               startIcon={<Iconify icon="solar:calendar-add-bold-duotone" />}
@@ -528,7 +728,7 @@ export default function ShiftRegistrationView() {
         </Card>
 
         {/* Calendar View */}
-        <Card>
+        <Card id="tour-calendar-view">
           <StyledCalendar eventColor={events.length > 0 ? events[0].color : undefined}>
             <CalendarToolbar
               date={date}
@@ -779,11 +979,11 @@ export default function ShiftRegistrationView() {
       {/* Weekly Registration Dialog */}
       <Dialog
         open={weeklyDialog.value}
-        onClose={weeklyDialog.onFalse}
+        onClose={tourWeeklyDialogRef.current ? closeTourWeeklyDialog : weeklyDialog.onFalse}
         maxWidth="md"
         fullWidth
         fullScreen={!smUp}
-        PaperProps={{ sx: { borderRadius: smUp ? 2 : 0 } }}
+        PaperProps={{ sx: { borderRadius: smUp ? 2 : 0 }, id: 'tour-weekly-dialog' }}
       >
         <DialogTitle sx={{ px: { xs: 2, sm: 3 }, py: { xs: 1.5, sm: 2 } }}>
           <Stack
@@ -793,7 +993,7 @@ export default function ShiftRegistrationView() {
             spacing={1}
           >
             <Typography variant="h6">Đăng ký lịch tuần</Typography>
-            <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.5}>
+            <Stack id="tour-week-navigator" direction="row" alignItems="center" justifyContent="center" spacing={0.5}>
               <IconButton
                 size="small"
                 onClick={() => {
@@ -831,7 +1031,7 @@ export default function ShiftRegistrationView() {
         </DialogTitle>
 
         <DialogContent sx={{ px: { xs: 1.5, sm: 2 } }}>
-          <Stack spacing={2} sx={{ mt: 1 }}>
+          <Stack id="tour-week-grid" spacing={2} sx={{ mt: 1 }}>
             {weekSchedules.length === 0 ? (
               <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
                 Không có ca làm nào trong tuần này
@@ -1082,10 +1282,11 @@ export default function ShiftRegistrationView() {
         </DialogContent>
 
         <DialogActions>
-          <Button variant="outlined" onClick={weeklyDialog.onFalse}>
+          <Button variant="outlined" onClick={tourWeeklyDialogRef.current ? closeTourWeeklyDialog : weeklyDialog.onFalse}>
             Hủy
           </Button>
           <LoadingButton
+            id="tour-week-confirm-btn"
             variant="contained"
             onClick={handleWeeklySubmit}
             loading={weeklyRegistering}
