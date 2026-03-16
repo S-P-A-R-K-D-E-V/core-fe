@@ -46,6 +46,7 @@
     "aws-amplify": "^6.0.6",
     "axios": "^1.6.2",
     "date-fns": "^2.30.0",
+    "driver.js": "^1.4.0",
     "firebase": "^10.7.1",
     "framer-motion": "^10.16.16",
     "highlight.js": "^11.9.0",

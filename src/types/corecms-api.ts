@@ -1248,6 +1248,18 @@ export interface IKiotVietBankAccount {
 
 // ======================================================================
 // Shift Registration Types
+
+// ======================================================================
+// User Tour Types
+// ======================================================================
+
+export interface IUserTourStatus {
+  tourKey: string;
+  isCompleted: boolean;
+  completedAt?: string | null;
+}
+
+// ======================================================================
 // ======================================================================
 
 export interface IShiftRegistration {

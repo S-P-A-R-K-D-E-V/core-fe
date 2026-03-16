@@ -29,6 +29,9 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Tooltip from '@mui/material/Tooltip';
 import Collapse from '@mui/material/Collapse';
 import Divider from '@mui/material/Divider';
+import Menu from '@mui/material/Menu';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import LoadingButton from '@mui/lab/LoadingButton';
 import { useTheme, alpha } from '@mui/material/styles';
 
@@ -46,6 +49,8 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { usePageTours } from 'src/hooks/use-tour';
+import type { TourDefinition } from 'src/hooks/use-tour';
 
 import {
   IShiftCashSummary,
@@ -82,6 +87,127 @@ const DENOMINATIONS = [1, 2, 5, 10, 20, 50, 100, 200, 500];
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('vi-VN').format(value);
 }
+
+// ======================================================================
+// Tour definitions
+// ======================================================================
+
+const SHIFT_CASH_TOURS: TourDefinition[] = [
+  {
+    tourKey: 'shift-cash-overview',
+    label: 'Tổng quan',
+    steps: [
+      {
+        element: '#tour-date-picker',
+        popover: {
+          title: 'Chọn ngày',
+          description: 'Chọn ngày bạn muốn xem hoặc kiểm tiền. Mặc định là hôm nay.',
+          side: 'bottom' as const,
+          align: 'start' as const,
+        },
+      },
+      {
+        element: '#tour-denomination-box',
+        popover: {
+          title: 'Bảng mệnh giá tiền mặt',
+          description:
+            'Nhập số lượng tiền theo từng mệnh giá để tính tổng tiền mặt trong quầy. Nhấn "Mở Quầy" để bắt đầu ca mới.',
+          side: 'right' as const,
+          align: 'start' as const,
+        },
+      },
+      {
+        element: '#tour-summary-box',
+        popover: {
+          title: 'Tổng hợp',
+          description:
+            'Xem tồn đầu ca, doanh thu KiotViet, thu/chi quầy và tồn cuối lý thuyết. So sánh với tiền mặt kiểm đếm thực tế để biết chênh lệch.',
+          side: 'left' as const,
+          align: 'start' as const,
+        },
+      },
+      {
+        element: '#tour-difference-box',
+        popover: {
+          title: 'Chênh lệch',
+          description:
+            'Hiển thị chênh lệch giữa tiền mặt kiểm đếm thực tế và tồn cuối lý thuyết. Xanh = dư, Đỏ = thiếu.',
+          side: 'top' as const,
+          align: 'start' as const,
+        },
+      },
+    ],
+  },
+  {
+    tourKey: 'shift-cash-transactions',
+    label: 'Thu chi & Chốt tiền',
+    steps: [
+      {
+        element: '#tour-tabs-section',
+        popover: {
+          title: 'Các tab chi tiết',
+          description:
+            'Trang có 3 tab: Thu chi quầy, Bán hàng KiotViet, và Nhật ký chỉnh sửa.',
+          side: 'top' as const,
+          align: 'start' as const,
+        },
+      },
+      {
+        element: '#tour-add-tx-buttons',
+        popover: {
+          title: 'Thêm thu / chi',
+          description:
+            'Nhấn "Thêm thu" hoặc "Thêm chi" để ghi nhận các khoản thu chi ngoài KiotViet (ví dụ: tiền tip, mua đồ dùng...).',
+          side: 'bottom' as const,
+          align: 'start' as const,
+        },
+      },
+      {
+        element: '#tour-finalize-area',
+        popover: {
+          title: 'Chốt tiền cuối ca',
+          description:
+            'Sau khi kiểm đếm xong, nhấn "Chốt tiền" → nhập mệnh giá → "Chốt ca" để lưu kết quả. Tồn cuối sẽ thành tồn đầu ca ngày kế tiếp.',
+          side: 'left' as const,
+          align: 'start' as const,
+        },
+      },
+    ],
+  },
+  {
+    tourKey: 'shift-cash-kiotviet',
+    label: 'KiotViet',
+    steps: [
+      {
+        element: '#tour-kiotviet-summary',
+        popover: {
+          title: 'Tổng quan KiotViet',
+          description:
+            'Hiển thị tổng doanh thu từ KiotViet: tiền mặt, chuyển khoản, quẹt thẻ. Bao gồm cả đơn trả hàng.',
+          side: 'left' as const,
+          align: 'start' as const,
+        },
+      },
+      {
+        element: '#tour-tabs-section',
+        popover: {
+          title: 'Tab Bán hàng KiotViet',
+          description:
+            'Chuyển sang tab "Bán hàng KiotViet" để xem chi tiết từng hóa đơn, phân loại theo tiền mặt / chuyển khoản / thẻ / trả hàng.',
+          side: 'top' as const,
+          align: 'start' as const,
+        },
+      },
+      {
+        popover: {
+          title: 'Hoàn thành hướng dẫn! 🎉',
+          description:
+            'Bạn đã nắm được cách sử dụng trang Kiểm tiền quầy. Nhấn nút ❓ ở góc trên bất kỳ lúc nào để xem lại.',
+        },
+      },
+    ],
+  },
+];
 
 // ======================================================================
 
@@ -146,6 +272,17 @@ export default function ShiftCashDashboardView() {
   const isAdmin = user?.roles?.includes('Admin') || user?.role === 'Admin';
   const canEdit = isToday || isAdmin;
   const hasOpenedToday = (summary?.denominations ?? []).length > 0;
+
+  // ========== Tour hướng dẫn ==========
+  const {
+    startTour,
+    startNextPending,
+    resetAndRestartAll,
+    completedMap,
+    allCompleted,
+    tours: tourList,
+  } = usePageTours({ tours: SHIFT_CASH_TOURS });
+  const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -473,11 +610,57 @@ export default function ShiftCashDashboardView() {
             { name: 'Dashboard', href: paths.dashboard.root },
             { name: 'Kiểm tiền' },
           ]}
+          action={
+            <>
+              <Tooltip title="Hướng dẫn sử dụng">
+                <IconButton onClick={(e) => setTourMenuAnchor(e.currentTarget)}>
+                  <Iconify icon="solar:question-circle-bold" width={24} />
+                </IconButton>
+              </Tooltip>
+              <Menu
+                anchorEl={tourMenuAnchor}
+                open={Boolean(tourMenuAnchor)}
+                onClose={() => setTourMenuAnchor(null)}
+                slotProps={{ paper: { sx: { minWidth: 220 } } }}
+              >
+                {tourList.map((t) => (
+                  <MenuItem
+                    key={t.tourKey}
+                    onClick={() => {
+                      setTourMenuAnchor(null);
+                      startTour(t.tourKey);
+                    }}
+                  >
+                    <ListItemIcon>
+                      <Iconify
+                        icon={completedMap[t.tourKey] ? 'solar:check-circle-bold' : 'solar:play-circle-bold'}
+                        width={20}
+                        sx={{ color: completedMap[t.tourKey] ? 'success.main' : 'text.secondary' }}
+                      />
+                    </ListItemIcon>
+                    <ListItemText primary={t.label} />
+                  </MenuItem>
+                ))}
+                <Divider />
+                <MenuItem
+                  onClick={() => {
+                    setTourMenuAnchor(null);
+                    resetAndRestartAll();
+                  }}
+                >
+                  <ListItemIcon>
+                    <Iconify icon="solar:restart-bold" width={20} />
+                  </ListItemIcon>
+                  <ListItemText primary="Xem lại tất cả" />
+                </MenuItem>
+              </Menu>
+            </>
+          }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
 
         {/* Date picker */}
-        <Card sx={{ mb: 3, p: 2.5 }}>
+        <Card id="tour-date-picker" sx={{ mb: 3, p: 2.5 }}>
           <Stack direction="row" spacing={2} alignItems="center">
             <DatePicker
               label="Ngày"
@@ -527,7 +710,7 @@ export default function ShiftCashDashboardView() {
             {/* Row 1: Denomination box + Summary box */}
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
               {/* Denomination Box */}
-              <Card sx={{ flex: 1, p: 3 }}>
+              <Card id="tour-denomination-box" sx={{ flex: 1, p: 3 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Typography variant="h6">
@@ -544,7 +727,7 @@ export default function ShiftCashDashboardView() {
                       />
                     )}
                   </Stack>
-                  <Stack direction="row" spacing={1}>
+                  <Stack id="tour-finalize-area" direction="row" spacing={1}>
                     {!hasOpenedToday ? (
                       <Tooltip title={!canEdit ? 'Chỉ Admin mới có quyền chỉnh sửa ngày cũ' : ''}>
                         <span>
@@ -670,7 +853,7 @@ export default function ShiftCashDashboardView() {
               </Card>
 
               {/* Summary Box */}
-              <Card sx={{ flex: 1, p: 3 }}>
+              <Card id="tour-summary-box" sx={{ flex: 1, p: 3 }}>
                 <Typography variant="h6" sx={{ mb: 2 }}>
                   <Iconify icon="solar:calculator-bold-duotone" width={24} sx={{ mr: 1, verticalAlign: 'middle' }} />
                   Tổng hợp
@@ -681,7 +864,7 @@ export default function ShiftCashDashboardView() {
                     <Typography variant="body2" color="text.secondary">Tồn đầu ca</Typography>
                     <Typography variant="body2">{formatCurrency(summary?.openingBalance || 0)}</Typography>
                   </Stack>
-                  <Stack direction="row" justifyContent="space-between">
+                  <Stack id="tour-kiotviet-summary" direction="row" justifyContent="space-between">
                     <Typography variant="body2" color="text.secondary">+ KiotViet</Typography>
                     <Typography variant="body2">
                         {kiotLoading ? '...' : formatCurrency((kiotData?.totalRevenue || 0) - (kiotData?.totalReturns || 0))}
@@ -739,6 +922,7 @@ export default function ShiftCashDashboardView() {
                   </Box>
 
                   <Box
+                    id="tour-difference-box"
                     sx={{
                       p: 2,
                       borderRadius: 1,
@@ -816,7 +1000,7 @@ export default function ShiftCashDashboardView() {
             </Stack>
 
             {/* Row 2: Tabs - Transactions / KiotViet / Logs */}
-            <Card>
+            <Card id="tour-tabs-section">
               <Tabs
                 value={tab}
                 onChange={(_, v) => setTab(v)}
@@ -858,7 +1042,7 @@ export default function ShiftCashDashboardView() {
                 {/* Tab 0: Thu chi quầy */}
                 {tab === 0 && (
                   <>
-                    <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                    <Stack id="tour-add-tx-buttons" direction="row" spacing={1} sx={{ mb: 2 }}>
                       <Button
                         variant="contained"
                         color="success"

@@ -209,6 +209,12 @@ export const endpoints = {
     create: '/notification/config',
     update: (id: string) => `/notification/config/${id}`,
   },
+  userTours: {
+    batch: '/user-tours/batch',
+    status: (tourKey: string) => `/user-tours/${tourKey}`,
+    complete: (tourKey: string) => `/user-tours/${tourKey}/complete`,
+    reset: (tourKey: string) => `/user-tours/${tourKey}/reset`,
+  },
   // POS / Inventory
   categories: {
     list: '/categories',
