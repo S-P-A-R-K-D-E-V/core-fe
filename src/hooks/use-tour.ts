@@ -112,20 +112,23 @@ export function usePageTours({
       ...driverConfig,
       steps: tourDef.steps,
       onDestroyStarted: () => {
+        // Capture state BEFORE destroy() wipes driver internals
+        const wasLastStep = driverObj.isLastStep();
+        driverObj.destroy();
+
         // Mark current tour as completed
         completeTour(tourKey)
           .then(() => {
             setCompletedMap((prev) => ({ ...prev, [tourKey]: true }));
 
-            // If user finished all steps (not closed early) and there's a next tour
-            if (nextTour && driverObj.isLastStep()) {
+            // If user finished all steps (not closed early) and there's a next tour → chain
+            if (nextTour && wasLastStep) {
               setTimeout(() => {
                 startTour(nextTour.tourKey);
               }, 400);
             }
           })
           .catch(() => {});
-        driverObj.destroy();
       },
     });
 
