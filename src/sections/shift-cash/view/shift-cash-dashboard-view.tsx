@@ -111,7 +111,7 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
         popover: {
           title: 'Bảng mệnh giá tiền mặt',
           description:
-            'Nhập số lượng tiền theo từng mệnh giá để tính tổng tiền mặt trong quầy. Nhấn "Mở Quầy" để bắt đầu ca mới.',
+            'Nhập số lượng tiền theo từng mệnh giá để tính tổng tiền mặt trong quầy. Nhấn "Mở Quầy" để bắt đầu ca mới ( dành cho buổi sáng), còn chốt quầy sẽ enable khu vực nhập số lượng tiền để thực hiện kiểm đếm. Các bạn kiểm đếm số lượng tiền mặt vào và Lưu Nháp hoặc Chốt quầy để lưu lại.',
           side: 'right' as const,
           align: 'start' as const,
         },
@@ -121,7 +121,7 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
         popover: {
           title: 'Tổng hợp',
           description:
-            'Xem tồn đầu ca, doanh thu KiotViet, thu/chi quầy và tồn cuối lý thuyết. So sánh với tiền mặt kiểm đếm thực tế để biết chênh lệch.',
+            'Xem tồn đầu ca, doanh thu KiotViet, thu/chi quầy và tồn cuối. So sánh với tiền mặt kiểm đếm thực tế để biết chênh lệch.',
           side: 'left' as const,
           align: 'start' as const,
         },
@@ -131,7 +131,7 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
         popover: {
           title: 'Chênh lệch',
           description:
-            'Hiển thị chênh lệch giữa tiền mặt kiểm đếm thực tế và tồn cuối lý thuyết. Xanh = dư, Đỏ = thiếu.',
+            'Hiển thị chênh lệch giữa tiền mặt kiểm đếm thực tế và tồn cuối. Xanh = dư, Đỏ = thiếu. Các trường hợp bị chênh lệnh khi hết ca vui lòng nhắn tin báo lại trên messenger nhóm A/C để team hỗ trợ kiểm tra nhé.',
           side: 'top' as const,
           align: 'start' as const,
         },
@@ -157,7 +157,7 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
         popover: {
           title: 'Thêm thu / chi',
           description:
-            'Nhấn "Thêm thu" hoặc "Thêm chi" để ghi nhận các khoản thu chi ngoài KiotViet (ví dụ: tiền tip, mua đồ dùng...).',
+            'Nhấn "Thêm thu" hoặc "Thêm chi" để ghi nhận các khoản thu chi ngoài KiotViet (ví dụ: tiền ship, mua đồ dùng...).',
           side: 'bottom' as const,
           align: 'start' as const,
         },
@@ -167,7 +167,7 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
         popover: {
           title: 'Chốt tiền cuối ca',
           description:
-            'Sau khi kiểm đếm xong, nhấn "Chốt tiền" → nhập mệnh giá → "Chốt ca" để lưu kết quả. Tồn cuối sẽ thành tồn đầu ca ngày kế tiếp.',
+            'Sau khi kiểm đếm xong, nhấn "Chốt tiền" → nhập mệnh giá → "Chốt ca" để lưu kết quả.',
           side: 'left' as const,
           align: 'start' as const,
         },
@@ -193,7 +193,7 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
         popover: {
           title: 'Tab Bán hàng KiotViet',
           description:
-            'Chuyển sang tab "Bán hàng KiotViet" để xem chi tiết từng hóa đơn, phân loại theo tiền mặt / chuyển khoản / thẻ / trả hàng.',
+            'Chuyển sang tab "Bán hàng KiotViet" để xem chi tiết từng hóa đơn khi cần kiểm tra lại thông tin khi lệch giá trị, phân loại theo tiền mặt / chuyển khoản / thẻ / trả hàng. Báo lại với a/c quản lý để xử lý trường hợp chênh lệch.',
           side: 'top' as const,
           align: 'start' as const,
         },
@@ -905,7 +905,7 @@ export default function ShiftCashDashboardView() {
 
                   <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 1.5 }}>
                     <Stack direction="row" justifyContent="space-between">
-                      <Typography variant="subtitle2">= Tồn cuối lý thuyết</Typography>
+                      <Typography variant="subtitle2">= Tồn cuối</Typography>
                       <Typography variant="subtitle2" color="info.main">
                         {formatCurrency(summary?.expectedClosing || 0)}
                       </Typography>
@@ -1655,7 +1655,7 @@ export default function ShiftCashDashboardView() {
                 </Stack>
                 <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 1 }}>
                   <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="subtitle2">= Tồn cuối lý thuyết</Typography>
+                    <Typography variant="subtitle2">= Tồn cuối</Typography>
                     <Typography variant="subtitle2" color="info.main">
                       {formatCurrency(summary?.expectedClosing || 0)}
                     </Typography>

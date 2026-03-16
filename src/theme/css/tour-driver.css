@@ -1,0 +1,219 @@
+/*
+ * driver.js — MUI-themed overrides
+ * Matches the MUI Material palette & typography from the app theme.
+ * Font: Public Sans · Border-radius: 12px · Primary: #00A76F
+ */
+
+/* ====================================================================
+   Overlay
+   ==================================================================== */
+.driver-overlay {
+  /* background-color: rgba(22, 28, 36, 0.72) !important; */
+  /* backdrop-filter: blur(6px); */
+  /* -webkit-backdrop-filter: blur(6px); */
+}
+
+/* ====================================================================
+   Popover — container
+   ==================================================================== */
+.driver-popover {
+  font-family: 'Public Sans', sans-serif;
+  background: #ffffff !important;
+  border: none !important;
+  border-radius: 12px !important;
+  box-shadow:
+    0 0 2px 0 rgba(145, 158, 171, 0.2),
+    0 12px 24px -4px rgba(145, 158, 171, 0.12) !important;
+  padding: 20px !important;
+  max-width: 380px !important;
+  min-width: 280px !important;
+  color: #212B36;
+}
+
+/* ====================================================================
+   Arrow
+   ==================================================================== */
+.driver-popover-arrow {
+  border: none !important;
+}
+
+.driver-popover.driver-popover-side-left .driver-popover-arrow-side-right,
+.driver-popover.driver-popover-side-right .driver-popover-arrow-side-left,
+.driver-popover.driver-popover-side-top .driver-popover-arrow-side-bottom,
+.driver-popover.driver-popover-side-bottom .driver-popover-arrow-side-top {
+  background: #ffffff !important;
+  border: none !important;
+}
+
+/* ====================================================================
+   Title
+   ==================================================================== */
+.driver-popover-title {
+  font-family: 'Public Sans', sans-serif !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1.5 !important;
+  color: #212B36 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* ====================================================================
+   Description
+   ==================================================================== */
+.driver-popover-description {
+  font-family: 'Public Sans', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 1.6 !important;
+  color: #637381 !important;
+  margin: 10px 0 0 !important;
+  padding: 0 !important;
+}
+
+/* ====================================================================
+   Footer
+   ==================================================================== */
+.driver-popover-footer {
+  margin-top: 16px !important;
+  padding: 0 !important;
+  border-top: none !important;
+  gap: 8px;
+}
+
+/* ====================================================================
+   Progress text
+   ==================================================================== */
+.driver-popover-progress-text {
+  font-family: 'Public Sans', sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #919EAB !important;
+  letter-spacing: 0.2px;
+}
+
+/* ====================================================================
+   Buttons — shared base
+   ==================================================================== */
+.driver-popover-prev-btn,
+.driver-popover-next-btn {
+  font-family: 'Public Sans', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 1.71 !important;
+  border-radius: 8px !important;
+  padding: 4px 14px !important;
+  text-shadow: none !important;
+  transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer;
+  min-height: 32px;
+  text-transform: none !important;
+}
+
+/* ====================================================================
+   Previous button — outlined style
+   ==================================================================== */
+.driver-popover-prev-btn {
+  background: transparent !important;
+  color: #212B36 !important;
+  border: 1px solid rgba(145, 158, 171, 0.32) !important;
+}
+
+.driver-popover-prev-btn:hover {
+  background: rgba(145, 158, 171, 0.08) !important;
+  border-color: #212B36 !important;
+}
+
+/* ====================================================================
+   Next / Done button — contained primary style
+   ==================================================================== */
+.driver-popover-next-btn {
+  background: #00A76F !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 8px 16px 0 rgba(0, 167, 111, 0.24) !important;
+}
+
+.driver-popover-next-btn:hover {
+  background: #007867 !important;
+  box-shadow: none !important;
+}
+
+/* ====================================================================
+   Close button — minimal icon style
+   ==================================================================== */
+.driver-popover-close-btn {
+  width: 28px !important;
+  height: 28px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  color: #637381 !important;
+  font-size: 16px !important;
+  font-weight: 400 !important;
+  top: 12px !important;
+  right: 12px !important;
+  padding: 0 !important;
+  transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  background: transparent !important;
+}
+
+.driver-popover-close-btn:hover {
+  background: rgba(145, 158, 171, 0.08) !important;
+  color: #212B36 !important;
+}
+
+/* ====================================================================
+   Highlighted element
+   ==================================================================== */
+.driver-active-element {
+  border-radius: 8px !important;
+}
+
+/* ====================================================================
+   Dark mode support (prefers-color-scheme)
+   ==================================================================== */
+@media (prefers-color-scheme: dark) {
+  .driver-popover {
+    background: #212B36 !important;
+    color: #ffffff;
+    box-shadow:
+      0 0 2px 0 rgba(0, 0, 0, 0.2),
+      0 12px 24px -4px rgba(0, 0, 0, 0.12) !important;
+  }
+
+  .driver-popover.driver-popover-side-left .driver-popover-arrow-side-right,
+  .driver-popover.driver-popover-side-right .driver-popover-arrow-side-left,
+  .driver-popover.driver-popover-side-top .driver-popover-arrow-side-bottom,
+  .driver-popover.driver-popover-side-bottom .driver-popover-arrow-side-top {
+    background: #212B36 !important;
+  }
+
+  .driver-popover-title {
+    color: #ffffff !important;
+  }
+
+  .driver-popover-description {
+    color: #919EAB !important;
+  }
+
+  .driver-popover-prev-btn {
+    color: #ffffff !important;
+    border-color: rgba(145, 158, 171, 0.32) !important;
+  }
+
+  .driver-popover-prev-btn:hover {
+    background: rgba(145, 158, 171, 0.16) !important;
+    border-color: #ffffff !important;
+  }
+
+  .driver-popover-close-btn {
+    color: #919EAB !important;
+  }
+
+  .driver-popover-close-btn:hover {
+    background: rgba(145, 158, 171, 0.16) !important;
+    color: #ffffff !important;
+  }
+}

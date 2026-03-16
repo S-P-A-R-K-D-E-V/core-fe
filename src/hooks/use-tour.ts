@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { driver, DriveStep, Config } from 'driver.js';
 import 'driver.js/dist/driver.css';
+import 'src/theme/css/tour-driver.css';
 
 import { getBatchTourStatus, completeTour, resetTour } from 'src/api/userTours';
 
@@ -58,6 +59,8 @@ export function usePageTours({
   const hasAutoStarted = useRef(false);
   const toursRef = useRef(tours);
   toursRef.current = tours;
+  const completedMapRef = useRef(completedMap);
+  completedMapRef.current = completedMap;
 
   // Fetch all tour statuses in 1 API call
   useEffect(() => {
@@ -98,16 +101,18 @@ export function usePageTours({
       driverRef.current.destroy();
     }
 
-    // Find index of this tour to know if there's a next one
+    // Find next uncompleted tour after this one
     const currentIdx = toursRef.current.findIndex((t) => t.tourKey === tourKey);
-    const nextTour = toursRef.current[currentIdx + 1];
+    const nextPendingTour = toursRef.current
+      .slice(currentIdx + 1)
+      .find((t) => !completedMapRef.current[t.tourKey]);
 
     const driverObj = driver({
       showProgress: true,
       showButtons: ['next', 'previous', 'close'],
       nextBtnText: 'Tiếp',
       prevBtnText: 'Quay lại',
-      doneBtnText: nextTour ? 'Tiếp tục →' : 'Hoàn thành',
+      doneBtnText: nextPendingTour ? 'Tiếp tục →' : 'Hoàn thành',
       progressText: `${tourDef.label} — {{current}} / {{total}}`,
       ...driverConfig,
       steps: tourDef.steps,
@@ -121,11 +126,16 @@ export function usePageTours({
           .then(() => {
             setCompletedMap((prev) => ({ ...prev, [tourKey]: true }));
 
-            // If user finished all steps (not closed early) and there's a next tour → chain
-            if (nextTour && wasLastStep) {
-              setTimeout(() => {
-                startTour(nextTour.tourKey);
-              }, 400);
+            // Chain to next uncompleted tour only if user finished all steps
+            if (wasLastStep) {
+              const nextUncompleted = toursRef.current
+                .slice(currentIdx + 1)
+                .find((t) => !completedMapRef.current[t.tourKey] && t.tourKey !== tourKey);
+              if (nextUncompleted) {
+                setTimeout(() => {
+                  startTour(nextUncompleted.tourKey);
+                }, 400);
+              }
             }
           })
           .catch(() => {});
