@@ -10,11 +10,9 @@ import TableBody from '@mui/material/TableBody';
 import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
 
-
-// ------ Summary Row (like KiotViet top row) ------
-
 import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
+import Stack from '@mui/material/Stack';
 import { useBoolean } from 'src/hooks/use-boolean';
 
 import { paths } from 'src/routes/paths';
@@ -37,7 +35,7 @@ import {
 } from 'src/components/table';
 
 import { IProduct, ICategory } from 'src/types/corecms-api';
-import { getAllProducts, deleteProduct } from 'src/api/products';
+import { getAllProducts, deleteProduct, syncKiotViet } from 'src/api/products';
 import { getAllCategories } from 'src/api/categories';
 import { fCurrency, fNumber } from 'src/utils/format-number';
 import ProductTableToolbar from '../product-table-toolbar';
@@ -46,16 +44,14 @@ import ProductTableRow from '../product-table-row';
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
-  { id: 'star', label: '', width: 40 },
   { id: 'image', label: '', width: 40 },
-  { id: 'sku', label: 'Mã hàng', width: 140 },
+  { id: 'code', label: 'Mã hàng', width: 140 },
   { id: 'name', label: 'Tên hàng' },
   { id: 'category', label: 'Nhóm hàng', width: 160 },
-  { id: 'sellingPrice', label: 'Giá bán', width: 110, align: 'right' as const },
-  { id: 'costPrice', label: 'Giá vốn', width: 110, align: 'right' as const },
+  { id: 'basePrice', label: 'Giá bán', width: 110, align: 'right' as const },
   { id: 'stock', label: 'Tồn kho', width: 90, align: 'right' as const },
-  { id: 'ordered', label: 'Khách đặt', width: 90, align: 'right' as const },
-  { id: 'createdAt', label: 'Thời gian tạo', width: 150 },
+  { id: 'status', label: 'Trạng thái', width: 110 },
+  { id: 'createdDate', label: 'Thời gian tạo', width: 150 },
 ];
 
 // ----------------------------------------------------------------------
@@ -77,7 +73,8 @@ export default function ProductListView() {
         getAllProducts({ keyword: filterName || undefined, categoryId: filterCategory || undefined }),
         getAllCategories(),
       ]);
-      setTableData(products);
+      // Only show master products (no masterProductId)
+      setTableData(products.filter((p) => !p.masterProductId));
       setCategories(cats);
     } catch (error) {
       console.error(error);
@@ -92,7 +89,10 @@ export default function ProductListView() {
   const notFound = !dataFiltered.length;
 
   // Summary stats
-  const totalStock = tableData.reduce((sum, p) => sum + p.totalStock, 0);
+  const totalStock = tableData.reduce(
+    (sum, p) => sum + (p.inventories?.reduce((s, inv) => s + (inv.onHand || 0), 0) || 0),
+    0
+  );
 
   const handleFilterName = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     table.onResetPage();
@@ -134,6 +134,22 @@ export default function ProductListView() {
     router.push(`${paths.dashboard.pos.product.new}?categoryId=${product.categoryId}`);
   }, [router]);
 
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      await syncKiotViet();
+      enqueueSnackbar('Đồng bộ KiotViet thành công!');
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar('Đồng bộ thất bại', { variant: 'error' });
+    } finally {
+      setSyncing(false);
+    }
+  }, [enqueueSnackbar, fetchData]);
+
   return (
     <>
       <Container maxWidth="lg">
@@ -145,9 +161,19 @@ export default function ProductListView() {
             { name: 'Sản phẩm' },
           ]}
           action={
-            <Button component={RouterLink} href={paths.dashboard.pos.product.new} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
-              Thêm sản phẩm
-            </Button>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="outlined"
+                startIcon={<Iconify icon="mdi:sync" />}
+                onClick={handleSync}
+                disabled={syncing}
+              >
+                {syncing ? 'Đang đồng bộ...' : 'Đồng bộ KiotViet'}
+              </Button>
+              <Button component={RouterLink} href={paths.dashboard.pos.product.new} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+                Thêm sản phẩm
+              </Button>
+            </Stack>
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
@@ -169,7 +195,7 @@ export default function ProductListView() {
               action={<Button color="error" onClick={confirm.onTrue}>Xóa</Button>}
             />
             <Scrollbar>
-              <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 1100 }}>
+              <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 960 }}>
                 <TableHeadCustom
                   order={table.order}
                   orderBy={table.orderBy}
@@ -226,16 +252,11 @@ export default function ProductListView() {
 function SummaryRow({ totalStock }: { totalStock: number }) {
   return (
     <TableRow sx={{ bgcolor: 'background.neutral' }}>
-      <TableCell colSpan={8} />
+      <TableCell colSpan={6} />
       <TableCell align="right">
         <Typography variant="subtitle2">{fNumber(totalStock)}</Typography>
       </TableCell>
-      <TableCell align="right">
-        <Typography variant="subtitle2">0</Typography>
-      </TableCell>
-      <TableCell>
-        <Typography variant="caption" sx={{ color: 'text.disabled' }}>---</Typography>
-      </TableCell>
+      <TableCell colSpan={2} />
     </TableRow>
   );
 }

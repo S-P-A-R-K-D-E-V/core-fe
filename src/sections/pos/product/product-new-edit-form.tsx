@@ -106,7 +106,7 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
     barcode: Yup.string().default(''),
     description: Yup.string().default(''),
     categoryId: Yup.string().required('Nhóm hàng là bắt buộc'),
-    unitOfMeasureId: Yup.string().required('Đơn vị tính là bắt buộc'),
+    unitOfMeasureId: Yup.string().default(''),
     costPrice: Yup.number().min(0).default(0),
     sellingPrice: Yup.number().min(0).default(0),
     imageUrl: Yup.string().default(''),
@@ -197,6 +197,24 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
           }))
         );
       }
+
+      // Reverse-engineer product attributes from variant combinations
+      if (currentProduct.variants && currentProduct.variants.length > 0) {
+        const attrMap = new Map<string, AttributeFormItem>();
+        currentProduct.variants.forEach((v) => {
+          v.combinations?.forEach((c) => {
+            const key = `${c.attributeId}:${c.valueName}`;
+            if (!attrMap.has(key)) {
+              attrMap.set(key, {
+                attributeId: c.attributeId,
+                attributeName: c.attributeName,
+                value: c.valueName,
+              });
+            }
+          });
+        });
+        setProductAttributes(Array.from(attrMap.values()));
+      }
     }
   }, [currentProduct, defaultValues, reset]);
 
@@ -265,6 +283,14 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
 
     setValue('variants', newVariants);
     setValue('hasVariants', newVariants.length > 0);
+
+    // Auto-set parent price to average of variants
+    if (newVariants.length > 0) {
+      const avgCost = newVariants.reduce((sum, v) => sum + (v.costPrice || 0), 0) / newVariants.length;
+      const avgPrice = newVariants.reduce((sum, v) => sum + (v.sellingPrice || 0), 0) / newVariants.length;
+      setValue('costPrice', Math.round(avgCost));
+      setValue('sellingPrice', Math.round(avgPrice));
+    }
   }, [unitConversions, productAttributes, watch, setValue]);
 
   const handleUnitAttrSave = (
@@ -308,7 +334,7 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
           barcode: data.barcode || undefined,
           description: data.description || undefined,
           categoryId: data.categoryId,
-          unitOfMeasureId: data.unitOfMeasureId,
+          unitOfMeasureId: data.unitOfMeasureId || undefined,
           costPrice: data.costPrice,
           sellingPrice: data.sellingPrice,
           imageUrl: data.imageUrl || undefined,
@@ -330,7 +356,7 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
           barcode: data.barcode || undefined,
           description: data.description || undefined,
           categoryId: data.categoryId,
-          unitOfMeasureId: data.unitOfMeasureId,
+          unitOfMeasureId: data.unitOfMeasureId || undefined,
           costPrice: data.costPrice,
           sellingPrice: data.sellingPrice,
           imageUrl: data.imageUrl || undefined,

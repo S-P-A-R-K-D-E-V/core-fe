@@ -33,3 +33,8 @@ export async function updateProduct(id: string, data: IUpdateProductRequest): Pr
 export async function deleteProduct(id: string): Promise<void> {
   await axios.delete(endpoints.products.delete(id));
 }
+
+export async function syncKiotViet(): Promise<unknown> {
+  const response = await axios.post(endpoints.kiotViet.sync);
+  return response.data;
+}
