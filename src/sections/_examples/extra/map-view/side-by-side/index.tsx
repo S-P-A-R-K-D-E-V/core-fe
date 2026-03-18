@@ -70,6 +70,7 @@ function MapSideBySide({ ...other }: MapBoxProps) {
 
   return (
     <>
+      {/* @ts-expect-error react-map-gl version type mismatch */}
       <Map
         id="left-map"
         {...viewState}
@@ -85,6 +86,7 @@ function MapSideBySide({ ...other }: MapBoxProps) {
         {...other}
       />
 
+      {/* @ts-expect-error react-map-gl version type mismatch */}
       <Map
         id="right-map"
         {...viewState}

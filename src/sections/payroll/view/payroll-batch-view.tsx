@@ -28,6 +28,7 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
+import LoadingButton from '@mui/lab/LoadingButton';
 
 import { paths } from 'src/routes/paths';
 
@@ -62,9 +63,11 @@ import {
   removeWaiver,
   waivePenalty,
 } from 'src/api/payroll';
+import { adjustAttendanceTime } from 'src/api/attendance';
 import { getAllPayrollCycles } from 'src/api/payrollCycle';
 
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 
 import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
@@ -119,6 +122,13 @@ export default function PayrollBatchView() {
   const [waivingShiftId, setWaivingShiftId] = useState<string | null>(null);
   const [shiftDetailTab, setShiftDetailTab] = useState<'calendar' | 'table'>('calendar');
   const [calendarWeekOffset, setCalendarWeekOffset] = useState(0);
+
+  // Edit checkin/checkout state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingShift, setEditingShift] = useState<IPayrollShiftItem | null>(null);
+  const [checkInValue, setCheckInValue] = useState('');
+  const [checkOutValue, setCheckOutValue] = useState('');
+  const [editingSubmitting, setEditingSubmitting] = useState(false);
 
   const fetchCycles = useCallback(async () => {
     try {
@@ -365,6 +375,104 @@ export default function PayrollBatchView() {
     if (shift.status === 'Wrong') return { bg: alpha(theme.palette.warning.main, 0.1), border: theme.palette.warning.main };
     if (shift.lateMinutes > 0) return { bg: alpha(theme.palette.warning.main, 0.08), border: theme.palette.warning.light };
     return { bg: alpha(theme.palette.success.main, 0.08), border: theme.palette.success.main };
+  };
+
+  // Helper function to convert shift time to datetime local format
+  const shiftTimeToDatetimeLocal = (date: string, shiftTime?: string): string => {
+    if (!shiftTime) return '';
+    const time = shiftTime.substring(0, 5);
+    return `${date}T${time}`;
+  };
+
+  // Helper functions for datetime conversion
+  const toDatetimeLocalValue = (isoString?: string): string => {
+    if (!isoString) return '';
+    const d = new Date(isoString);
+    const vnOffset = 7 * 60;
+    const localOffset = d.getTimezoneOffset();
+    const vnDate = new Date(d.getTime() + (vnOffset + localOffset) * 60000);
+    const yyyy = vnDate.getFullYear();
+    const mm = String(vnDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(vnDate.getDate()).padStart(2, '0');
+    const hh = String(vnDate.getHours()).padStart(2, '0');
+    const min = String(vnDate.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  };
+
+  const datetimeLocalToUtcIso = (localValue: string): string => {
+    const [datePart, timePart] = localValue.split('T');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart.split(':').map(Number);
+    const vnDate = new Date(Date.UTC(year, month - 1, day, hours - 7, minutes));
+    return vnDate.toISOString();
+  };
+
+  const parseDatetimeLocalStr = (val: string) => (val ? new Date(val) : null);
+  const toDatetimeLocalStr = (date: any) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const vnOffset = 7 * 60;
+    const localOffset = d.getTimezoneOffset();
+    const vnDate = new Date(d.getTime() + (vnOffset + localOffset) * 60000);
+    const yyyy = vnDate.getFullYear();
+    const mm = String(vnDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(vnDate.getDate()).padStart(2, '0');
+    const hh = String(vnDate.getHours()).padStart(2, '0');
+    const min = String(vnDate.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  };
+
+  // Handler functions for edit dialog
+  const handleOpenEditShift = (shift: IPayrollShiftItem) => {
+    if (selectedPayrollRecord?.isFinalized) return;
+    setEditingShift(shift);
+    setCheckInValue(shift.checkInTime ? toDatetimeLocalValue(shift.checkInTime) : '');
+    setCheckOutValue(shift.checkOutTime ? toDatetimeLocalValue(shift.checkOutTime) : '');
+    setEditDialogOpen(true);
+  };
+
+  const handleSetCheckInToShiftStart = () => {
+    if (!editingShift) return;
+    const val = shiftTimeToDatetimeLocal(editingShift.date, editingShift.shiftStartTime);
+    if (val) setCheckInValue(val);
+  };
+
+  const handleSetCheckOutToShiftEnd = () => {
+    if (!editingShift) return;
+    const val = shiftTimeToDatetimeLocal(editingShift.date, editingShift.shiftEndTime);
+    if (val) setCheckOutValue(val);
+  };
+
+  const handleCloseEditDialog = () => {
+    setEditDialogOpen(false);
+    setEditingShift(null);
+    setCheckInValue('');
+    setCheckOutValue('');
+  };
+
+  const handleSubmitEditShift = async () => {
+    if (!editingShift || (!checkInValue && !checkOutValue)) return;
+    try {
+      setEditingSubmitting(true);
+      await adjustAttendanceTime({
+        shiftAssignmentId: editingShift.shiftAssignmentId,
+        checkInTime: checkInValue ? datetimeLocalToUtcIso(checkInValue) : undefined,
+        checkOutTime: checkOutValue ? datetimeLocalToUtcIso(checkOutValue) : undefined,
+        note: 'Điều chỉnh từ bảng lương',
+      });
+      enqueueSnackbar('Điều chỉnh thời gian checkin/checkout thành công', { variant: 'success' });
+      handleCloseEditDialog();
+      // Refresh shift details
+      if (selectedPayrollRecord) {
+        const data = await getPayrollShiftDetails(selectedPayrollRecord.id);
+        setShiftDetail(data);
+      }
+    } catch (error: any) {
+      console.error('Error adjusting attendance:', error);
+      enqueueSnackbar(error?.message || 'Điều chỉnh thất bại', { variant: 'error' });
+    } finally {
+      setEditingSubmitting(false);
+    }
   };
 
   // Cycles that still have unfinalized employees (or not yet loaded → show by default)
@@ -923,6 +1031,19 @@ export default function PayrollBatchView() {
                                           </Button>
                                         </Box>
                                       )}
+                                      {!selectedPayrollRecord?.isFinalized && (
+                                        <Button
+                                          size="small"
+                                          variant="outlined"
+                                          color="warning"
+                                          fullWidth
+                                          sx={{ fontSize: '0.65rem', py: 0.25, mt: 0.5 }}
+                                          startIcon={<Iconify icon="mingcute:pencil-line" width={12} />}
+                                          onClick={(e) => { e.stopPropagation(); handleOpenEditShift(shift); }}
+                                        >
+                                          Chỉnh sửa
+                                        </Button>
+                                      )}
                                     </Box>
                                   );
                                 })}
@@ -1055,6 +1176,22 @@ export default function PayrollBatchView() {
                                 </Tooltip>
                               </Stack>
                             )}
+                            {!selectedPayrollRecord?.isFinalized && (
+                              <Box sx={{ mt: 1 }}>
+                                <Tooltip title="Chỉnh sửa thời gian checkin/checkout">
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="warning"
+                                    fullWidth
+                                    startIcon={<Iconify icon="mingcute:pencil-line" />}
+                                    onClick={(e) => { e.stopPropagation(); handleOpenEditShift(shift); }}
+                                  >
+                                    Chỉnh sửa
+                                  </Button>
+                                </Tooltip>
+                              </Box>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1078,6 +1215,74 @@ export default function PayrollBatchView() {
           <Button onClick={handleCloseShiftDetail} color="inherit">
             Đóng
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ========== Edit Checkin/Checkout Dialog ========== */}
+      <Dialog open={editDialogOpen} onClose={handleCloseEditDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Chỉnh sửa thời gian checkin/checkout</DialogTitle>
+        <DialogContent>
+          {editingShift && (
+            <Stack spacing={2.5} sx={{ mt: 1 }}>
+              <Stack spacing={0.5}>
+                <Typography variant="subtitle2">
+                  {selectedPayrollRecord?.userName}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {editingShift.shiftName} — {editingShift.shiftStartTime} → {editingShift.shiftEndTime}
+                  {' | '}
+                  {editingShift.date}
+                </Typography>
+              </Stack>
+
+              <Box>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <DateTimePicker
+                    label="Giờ vào"
+                    value={parseDatetimeLocalStr(checkInValue)}
+                    onChange={(val) => setCheckInValue(toDatetimeLocalStr(val))}
+                    format="dd/MM/yyyy HH:mm"
+                    slotProps={{ textField: { fullWidth: true, size: 'small' } }}
+                  />
+                  <Tooltip title={`Đặt thời gian bắt đầu ca (${editingShift?.shiftStartTime})`}>
+                    <IconButton color="primary" onClick={handleSetCheckInToShiftStart} size="small">
+                      <Iconify icon="solar:check-circle-bold" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              </Box>
+
+              <Box>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <DateTimePicker
+                    label="Giờ ra"
+                    value={parseDatetimeLocalStr(checkOutValue)}
+                    onChange={(val) => setCheckOutValue(toDatetimeLocalStr(val))}
+                    format="dd/MM/yyyy HH:mm"
+                    slotProps={{ textField: { fullWidth: true, size: 'small' } }}
+                  />
+                  <Tooltip title={`Đặt thời gian kết thúc ca (${editingShift?.shiftEndTime})`}>
+                    <IconButton color="primary" onClick={handleSetCheckOutToShiftEnd} size="small">
+                      <Iconify icon="solar:check-circle-bold" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              </Box>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button variant="outlined" color="inherit" onClick={handleCloseEditDialog}>
+            Hủy
+          </Button>
+          <LoadingButton
+            variant="contained"
+            loading={editingSubmitting}
+            onClick={handleSubmitEditShift}
+            disabled={!checkInValue && !checkOutValue}
+          >
+            Lưu
+          </LoadingButton>
         </DialogActions>
       </Dialog>
     </Container>

@@ -26,7 +26,7 @@ import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 import { fCurrency } from 'src/utils/format-number';
 
-import { IProduct, ICustomer, IWarehouse } from 'src/types/corecms-api';
+import { IProduct, IProductListItem, ICustomer, IWarehouse } from 'src/types/corecms-api';
 import { getAllProducts } from 'src/api/products';
 import { getAllCustomers } from 'src/api/customers';
 import { getAllWarehouses } from 'src/api/warehouses';
@@ -83,7 +83,7 @@ export default function PosSaleView() {
   const { enqueueSnackbar } = useSnackbar();
 
   // Data
-  const [products, setProducts] = useState<IProduct[]>([]);
+  const [products, setProducts] = useState<IProductListItem[]>([]);
   const [customers, setCustomers] = useState<ICustomer[]>([]);
   const [warehouses, setWarehouses] = useState<IWarehouse[]>([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState<IWarehouse | null>(null);
@@ -102,7 +102,7 @@ export default function PosSaleView() {
   useEffect(() => {
     Promise.all([getAllProducts({ isActive: true }), getAllCustomers({ isActive: true }), getAllWarehouses()])
       .then(([p, c, w]) => {
-        setProducts(p);
+        setProducts(p.items);
         setCustomers(c);
         setWarehouses(w);
         if (w.length > 0) setSelectedWarehouse(w.find((wh) => wh.isActive) || w[0]);
@@ -159,7 +159,7 @@ export default function PosSaleView() {
   );
 
   const handleAddProduct = useCallback(
-    (product: IProduct) => {
+    (product: IProductListItem) => {
       updateActiveOrder((order) => {
         const existingIdx = order.items.findIndex((item) => item.productId === product.id);
         if (existingIdx >= 0) {
@@ -174,10 +174,10 @@ export default function PosSaleView() {
             {
               productId: product.id,
               name: product.name,
-              sku: product.sku || '',
+              sku: product.sku || product.code || '',
               quantity: 1,
-              unitPrice: product.sellingPrice,
-              vatRate: product.vatRate,
+              unitPrice: product.sellingPrice || product.basePrice,
+              vatRate: product.vatRate || 0,
               discountAmount: 0,
               imageUrl: product.imageUrl,
             },
@@ -322,7 +322,7 @@ export default function PosSaleView() {
         });
 
         // Refresh products to update stock
-        getAllProducts({ isActive: true }).then(setProducts).catch(console.error);
+        getAllProducts({ isActive: true }).then((r) => setProducts(r.items)).catch(console.error);
       } catch (error: any) {
         const message = error?.title || error?.message || 'Có lỗi xảy ra khi thanh toán';
         enqueueSnackbar(message, { variant: 'error' });
@@ -512,10 +512,10 @@ export default function PosSaleView() {
                       {product.sku}
                     </Typography>
                     <Typography variant="subtitle2" color="primary.main" sx={{ mt: 0.5 }}>
-                      {fCurrency(product.sellingPrice)}
+                      {fCurrency(product.sellingPrice || product.basePrice)}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Tồn: {product.totalStock}
+                      Tồn: {product.totalStock ?? '—'}
                     </Typography>
                   </Card>
                 </Grid>

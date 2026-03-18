@@ -43,6 +43,7 @@ function MapHeatmap({ ...other }: MapBoxProps) {
 
   return (
     <>
+      {/* @ts-expect-error react-map-gl version type mismatch */}
       <Map
         initialViewState={{
           latitude: 40,

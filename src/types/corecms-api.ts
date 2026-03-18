@@ -157,7 +157,7 @@ export interface IErrorResponse {
 // Attendance / Shift Management Types
 // ======================================================================
 
-export type ShiftType = 'Main' | 'Extra';
+export type ShiftType = 'Main' | 'Extra' | 'Normal' | 'Holiday';
 export type AttendanceStatus = 'OnTime' | 'Late' | 'Absent';
 export type AttendanceRequestType = 'MissedCheckIn' | 'MissedCheckOut' | 'OvertimeCompensation' | 'ShiftSwap';
 export type RequestStatus = 'Pending' | 'Approved' | 'Rejected';
@@ -301,6 +301,7 @@ export interface IShiftAssignment {
 export interface ICreateShiftAssignmentRequest {
   staffId: string;
   shiftScheduleId: string;       // Updated: use ShiftScheduleId
+  shiftId?: string;              // Legacy field
   date: string;                  // "yyyy-MM-dd"
   note?: string;
 }
@@ -310,7 +311,7 @@ export interface IBulkAssignShiftScheduleRequest {
   shiftScheduleId: string;
   fromDate: string;
   toDate: string;
-  filterDays?: number;           // Optional: WeekDays flags bitmask (Mon=1,Tue=2,Wed=4,Thu=8,Fri=16,Sat=32,Sun=64)
+  filterDays?: number | number[]; // Optional: WeekDays flags bitmask or array of day numbers
 }
 
 export interface IManageShiftAssignmentsRequest {
@@ -945,6 +946,7 @@ export interface IKiotVietInvoiceDetailResponse {
   createdDate: string;
   products: IKiotVietInvoiceDetailProduct[];
   payments: IKiotVietInvoicePayment[];
+  surcharges: { id: number; surchargeName?: string; price: number }[];
 }
 
 // ==================== POS / INVENTORY ====================
@@ -1027,131 +1029,280 @@ export interface IUpdateVariantAttributeRequest {
 }
 
 // --- Product ---
-export interface IProduct {
-  id: string;
-  name: string;
-  sku?: string;
-  barcode?: string;
-  description?: string;
-  categoryId: string;
-  categoryName: string;
-  unitOfMeasureId: string;
-  unitOfMeasureName: string;
-  costPrice: number;
-  sellingPrice: number;
-  vatRate: number;
-  imageUrl?: string;
-  isActive: boolean;
-  hasVariants: boolean;
-  lowStockThreshold: number;
-  highStockThreshold: number;
-  isLoyaltyPoints: boolean;
-  weight?: number;
-  weightUnit?: string;
-  location?: string;
-  createdAt: string;
-  updatedAt?: string;
-  variants?: IProductVariant[];
-  unitConversions?: IProductUnitConversion[];
-  totalStock: number;
-}
-
-export interface IProductVariant {
-  id: string;
-  productId: string;
-  sku: string;
-  barcode?: string;
-  name: string;
-  costPrice?: number;
-  sellingPrice?: number;
-  imageUrl?: string;
-  isActive: boolean;
-  createdAt: string;
-  combinations: IVariantCombination[];
-  totalStock: number;
-}
-
-export interface IVariantCombination {
+export interface IProductVariantCombination {
   attributeId: string;
   attributeName: string;
   valueId: string;
   valueName: string;
 }
 
-export interface IProductUnitConversion {
+export interface IProductVariant {
   id: string;
-  productId: string;
-  unitOfMeasureId: string;
-  unitOfMeasureName: string;
-  unitOfMeasureAbbreviation?: string;
-  conversionRate: number;
-  costPrice?: number;
-  sellingPrice?: number;
-  barcode?: string;
-  createdAt: string;
-}
-
-export interface ICreateProductUnitConversionRequest {
-  unitOfMeasureId: string;
-  conversionRate: number;
-  costPrice?: number;
-  sellingPrice?: number;
-  barcode?: string;
-}
-
-export interface ICreateProductVariantRequest {
+  name: string;
   sku: string;
   barcode?: string;
-  name: string;
   costPrice?: number;
   sellingPrice?: number;
   imageUrl?: string;
-  attributeValueIds: string[];
+  totalStock?: number;
+  isActive?: boolean;
+  combinations?: IProductVariantCombination[];
+}
+
+export interface IProductUnitConversion {
+  unitOfMeasureId: string;
+  unitOfMeasureName: string;
+  conversionRate: number;
+  costPrice?: number;
+  sellingPrice?: number;
+  barcode?: string;
+}
+
+export interface IProduct {
+  id: string;
+  kiotVietId?: number;
+  code: string;
+  name: string;
+  barCode?: string;
+  fullName?: string;
+  description?: string;
+  categoryId: string;
+  categoryName: string;
+  allowsSale: boolean;
+  hasVariants: boolean;
+  unit?: string;
+  masterProductId?: string;
+  basePrice: number;
+  weight?: number;
+  productType: number; // 1: combo, 2: normal, 3: service
+  isActive: boolean;
+  isRewardPoint?: boolean;
+  isLotSerialControl?: boolean;
+  isBatchExpireControl?: boolean;
+  taxType?: string;
+  taxRate?: string;
+  taxRateDirect?: number;
+  minQuantity: number;
+  maxQuantity: number;
+  createdDate: string;
+  modifiedDate?: string;
+  attributes?: IProductAttribute[];
+  images?: IProductImage[];
+  inventories?: IProductInventory[];
+  childProducts?: IProductChild[];
+  // Extended fields (new schema aliases)
+  sku?: string;
+  barcode?: string;
+  sellingPrice?: number;
+  costPrice?: number;
+  vatRate?: number;
+  imageUrl?: string;
+  totalStock?: number;
+  unitOfMeasureId?: string;
+  unitOfMeasureName?: string;
+  lowStockThreshold?: number;
+  highStockThreshold?: number;
+  isLoyaltyPoints?: boolean;
+  weightUnit?: string;
+  location?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  variants?: IProductVariant[];
+  unitConversions?: IProductUnitConversion[];
+}
+
+export interface IProductAttribute {
+  id: string;
+  attributeName: string;
+  attributeValue: string;
+}
+
+export interface IProductImage {
+  id: string;
+  imageUrl: string;
+  sortOrder: number;
+}
+
+export interface IProductInventory {
+  id: string;
+  productId: string;
+  branchId?: number;
+  branchName?: string;
+  onHand?: number;
+  reserved: number;
+  cost?: number;
+}
+
+export interface IProductChild {
+  id: string;
+  code: string;
+  name: string;
+  fullName: string;
+  barCode?: string;
+  basePrice: number;
+  conversionValue?: number;
+  isActive: boolean;
+  inventories?: IProductInventory[];
+  attributes?: IProductAttribute[];
+}
+
+export interface IPagedResult<T> {
+  items: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface IProductListItem {
+  id: string;
+  kiotVietId?: number;
+  code: string;
+  name: string;
+  fullName?: string;
+  barCode?: string;
+  categoryName: string;
+  hasVariants: boolean;
+  basePrice: number;
+  weight?: number;
+  productType: number;
+  isActive: boolean;
+  isRewardPoint?: boolean;
+  tradeMarkName?: string;
+  minQuantity: number;
+  maxQuantity: number;
+  createdDate: string;
+  modifiedDate?: string;
+  inventories?: IProductInventory[];
+  childProducts?: IProductChild[];
+  // Extended fields (new schema aliases)
+  sku?: string;
+  barcode?: string;
+  sellingPrice?: number;
+  costPrice?: number;
+  vatRate?: number;
+  imageUrl?: string;
+  totalStock?: number;
+  variants?: IProductVariant[];
+}
+
+export interface ICreateProductAttributeRequest {
+  attributeName: string;
+  attributeValue: string;
+}
+
+export interface ICreateProductImageRequest {
+  imageUrl: string;
 }
 
 export interface ICreateProductRequest {
+  code?: string;
   name: string;
-  sku?: string;
-  barcode?: string;
+  barCode?: string;
+  fullName?: string;
   description?: string;
   categoryId: string;
-  unitOfMeasureId: string;
-  costPrice: number;
-  sellingPrice: number;
-  vatRate?: number;
-  imageUrl?: string;
+  allowsSale?: boolean;
   hasVariants?: boolean;
+  unit?: string;
+  masterProductId?: string;
+  basePrice?: number;
+  weight?: number;
+  productType?: number;
+  isRewardPoint?: boolean;
+  isLotSerialControl?: boolean;
+  isBatchExpireControl?: boolean;
+  orderTemplate?: string;
+  minQuantity?: number;
+  maxQuantity?: number;
+  taxType?: string;
+  taxRate?: string;
+  taxRateDirect?: number;
+  attributes?: ICreateProductAttributeRequest[];
+  images?: ICreateProductImageRequest[];
+  // Extended fields
+  sku?: string;
+  barcode?: string;
+  unitOfMeasureId?: string;
+  costPrice?: number;
+  sellingPrice?: number;
+  imageUrl?: string;
   lowStockThreshold?: number;
   highStockThreshold?: number;
   isLoyaltyPoints?: boolean;
-  weight?: number;
   weightUnit?: string;
   location?: string;
-  variants?: ICreateProductVariantRequest[];
-  unitConversions?: ICreateProductUnitConversionRequest[];
+  vatRate?: number;
+  variants?: {
+    sku: string;
+    barcode?: string;
+    name: string;
+    costPrice?: number;
+    sellingPrice?: number;
+    imageUrl?: string;
+    attributeValueIds?: string[];
+  }[];
+  unitConversions?: {
+    unitOfMeasureId: string;
+    conversionRate: number;
+    costPrice?: number;
+    sellingPrice?: number;
+    barcode?: string;
+  }[];
 }
 
 export interface IUpdateProductRequest {
+  code?: string;
   name: string;
-  sku?: string;
-  barcode?: string;
+  barCode?: string;
+  fullName?: string;
   description?: string;
   categoryId: string;
-  unitOfMeasureId: string;
-  costPrice: number;
-  sellingPrice: number;
-  vatRate?: number;
-  imageUrl?: string;
-  isActive?: boolean;
+  allowsSale?: boolean;
   hasVariants?: boolean;
+  unit?: string;
+  masterProductId?: string;
+  basePrice?: number;
+  weight?: number;
+  productType?: number;
+  isActive?: boolean;
+  isRewardPoint?: boolean;
+  isLotSerialControl?: boolean;
+  isBatchExpireControl?: boolean;
+  orderTemplate?: string;
+  minQuantity?: number;
+  maxQuantity?: number;
+  taxType?: string;
+  taxRate?: string;
+  taxRateDirect?: number;
+  // Extended fields
+  sku?: string;
+  barcode?: string;
+  unitOfMeasureId?: string;
+  costPrice?: number;
+  sellingPrice?: number;
+  imageUrl?: string;
   lowStockThreshold?: number;
   highStockThreshold?: number;
   isLoyaltyPoints?: boolean;
-  weight?: number;
   weightUnit?: string;
   location?: string;
-  variants?: ICreateProductVariantRequest[];
-  unitConversions?: ICreateProductUnitConversionRequest[];
+  vatRate?: number;
+  variants?: {
+    sku: string;
+    barcode?: string;
+    name: string;
+    costPrice?: number;
+    sellingPrice?: number;
+    imageUrl?: string;
+    attributeValueIds?: string[];
+  }[];
+  unitConversions?: {
+    unitOfMeasureId: string;
+    conversionRate: number;
+    costPrice?: number;
+    sellingPrice?: number;
+    barcode?: string;
+  }[];
 }
 
 // --- Warehouse ---

@@ -75,7 +75,8 @@ export default function InvoiceToolbar({
             fileName={invoice.invoiceNumber}
             style={{ textDecoration: 'none' }}
           >
-            {({ loading }) => (
+            {/* @ts-expect-error @react-pdf/renderer render function children type mismatch */}
+            {({ loading }: { loading: boolean }) => (
               <Tooltip title="Download">
                 <IconButton>
                   {loading ? (

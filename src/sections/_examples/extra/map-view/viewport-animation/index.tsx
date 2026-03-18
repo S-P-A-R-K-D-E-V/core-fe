@@ -28,6 +28,7 @@ function MapViewportAnimation({ data, ...other }: Props) {
   );
 
   return (
+    // @ts-expect-error react-map-gl version type mismatch
     <Map
       initialViewState={{
         latitude: 37.7751,
