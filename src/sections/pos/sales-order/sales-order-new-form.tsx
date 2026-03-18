@@ -30,7 +30,7 @@ import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 import FormProvider, { RHFTextField, RHFSelect } from 'src/components/hook-form';
 
-import { ICustomer, IWarehouse, IProduct, IBarcodeLookup } from 'src/types/corecms-api';
+import { ICustomer, IWarehouse, IProduct, IProductListItem, IBarcodeLookup } from 'src/types/corecms-api';
 import { createSalesOrder } from 'src/api/sales-orders';
 import { getAllCustomers } from 'src/api/customers';
 import { getAllWarehouses } from 'src/api/warehouses';
@@ -70,11 +70,11 @@ export default function SalesOrderNewForm() {
 
   const [customers, setCustomers] = useState<ICustomer[]>([]);
   const [warehouses, setWarehouses] = useState<IWarehouse[]>([]);
-  const [products, setProducts] = useState<IProduct[]>([]);
+  const [products, setProducts] = useState<IProductListItem[]>([]);
 
   useEffect(() => {
     Promise.all([getAllCustomers(), getAllWarehouses(), getAllProducts()])
-      .then(([c, w, p]) => { setCustomers(c); setWarehouses(w); setProducts(p); })
+      .then(([c, w, p]) => { setCustomers(c); setWarehouses(w); setProducts(p.items); })
       .catch(console.error);
   }, []);
 
@@ -115,8 +115,8 @@ export default function SalesOrderNewForm() {
   const handleProductChange = useCallback((index: number, productId: string) => {
     const product = products.find((p) => p.id === productId);
     if (product) {
-      setValue(`items.${index}.unitPrice`, product.sellingPrice);
-      setValue(`items.${index}.vatRate`, product.vatRate);
+      setValue(`items.${index}.unitPrice`, product.sellingPrice || product.basePrice);
+      setValue(`items.${index}.vatRate`, product.vatRate || 0);
     }
   }, [products, setValue]);
 
@@ -133,7 +133,7 @@ export default function SalesOrderNewForm() {
         productId: result.productId,
         productVariantId: '',
         quantity: 1,
-        unitPrice: product?.sellingPrice || 0,
+        unitPrice: product?.sellingPrice || product?.basePrice || 0,
         vatRate: product?.vatRate || 0,
         discountAmount: 0,
       });

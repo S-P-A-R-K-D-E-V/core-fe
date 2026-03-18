@@ -7,17 +7,13 @@ import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
 import TableBody from '@mui/material/TableBody';
-import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
 
-import TableRow from '@mui/material/TableRow';
-import TableCell from '@mui/material/TableCell';
 import Stack from '@mui/material/Stack';
 import { useBoolean } from 'src/hooks/use-boolean';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
-import { RouterLink } from 'src/routes/components';
 
 import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
@@ -26,73 +22,136 @@ import { ConfirmDialog } from 'src/components/custom-dialog';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import {
   useTable,
-  emptyRows,
   TableNoData,
-  TableEmptyRows,
   TableHeadCustom,
   TableSelectedAction,
   TablePaginationCustom,
 } from 'src/components/table';
 
-import { IProduct, ICategory } from 'src/types/corecms-api';
+import { IProductListItem, ICategory } from 'src/types/corecms-api';
 import { getAllProducts, deleteProduct, syncKiotViet } from 'src/api/products';
 import { getAllCategories } from 'src/api/categories';
-import { fCurrency, fNumber } from 'src/utils/format-number';
 import ProductTableToolbar from '../product-table-toolbar';
 import ProductTableRow from '../product-table-row';
+import ProductEditDialog from '../product-edit-dialog';
 
 // ----------------------------------------------------------------------
 
-const TABLE_HEAD = [
-  { id: 'image', label: '', width: 40 },
-  { id: 'code', label: 'Mã hàng', width: 140 },
-  { id: 'name', label: 'Tên hàng' },
-  { id: 'category', label: 'Nhóm hàng', width: 160 },
-  { id: 'basePrice', label: 'Giá bán', width: 110, align: 'right' as const },
-  { id: 'stock', label: 'Tồn kho', width: 90, align: 'right' as const },
-  { id: 'status', label: 'Trạng thái', width: 110 },
-  { id: 'createdDate', label: 'Thời gian tạo', width: 150 },
+export type ColumnKey =
+  | 'image'
+  | 'code'
+  | 'barCode'
+  | 'name'
+  | 'category'
+  | 'productType'
+  | 'basePrice'
+  | 'cost'
+  | 'tradeMarkName'
+  | 'stock'
+  | 'reserved'
+  | 'createdDate'
+  | 'estimatedOutOfStock'
+  | 'minQuantity'
+  | 'maxQuantity'
+  | 'status'
+  | 'isRewardPoint';
+
+export interface ColumnConfig {
+  id: ColumnKey;
+  label: string;
+  width?: number;
+  align?: 'left' | 'right' | 'center';
+  defaultVisible: boolean;
+}
+
+export const ALL_COLUMNS: ColumnConfig[] = [
+  { id: 'image', label: 'Hình ảnh', width: 40, defaultVisible: true },
+  { id: 'code', label: 'Mã hàng', width: 140, defaultVisible: true },
+  { id: 'barCode', label: 'Mã vạch', width: 140, defaultVisible: false },
+  { id: 'name', label: 'Tên hàng', defaultVisible: true },
+  { id: 'category', label: 'Nhóm hàng', width: 160, defaultVisible: false },
+  { id: 'productType', label: 'Loại hàng', width: 110, defaultVisible: false },
+  { id: 'basePrice', label: 'Giá bán', width: 120, align: 'right', defaultVisible: true },
+  { id: 'cost', label: 'Giá vốn', width: 120, align: 'right', defaultVisible: true },
+  { id: 'tradeMarkName', label: 'Thương hiệu', width: 130, defaultVisible: false },
+  { id: 'stock', label: 'Tồn kho', width: 90, align: 'right', defaultVisible: true },
+  { id: 'reserved', label: 'Khách đặt', width: 90, align: 'right', defaultVisible: true },
+  { id: 'createdDate', label: 'Thời gian tạo', width: 150, defaultVisible: true },
+  { id: 'estimatedOutOfStock', label: 'Dự kiến hết hàng', width: 140, defaultVisible: true },
+  { id: 'minQuantity', label: 'Định mức tồn ít nhất', width: 140, align: 'right', defaultVisible: false },
+  { id: 'maxQuantity', label: 'Định mức tồn nhiều nhất', width: 140, align: 'right', defaultVisible: false },
+  { id: 'status', label: 'Trạng thái', width: 110, defaultVisible: false },
+  { id: 'isRewardPoint', label: 'Tích điểm', width: 90, defaultVisible: false },
 ];
+
+const STORAGE_KEY = 'product-list-visible-columns';
+
+function getInitialVisibleColumns(): ColumnKey[] {
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) return JSON.parse(stored);
+    } catch { /* ignore */ }
+  }
+  return ALL_COLUMNS.filter((c) => c.defaultVisible).map((c) => c.id);
+}
 
 // ----------------------------------------------------------------------
 
 export default function ProductListView() {
   const { enqueueSnackbar } = useSnackbar();
-  const table = useTable();
+  const table = useTable({ defaultRowsPerPage: 25 });
   const router = useRouter();
   const confirm = useBoolean();
 
-  const [tableData, setTableData] = useState<IProduct[]>([]);
+  const [tableData, setTableData] = useState<IProductListItem[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [filterName, setFilterName] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(getInitialVisibleColumns);
+  const editDialog = useBoolean();
+  const [editProductId, setEditProductId] = useState<string | undefined>(undefined);
+
+  const handleToggleColumn = useCallback((columnId: ColumnKey) => {
+    setVisibleColumns((prev) => {
+      const nextSet = new Set(
+        prev.includes(columnId) ? prev.filter((c) => c !== columnId) : [...prev, columnId]
+      );
+      // Always maintain ALL_COLUMNS order
+      const next = ALL_COLUMNS.map((c) => c.id).filter((id) => nextSet.has(id));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const visibleHeadLabels = ALL_COLUMNS
+    .filter((c) => visibleColumns.includes(c.id))
+    .map(({ id, label, width, align }) => ({ id, label, width, align: align as 'left' | 'right' | 'center' | undefined }));
 
   const fetchData = useCallback(async () => {
     try {
-      const [products, cats] = await Promise.all([
-        getAllProducts({ keyword: filterName || undefined, categoryId: filterCategory || undefined }),
+      const [pagedResult, cats] = await Promise.all([
+        getAllProducts({
+          keyword: filterName || undefined,
+          categoryId: filterCategory || undefined,
+          page: table.page + 1,
+          pageSize: table.rowsPerPage,
+        }),
         getAllCategories(),
       ]);
-      // Only show master products (no masterProductId)
-      setTableData(products.filter((p) => !p.masterProductId));
+      setTableData(pagedResult.items);
+      setTotalCount(pagedResult.totalCount);
       setCategories(cats);
     } catch (error) {
       console.error(error);
       enqueueSnackbar('Không thể tải sản phẩm', { variant: 'error' });
     }
-  }, [enqueueSnackbar, filterName, filterCategory]);
+  }, [enqueueSnackbar, filterName, filterCategory, table.page, table.rowsPerPage]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const dataFiltered = tableData;
-  const dataInPage = dataFiltered.slice(table.page * table.rowsPerPage, table.page * table.rowsPerPage + table.rowsPerPage);
-  const notFound = !dataFiltered.length;
-
-  // Summary stats
-  const totalStock = tableData.reduce(
-    (sum, p) => sum + (p.inventories?.reduce((s, inv) => s + (inv.onHand || 0), 0) || 0),
-    0
-  );
+  const notFound = !tableData.length;
 
   const handleFilterName = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     table.onResetPage();
@@ -109,29 +168,43 @@ export default function ProductListView() {
       await deleteProduct(id);
       enqueueSnackbar('Xóa thành công!');
       fetchData();
-      table.onUpdatePageDeleteRow(dataInPage.length);
     } catch (error) {
       enqueueSnackbar('Xóa thất bại', { variant: 'error' });
     }
-  }, [dataInPage.length, enqueueSnackbar, fetchData, table]);
+  }, [enqueueSnackbar, fetchData]);
 
   const handleDeleteRows = useCallback(async () => {
     try {
       await Promise.all(table.selected.map((id) => deleteProduct(id)));
       enqueueSnackbar('Xóa thành công!');
       fetchData();
-      table.onUpdatePageDeleteRows({ totalRowsInPage: dataInPage.length, totalRowsFiltered: dataFiltered.length });
     } catch (error) {
       enqueueSnackbar('Xóa thất bại', { variant: 'error' });
     }
-  }, [dataFiltered.length, dataInPage.length, enqueueSnackbar, fetchData, table]);
+  }, [enqueueSnackbar, fetchData, table]);
 
   const handleEditRow = useCallback((id: string) => {
-    router.push(paths.dashboard.pos.product.edit(id));
-  }, [router]);
+    setEditProductId(id);
+    editDialog.onTrue();
+  }, [editDialog]);
 
-  const handleAddSameCategory = useCallback((product: IProduct) => {
-    router.push(`${paths.dashboard.pos.product.new}?categoryId=${product.categoryId}`);
+  const handleCreateProduct = useCallback(() => {
+    setEditProductId(undefined);
+    editDialog.onTrue();
+  }, [editDialog]);
+
+  const handleDialogClose = useCallback(() => {
+    editDialog.onFalse();
+    setEditProductId(undefined);
+  }, [editDialog]);
+
+  const handleDialogSaved = useCallback(() => {
+    handleDialogClose();
+    fetchData();
+  }, [handleDialogClose, fetchData]);
+
+  const handleAddSameCategory = useCallback((product: IProductListItem) => {
+    router.push(`${paths.dashboard.pos.product.new}?categoryId=${product.id}`);
   }, [router]);
 
   const [syncing, setSyncing] = useState(false);
@@ -149,6 +222,9 @@ export default function ProductListView() {
       setSyncing(false);
     }
   }, [enqueueSnackbar, fetchData]);
+
+  // Total column count = visible columns + checkbox column
+  const totalColSpan = visibleHeadLabels.length + 1;
 
   return (
     <>
@@ -170,7 +246,7 @@ export default function ProductListView() {
               >
                 {syncing ? 'Đang đồng bộ...' : 'Đồng bộ KiotViet'}
               </Button>
-              <Button component={RouterLink} href={paths.dashboard.pos.product.new} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+              <Button variant="contained" startIcon={<Iconify icon="mingcute:add-line" />} onClick={handleCreateProduct}>
                 Thêm sản phẩm
               </Button>
             </Stack>
@@ -185,13 +261,15 @@ export default function ProductListView() {
             filterCategory={filterCategory}
             onFilterCategory={handleFilterCategory}
             categories={categories}
+            visibleColumns={visibleColumns}
+            onToggleColumn={handleToggleColumn}
           />
           <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
             <TableSelectedAction
               dense={table.dense}
               numSelected={table.selected.length}
-              rowCount={dataFiltered.length}
-              onSelectAllRows={(checked) => table.onSelectAllRows(checked, dataFiltered.map((row) => row.id))}
+              rowCount={tableData.length}
+              onSelectAllRows={(checked) => table.onSelectAllRows(checked, tableData.map((row) => row.id))}
               action={<Button color="error" onClick={confirm.onTrue}>Xóa</Button>}
             />
             <Scrollbar>
@@ -199,17 +277,14 @@ export default function ProductListView() {
                 <TableHeadCustom
                   order={table.order}
                   orderBy={table.orderBy}
-                  headLabel={TABLE_HEAD}
-                  rowCount={dataFiltered.length}
+                  headLabel={visibleHeadLabels}
+                  rowCount={tableData.length}
                   numSelected={table.selected.length}
                   onSort={table.onSort}
-                  onSelectAllRows={(checked) => table.onSelectAllRows(checked, dataFiltered.map((row) => row.id))}
+                  onSelectAllRows={(checked) => table.onSelectAllRows(checked, tableData.map((row) => row.id))}
                 />
                 <TableBody>
-                  {/* Summary row */}
-                  <SummaryRow totalStock={totalStock} />
-
-                  {dataInPage.map((row) => (
+                  {tableData.map((row) => (
                     <ProductTableRow
                       key={row.id}
                       row={row}
@@ -218,16 +293,17 @@ export default function ProductListView() {
                       onDeleteRow={() => handleDeleteRow(row.id)}
                       onEditRow={() => handleEditRow(row.id)}
                       onAddSameCategory={() => handleAddSameCategory(row)}
+                      visibleColumns={visibleColumns}
+                      totalColSpan={totalColSpan}
                     />
                   ))}
-                  <TableEmptyRows height={table.dense ? 56 : 76} emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)} />
                   <TableNoData notFound={notFound} />
                 </TableBody>
               </Table>
             </Scrollbar>
           </TableContainer>
           <TablePaginationCustom
-            count={dataFiltered.length}
+            count={totalCount}
             page={table.page}
             rowsPerPage={table.rowsPerPage}
             onPageChange={table.onChangePage}
@@ -245,18 +321,13 @@ export default function ProductListView() {
         content={<>Bạn có chắc muốn xóa <strong>{table.selected.length}</strong> sản phẩm?</>}
         action={<Button variant="contained" color="error" onClick={() => { handleDeleteRows(); confirm.onFalse(); }}>Xóa</Button>}
       />
-    </>
-  );
-}
 
-function SummaryRow({ totalStock }: { totalStock: number }) {
-  return (
-    <TableRow sx={{ bgcolor: 'background.neutral' }}>
-      <TableCell colSpan={6} />
-      <TableCell align="right">
-        <Typography variant="subtitle2">{fNumber(totalStock)}</Typography>
-      </TableCell>
-      <TableCell colSpan={2} />
-    </TableRow>
+      <ProductEditDialog
+        open={editDialog.value}
+        onClose={handleDialogClose}
+        productId={editProductId}
+        onSaved={handleDialogSaved}
+      />
+    </>
   );
 }

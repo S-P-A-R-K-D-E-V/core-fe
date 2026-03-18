@@ -35,6 +35,7 @@ function MapInteraction({ ...other }: MapBoxProps) {
   );
 
   return (
+    // @ts-expect-error react-map-gl version type mismatch
     <Map
       {...settings}
       initialViewState={{

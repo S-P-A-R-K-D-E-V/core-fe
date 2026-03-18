@@ -37,7 +37,7 @@ import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 import FormProvider, { RHFTextField, RHFSelect } from 'src/components/hook-form';
 
-import { ISupplier, IWarehouse, IProduct, IProductVariant } from 'src/types/corecms-api';
+import { ISupplier, IWarehouse, IProduct, IProductListItem, IProductVariant } from 'src/types/corecms-api';
 import { createPurchaseOrder } from 'src/api/purchase-orders';
 import { getAllSuppliers } from 'src/api/suppliers';
 import { getAllWarehouses } from 'src/api/warehouses';
@@ -51,7 +51,7 @@ import PurchaseOrderQuickCreateSupplier from './purchase-order-quick-create-supp
 type ProductOption = {
   id: string;
   label: string;
-  product: IProduct;
+  product: IProductListItem;
   variant?: IProductVariant;
   costPrice: number;
   vatRate: number;
@@ -100,7 +100,7 @@ export default function PurchaseOrderNewForm() {
 
   const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
   const [warehouses, setWarehouses] = useState<IWarehouse[]>([]);
-  const [products, setProducts] = useState<IProduct[]>([]);
+  const [products, setProducts] = useState<IProductListItem[]>([]);
 
   // Pagination for items table
   const [itemsPage, setItemsPage] = useState(0);
@@ -112,7 +112,7 @@ export default function PurchaseOrderNewForm() {
       .then(([s, w, p]) => {
         setSuppliers(s);
         setWarehouses(w);
-        setProducts(p);
+        setProducts(p.items);
       })
       .catch(console.error);
   }, []);
@@ -129,16 +129,16 @@ export default function PurchaseOrderNewForm() {
             label: `${p.name} — ${combLabel} (${v.sku})`,
             product: p,
             variant: v,
-            costPrice: v.costPrice ?? p.costPrice,
+            costPrice: v.costPrice ?? p.costPrice ?? 0,
             vatRate: p.vatRate || 0,
           });
         });
       } else {
         opts.push({
           id: p.id,
-          label: `${p.name} (${p.sku})`,
+          label: `${p.name} (${p.sku || p.code})`,
           product: p,
-          costPrice: p.costPrice,
+          costPrice: p.costPrice ?? 0,
           vatRate: p.vatRate || 0,
         });
       }

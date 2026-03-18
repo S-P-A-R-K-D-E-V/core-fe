@@ -366,6 +366,7 @@ export default function ShiftRegistrationView() {
             scheduleId: schedule.id,
             date: dateStr,
             color: schedule.color,
+            type: (schedule as any).type || 'Normal',
             startTime: schedule.startTime,
             endTime: schedule.endTime,
             users: [],

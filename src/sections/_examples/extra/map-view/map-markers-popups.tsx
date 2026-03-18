@@ -26,6 +26,7 @@ function MapMarkersPopups({ data, ...other }: Props) {
   const [popupInfo, setPopupInfo] = useState<CountryProps | null>(null);
 
   return (
+    // @ts-expect-error react-map-gl version type mismatch
     <Map
       initialViewState={{
         zoom: 2,

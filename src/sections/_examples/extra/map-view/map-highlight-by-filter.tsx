@@ -55,6 +55,7 @@ function MapHighlightByFilter({ ...other }: MapBoxProps) {
   const filter: any = useMemo(() => ['in', 'COUNTY', selectedCounty], [selectedCounty]);
 
   return (
+    // @ts-expect-error react-map-gl version type mismatch
     <Map
       initialViewState={{
         latitude: 38.88,

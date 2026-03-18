@@ -39,22 +39,48 @@ export default function ProductQuickView({ product, open, onClose, onEdit }: Pro
   const {
     id,
     name,
-    sku,
-    barcode,
+    code,
+    barCode,
     description,
     categoryName,
+    unit,
+    basePrice,
+    taxRate,
+    taxRateDirect,
+    isActive,
+    hasVariants,
+    minQuantity,
+    maxQuantity,
+    createdDate,
+    modifiedDate,
+    inventories,
+    attributes,
+    // Extended alias fields (populated by mapProductResponse)
+    sku,
+    barcode,
     unitOfMeasureName,
     costPrice,
     sellingPrice,
     vatRate,
-    isActive,
-    hasVariants,
     lowStockThreshold,
     totalStock,
     createdAt,
     updatedAt,
     variants,
   } = product;
+
+  // Use mapped values with fallback to original backend fields
+  const displaySku = sku || code || '';
+  const displayBarcode = barcode || barCode || '';
+  const displayUnit = unitOfMeasureName || unit || '';
+  const displayCostPrice = costPrice ?? basePrice ?? 0;
+  const displaySellingPrice = sellingPrice ?? basePrice ?? 0;
+  const displayVatRate = vatRate ?? taxRateDirect ?? (taxRate ? parseFloat(taxRate) : 0);
+  const displayLowStock = lowStockThreshold ?? minQuantity ?? 0;
+  const displayTotalStock = totalStock ?? inventories?.reduce((s, inv) => s + (inv.onHand || 0), 0) ?? 0;
+  const displayCreatedAt = createdAt || createdDate;
+  // Build "created by attributes" label from product attributes
+  const createdByAttrs = attributes?.map((a) => `${a.attributeName}: ${a.attributeValue}`).join(', ');
 
   return (
     <Drawer
@@ -97,11 +123,11 @@ export default function ProductQuickView({ product, open, onClose, onEdit }: Pro
           >
             <Box>
               <Box className="info-label">SKU</Box>
-              <Box className="info-value">{sku}</Box>
+              <Box className="info-value">{displaySku}</Box>
             </Box>
             <Box>
               <Box className="info-label">Barcode</Box>
-              <Box className="info-value">{barcode || '—'}</Box>
+              <Box className="info-value">{displayBarcode || '—'}</Box>
             </Box>
             <Box>
               <Box className="info-label">Danh mục</Box>
@@ -109,51 +135,60 @@ export default function ProductQuickView({ product, open, onClose, onEdit }: Pro
             </Box>
             <Box>
               <Box className="info-label">Đơn vị tính</Box>
-              <Box className="info-value">{unitOfMeasureName}</Box>
+              <Box className="info-value">{displayUnit || '—'}</Box>
             </Box>
             <Box>
               <Box className="info-label">Giá nhập</Box>
               <Box className="info-value" sx={{ color: 'warning.main' }}>
-                {fCurrency(costPrice)}
+                {fCurrency(displayCostPrice)}
               </Box>
             </Box>
             <Box>
               <Box className="info-label">Giá bán</Box>
               <Box className="info-value" sx={{ color: 'success.main' }}>
-                {fCurrency(sellingPrice)}
+                {fCurrency(displaySellingPrice)}
               </Box>
             </Box>
             <Box>
               <Box className="info-label">VAT</Box>
-              <Box className="info-value">{vatRate}%</Box>
+              <Box className="info-value">{displayVatRate}%</Box>
             </Box>
             <Box>
               <Box className="info-label">Tồn kho</Box>
               <Box className="info-value">
                 <Label
                   color={
-                    totalStock <= 0
+                    displayTotalStock <= 0
                       ? 'error'
-                      : totalStock <= lowStockThreshold
+                      : displayTotalStock <= displayLowStock
                         ? 'warning'
                         : 'success'
                   }
                 >
-                  {totalStock}
+                  {displayTotalStock}
                 </Label>
               </Box>
             </Box>
             <Box>
               <Box className="info-label">Cảnh báo tồn kho</Box>
-              <Box className="info-value">{lowStockThreshold}</Box>
+              <Box className="info-value">{displayLowStock}</Box>
             </Box>
             <Box>
               <Box className="info-label">Ngày tạo</Box>
               <Box className="info-value">
-                {createdAt ? format(new Date(createdAt), 'dd/MM/yyyy HH:mm') : '—'}
+                {displayCreatedAt ? format(new Date(displayCreatedAt), 'dd/MM/yyyy HH:mm') : '—'}
               </Box>
             </Box>
           </Box>
+
+          {createdByAttrs && (
+            <Box>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                Thuộc tính
+              </Typography>
+              <Typography variant="body2">{createdByAttrs}</Typography>
+            </Box>
+          )}
 
           {description && (
             <Box>
@@ -228,10 +263,10 @@ export default function ProductQuickView({ product, open, onClose, onEdit }: Pro
                       <TableCell align="center">
                         <Label
                           color={
-                            v.totalStock <= 0 ? 'error' : v.totalStock <= 10 ? 'warning' : 'success'
+                            (v.totalStock || 0) <= 0 ? 'error' : (v.totalStock || 0) <= 10 ? 'warning' : 'success'
                           }
                         >
-                          {v.totalStock}
+                          {v.totalStock || 0}
                         </Label>
                       </TableCell>
                     </TableRow>

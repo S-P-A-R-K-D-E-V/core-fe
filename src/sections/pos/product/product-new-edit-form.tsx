@@ -64,9 +64,12 @@ interface VariantFormItem {
 
 type Props = {
   currentProduct?: IProduct;
+  isDialog?: boolean;
+  onDialogClose?: () => void;
+  onDialogSaved?: () => void;
 };
 
-export default function ProductNewEditForm({ currentProduct }: Props) {
+export default function ProductNewEditForm({ currentProduct, isDialog, onDialogClose, onDialogSaved }: Props) {
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
 
@@ -135,17 +138,17 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
   const defaultValues = useMemo(
     () => ({
       name: currentProduct?.name || '',
-      sku: currentProduct?.sku || '',
-      barcode: currentProduct?.barcode || '',
+      sku: currentProduct?.sku || currentProduct?.code || '',
+      barcode: currentProduct?.barcode || currentProduct?.barCode || '',
       description: currentProduct?.description || '',
       categoryId: currentProduct?.categoryId || '',
       unitOfMeasureId: currentProduct?.unitOfMeasureId || '',
-      costPrice: currentProduct?.costPrice || 0,
-      sellingPrice: currentProduct?.sellingPrice || 0,
-      imageUrl: currentProduct?.imageUrl || '',
-      lowStockThreshold: currentProduct?.lowStockThreshold || 0,
-      highStockThreshold: currentProduct?.highStockThreshold || 999999999,
-      isLoyaltyPoints: currentProduct?.isLoyaltyPoints || false,
+      costPrice: currentProduct?.costPrice ?? currentProduct?.basePrice ?? 0,
+      sellingPrice: currentProduct?.sellingPrice ?? currentProduct?.basePrice ?? 0,
+      imageUrl: currentProduct?.imageUrl || currentProduct?.images?.[0]?.imageUrl || '',
+      lowStockThreshold: currentProduct?.lowStockThreshold ?? currentProduct?.minQuantity ?? 0,
+      highStockThreshold: currentProduct?.highStockThreshold ?? currentProduct?.maxQuantity ?? 999999999,
+      isLoyaltyPoints: currentProduct?.isLoyaltyPoints ?? currentProduct?.isRewardPoint ?? false,
       weight: currentProduct?.weight || 0,
       weightUnit: currentProduct?.weightUnit || 'g',
       location: currentProduct?.location || '',
@@ -184,8 +187,8 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
       reset(defaultValues);
       setSelectedCategoryName(currentProduct.categoryName || '');
 
-      // Load unit conversions from product
-      if (currentProduct.unitConversions) {
+      // Load unit conversions from product (mapped from childProducts by API layer)
+      if (currentProduct.unitConversions && currentProduct.unitConversions.length > 0) {
         setUnitConversions(
           currentProduct.unitConversions.map((uc) => ({
             unitOfMeasureId: uc.unitOfMeasureId,
@@ -196,9 +199,11 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
             barcode: uc.barcode || '',
           }))
         );
+      } else {
+        setUnitConversions([]);
       }
 
-      // Reverse-engineer product attributes from variant combinations
+      // Reverse-engineer product attributes from variant combinations (mapped from childProducts)
       if (currentProduct.variants && currentProduct.variants.length > 0) {
         const attrMap = new Map<string, AttributeFormItem>();
         currentProduct.variants.forEach((v) => {
@@ -214,6 +219,17 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
           });
         });
         setProductAttributes(Array.from(attrMap.values()));
+      } else if (currentProduct.attributes && currentProduct.attributes.length > 0) {
+        // Fallback: use product-level attributes directly
+        setProductAttributes(
+          currentProduct.attributes.map((a) => ({
+            attributeId: a.id,
+            attributeName: a.attributeName,
+            value: a.attributeValue,
+          }))
+        );
+      } else {
+        setProductAttributes([]);
       }
     }
   }, [currentProduct, defaultValues, reset]);
@@ -372,7 +388,12 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
         });
         enqueueSnackbar('Tạo thành công!');
       }
-      router.push(paths.dashboard.pos.product.list);
+      if (isDialog) {
+        onDialogSaved?.();
+        onDialogClose?.();
+      } else {
+        router.push(paths.dashboard.pos.product.list);
+      }
     } catch (error) {
       console.error(error);
       enqueueSnackbar('Có lỗi xảy ra', { variant: 'error' });
@@ -554,7 +575,7 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
               Quản lý theo đơn vị tính và thuộc tính
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Hàng hóa được tạo ra từ ĐƠN VỊ và THUỘC TÍNH
+              Hàng hóa được tạo ra từ <b>{productAttributes.length > 0 ? productAttributes.map((a) => `${a.attributeName}`).join(', ') : '—'}</b>
             </Typography>
           </Box>
           <Button
@@ -567,24 +588,8 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
         </Stack>
 
         {/* Summary of configured units & attributes */}
-        {(unitConversions.length > 0 || productAttributes.length > 0) && (
+        {/* {(unitConversions.length > 0 || productAttributes.length > 0) && (
           <Stack spacing={1} sx={{ mt: 2 }}>
-            {unitConversions.length > 0 && (
-              <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
-                  Đơn vị:
-                </Typography>
-                {unitConversions.map((uc, i) => (
-                  <Chip
-                    key={i}
-                    label={`${uc.unitOfMeasureName} (x${uc.conversionRate})`}
-                    size="small"
-                    color="primary"
-                    variant="soft"
-                  />
-                ))}
-              </Stack>
-            )}
             {productAttributes.length > 0 && (
               <Stack direction="row" spacing={0.5} flexWrap="wrap">
                 <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
@@ -614,7 +619,7 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
               </Button>
             )}
           </Stack>
-        )}
+        )} */}
       </Card>
 
       {/* Generated child products / variants */}
@@ -731,7 +736,7 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
         <Stack direction="row" justifyContent="flex-end" spacing={2}>
           <Button
             variant="outlined"
-            onClick={() => router.push(paths.dashboard.pos.product.list)}
+            onClick={() => isDialog ? onDialogClose?.() : router.push(paths.dashboard.pos.product.list)}
           >
             Bỏ qua
           </Button>
@@ -769,6 +774,7 @@ export default function ProductNewEditForm({ currentProduct }: Props) {
         onSave={handleUnitAttrSave}
         baseCostPrice={watch('costPrice') || 0}
         baseSellingPrice={watch('sellingPrice') || 0}
+        isEditMode={!!currentProduct}
       />
     </FormProvider>
   );

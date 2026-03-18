@@ -5,6 +5,7 @@ import { styled } from '@mui/material/styles';
 import Stepper, { StepperProps } from '@mui/material/Stepper';
 import StepLabel, { stepLabelClasses } from '@mui/material/StepLabel';
 import MuiStepConnector, { stepConnectorClasses } from '@mui/material/StepConnector';
+import { StepIconProps } from '@mui/material/StepIcon';
 
 import Iconify from 'src/components/iconify';
 
@@ -63,11 +64,6 @@ export default function CheckoutSteps({ steps, activeStep, sx, ...other }: Props
 }
 
 // ----------------------------------------------------------------------
-
-type StepIconProps = {
-  active: boolean;
-  completed: boolean;
-};
 
 function StepIcon({ active, completed }: StepIconProps) {
   return (

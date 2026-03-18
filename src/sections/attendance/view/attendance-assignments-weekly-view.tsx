@@ -65,6 +65,8 @@ import { StyledCalendar } from '../../calendar/styles';
 interface IAssignmentWithDetails extends IShiftAssignment {
   attendanceLog?: IAttendanceLog;
   scheduleColor?: string;
+  scheduleStartTime?: string;
+  scheduleEndTime?: string;
 }
 
 const WEEKDAYS = [

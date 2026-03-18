@@ -34,6 +34,7 @@ function MapDraggableMarkers({ ...other }: MapBoxProps) {
 
   return (
     <>
+      {/* @ts-expect-error react-map-gl version type mismatch */}
       <Map initialViewState={{ latitude: 40, longitude: -100, zoom: 3.5 }} {...other}>
         <MapControl />
 

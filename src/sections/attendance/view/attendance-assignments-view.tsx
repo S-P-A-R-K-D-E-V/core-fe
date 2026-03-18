@@ -204,6 +204,7 @@ export default function AttendanceAssignmentsView() {
       setCreating(true);
       await createShiftAssignment({
         staffId: newStaffId,
+        shiftScheduleId: newShiftId,
         shiftId: newShiftId,
         date: newDate,
         note: newNote || undefined,

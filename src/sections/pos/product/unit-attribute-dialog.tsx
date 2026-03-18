@@ -57,6 +57,7 @@ type Props = {
   onSave: (units: UnitConversionFormItem[], attrs: AttributeFormItem[]) => void;
   baseCostPrice: number;
   baseSellingPrice: number;
+  isEditMode?: boolean;
 };
 
 export default function UnitAttributeDialog({
@@ -67,6 +68,7 @@ export default function UnitAttributeDialog({
   onSave,
   baseCostPrice,
   baseSellingPrice,
+  isEditMode,
 }: Props) {
   const { enqueueSnackbar } = useSnackbar();
 
@@ -368,67 +370,83 @@ export default function UnitAttributeDialog({
                     ))}
                   </Select>
                 </FormControl>
-                <TextField size="small" value={attr.value} disabled sx={{ width: 200 }} />
-                <IconButton
+                <TextField
                   size="small"
-                  color="error"
-                  onClick={() => handleRemoveAttribute(idx)}
-                >
-                  <Iconify icon="solar:trash-bin-trash-bold" width={18} />
-                </IconButton>
+                  value={attr.value}
+                  disabled={!isEditMode}
+                  onChange={(e) => {
+                    if (isEditMode) {
+                      setAttributes(attributes.map((a, i) => i === idx ? { ...a, value: e.target.value } : a));
+                    }
+                  }}
+                  sx={{ width: 200 }}
+                />
+                {!isEditMode && (
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => handleRemoveAttribute(idx)}
+                  >
+                    <Iconify icon="solar:trash-bin-trash-bold" width={18} />
+                  </IconButton>
+                )}
               </Stack>
             ))}
 
-            {/* Add attribute */}
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
-              <FormControl size="small" sx={{ minWidth: 140 }}>
-                <InputLabel>Thuộc tính</InputLabel>
-                <Select
-                  value={selectedAttrId}
-                  onChange={(e) => setSelectedAttrId(e.target.value)}
-                  label="Thuộc tính"
-                >
-                  {variantAttributes.map((a) => (
-                    <MenuItem key={a.id} value={a.id}>
-                      {a.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                size="small"
-                label="Giá trị"
-                value={attrValue}
-                onChange={(e) => setAttrValue(e.target.value)}
-                sx={{ width: 200 }}
-              />
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={handleAddAttribute}
-                startIcon={<Iconify icon="mingcute:add-line" />}
-              >
-                Thêm
-              </Button>
-            </Stack>
+            {/* Add attribute - only in create mode */}
+            {!isEditMode && (
+              <>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                  <FormControl size="small" sx={{ minWidth: 140 }}>
+                    <InputLabel>Thuộc tính</InputLabel>
+                    <Select
+                      value={selectedAttrId}
+                      onChange={(e) => setSelectedAttrId(e.target.value)}
+                      label="Thuộc tính"
+                    >
+                      {variantAttributes.map((a) => (
+                        <MenuItem key={a.id} value={a.id}>
+                          {a.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    size="small"
+                    label="Giá trị"
+                    value={attrValue}
+                    onChange={(e) => setAttrValue(e.target.value)}
+                    sx={{ width: 200 }}
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleAddAttribute}
+                    startIcon={<Iconify icon="mingcute:add-line" />}
+                  >
+                    Thêm
+                  </Button>
+                </Stack>
 
-            {/* Create new attribute type inline */}
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="caption" color="text.secondary">
-              + Thêm thuộc tính
-            </Typography>
-            <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
-              <TextField
-                size="small"
-                label="Tên thuộc tính"
-                value={newAttrName}
-                onChange={(e) => setNewAttrName(e.target.value)}
-                sx={{ width: 160 }}
-              />
-              <Button size="small" variant="soft" onClick={handleCreateAttrType}>
-                Tạo
-              </Button>
-            </Stack>
+                {/* Create new attribute type inline */}
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="caption" color="text.secondary">
+                  + Thêm thuộc tính
+                </Typography>
+                <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                  <TextField
+                    size="small"
+                    label="Tên thuộc tính"
+                    value={newAttrName}
+                    onChange={(e) => setNewAttrName(e.target.value)}
+                    sx={{ width: 160 }}
+                  />
+                  <Button size="small" variant="soft" onClick={handleCreateAttrType}>
+                    Tạo
+                  </Button>
+                </Stack>
+              </>
+            )}
           </AccordionDetails>
         </Accordion>
       </DialogContent>
