@@ -1,20 +1,16 @@
 services:
 
-  web-1:
+  web:
     image: satthuno99/core-fe:latest
-    container_name: core-web-1
+    container_name: core-web
     restart: always
     expose:
       - "3000"
-    networks:
-      - core-network
-
-  web-2:
-    image: satthuno99/core-fe:latest
-    container_name: core-web-2
-    restart: always
-    expose:
-      - "3000"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
     networks:
       - core-network
 
@@ -29,8 +25,7 @@ services:
     volumes:
       - ../docker/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - web-1
-      - web-2
+      - web
     networks:
       - core-network
 
