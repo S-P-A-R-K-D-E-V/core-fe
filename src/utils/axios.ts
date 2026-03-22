@@ -218,6 +218,13 @@ export const endpoints = {
     create: '/notification/config',
     update: (id: string) => `/notification/config/${id}`,
   },
+  notifications: {
+    list: '/notifications',
+    unreadCount: '/notifications/unread-count',
+    markAsRead: (id: string) => `/notifications/${id}/read`,
+    markAllAsRead: '/notifications/read-all',
+    delete: (id: string) => `/notifications/${id}`,
+  },
   userTours: {
     batch: '/user-tours/batch',
     status: (tourKey: string) => `/user-tours/${tourKey}`,

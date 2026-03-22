@@ -1,7 +1,9 @@
 import { m } from 'framer-motion';
-import { useContext, useCallback } from 'react';
+import { useState, useContext, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 import List from '@mui/material/List';
 import Stack from '@mui/material/Stack';
 import Badge from '@mui/material/Badge';
@@ -19,10 +21,13 @@ import { useBoolean } from 'src/hooks/use-boolean';
 import { SyncNotificationContext } from 'src/hooks/use-sync-notification';
 
 import { fToNow } from 'src/utils/format-time';
+import { useRouter } from 'src/routes/hooks';
 
 import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
 import { varHover } from 'src/components/animate';
+
+import type { INotification, NotificationCategory } from 'src/types/notification';
 
 // ----------------------------------------------------------------------
 
@@ -33,17 +38,75 @@ const STATUS_CONFIG: Record<string, { color: string; icon: string; label: string
   Failed: { color: 'error.main', icon: 'mdi:alert-circle-outline', label: 'Thất bại' },
 };
 
+const CATEGORY_CONFIG: Record<NotificationCategory, { icon: string; color: string; label: string }> = {
+  System: { icon: 'mdi:cog-outline', color: 'text.secondary', label: 'Hệ thống' },
+  Sync: { icon: 'mdi:cloud-sync-outline', color: 'info.main', label: 'Đồng bộ' },
+  Attendance: { icon: 'mdi:fingerprint', color: 'success.main', label: 'Chấm công' },
+  Shift: { icon: 'mdi:calendar-clock-outline', color: 'primary.main', label: 'Ca làm' },
+  Payroll: { icon: 'mdi:cash-multiple', color: 'warning.main', label: 'Bảng lương' },
+  Salary: { icon: 'mdi:currency-usd', color: 'error.main', label: 'Lương' },
+};
+
+const TABS = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'Attendance', label: 'Chấm công' },
+  { value: 'Shift', label: 'Ca làm' },
+  { value: 'Payroll', label: 'Lương' },
+  { value: 'System', label: 'Hệ thống' },
+];
+
 export default function NotificationsPopover() {
   const drawer = useBoolean();
-  const { notifications, totalUnRead, markAllAsRead, removeNotification } =
-    useContext(SyncNotificationContext);
+  const router = useRouter();
 
-  const handleClose = useCallback(
+  const {
+    // Sync (ephemeral)
+    notifications: syncNotifications,
+    totalUnRead,
+    markAllAsRead: markSyncAllAsRead,
+    removeNotification,
+    // DB (persistent)
+    dbNotifications,
+    dbUnreadCount,
+    markAsRead,
+    markDbAllAsRead,
+    deleteDbNotification,
+    loadNotifications,
+  } = useContext(SyncNotificationContext);
+
+  const [currentTab, setCurrentTab] = useState<string>('all');
+
+  const handleMarkAllAsRead = useCallback(() => {
+    markSyncAllAsRead();
+    markDbAllAsRead();
+  }, [markSyncAllAsRead, markDbAllAsRead]);
+
+  const handleRemoveSyncNotification = useCallback(
     (id: string) => {
       removeNotification(id);
     },
     [removeNotification]
   );
+
+  const handleDbNotificationClick = useCallback(
+    (notification: INotification) => {
+      if (!notification.isRead) {
+        markAsRead(notification.id);
+      }
+      if (notification.actionUrl) {
+        router.push(notification.actionUrl);
+        drawer.onFalse();
+      }
+    },
+    [markAsRead, router, drawer]
+  );
+
+  const filteredDbNotifications =
+    currentTab === 'all'
+      ? dbNotifications
+      : dbNotifications.filter((n) => n.category === currentTab);
+
+  const hasAnyNotifications = syncNotifications.length > 0 || dbNotifications.length > 0;
 
   const renderHead = (
     <Stack direction="row" alignItems="center" sx={{ py: 2, pl: 2.5, pr: 1, minHeight: 68 }}>
@@ -53,12 +116,24 @@ export default function NotificationsPopover() {
 
       {!!totalUnRead && (
         <Tooltip title="Đánh dấu tất cả đã đọc">
-          <IconButton color="primary" onClick={markAllAsRead}>
+          <IconButton color="primary" onClick={handleMarkAllAsRead}>
             <Iconify icon="eva:done-all-fill" />
           </IconButton>
         </Tooltip>
       )}
     </Stack>
+  );
+
+  const renderTabs = (
+    <Tabs
+      value={currentTab}
+      onChange={(_e, newValue) => setCurrentTab(newValue)}
+      sx={{ px: 2.5 }}
+    >
+      {TABS.map((tab) => (
+        <Tab key={tab.value} value={tab.value} label={tab.label} sx={{ minWidth: 'auto' }} />
+      ))}
+    </Tabs>
   );
 
   const renderEmpty = (
@@ -70,10 +145,14 @@ export default function NotificationsPopover() {
     </Stack>
   );
 
-  const renderList = (
-    <Scrollbar>
+  // Sync notifications (real-time ephemeral)
+  const renderSyncList = syncNotifications.length > 0 && currentTab === 'all' && (
+    <>
+      <Typography variant="overline" sx={{ px: 2.5, py: 1, color: 'text.secondary', display: 'block' }}>
+        Đồng bộ
+      </Typography>
       <List disablePadding>
-        {notifications.map((notification) => {
+        {syncNotifications.map((notification) => {
           const config = STATUS_CONFIG[notification.status] || STATUS_CONFIG.Pending;
           const isRunning = notification.status === 'Running';
           const isPending = notification.status === 'Pending';
@@ -87,12 +166,7 @@ export default function NotificationsPopover() {
                 ...(notification.isUnRead && { bgcolor: 'action.selected' }),
               }}
             >
-              <Stack
-                direction="row"
-                alignItems="flex-start"
-                spacing={1.5}
-                sx={{ width: 1 }}
-              >
+              <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ width: 1 }}>
                 <Iconify
                   icon={config.icon}
                   width={24}
@@ -131,10 +205,7 @@ export default function NotificationsPopover() {
                       )}
 
                       <Stack direction="row" alignItems="center" spacing={0.5}>
-                        <Typography
-                          variant="caption"
-                          sx={{ color: config.color, fontWeight: 600 }}
-                        >
+                        <Typography variant="caption" sx={{ color: config.color, fontWeight: 600 }}>
                           {config.label}
                         </Typography>
                         <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: 'text.disabled' }} />
@@ -147,7 +218,11 @@ export default function NotificationsPopover() {
                 />
 
                 {(notification.status === 'Completed' || notification.status === 'Failed') && (
-                  <IconButton size="small" onClick={() => handleClose(notification.id)} sx={{ mt: 0.5 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleRemoveSyncNotification(notification.id)}
+                    sx={{ mt: 0.5 }}
+                  >
                     <Iconify icon="mingcute:close-line" width={16} />
                   </IconButton>
                 )}
@@ -156,7 +231,81 @@ export default function NotificationsPopover() {
           );
         })}
       </List>
-    </Scrollbar>
+      {filteredDbNotifications.length > 0 && <Divider sx={{ borderStyle: 'dashed' }} />}
+    </>
+  );
+
+  // DB notifications (persistent)
+  const renderDbList = filteredDbNotifications.length > 0 && (
+    <>
+      {currentTab === 'all' && (
+        <Typography variant="overline" sx={{ px: 2.5, py: 1, color: 'text.secondary', display: 'block' }}>
+          Thông báo
+        </Typography>
+      )}
+      <List disablePadding>
+        {filteredDbNotifications.map((notification) => {
+          const catConfig = CATEGORY_CONFIG[notification.category as NotificationCategory] || CATEGORY_CONFIG.System;
+
+          return (
+            <ListItemButton
+              key={notification.id}
+              onClick={() => handleDbNotificationClick(notification)}
+              sx={{
+                py: 1.5,
+                px: 2.5,
+                ...(!notification.isRead && { bgcolor: 'action.selected' }),
+              }}
+            >
+              <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ width: 1 }}>
+                <Iconify
+                  icon={catConfig.icon}
+                  width={24}
+                  sx={{ mt: 0.5, color: catConfig.color }}
+                />
+
+                <ListItemText
+                  sx={{ flex: 1 }}
+                  primary={
+                    <Typography variant="subtitle2" noWrap>
+                      {notification.title}
+                    </Typography>
+                  }
+                  secondary={
+                    <Stack spacing={0.5}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        {notification.message}
+                      </Typography>
+
+                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <Typography variant="caption" sx={{ color: catConfig.color, fontWeight: 600 }}>
+                          {catConfig.label}
+                        </Typography>
+                        <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: 'text.disabled' }} />
+                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                          {fToNow(notification.createdAt)}
+                        </Typography>
+                      </Stack>
+                    </Stack>
+                  }
+                />
+
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteDbNotification(notification.id);
+                  }}
+                  sx={{ mt: 0.5 }}
+                >
+                  <Iconify icon="mingcute:close-line" width={16} />
+                </IconButton>
+              </Stack>
+            </ListItemButton>
+          );
+        })}
+      </List>
+    </>
   );
 
   return (
@@ -187,13 +336,21 @@ export default function NotificationsPopover() {
       >
         {renderHead}
 
+        {renderTabs}
+
         <Divider />
 
-        {notifications.length === 0 ? renderEmpty : renderList}
+        <Scrollbar>
+          {!hasAnyNotifications && currentTab === 'all' && renderEmpty}
+          {filteredDbNotifications.length === 0 && syncNotifications.length === 0 && currentTab !== 'all' && renderEmpty}
 
-        {notifications.length > 0 && (
+          {renderSyncList}
+          {renderDbList}
+        </Scrollbar>
+
+        {hasAnyNotifications && (
           <Box sx={{ p: 1 }}>
-            <Button fullWidth size="large" onClick={markAllAsRead}>
+            <Button fullWidth size="large" onClick={handleMarkAllAsRead}>
               Đánh dấu tất cả đã đọc
             </Button>
           </Box>

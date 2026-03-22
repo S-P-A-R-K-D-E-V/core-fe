@@ -4,8 +4,17 @@ import * as signalR from '@microsoft/signalr';
 import { HOST_API } from 'src/config-global';
 
 import type { ISyncJobStatus, ISyncJobResponse } from 'src/types/sync-job';
+import type { INotification, NotificationCategory } from 'src/types/notification';
+
+import { setSession } from 'src/auth/context/jwt/utils';
 
 import axios, { endpoints } from 'src/utils/axios';
+import {
+  getNotifications,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  deleteNotification as apiDeleteNotification,
+} from 'src/api/notifications';
 
 // ----------------------------------------------------------------------
 
@@ -20,6 +29,15 @@ type SyncNotification = {
 };
 
 type SyncNotificationContextType = {
+  // Persistent notifications (from DB)
+  dbNotifications: INotification[];
+  dbTotalCount: number;
+  dbUnreadCount: number;
+  loadNotifications: (page?: number, category?: NotificationCategory) => Promise<void>;
+  markAsRead: (notificationId: string) => Promise<void>;
+  markDbAllAsRead: () => Promise<void>;
+  deleteDbNotification: (notificationId: string) => Promise<void>;
+  // Sync notifications (ephemeral/real-time)
   notifications: SyncNotification[];
   totalUnRead: number;
   startSync: (type?: 'all' | 'invoices' | 'purchase-orders') => Promise<string | null>;
@@ -28,6 +46,13 @@ type SyncNotificationContextType = {
 };
 
 export const SyncNotificationContext = createContext<SyncNotificationContextType>({
+  dbNotifications: [],
+  dbTotalCount: 0,
+  dbUnreadCount: 0,
+  loadNotifications: async () => {},
+  markAsRead: async () => {},
+  markDbAllAsRead: async () => {},
+  deleteDbNotification: async () => {},
   notifications: [],
   totalUnRead: 0,
   startSync: async () => null,
@@ -61,9 +86,16 @@ type Props = {
 };
 
 export function SyncNotificationProvider({ children }: Props) {
+  // Sync notifications state (ephemeral)
   const [notifications, setNotifications] = useState<SyncNotification[]>([]);
-  const connectionRef = useRef<signalR.HubConnection | null>(null);
+  const syncConnectionRef = useRef<signalR.HubConnection | null>(null);
   const subscribedJobs = useRef<Set<string>>(new Set());
+
+  // DB notifications state (persistent)
+  const [dbNotifications, setDbNotifications] = useState<INotification[]>([]);
+  const [dbTotalCount, setDbTotalCount] = useState(0);
+  const [dbUnreadCount, setDbUnreadCount] = useState(0);
+  const notifConnectionRef = useRef<signalR.HubConnection | null>(null);
 
   // Connect SignalR – wait until the auth token is available
   const [authReady, setAuthReady] = useState(false);
@@ -73,7 +105,6 @@ export function SyncNotificationProvider({ children }: Props) {
       setAuthReady(true);
       return undefined;
     }
-    // Poll briefly for the token (auth may still be initialising)
     const id = setInterval(() => {
       if (sessionStorage.getItem('accessToken')) {
         setAuthReady(true);
@@ -83,6 +114,72 @@ export function SyncNotificationProvider({ children }: Props) {
     return () => clearInterval(id);
   }, []);
 
+  // --- Load initial DB notifications ---
+  const loadNotifications = useCallback(
+    async (page: number = 1, category?: NotificationCategory) => {
+      try {
+        const data = await getNotifications({ page, pageSize: 20, category });
+        if (page === 1) {
+          setDbNotifications(data.items);
+        } else {
+          setDbNotifications((prev) => [...prev, ...data.items]);
+        }
+        setDbTotalCount(data.totalCount);
+        setDbUnreadCount(data.unreadCount);
+      } catch (error) {
+        console.error('Failed to load notifications:', error);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (authReady) {
+      loadNotifications();
+    }
+  }, [authReady, loadNotifications]);
+
+  // --- Connect to Notification Hub (persistent notifications) ---
+  useEffect(() => {
+    if (!authReady || !HOST_API) return undefined;
+
+    const connection = new signalR.HubConnectionBuilder()
+      .withUrl(`${HOST_API}/hubs/notifications`, {
+        accessTokenFactory: () => sessionStorage.getItem('accessToken') || '',
+      })
+      .withAutomaticReconnect()
+      .configureLogging(signalR.LogLevel.Warning)
+      .build();
+
+    connection.on('NewNotification', (notification: INotification) => {
+      setDbNotifications((prev) => [notification, ...prev]);
+      setDbUnreadCount((prev) => prev + 1);
+      setDbTotalCount((prev) => prev + 1);
+    });
+
+    connection.on('ForceLogout', (payload: { Reason: string }) => {
+      console.warn('Force logout:', payload.Reason);
+      // Clear all session/cache to ensure fresh navigation on re-login
+      setSession(null);
+      sessionStorage.clear();
+      localStorage.removeItem('sessionToken');
+      // Full page reload clears SWR cache, React state, and SignalR connections
+      window.location.href = '/auth/jwt/login';
+    });
+
+    connection
+      .start()
+      .then(() => {
+        notifConnectionRef.current = connection;
+      })
+      .catch((err) => console.error('Notification SignalR connect failed:', err));
+
+    return () => {
+      connection.stop();
+    };
+  }, [authReady]);
+
+  // --- Connect to Sync Hub (ephemeral sync notifications) ---
   useEffect(() => {
     if (!authReady || !HOST_API) return undefined;
 
@@ -126,9 +223,9 @@ export function SyncNotificationProvider({ children }: Props) {
     connection
       .start()
       .then(() => {
-        connectionRef.current = connection;
+        syncConnectionRef.current = connection;
       })
-      .catch((err) => console.error('SignalR connect failed:', err));
+      .catch((err) => console.error('Sync SignalR connect failed:', err));
 
     return () => {
       connection.stop();
@@ -136,7 +233,7 @@ export function SyncNotificationProvider({ children }: Props) {
   }, [authReady]);
 
   const subscribeToJob = useCallback((jobId: string) => {
-    const conn = connectionRef.current;
+    const conn = syncConnectionRef.current;
     if (conn && conn.state === signalR.HubConnectionState.Connected && !subscribedJobs.current.has(jobId)) {
       conn.invoke('SubscribeToJob', jobId).catch(console.error);
       subscribedJobs.current.add(jobId);
@@ -172,6 +269,7 @@ export function SyncNotificationProvider({ children }: Props) {
     [subscribeToJob]
   );
 
+  // --- Sync notification actions ---
   const markAllAsRead = useCallback(() => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isUnRead: false })));
   }, []);
@@ -180,20 +278,80 @@ export function SyncNotificationProvider({ children }: Props) {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
+  // --- DB notification actions ---
+  const markAsRead = useCallback(
+    async (notificationId: string) => {
+      try {
+        await markNotificationAsRead(notificationId);
+        setDbNotifications((prev) =>
+          prev.map((n) =>
+            n.id === notificationId ? { ...n, isRead: true, readAt: new Date().toISOString() } : n
+          )
+        );
+        setDbUnreadCount((prev) => Math.max(0, prev - 1));
+      } catch (error) {
+        console.error('Mark as read failed:', error);
+      }
+    },
+    []
+  );
+
+  const markDbAllAsRead = useCallback(async () => {
+    try {
+      await markAllNotificationsAsRead();
+      setDbNotifications((prev) =>
+        prev.map((n) => ({ ...n, isRead: true, readAt: new Date().toISOString() }))
+      );
+      setDbUnreadCount(0);
+    } catch (error) {
+      console.error('Mark all as read failed:', error);
+    }
+  }, []);
+
+  const deleteDbNotification = useCallback(async (notificationId: string) => {
+    try {
+      await apiDeleteNotification(notificationId);
+      setDbNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+      setDbTotalCount((prev) => prev - 1);
+    } catch (error) {
+      console.error('Delete notification failed:', error);
+    }
+  }, []);
+
   const totalUnRead = useMemo(
-    () => notifications.filter((n) => n.isUnRead).length,
-    [notifications]
+    () => notifications.filter((n) => n.isUnRead).length + dbUnreadCount,
+    [notifications, dbUnreadCount]
   );
 
   const value = useMemo(
     () => ({
+      dbNotifications,
+      dbTotalCount,
+      dbUnreadCount,
+      loadNotifications,
+      markAsRead,
+      markDbAllAsRead,
+      deleteDbNotification,
       notifications,
       totalUnRead,
       startSync,
       markAllAsRead,
       removeNotification,
     }),
-    [notifications, totalUnRead, startSync, markAllAsRead, removeNotification]
+    [
+      dbNotifications,
+      dbTotalCount,
+      dbUnreadCount,
+      loadNotifications,
+      markAsRead,
+      markDbAllAsRead,
+      deleteDbNotification,
+      notifications,
+      totalUnRead,
+      startSync,
+      markAllAsRead,
+      removeNotification,
+    ]
   );
 
   return (
