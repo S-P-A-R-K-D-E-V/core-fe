@@ -72,7 +72,7 @@ const EMPTY_FORM = {
   userId: '',
   salaryType: 'Monthly',
   amount: '',
-  effectiveFrom: new Date().toISOString().split('T')[0],
+  effectiveFrom: new Date().toISOString(),
   effectiveTo: '',
   note: '',
 };

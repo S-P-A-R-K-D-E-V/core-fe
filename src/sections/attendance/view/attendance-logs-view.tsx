@@ -58,8 +58,8 @@ export default function AttendanceLogsView() {
 
   const [tableData, setTableData] = useState<IAttendanceLog[]>([]);
   const [users, setUsers] = useState<IUser[]>([]);
-  const [fromDate, setFromDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [fromDate, setFromDate] = useState(() => new Date().toISOString());
+  const [toDate, setToDate] = useState(() => new Date().toISOString());
   const [filterStaffId, setFilterStaffId] = useState('');
 
   useEffect(() => {

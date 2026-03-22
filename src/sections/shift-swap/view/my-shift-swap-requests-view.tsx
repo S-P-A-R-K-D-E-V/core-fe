@@ -94,10 +94,10 @@ export default function MyShiftSwapRequestsView() {
 
   const handleOpenDialog = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toISOString();
       const nextMonth = new Date();
       nextMonth.setMonth(nextMonth.getMonth() + 1);
-      const endDate = nextMonth.toISOString().split('T')[0];
+      const endDate = nextMonth.toISOString();
 
       const [assignments, userData] = await Promise.all([
         getMySchedule(today, endDate),

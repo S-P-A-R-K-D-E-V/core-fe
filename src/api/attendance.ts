@@ -18,12 +18,15 @@ import {
   IAttendanceLog,
   ICheckInRequest,
   ICheckOutRequest,
+  ISmartCheckInRequest,
+  ISmartCheckOutRequest,
   IManualAttendanceAdjustmentRequest,
   IAdjustAttendanceTimeRequest,
   IAttendanceRequest,
   ICreateAttendanceRequestDto,
   IProcessAttendanceRequestDto,
   IAttendanceReport,
+  IBranchLocation,
 } from 'src/types/corecms-api';
 
 // ======================================================================
@@ -222,9 +225,28 @@ export async function checkOut(data: ICheckOutRequest): Promise<IAttendanceLog> 
   return response.data;
 }
 
+export async function smartCheckIn(data: ISmartCheckInRequest): Promise<IAttendanceLog> {
+  const response = await axios.post<IAttendanceLog>(endpoints.attendance.smartCheckIn, data);
+  return response.data;
+}
+
+export async function smartCheckOut(data: ISmartCheckOutRequest): Promise<IAttendanceLog[]> {
+  const response = await axios.post<IAttendanceLog[]>(endpoints.attendance.smartCheckOut, data);
+  return response.data;
+}
+
 // ======================================================================
 // Attendance Logs
 // ======================================================================
+
+// ======================================================================
+// Branch Locations (for geofencing)
+// ======================================================================
+
+export async function getBranchLocations(): Promise<IBranchLocation[]> {
+  const response = await axios.get<IBranchLocation[]>(endpoints.branches.list);
+  return response.data;
+}
 
 export async function getAttendanceLogs(
   fromDate: string,

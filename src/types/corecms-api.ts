@@ -288,6 +288,12 @@ export interface IShiftAssignment {
   date: string;                  // "yyyy-MM-dd"
   note?: string;
   createdAt: string;
+  // Schedule-embedded attendance info (from MyScheduleResponse)
+  hasCheckedIn?: boolean;
+  hasCheckedOut?: boolean;
+  checkInTime?: string;
+  checkOutTime?: string;
+  workedHours?: number;
   // Legacy fields (for backward compatibility)
   shiftId?: string;              // Deprecated
   shiftName?: string;            // Deprecated
@@ -339,8 +345,10 @@ export interface IAttendanceLog {
   checkOutTime?: string;
   checkInLatitude?: number;
   checkInLongitude?: number;
+  checkInAccuracy?: number;
   checkOutLatitude?: number;
   checkOutLongitude?: number;
+  checkOutAccuracy?: number;
   checkInIpAddress?: string;
   checkOutIpAddress?: string;
   checkInWifiName?: string;
@@ -351,6 +359,7 @@ export interface IAttendanceLog {
   lateMinutes: number;
   status: string;
   isAutoClosedBySystem: boolean;
+  isAutoOpenedBySystem: boolean;
   isOvertime: boolean;
   isCorrectShift: boolean;
   workedHours?: number;
@@ -362,6 +371,7 @@ export interface ICheckInRequest {
   isOvertime?: boolean;
   latitude?: number;
   longitude?: number;
+  accuracy?: number;
   ipAddress?: string;
   wifiName?: string;
   faceVerified: boolean;
@@ -371,6 +381,25 @@ export interface ICheckOutRequest {
   attendanceLogId: string;
   latitude?: number;
   longitude?: number;
+  accuracy?: number;
+  ipAddress?: string;
+  wifiName?: string;
+  faceVerified: boolean;
+}
+
+export interface ISmartCheckInRequest {
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  ipAddress?: string;
+  wifiName?: string;
+  faceVerified: boolean;
+}
+
+export interface ISmartCheckOutRequest {
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
   ipAddress?: string;
   wifiName?: string;
   faceVerified: boolean;
@@ -442,6 +471,15 @@ export interface IAttendanceReport {
   lateCount: number;
   totalLateMinutes: number;
   overtimeHours: number;
+}
+
+// --- Branch Location (for geofencing) ---
+export interface IBranchLocation {
+  id: string;
+  branchName: string;
+  latitude?: number;
+  longitude?: number;
+  geofenceRadius: number;
 }
 
 // --- Salary Configuration ---
