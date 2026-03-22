@@ -199,6 +199,9 @@ export const endpoints = {
     bankAccounts: '/kiotviet/bank-accounts',
     exportExcel: '/kiotviet/export-excel',
     sync: '/kiotviet/sync',
+    syncInvoices: '/kiotviet/sync/invoices',
+    syncPurchaseOrders: '/kiotviet/sync/purchase-orders',
+    syncJobStatus: (jobId: string) => `/kiotviet/sync/jobs/${jobId}`,
   },
   shiftRegistrations: {
     register: '/shift-registrations/register',

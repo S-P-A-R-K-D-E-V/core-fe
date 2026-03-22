@@ -2,6 +2,7 @@ import Box from '@mui/material/Box';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useResponsive } from 'src/hooks/use-responsive';
+import { SyncNotificationProvider } from 'src/hooks/use-sync-notification';
 
 import { useSettingsContext } from 'src/components/settings';
 
@@ -36,19 +37,19 @@ export default function DashboardLayout({ children }: Props) {
 
   if (isHorizontal) {
     return (
-      <>
+      <SyncNotificationProvider>
         <Header onOpenNav={nav.onTrue} />
 
         {lgUp ? renderHorizontal : renderNavVertical}
 
         <Main>{children}</Main>
-      </>
+      </SyncNotificationProvider>
     );
   }
 
   if (isMini) {
     return (
-      <>
+      <SyncNotificationProvider>
         <Header onOpenNav={nav.onTrue} />
 
         <Box
@@ -62,12 +63,12 @@ export default function DashboardLayout({ children }: Props) {
 
           <Main>{children}</Main>
         </Box>
-      </>
+      </SyncNotificationProvider>
     );
   }
 
   return (
-    <>
+    <SyncNotificationProvider>
       <Header onOpenNav={nav.onTrue} />
 
       <Box
@@ -81,6 +82,6 @@ export default function DashboardLayout({ children }: Props) {
 
         <Main>{children}</Main>
       </Box>
-    </>
+    </SyncNotificationProvider>
   );
 }

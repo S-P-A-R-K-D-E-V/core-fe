@@ -1,9 +1,7 @@
 import { m } from 'framer-motion';
-import { useState, useCallback } from 'react';
+import { useContext, useCallback } from 'react';
 
-import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
-import Tabs from '@mui/material/Tabs';
 import List from '@mui/material/List';
 import Stack from '@mui/material/Stack';
 import Badge from '@mui/material/Badge';
@@ -13,123 +11,150 @@ import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import ListItemText from '@mui/material/ListItemText';
+import ListItemButton from '@mui/material/ListItemButton';
+import LinearProgress from '@mui/material/LinearProgress';
 
 import { useBoolean } from 'src/hooks/use-boolean';
-import { useResponsive } from 'src/hooks/use-responsive';
+import { SyncNotificationContext } from 'src/hooks/use-sync-notification';
 
-import { _notifications } from 'src/_mock';
+import { fToNow } from 'src/utils/format-time';
 
-import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
 import { varHover } from 'src/components/animate';
 
-import NotificationItem from './notification-item';
-
 // ----------------------------------------------------------------------
 
-const TABS = [
-  {
-    value: 'all',
-    label: 'All',
-    count: 22,
-  },
-  {
-    value: 'unread',
-    label: 'Unread',
-    count: 12,
-  },
-  {
-    value: 'archived',
-    label: 'Archived',
-    count: 10,
-  },
-];
-
-// ----------------------------------------------------------------------
+const STATUS_CONFIG: Record<string, { color: string; icon: string; label: string }> = {
+  Pending: { color: 'warning.main', icon: 'mdi:clock-outline', label: 'Đang chờ' },
+  Running: { color: 'info.main', icon: 'mdi:sync', label: 'Đang chạy' },
+  Completed: { color: 'success.main', icon: 'mdi:check-circle-outline', label: 'Hoàn thành' },
+  Failed: { color: 'error.main', icon: 'mdi:alert-circle-outline', label: 'Thất bại' },
+};
 
 export default function NotificationsPopover() {
   const drawer = useBoolean();
+  const { notifications, totalUnRead, markAllAsRead, removeNotification } =
+    useContext(SyncNotificationContext);
 
-  const smUp = useResponsive('up', 'sm');
-
-  const [currentTab, setCurrentTab] = useState('all');
-
-  const handleChangeTab = useCallback((event: React.SyntheticEvent, newValue: string) => {
-    setCurrentTab(newValue);
-  }, []);
-
-  const [notifications, setNotifications] = useState(_notifications);
-
-  const totalUnRead = notifications.filter((item) => item.isUnRead === true).length;
-
-  const handleMarkAllAsRead = () => {
-    setNotifications(
-      notifications.map((notification) => ({
-        ...notification,
-        isUnRead: false,
-      }))
-    );
-  };
+  const handleClose = useCallback(
+    (id: string) => {
+      removeNotification(id);
+    },
+    [removeNotification]
+  );
 
   const renderHead = (
     <Stack direction="row" alignItems="center" sx={{ py: 2, pl: 2.5, pr: 1, minHeight: 68 }}>
       <Typography variant="h6" sx={{ flexGrow: 1 }}>
-        Notifications
+        Thông báo
       </Typography>
 
       {!!totalUnRead && (
-        <Tooltip title="Mark all as read">
-          <IconButton color="primary" onClick={handleMarkAllAsRead}>
+        <Tooltip title="Đánh dấu tất cả đã đọc">
+          <IconButton color="primary" onClick={markAllAsRead}>
             <Iconify icon="eva:done-all-fill" />
           </IconButton>
         </Tooltip>
       )}
-
-      {!smUp && (
-        <IconButton onClick={drawer.onFalse}>
-          <Iconify icon="mingcute:close-line" />
-        </IconButton>
-      )}
     </Stack>
   );
 
-  const renderTabs = (
-    <Tabs value={currentTab} onChange={handleChangeTab}>
-      {TABS.map((tab) => (
-        <Tab
-          key={tab.value}
-          iconPosition="end"
-          value={tab.value}
-          label={tab.label}
-          icon={
-            <Label
-              variant={((tab.value === 'all' || tab.value === currentTab) && 'filled') || 'soft'}
-              color={
-                (tab.value === 'unread' && 'info') ||
-                (tab.value === 'archived' && 'success') ||
-                'default'
-              }
-            >
-              {tab.count}
-            </Label>
-          }
-          sx={{
-            '&:not(:last-of-type)': {
-              mr: 3,
-            },
-          }}
-        />
-      ))}
-    </Tabs>
+  const renderEmpty = (
+    <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }}>
+      <Iconify icon="solar:bell-off-bold-duotone" width={48} sx={{ color: 'text.disabled', mb: 2 }} />
+      <Typography variant="body2" color="text.secondary">
+        Không có thông báo
+      </Typography>
+    </Stack>
   );
 
   const renderList = (
     <Scrollbar>
       <List disablePadding>
-        {notifications.map((notification) => (
-          <NotificationItem key={notification.id} notification={notification} />
-        ))}
+        {notifications.map((notification) => {
+          const config = STATUS_CONFIG[notification.status] || STATUS_CONFIG.Pending;
+          const isRunning = notification.status === 'Running';
+          const isPending = notification.status === 'Pending';
+
+          return (
+            <ListItemButton
+              key={notification.id}
+              sx={{
+                py: 1.5,
+                px: 2.5,
+                ...(notification.isUnRead && { bgcolor: 'action.selected' }),
+              }}
+            >
+              <Stack
+                direction="row"
+                alignItems="flex-start"
+                spacing={1.5}
+                sx={{ width: 1 }}
+              >
+                <Iconify
+                  icon={config.icon}
+                  width={24}
+                  sx={{
+                    mt: 0.5,
+                    color: config.color,
+                    ...(isRunning && {
+                      animation: 'spin 1s linear infinite',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' },
+                      },
+                    }),
+                  }}
+                />
+
+                <ListItemText
+                  sx={{ flex: 1 }}
+                  primary={
+                    <Typography variant="subtitle2" noWrap>
+                      {notification.title}
+                    </Typography>
+                  }
+                  secondary={
+                    <Stack spacing={0.5}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        {notification.message}
+                      </Typography>
+
+                      {(isRunning || isPending) && (
+                        <LinearProgress
+                          variant={isRunning ? 'indeterminate' : 'determinate'}
+                          value={0}
+                          sx={{ height: 4, borderRadius: 1 }}
+                        />
+                      )}
+
+                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: config.color, fontWeight: 600 }}
+                        >
+                          {config.label}
+                        </Typography>
+                        <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: 'text.disabled' }} />
+                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                          {fToNow(notification.createdAt)}
+                        </Typography>
+                      </Stack>
+                    </Stack>
+                  }
+                />
+
+                {(notification.status === 'Completed' || notification.status === 'Failed') && (
+                  <IconButton size="small" onClick={() => handleClose(notification.id)} sx={{ mt: 0.5 }}>
+                    <Iconify icon="mingcute:close-line" width={16} />
+                  </IconButton>
+                )}
+              </Stack>
+            </ListItemButton>
+          );
+        })}
       </List>
     </Scrollbar>
   );
@@ -164,27 +189,15 @@ export default function NotificationsPopover() {
 
         <Divider />
 
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          sx={{ pl: 2.5, pr: 1 }}
-        >
-          {renderTabs}
-          <IconButton onClick={handleMarkAllAsRead}>
-            <Iconify icon="solar:settings-bold-duotone" />
-          </IconButton>
-        </Stack>
+        {notifications.length === 0 ? renderEmpty : renderList}
 
-        <Divider />
-
-        {renderList}
-
-        <Box sx={{ p: 1 }}>
-          <Button fullWidth size="large">
-            View All
-          </Button>
-        </Box>
+        {notifications.length > 0 && (
+          <Box sx={{ p: 1 }}>
+            <Button fullWidth size="large" onClick={markAllAsRead}>
+              Đánh dấu tất cả đã đọc
+            </Button>
+          </Box>
+        )}
       </Drawer>
     </>
   );
