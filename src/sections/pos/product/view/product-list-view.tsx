@@ -28,8 +28,11 @@ import {
   TablePaginationCustom,
 } from 'src/components/table';
 
+import { useContext } from 'react';
+
 import { IProductListItem, ICategory } from 'src/types/corecms-api';
-import { getAllProducts, deleteProduct, syncKiotViet } from 'src/api/products';
+import { getAllProducts, deleteProduct } from 'src/api/products';
+import { SyncNotificationContext } from 'src/hooks/use-sync-notification';
 import { getAllCategories } from 'src/api/categories';
 import ProductTableToolbar from '../product-table-toolbar';
 import ProductTableRow from '../product-table-row';
@@ -207,21 +210,25 @@ export default function ProductListView() {
     router.push(`${paths.dashboard.pos.product.new}?categoryId=${product.id}`);
   }, [router]);
 
+  const { startSync } = useContext(SyncNotificationContext);
   const [syncing, setSyncing] = useState(false);
 
   const handleSync = useCallback(async () => {
     setSyncing(true);
     try {
-      await syncKiotViet();
-      enqueueSnackbar('Đồng bộ KiotViet thành công!');
-      fetchData();
+      const jobId = await startSync('all');
+      if (jobId) {
+        enqueueSnackbar('Đã gửi yêu cầu đồng bộ KiotViet. Xem tiến trình tại Notifications.', { variant: 'info' });
+      } else {
+        enqueueSnackbar('Gửi yêu cầu đồng bộ thất bại', { variant: 'error' });
+      }
     } catch (error) {
       console.error(error);
       enqueueSnackbar('Đồng bộ thất bại', { variant: 'error' });
     } finally {
       setSyncing(false);
     }
-  }, [enqueueSnackbar, fetchData]);
+  }, [enqueueSnackbar, startSync]);
 
   // Total column count = visible columns + checkbox column
   const totalColSpan = visibleHeadLabels.length + 1;

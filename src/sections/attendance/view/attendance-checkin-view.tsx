@@ -50,7 +50,7 @@ import { checkinFace } from 'src/api/checkinFace';
 
 // ----------------------------------------------------------------------
 
-const GPS_ACCURACY_THRESHOLD = 200; // metres — reject if accuracy > this
+const GPS_ACCURACY_THRESHOLD = 50; // metres — reject if accuracy > this
 const GEOFENCE_ENABLE_DELAY_MS = 3000; // anti-fraud: wait 3s before enabling check-in
 
 /** Haversine distance in metres */
