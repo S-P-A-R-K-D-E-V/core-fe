@@ -116,6 +116,8 @@ export const endpoints = {
   attendance: {
     checkIn: '/attendance/check-in',
     checkOut: '/attendance/check-out',
+    smartCheckIn: '/attendance/smart-check-in',
+    smartCheckOut: '/attendance/smart-check-out',
     logs: '/attendance/logs',
     myLogs: '/attendance/my-logs',
     manualAdjustment: '/attendance/manual-adjustment',
@@ -126,6 +128,9 @@ export const endpoints = {
     processRequest: (id: string) => `/attendance/requests/${id}/process`,
     report: '/attendance/report',
     myReport: '/attendance/my-report',
+  },
+  branches: {
+    list: '/branches',
   },
   salary: {
     list: '/salary-configurations',

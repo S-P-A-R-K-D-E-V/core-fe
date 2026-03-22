@@ -91,7 +91,7 @@ export default function ShiftScheduleNewEditForm({ currentSchedule }: Props) {
       shiftTemplateId: currentSchedule?.shiftTemplateId || '',
       startTime: currentSchedule?.startTime || '08:00',
       endTime: currentSchedule?.endTime || '17:00',
-      fromDate: currentSchedule?.fromDate || new Date().toISOString().split('T')[0],
+      fromDate: currentSchedule?.fromDate || new Date().toISOString(),
       toDate: currentSchedule?.toDate || '',
       checkInAllowedMinutesBefore: currentSchedule?.checkInAllowedMinutesBefore ?? 15,
     }),

@@ -66,7 +66,7 @@ export default function AttendanceReportView() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
   });
-  const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [toDate, setToDate] = useState(() => new Date().toISOString());
 
   const [range, setRange] = useState<'day' | 'week' | 'month'>('month');
 
@@ -119,7 +119,7 @@ export default function AttendanceReportView() {
 
   const handleAutoClose = async () => {
     try {
-      const result = await autoCloseShifts(new Date().toISOString().split('T')[0]);
+      const result = await autoCloseShifts(new Date().toISOString());
       enqueueSnackbar(`Auto-closed ${result.closedCount} shift(s)`);
       fetchReport();
     } catch (error) {

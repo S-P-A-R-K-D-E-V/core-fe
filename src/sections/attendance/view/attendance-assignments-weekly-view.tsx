@@ -199,18 +199,18 @@ export default function AttendanceAssignmentsWeeklyView() {
   // Single assign form
   const [newStaffId, setNewStaffId] = useState('');
   const [newScheduleId, setNewScheduleId] = useState('');
-  const [newDate, setNewDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [newDate, setNewDate] = useState(() => new Date().toISOString());
   const [newNote, setNewNote] = useState('');
   const [creating, setCreating] = useState(false);
 
   // Bulk assign form
   const [bulkStaffIds, setBulkStaffIds] = useState<string[]>([]);
   const [bulkScheduleId, setBulkScheduleId] = useState('');
-  const [bulkFromDate, setBulkFromDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [bulkFromDate, setBulkFromDate] = useState(() => new Date().toISOString());
   const [bulkToDate, setBulkToDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 6);
-    return d.toISOString().split('T')[0];
+    return d.toISOString();
   });
   const [bulkFilterDays, setBulkFilterDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [bulkAssigning, setBulkAssigning] = useState(false);

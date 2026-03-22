@@ -37,16 +37,34 @@ import { useAuthContext } from 'src/auth/hooks';
 import { usePageTours } from 'src/hooks/use-tour';
 import type { TourDefinition } from 'src/hooks/use-tour';
 
-import { IShiftAssignment, IAttendanceLog } from 'src/types/corecms-api';
+import { IShiftAssignment, IAttendanceLog, IBranchLocation } from 'src/types/corecms-api';
 import {
   getMySchedule,
   getMyAttendanceLogs,
+  getBranchLocations,
   checkIn,
-  checkOut,
+  smartCheckIn,
+  smartCheckOut,
 } from 'src/api/attendance';
 import { checkinFace } from 'src/api/checkinFace';
 
 // ----------------------------------------------------------------------
+
+const GPS_ACCURACY_THRESHOLD = 200; // metres — reject if accuracy > this
+const GEOFENCE_ENABLE_DELAY_MS = 3000; // anti-fraud: wait 3s before enabling check-in
+
+/** Haversine distance in metres */
+function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 export default function AttendanceCheckinView() {
   const settings = useSettingsContext();
@@ -59,14 +77,23 @@ export default function AttendanceCheckinView() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [geoLocation, setGeoLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoAccuracy, setGeoAccuracy] = useState<number | null>(null);
   const [geoAddress, setGeoAddress] = useState<string | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
+
+  // Branch geofencing
+  const [branches, setBranches] = useState<IBranchLocation[]>([]);
+  const [nearestBranch, setNearestBranch] = useState<{ name: string; distance: number; radius: number } | null>(null);
+  const [isWithinGeofence, setIsWithinGeofence] = useState(false);
+  const [gpsStableAt, setGpsStableAt] = useState<number | null>(null); // timestamp when first valid GPS signal arrived
+  const gpsReadyForCheckin = isWithinGeofence && gpsStableAt !== null && Date.now() - gpsStableAt >= GEOFENCE_ENABLE_DELAY_MS;
+
+  const watchIdRef = useRef<number | null>(null);
 
   // Face capture dialog state
   const [faceDialogOpen, setFaceDialogOpen] = useState(false);
   const [pendingCheckin, setPendingCheckin] = useState<{
-    assignmentId: string;
-    isOvertime: boolean;
+    mode: 'smart' | 'overtime';
     shiftName?: string;
   } | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
@@ -82,28 +109,90 @@ export default function AttendanceCheckinView() {
   const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
   const tourDialogRef = useRef(false); // flag: dialog opened by tour
 
-  const today = new Date().toISOString().split('T')[0];
+  const [today] = useState(() => new Date().toISOString());
 
-  // Get geolocation
+  // ── Continuous GPS tracking with watchPosition ──
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setGeoLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (error) => {
-          setGeoError('Không lấy được vị trí GPS. Kiểm tra quyền trình duyệt.');
-          console.error('Geolocation error:', error);
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    } else {
+    if (!navigator.geolocation) {
       setGeoError('Trình duyệt không hỗ trợ GPS.');
+      return undefined;
     }
+
+    const id = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        setGeoLocation({ lat: latitude, lng: longitude });
+        setGeoAccuracy(accuracy);
+        setGeoError(null);
+      },
+      (error) => {
+        setGeoError('Không lấy được vị trí GPS. Kiểm tra quyền trình duyệt.');
+        console.error('Geolocation error:', error);
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+    );
+    watchIdRef.current = id;
+
+    return () => {
+      navigator.geolocation.clearWatch(id);
+      watchIdRef.current = null;
+    };
   }, []);
+
+  // Fetch branch locations for geofencing
+  useEffect(() => {
+    getBranchLocations()
+      .then((data) => {
+        const withCoords = data.filter((b: IBranchLocation) => b.latitude != null && b.longitude != null);
+        setBranches(withCoords);
+      })
+      .catch((err) => console.error('Failed to fetch branch locations:', err));
+  }, []);
+
+  // Calculate distance to nearest branch whenever GPS updates
+  useEffect(() => {
+    if (!geoLocation || branches.length === 0) {
+      setNearestBranch(null);
+      setIsWithinGeofence(false);
+      return;
+    }
+
+    const distances = branches
+      .filter((b) => b.latitude != null && b.longitude != null)
+      .map((b) => ({
+        name: b.branchName,
+        distance: Math.round(getDistanceMeters(geoLocation.lat, geoLocation.lng, b.latitude!, b.longitude!)),
+        radius: b.geofenceRadius,
+      }));
+
+    const closest = distances.length > 0
+      ? distances.reduce((a, b) => (a.distance < b.distance ? a : b))
+      : null;
+
+    setNearestBranch(closest);
+    const within = closest ? closest.distance <= closest.radius : false;
+    const accuracyOk = !geoAccuracy || geoAccuracy <= GPS_ACCURACY_THRESHOLD;
+    setIsWithinGeofence(within && accuracyOk);
+  }, [geoLocation, geoAccuracy, branches]);
+
+  // Anti-fraud: track when GPS first becomes stable + within geofence → start delay timer
+  useEffect(() => {
+    if (isWithinGeofence && gpsStableAt === null) {
+      setGpsStableAt(Date.now());
+    } else if (!isWithinGeofence) {
+      setGpsStableAt(null);
+    }
+  }, [isWithinGeofence, gpsStableAt]);
+
+  // Force re-render after GEOFENCE_ENABLE_DELAY_MS to update gpsReadyForCheckin
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    if (gpsStableAt === null) return undefined;
+    const remaining = GEOFENCE_ENABLE_DELAY_MS - (Date.now() - gpsStableAt);
+    if (remaining <= 0) return undefined;
+    const timer = setTimeout(() => forceUpdate((n) => n + 1), remaining + 50);
+    return () => clearTimeout(timer);
+  }, [gpsStableAt]);
 
   // Reverse geocode to get address
   useEffect(() => {
@@ -144,6 +233,125 @@ export default function AttendanceCheckinView() {
 
   const getCompletedLogs = (assignmentId: string) =>
     todayLogs.filter((log) => log.shiftAssignmentId === assignmentId);
+
+  // ── Smart shift state ──
+  // Detect if employee currently has an open check-in (any non-overtime log without checkout)
+  const openNonOvertimeLog = useMemo(
+    () => todayLogs.find((l) => l.checkInTime && !l.checkOutTime && !l.isOvertime),
+    [todayLogs]
+  );
+  // Also check schedule-embedded data (hasCheckedIn from my-schedule API)
+  const hasOpenCheckinFromSchedule = useMemo(
+    () => todayAssignments.some((a) => a.hasCheckedIn && !a.hasCheckedOut),
+    [todayAssignments]
+  );
+  const isCurrentlyWorking = !!openNonOvertimeLog || hasOpenCheckinFromSchedule;
+
+  // Build consecutive chain info for display
+  const shiftTimeline = useMemo(() => {
+    if (todayAssignments.length === 0) return [];
+
+    const sorted = [...todayAssignments].sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    return sorted.map((assignment, idx) => {
+      const logs = getCompletedLogs(assignment.assignmentId);
+      const openLog = logs.find((l) => l.checkInTime && !l.checkOutTime);
+      const completedLog = logs.find((l) => l.checkInTime && l.checkOutTime);
+
+      // Determine status from logs first, then fall back to schedule-embedded data
+      let status: 'upcoming' | 'active' | 'completed' | 'auto-transitioned';
+      if (completedLog) {
+        status = completedLog.isAutoClosedBySystem || completedLog.isAutoOpenedBySystem
+          ? 'auto-transitioned'
+          : 'completed';
+      } else if (openLog) {
+        status = 'active';
+      } else if (assignment.hasCheckedIn && assignment.hasCheckedOut) {
+        status = 'completed';
+      } else if (assignment.hasCheckedIn && !assignment.hasCheckedOut) {
+        status = 'active';
+      } else {
+        status = 'upcoming';
+      }
+
+      // Check if consecutive with previous
+      const isConsecutiveWithPrev =
+        idx > 0 && sorted[idx - 1].endTime === assignment.startTime;
+      // Check if consecutive with next
+      const isConsecutiveWithNext =
+        idx < sorted.length - 1 && assignment.endTime === sorted[idx + 1].startTime;
+
+      return {
+        assignment,
+        logs,
+        openLog,
+        completedLog,
+        status,
+        isConsecutiveWithPrev,
+        isConsecutiveWithNext,
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayAssignments, todayLogs]);
+
+  // Determine what shift is "currently active" for display (based on time, for consecutive chain)
+  const currentShiftDisplay = useMemo(() => {
+    if (!isCurrentlyWorking) return null;
+
+    // Find the assignment that has the open log (from logs API or schedule-embedded data)
+    let checkedInAssignment: IShiftAssignment | undefined;
+    if (openNonOvertimeLog) {
+      checkedInAssignment = todayAssignments.find(
+        (a) => a.assignmentId === openNonOvertimeLog.shiftAssignmentId
+      );
+    }
+    // Fallback: use schedule-embedded hasCheckedIn data
+    if (!checkedInAssignment) {
+      checkedInAssignment = todayAssignments.find(
+        (a) => a.hasCheckedIn && !a.hasCheckedOut
+      );
+    }
+    if (!checkedInAssignment) return null;
+
+    // Build consecutive chain starting from checked-in assignment
+    const sorted = [...todayAssignments].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const startIdx = sorted.findIndex((a) => a.assignmentId === checkedInAssignment.assignmentId);
+    if (startIdx < 0) return null;
+
+    const chain = [sorted[startIdx]];
+    for (let i = startIdx + 1; i < sorted.length; i++) {
+      if (chain[chain.length - 1].endTime === sorted[i].startTime) {
+        chain.push(sorted[i]);
+      } else {
+        break;
+      }
+    }
+
+    // Determine which shift in the chain should be "active" based on current time
+    const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+    let activeInChain = chain[0]; // default: first shift
+    for (const shift of chain) {
+      if (nowTime >= shift.startTime && nowTime < shift.endTime) {
+        activeInChain = shift;
+        break;
+      }
+      if (nowTime >= shift.endTime) {
+        // Past this shift, check next
+        activeInChain = shift;
+      }
+    }
+
+    const lastShift = chain[chain.length - 1];
+
+    return {
+      checkedInShift: checkedInAssignment,
+      currentShift: activeInChain,
+      chain,
+      overallStart: chain[0].startTime,
+      overallEnd: lastShift.endTime,
+      isMultiShift: chain.length > 1,
+    };
+  }, [isCurrentlyWorking, openNonOvertimeLog, todayAssignments]);
 
   // ── Camera helpers ──
 
@@ -232,8 +440,8 @@ export default function AttendanceCheckinView() {
   // ── Dialog open / close ──
 
   const openFaceDialog = useCallback(
-    (assignmentId: string, isOvertime: boolean, shiftName?: string) => {
-      setPendingCheckin({ assignmentId, isOvertime, shiftName });
+    (mode: 'smart' | 'overtime', shiftName?: string) => {
+      setPendingCheckin({ mode, shiftName });
       setFaceDialogOpen(true);
       setCapturedImage(null);
       // Start camera after dialog renders
@@ -255,8 +463,7 @@ export default function AttendanceCheckinView() {
     if (!capturedImage || !pendingCheckin) return;
 
     setSubmitting(true);
-    const loadingKey = pendingCheckin.assignmentId || 'overtime';
-    setActionLoading(loadingKey);
+    setActionLoading(pendingCheckin.mode);
 
     try {
       const staffName = user?.displayName || user?.name || user?.email || 'N/A';
@@ -271,17 +478,26 @@ export default function AttendanceCheckinView() {
         time: new Date().toISOString(),
       });
 
-      // 2) Check-in ca làm
-      await checkIn({
-        shiftAssignmentId: pendingCheckin.isOvertime ? undefined : pendingCheckin.assignmentId,
-        isOvertime: pendingCheckin.isOvertime,
-        latitude: geoLocation?.lat,
-        longitude: geoLocation?.lng,
-        faceVerified: true,
-      });
+      // 2) Check-in
+      if (pendingCheckin.mode === 'overtime') {
+        await checkIn({
+          isOvertime: true,
+          latitude: geoLocation?.lat,
+          longitude: geoLocation?.lng,
+          accuracy: geoAccuracy ?? undefined,
+          faceVerified: true,
+        });
+      } else {
+        await smartCheckIn({
+          latitude: geoLocation?.lat,
+          longitude: geoLocation?.lng,
+          accuracy: geoAccuracy ?? undefined,
+          faceVerified: true,
+        });
+      }
 
       enqueueSnackbar(
-        pendingCheckin.isOvertime
+        pendingCheckin.mode === 'overtime'
           ? 'Check-in ngoài giờ thành công!'
           : 'Check-in thành công!',
         { variant: 'success' }
@@ -296,18 +512,18 @@ export default function AttendanceCheckinView() {
       setSubmitting(false);
       setActionLoading(null);
     }
-  }, [capturedImage, pendingCheckin, user, geoLocation, enqueueSnackbar, closeFaceDialog, fetchData]);
+  }, [capturedImage, pendingCheckin, user, geoLocation, geoAccuracy, enqueueSnackbar, closeFaceDialog, fetchData]);
 
-  const handleCheckOut = async (logId: string) => {
+  const handleSmartCheckOut = async () => {
     try {
-      setActionLoading(logId);
-      await checkOut({
-        attendanceLogId: logId,
+      setActionLoading('checkout');
+      await smartCheckOut({
         latitude: geoLocation?.lat,
         longitude: geoLocation?.lng,
+        accuracy: geoAccuracy ?? undefined,
         faceVerified: false,
       });
-      enqueueSnackbar('Check-out thành công!', { variant: 'success' });
+      enqueueSnackbar('Kết thúc làm việc thành công!', { variant: 'success' });
       fetchData();
     } catch (error: any) {
       console.error(error);
@@ -349,15 +565,15 @@ export default function AttendanceCheckinView() {
   const CHECKIN_TOURS: TourDefinition[] = useMemo(
     () => [
       {
-        tourKey: 'attendance-checkin-overview',
+        tourKey: 'attendance-checkin-overview-v2',
         label: 'Tổng quan Check-in',
         steps: [
           {
             element: '#tour-gps-status',
             popover: {
-              title: 'Trạng thái GPS',
+              title: 'Vị trí & Khu vực cửa hàng',
               description:
-                'Hệ thống tự động lấy vị trí GPS của bạn khi mở trang. Vị trí này sẽ được ghi nhận khi check-in/check-out. Nếu có lỗi GPS, hãy kiểm tra lại quyền trình duyệt hoặc thử load lại trang để có thông báo yêu cầu cấp quyền.',
+                'Hệ thống tự động xác định vị trí GPS của bạn. Bạn chỉ có thể check-in khi đang ở trong phạm vi 100m quanh cửa hàng. Nếu có lỗi GPS, hãy kiểm tra quyền trình duyệt hoặc tải lại trang.',
               side: 'bottom' as const,
               align: 'start' as const,
             },
@@ -367,7 +583,7 @@ export default function AttendanceCheckinView() {
             popover: {
               title: 'Thời gian hiện tại',
               description:
-                'Hiển thị ngày và giờ hiện tại. Thời gian check-in sẽ được ghi nhận chính xác theo giờ server.',
+                'Hiển thị ngày và giờ hiện tại. Thời gian check-in/check-out sẽ được ghi nhận chính xác theo giờ server.',
               side: 'bottom' as const,
               align: 'center' as const,
             },
@@ -377,7 +593,7 @@ export default function AttendanceCheckinView() {
             popover: {
               title: 'Danh sách ca làm',
               description:
-                'Hiển thị các ca làm hôm nay của bạn. Mỗi ca có nút "Chụp ảnh & Check In" để bắt đầu và "Check Out" khi kết thúc ca.',
+                'Hiển thị các ca làm hôm nay. Nếu bạn có nhiều ca liên tiếp, hệ thống sẽ tự động check-out ca trước và check-in ca sau khi chuyển ca — bạn chỉ cần check-out ở ca cuối cùng.',
               side: 'top' as const,
               align: 'start' as const,
             },
@@ -387,7 +603,7 @@ export default function AttendanceCheckinView() {
             popover: {
               title: 'Check-in ngoài giờ',
               description:
-                'Nếu bạn không có ca được phân hoặc cần làm thêm ngoài giờ, nhấn nút này để check-in ngoài ca. Hệ thống sẽ ghi nhận giờ OT.',
+                'Nếu bạn không có ca được phân hoặc cần làm thêm ngoài giờ, nhấn nút này để check-in ngoài ca. Yêu cầu phải ở trong phạm vi cửa hàng.',
               side: 'top' as const,
               align: 'start' as const,
             },
@@ -395,7 +611,7 @@ export default function AttendanceCheckinView() {
         ],
       },
       {
-        tourKey: 'attendance-checkin-face',
+        tourKey: 'attendance-checkin-face-v2',
         label: 'Chụp ảnh Check-in',
         steps: [
           {
@@ -403,7 +619,7 @@ export default function AttendanceCheckinView() {
             popover: {
               title: 'Cửa sổ chụp ảnh',
               description:
-                'Khi nhấn "Chụp ảnh & Check In", cửa sổ này sẽ mở ra. Camera sẽ tự bật để bạn chụp ảnh xác nhận.',
+                'Khi nhấn "Chụp ảnh & Check In", cửa sổ này sẽ mở ra. Camera sẽ tự bật để bạn chụp ảnh xác nhận danh tính.',
               side: 'top' as const,
               align: 'center' as const,
             },
@@ -416,7 +632,7 @@ export default function AttendanceCheckinView() {
             popover: {
               title: 'Khung camera',
               description:
-                'Hướng camera về phía khuôn mặt. Phía dưới hiển thị thời gian, vị trí GPS và địa chỉ sẽ được chụp kèm ảnh.',
+                'Hướng camera về phía khuôn mặt. Ảnh chụp sẽ kèm theo thời gian, toạ độ GPS và địa chỉ để xác minh vị trí.',
               side: 'top' as const,
               align: 'center' as const,
             },
@@ -447,15 +663,15 @@ export default function AttendanceCheckinView() {
         ],
       },
       {
-        tourKey: 'attendance-checkin-schedule',
-        label: 'Lịch làm cá nhân',
+        tourKey: 'attendance-checkin-schedule-v2',
+        label: 'Lịch làm & Ca liên tiếp',
         steps: [
           {
             element: '#tour-my-schedule-btn',
             popover: {
               title: 'Xem lịch làm cá nhân',
               description:
-                'Nhấn vào đây để xem toàn bộ lịch làm việc của bạn trong tuần/tháng. Giúp bạn biết được ca nào đã được phân.',
+                'Nhấn vào đây để xem toàn bộ lịch làm việc trong tuần/tháng. Các ca liên tiếp sẽ được hiển thị dạng chuỗi để bạn dễ theo dõi.',
               side: 'bottom' as const,
               align: 'end' as const,
             },
@@ -464,7 +680,7 @@ export default function AttendanceCheckinView() {
             popover: {
               title: 'Hoàn thành hướng dẫn! 🎉',
               description:
-                'Bạn đã nắm được cách check-in/check-out. Nhấn nút ❓ ở góc trên bất kỳ lúc nào để xem lại hướng dẫn.',
+                'Lưu ý: Check-in yêu cầu ở gần cửa hàng (≤100m). Ca liên tiếp sẽ tự chuyển — bạn chỉ checkout ca cuối. Nhấn ❓ bất kỳ lúc nào để xem lại.',
             },
           },
         ],
@@ -554,8 +770,35 @@ export default function AttendanceCheckinView() {
       )}
 
       {geoLocation && (
-        <Alert id="tour-gps-status" severity="info" sx={{ mb: 2 }} icon={<Iconify icon="mdi:map-marker" />}>
-          GPS: {geoLocation.lat.toFixed(6)}, {geoLocation.lng.toFixed(6)}
+        <Alert
+          id="tour-gps-status"
+          severity={isWithinGeofence ? 'success' : 'warning'}
+          sx={{ mb: 2 }}
+          icon={<Iconify icon="mdi:map-marker" />}
+        >
+          <Stack spacing={0.5}>
+            <Typography variant="body2">
+              GPS: {geoLocation.lat.toFixed(6)}, {geoLocation.lng.toFixed(6)}
+              {geoAccuracy != null && ` (±${Math.round(geoAccuracy)}m)`}
+            </Typography>
+            {geoAccuracy != null && geoAccuracy > GPS_ACCURACY_THRESHOLD && (
+              <Typography variant="body2" color="error.main">
+                ⚠️ GPS không chính xác (accuracy {'>'}{geoAccuracy}/{GPS_ACCURACY_THRESHOLD}m). Hãy ra nơi thoáng hơn.
+              </Typography>
+            )}
+            {nearestBranch && (
+              <Typography variant="body2">
+                📍 Cửa hàng gần nhất: <strong>{nearestBranch.name}</strong> — cách{' '}
+                <strong>{nearestBranch.distance}m</strong> (cho phép: {nearestBranch.radius}m)
+                {nearestBranch.distance <= nearestBranch.radius ? ' ✅' : ' ❌ Ngoài phạm vi'}
+              </Typography>
+            )}
+            {branches.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                Chưa có cửa hàng nào cài đặt vị trí. Liên hệ admin.
+              </Typography>
+            )}
+          </Stack>
         </Alert>
       )}
 
@@ -614,8 +857,8 @@ export default function AttendanceCheckinView() {
                     <Iconify icon="mdi:clock-plus-outline" />
                   )
                 }
-                onClick={() => openFaceDialog('', true, 'Ngoài giờ')}
-                disabled={!!actionLoading}
+                onClick={() => openFaceDialog('overtime', 'Ngoài giờ')}
+                disabled={!!actionLoading || (branches.length > 0 && !gpsReadyForCheckin)}
               >
                 Chụp ảnh & Check In
               </Button>
@@ -626,128 +869,200 @@ export default function AttendanceCheckinView() {
 
       {!loading && todayAssignments.length > 0 && (
         <Stack id="tour-shift-list" spacing={3}>
-          {todayAssignments.map((assignment) => {
-            const openLog = getLogForAssignment(assignment.assignmentId);
-            const completedLogs = getCompletedLogs(assignment.assignmentId);
-            const isLoading = actionLoading === assignment.assignmentId || actionLoading === openLog?.id;
-
-            return (
-              <Card key={assignment.id} sx={{ p: 3 }}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
-                  <Box>
-                    <Typography variant="h6">{assignment.shiftName}</Typography>
+          {/* ── Smart Action Card ── */}
+          <Card sx={{ p: 3, border: '2px solid', borderColor: isCurrentlyWorking ? 'success.main' : 'primary.main' }}>
+            <Stack spacing={2}>
+              {isCurrentlyWorking && currentShiftDisplay ? (
+                <>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: 'success.main', animation: 'pulse 2s infinite', '@keyframes pulse': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.4 } } }} />
+                    <Typography variant="h6" color="success.main">Đang làm việc</Typography>
+                  </Stack>
+                  <Typography variant="body1">
+                    Ca hiện tại: <strong>{currentShiftDisplay.currentShift.shiftName || currentShiftDisplay.currentShift.scheduleName}</strong>{' '}
+                    ({currentShiftDisplay.currentShift.startTime} - {currentShiftDisplay.currentShift.endTime})
+                  </Typography>
+                  {currentShiftDisplay.isMultiShift && (
                     <Typography variant="body2" color="text.secondary">
-                      {assignment.startTime} - {assignment.endTime}
+                      Chuỗi ca liên tiếp: {currentShiftDisplay.overallStart} → {currentShiftDisplay.overallEnd}
+                      {' '}({currentShiftDisplay.chain.length} ca)
                     </Typography>
-                    {assignment.note && (
-                      <Typography variant="caption" color="text.secondary">
-                        Ghi chú: {assignment.note}
-                      </Typography>
-                    )}
-                  </Box>
-
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Label variant="soft" color={assignment.shiftType === 'Extra' ? 'warning' : 'info'}>
-                      {assignment.shiftType}
-                    </Label>
-
-                    {openLog ? (
-                      <Button
-                        variant="contained"
-                        color="error"
-                        size="large"
-                        startIcon={
-                          isLoading ? (
-                            <CircularProgress size={20} color="inherit" />
-                          ) : (
-                            <Iconify icon="mdi:logout" />
-                          )
-                        }
-                        onClick={() => handleCheckOut(openLog.id)}
-                        disabled={!!isLoading}
-                      >
-                        Check Out
-                      </Button>
-                    ) : (
+                  )}
+                  <Button
+                    variant="contained"
+                    color="error"
+                    size="large"
+                    fullWidth
+                    startIcon={
+                      actionLoading === 'checkout' ? (
+                        <CircularProgress size={20} color="inherit" />
+                      ) : (
+                        <Iconify icon="mdi:logout" />
+                      )
+                    }
+                    onClick={handleSmartCheckOut}
+                    disabled={!!actionLoading}
+                    sx={{ py: 1.5 }}
+                  >
+                    Kết thúc làm việc
+                  </Button>
+                  {currentShiftDisplay.isMultiShift && (
+                    <Typography variant="caption" color="text.secondary" textAlign="center">
+                      Hệ thống sẽ tự ghi nhận chuyển ca cho các ca liên tiếp
+                    </Typography>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Typography variant="h6" color="primary">
+                    Sẵn sàng làm việc
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Hệ thống sẽ tự nhận diện ca phù hợp dựa vào thời gian hiện tại
+                  </Typography>
+                  <Tooltip
+                    title={
+                      branches.length > 0 && !gpsReadyForCheckin
+                        ? 'Bạn chưa ở trong phạm vi cửa hàng hoặc GPS chưa ổn định'
+                        : ''
+                    }
+                  >
+                    <span>
                       <Button
                         variant="contained"
                         color="success"
                         size="large"
+                        fullWidth
                         startIcon={
-                          isLoading ? (
+                          actionLoading === 'smart' ? (
                             <CircularProgress size={20} color="inherit" />
                           ) : (
                             <Iconify icon="mdi:camera" />
                           )
                         }
-                        onClick={() =>
-                          openFaceDialog(
-                            assignment.assignmentId,
-                            false,
-                            assignment.shiftName || assignment.scheduleName
-                          )
-                        }
-                        disabled={!!isLoading}
+                        onClick={() => openFaceDialog('smart')}
+                        disabled={!!actionLoading || (branches.length > 0 && !gpsReadyForCheckin)}
+                        sx={{ py: 1.5 }}
                       >
-                        Chụp ảnh & Check In
+                        Chụp ảnh & Bắt đầu làm việc
                       </Button>
-                    )}
-                  </Stack>
-                </Stack>
+                    </span>
+                  </Tooltip>
+                </>
+              )}
+            </Stack>
+          </Card>
 
-                {/* Show logs for this assignment */}
-                {completedLogs.length > 0 && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                      Lịch sử chấm công:
-                    </Typography>
-                    <Stack spacing={1}>
-                      {completedLogs.map((log) => (
-                        <Stack
-                          key={log.id}
-                          direction="row"
-                          spacing={1}
-                          alignItems="center"
-                          sx={{ pl: 2 }}
-                        >
-                          <Chip
-                            size="small"
-                            label={`Vào: ${log.checkInTime ? new Date(log.checkInTime).toLocaleTimeString('vi-VN') : '-'}`}
-                            color="success"
-                            variant="soft"
-                          />
-                          <Chip
-                            size="small"
-                            label={`Ra: ${log.checkOutTime ? new Date(log.checkOutTime).toLocaleTimeString('vi-VN') : 'Đang làm'}`}
-                            color={log.checkOutTime ? 'info' : 'warning'}
-                            variant="soft"
-                          />
-                          {log.isLate && (
-                            <Chip
-                              size="small"
-                              label={`Trễ ${log.lateMinutes} phút`}
-                              color="error"
-                              variant="soft"
-                            />
-                          )}
-                          {log.isAutoClosedBySystem && (
-                            <Chip size="small" label="Tự động đóng" color="warning" variant="soft" />
-                          )}
-                          {log.workedHours != null && log.checkOutTime && (
-                            <Chip
-                              size="small"
-                              label={`${log.workedHours.toFixed(1)}h`}
-                              variant="soft"
-                            />
-                          )}
-                        </Stack>
-                      ))}
+          {/* ── Shift Timeline ── */}
+          <Card sx={{ p: 3 }}>
+            <Typography variant="subtitle1" sx={{ mb: 2 }}>
+              Lịch ca hôm nay
+            </Typography>
+            <Stack spacing={0}>
+              {shiftTimeline.map((item, idx) => {
+                const { assignment, status, isConsecutiveWithPrev, isConsecutiveWithNext, logs } = item;
+                const statusConfig = {
+                  upcoming: { color: 'default' as const, label: 'Sắp tới', icon: 'mdi:clock-outline' },
+                  active: { color: 'success' as const, label: 'Đang làm', icon: 'mdi:play-circle' },
+                  completed: { color: 'info' as const, label: 'Hoàn thành', icon: 'mdi:check-circle' },
+                  'auto-transitioned': { color: 'warning' as const, label: 'Tự động', icon: 'mdi:swap-horizontal-circle' },
+                }[status];
+
+                // Determine if this shift is the "currently active" one in a consecutive chain
+                const isActiveInChain = isCurrentlyWorking
+                  && currentShiftDisplay?.currentShift.assignmentId === assignment.assignmentId;
+
+                return (
+                  <Box key={assignment.id}>
+                    {/* Consecutive connector */}
+                    {isConsecutiveWithPrev && (
+                      <Stack direction="row" alignItems="center" sx={{ pl: 2, py: 0.5 }}>
+                        <Box sx={{ width: 2, height: 16, bgcolor: 'warning.main', ml: '7px' }} />
+                        <Typography variant="caption" color="warning.main" sx={{ ml: 1 }}>
+                          liên tiếp
+                        </Typography>
+                      </Stack>
+                    )}
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={2}
+                      sx={{
+                        p: 1.5,
+                        borderRadius: 1,
+                        bgcolor: isActiveInChain ? 'success.lighter' : 'transparent',
+                        border: isActiveInChain ? '1px solid' : 'none',
+                        borderColor: 'success.light',
+                      }}
+                    >
+                      {/* Timeline dot */}
+                      <Box
+                        sx={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: '50%',
+                          bgcolor: status === 'active' || isActiveInChain ? 'success.main'
+                            : status === 'completed' ? 'info.main'
+                            : status === 'auto-transitioned' ? 'warning.main'
+                            : 'grey.400',
+                          flexShrink: 0,
+                        }}
+                      />
+
+                      {/* Shift info */}
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="subtitle2">
+                          {assignment.shiftName || assignment.scheduleName}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {assignment.startTime} - {assignment.endTime}
+                        </Typography>
+                      </Box>
+
+                      {/* Status chip */}
+                      <Label variant="soft" color={statusConfig.color}>
+                        {statusConfig.label}
+                      </Label>
                     </Stack>
+
+                    {/* Show log details for completed/auto shifts */}
+                    {logs.length > 0 && (
+                      <Stack spacing={0.5} sx={{ pl: 5, pb: 1 }}>
+                        {logs.map((log) => (
+                          <Stack key={log.id} direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                            <Chip
+                              size="small"
+                              label={`Vào: ${log.checkInTime ? new Date(log.checkInTime).toLocaleTimeString('vi-VN') : '-'}`}
+                              color="success"
+                              variant="soft"
+                            />
+                            <Chip
+                              size="small"
+                              label={`Ra: ${log.checkOutTime ? new Date(log.checkOutTime).toLocaleTimeString('vi-VN') : 'Đang làm'}`}
+                              color={log.checkOutTime ? 'info' : 'warning'}
+                              variant="soft"
+                            />
+                            {log.isLate && (
+                              <Chip size="small" label={`Trễ ${log.lateMinutes} phút`} color="error" variant="soft" />
+                            )}
+                            {log.isAutoClosedBySystem && (
+                              <Chip size="small" label="Tự đóng" color="warning" variant="soft" />
+                            )}
+                            {log.isAutoOpenedBySystem && (
+                              <Chip size="small" label="Tự mở" color="warning" variant="soft" />
+                            )}
+                            {log.workedHours != null && log.checkOutTime && (
+                              <Chip size="small" label={`${log.workedHours.toFixed(1)}h`} variant="soft" />
+                            )}
+                          </Stack>
+                        ))}
+                      </Stack>
+                    )}
                   </Box>
-                )}
-              </Card>
-            );
-          })}
+                );
+              })}
+            </Stack>
+          </Card>
 
           {/* Overtime Check-in - Always available */}
           <Card id="tour-overtime-checkin" sx={{ p: 3, bgcolor: 'warning.lighter' }}>
@@ -772,8 +1087,8 @@ export default function AttendanceCheckinView() {
                     <Iconify icon="mdi:clock-plus-outline" />
                   )
                 }
-                onClick={() => openFaceDialog('', true, 'Ngoài giờ')}
-                disabled={!!actionLoading}
+                onClick={() => openFaceDialog('overtime', 'Ngoài giờ')}
+                disabled={!!actionLoading || (branches.length > 0 && !gpsReadyForCheckin)}
               >
                 Chụp ảnh & Check In
               </Button>
@@ -851,9 +1166,14 @@ export default function AttendanceCheckinView() {
                     </Typography>
                     <Typography variant="caption" display="block">
                       📍 {geoLocation
-                        ? `${geoLocation.lat.toFixed(4)}, ${geoLocation.lng.toFixed(4)}`
+                        ? `${geoLocation.lat.toFixed(4)}, ${geoLocation.lng.toFixed(4)}${geoAccuracy != null ? ` (±${Math.round(geoAccuracy)}m)` : ''}`
                         : 'Đang lấy vị trí...'}
                     </Typography>
+                    {nearestBranch && (
+                      <Typography variant="caption" display="block" sx={{ opacity: 0.85 }}>
+                        🏪 {nearestBranch.name} — {nearestBranch.distance}m
+                      </Typography>
+                    )}
                     {geoAddress && (
                       <Typography variant="caption" display="block" sx={{ opacity: 0.85 }}>
                         🏠 {geoAddress}

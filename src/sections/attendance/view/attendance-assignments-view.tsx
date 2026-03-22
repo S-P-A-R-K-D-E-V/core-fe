@@ -136,7 +136,7 @@ export default function AttendanceAssignmentsView() {
   // Create form state
   const [newStaffId, setNewStaffId] = useState('');
   const [newShiftId, setNewShiftId] = useState('');
-  const [newDate, setNewDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [newDate, setNewDate] = useState(() => new Date().toISOString());
   const [newNote, setNewNote] = useState('');
   const [creating, setCreating] = useState(false);
 
