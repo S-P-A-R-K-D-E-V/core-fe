@@ -92,13 +92,16 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
   useEffect(() => {
     Promise.all([
       getAllCategories(true),
-      getAllUnitOfMeasures(),
-      getAllVariantAttributes(),
+      // getAllUnitOfMeasures(),
+      // getAllVariantAttributes(),
     ])
-      .then(([cats, uoms, attrs]) => {
+      .then(([cats, 
+        // uoms, 
+        // attrs
+      ]) => {
         setCategories(cats);
-        setUnits(uoms);
-        setVariantAttributes(attrs);
+        // setUnits(uoms);
+        // setVariantAttributes(attrs);
       })
       .catch(console.error);
   }, []);
@@ -136,34 +139,39 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
   });
 
   const defaultValues = useMemo(
-    () => ({
-      name: currentProduct?.name || '',
-      sku: currentProduct?.sku || currentProduct?.code || '',
-      barcode: currentProduct?.barcode || currentProduct?.barCode || '',
-      description: currentProduct?.description || '',
-      categoryId: currentProduct?.categoryId || '',
-      unitOfMeasureId: currentProduct?.unitOfMeasureId || '',
-      costPrice: currentProduct?.costPrice ?? currentProduct?.basePrice ?? 0,
-      sellingPrice: currentProduct?.sellingPrice ?? currentProduct?.basePrice ?? 0,
-      imageUrl: currentProduct?.imageUrl || currentProduct?.images?.[0]?.imageUrl || '',
-      lowStockThreshold: currentProduct?.lowStockThreshold ?? currentProduct?.minQuantity ?? 0,
-      highStockThreshold: currentProduct?.highStockThreshold ?? currentProduct?.maxQuantity ?? 999999999,
-      isLoyaltyPoints: currentProduct?.isLoyaltyPoints ?? currentProduct?.isRewardPoint ?? false,
-      weight: currentProduct?.weight || 0,
-      weightUnit: currentProduct?.weightUnit || 'g',
-      location: currentProduct?.location || '',
-      hasVariants: currentProduct?.hasVariants || false,
-      variants:
-        currentProduct?.variants?.map((v) => ({
-          sku: v.sku,
-          barcode: v.barcode || '',
-          name: v.name,
-          costPrice: v.costPrice || 0,
-          sellingPrice: v.sellingPrice || 0,
-          imageUrl: v.imageUrl || '',
-          attributeValueIds: v.combinations?.map((c) => c.valueId) || [],
-        })) || [],
-    }),
+    () => {
+      const avgCostPrice = currentProduct?.inventories && currentProduct.inventories.length > 0
+        ? Math.round(currentProduct.inventories.reduce((sum, inv) => sum + (inv.cost || 0), 0) / currentProduct.inventories.length)
+        : currentProduct?.costPrice ?? currentProduct?.basePrice ?? 0;
+      return ({
+        name: currentProduct?.name || '',
+        sku: currentProduct?.sku || currentProduct?.code || '',
+        barcode: currentProduct?.barcode || currentProduct?.barCode || '',
+        description: currentProduct?.description || '',
+        categoryId: currentProduct?.categoryId || '',
+        unitOfMeasureId: currentProduct?.unitOfMeasureId || '',
+        costPrice: avgCostPrice || currentProduct?.costPrice || currentProduct?.basePrice || 0,
+        sellingPrice: currentProduct?.sellingPrice ?? currentProduct?.basePrice ?? 0,
+        imageUrl: currentProduct?.imageUrl || currentProduct?.images?.[0]?.imageUrl || '',
+        lowStockThreshold: currentProduct?.lowStockThreshold ?? currentProduct?.minQuantity ?? 0,
+        highStockThreshold: currentProduct?.highStockThreshold ?? currentProduct?.maxQuantity ?? 999999999,
+        isLoyaltyPoints: currentProduct?.isLoyaltyPoints ?? currentProduct?.isRewardPoint ?? false,
+        weight: currentProduct?.weight || 0,
+        weightUnit: currentProduct?.weightUnit || 'g',
+        location: currentProduct?.location || '',
+        hasVariants: currentProduct?.hasVariants || false,
+        variants:
+          currentProduct?.variants?.map((v) => ({
+            sku: v.sku,
+            barcode: v.barcode || '',
+            name: v.name,
+            costPrice: v.costPrice || 0,
+            sellingPrice: v.sellingPrice || 0,
+            imageUrl: v.imageUrl || '',
+            attributeValueIds: v.combinations?.map((c) => c.valueId) || [],
+          })) || [],
+      })
+    },
     [currentProduct]
   );
 
@@ -186,41 +194,11 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
     if (currentProduct) {
       reset(defaultValues);
       setSelectedCategoryName(currentProduct.categoryName || '');
+      // In edit mode: don't map childProducts into unitConversions
+      setUnitConversions([]);
 
-      // Load unit conversions from product (mapped from childProducts by API layer)
-      if (currentProduct.unitConversions && currentProduct.unitConversions.length > 0) {
-        setUnitConversions(
-          currentProduct.unitConversions.map((uc) => ({
-            unitOfMeasureId: uc.unitOfMeasureId,
-            unitOfMeasureName: uc.unitOfMeasureName,
-            conversionRate: uc.conversionRate,
-            costPrice: uc.costPrice || 0,
-            sellingPrice: uc.sellingPrice || 0,
-            barcode: uc.barcode || '',
-          }))
-        );
-      } else {
-        setUnitConversions([]);
-      }
-
-      // Reverse-engineer product attributes from variant combinations (mapped from childProducts)
-      if (currentProduct.variants && currentProduct.variants.length > 0) {
-        const attrMap = new Map<string, AttributeFormItem>();
-        currentProduct.variants.forEach((v) => {
-          v.combinations?.forEach((c) => {
-            const key = `${c.attributeId}:${c.valueName}`;
-            if (!attrMap.has(key)) {
-              attrMap.set(key, {
-                attributeId: c.attributeId,
-                attributeName: c.attributeName,
-                value: c.valueName,
-              });
-            }
-          });
-        });
-        setProductAttributes(Array.from(attrMap.values()));
-      } else if (currentProduct.attributes && currentProduct.attributes.length > 0) {
-        // Fallback: use product-level attributes directly
+      // Use product-level attributes directly from API (ProductAttribute table)
+      if (currentProduct.attributes && currentProduct.attributes.length > 0) {
         setProductAttributes(
           currentProduct.attributes.map((a) => ({
             attributeId: a.id,
@@ -347,6 +325,7 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
         await updateProduct(currentProduct.id, {
           name: data.name,
           sku: data.sku || undefined,
+          code: data.sku || undefined,
           barcode: data.barcode || undefined,
           description: data.description || undefined,
           categoryId: data.categoryId,
@@ -369,6 +348,7 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
         await createProduct({
           name: data.name,
           sku: data.sku || undefined,
+          code: data.sku || undefined,
           barcode: data.barcode || undefined,
           description: data.description || undefined,
           categoryId: data.categoryId,
@@ -462,16 +442,16 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
             </IconButton>
           </Stack>
 
-          <RHFSelect name="unitOfMeasureId" label="Đơn vị tính">
+          {/* <RHFSelect name="unitOfMeasureId" label="Đơn vị tính">
             <MenuItem value="">— Chọn đơn vị —</MenuItem>
             {units.map((u) => (
               <MenuItem key={u.id} value={u.id}>
                 {u.name} {u.abbreviation ? `(${u.abbreviation})` : ''}
               </MenuItem>
             ))}
-          </RHFSelect>
+          </RHFSelect> */}
 
-          <RHFTextField name="imageUrl" label="URL hình ảnh" />
+          {/* <RHFTextField name="imageUrl" label="URL hình ảnh" /> */}
         </Box>
       </Card>
 
@@ -487,10 +467,22 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
             rowGap={2}
             columnGap={2}
             display="grid"
-            gridTemplateColumns={{ xs: '1fr', sm: '1fr 1fr' }}
+            gridTemplateColumns={{ xs: '1fr', sm: currentProduct ? '1fr 1fr 1fr' : '1fr 1fr' }}
           >
             <RHFTextField name="costPrice" label="Giá vốn" type="number" />
             <RHFTextField name="sellingPrice" label="Giá bán" type="number" />
+            {currentProduct && (
+              <TextField
+                label="Tồn kho"
+                value={
+                  currentProduct.inventories
+                    ? currentProduct.inventories.reduce((sum, inv) => sum + (inv.onHand || 0), 0)
+                    : 0
+                }
+                InputProps={{ readOnly: true }}
+                type="number"
+              />
+            )}
           </Box>
         </AccordionDetails>
       </Accordion>

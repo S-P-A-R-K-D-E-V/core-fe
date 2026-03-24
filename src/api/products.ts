@@ -127,12 +127,65 @@ export async function getProductById(id: string): Promise<IProduct> {
 }
 
 export async function createProduct(data: ICreateProductRequest): Promise<{ id: string }> {
-  const response = await axios.post<{ id: string }>(endpoints.products.create, data);
+  // Map frontend extended field names to backend field names
+  const payload = {
+    code: data.code || data.sku || '',
+    name: data.name,
+    barCode: data.barCode || data.barcode,
+    fullName: data.fullName,
+    description: data.description,
+    categoryId: data.categoryId,
+    allowsSale: data.allowsSale ?? true,
+    hasVariants: data.hasVariants ?? false,
+    unit: data.unit,
+    masterProductId: data.masterProductId,
+    basePrice: data.basePrice ?? data.sellingPrice ?? 0,
+    weight: data.weight,
+    productType: data.productType ?? 2,
+    isRewardPoint: data.isRewardPoint ?? data.isLoyaltyPoints,
+    isLotSerialControl: data.isLotSerialControl,
+    isBatchExpireControl: data.isBatchExpireControl,
+    orderTemplate: data.orderTemplate,
+    minQuantity: data.minQuantity ?? data.lowStockThreshold ?? 0,
+    maxQuantity: data.maxQuantity ?? data.highStockThreshold ?? 999999999,
+    taxType: data.taxType,
+    taxRate: data.taxRate,
+    taxRateDirect: data.taxRateDirect ?? data.vatRate,
+    attributes: data.attributes,
+    images: data.images,
+  };
+  const response = await axios.post<{ id: string }>(endpoints.products.create, payload);
   return response.data;
 }
 
 export async function updateProduct(id: string, data: IUpdateProductRequest): Promise<void> {
-  await axios.put(endpoints.products.update(id), data);
+  // Map frontend extended field names to backend field names
+  const payload = {
+    code: data.code || data.sku,
+    name: data.name,
+    barCode: data.barCode || data.barcode,
+    fullName: data.fullName,
+    description: data.description,
+    categoryId: data.categoryId,
+    allowsSale: data.allowsSale ?? true,
+    hasVariants: data.hasVariants ?? false,
+    unit: data.unit,
+    masterProductId: data.masterProductId,
+    basePrice: data.basePrice ?? data.sellingPrice ?? 0,
+    weight: data.weight,
+    productType: data.productType ?? 2,
+    isActive: data.isActive ?? true,
+    isRewardPoint: data.isRewardPoint ?? data.isLoyaltyPoints,
+    isLotSerialControl: data.isLotSerialControl,
+    isBatchExpireControl: data.isBatchExpireControl,
+    orderTemplate: data.orderTemplate,
+    minQuantity: data.minQuantity ?? data.lowStockThreshold ?? 0,
+    maxQuantity: data.maxQuantity ?? data.highStockThreshold ?? 999999999,
+    taxType: data.taxType,
+    taxRate: data.taxRate,
+    taxRateDirect: data.taxRateDirect ?? data.vatRate,
+  };
+  await axios.put(endpoints.products.update(id), payload);
 }
 
 export async function deleteProduct(id: string): Promise<void> {
