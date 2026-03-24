@@ -1494,6 +1494,7 @@ export interface ICheckinFaceRequest {
   lng?: number;
   deviceName?: string;
   time?: string;
+  branchName?: string;
 }
 
 export interface ICheckinFaceResponse {

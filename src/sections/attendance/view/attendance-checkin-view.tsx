@@ -198,15 +198,28 @@ export default function AttendanceCheckinView() {
   useEffect(() => {
     if (!geoLocation) return;
     fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${geoLocation.lat}&lon=${geoLocation.lng}&format=json`,
+      `https://nominatim.openstreetmap.org/reverse?lat=${geoLocation.lat}&lon=${geoLocation.lng}&format=json&addressdetails=1`,
       { headers: { 'User-Agent': 'CoreCms/1.0' } }
     )
       .then((res) => res.json())
       .then((data) => {
-        if (data?.display_name) setGeoAddress(data.display_name);
+        if (isWithinGeofence && nearestBranch) {
+          // Near a branch: use branch name + short address components
+          const addr = data?.address;
+          const parts = [
+            nearestBranch.name,
+            addr?.road,
+            addr?.city_district,
+            addr?.city,
+            addr?.country,
+          ].filter(Boolean);
+          setGeoAddress(parts.join(', ') || data?.display_name);
+        } else if (data?.display_name) {
+          setGeoAddress(data.display_name);
+        }
       })
       .catch((err) => console.error('Reverse geocode failed:', err));
-  }, [geoLocation]);
+  }, [geoLocation, isWithinGeofence, nearestBranch]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -476,6 +489,7 @@ export default function AttendanceCheckinView() {
         lng: geoLocation?.lng,
         deviceName: navigator.userAgent.slice(0, 80),
         time: new Date().toISOString(),
+        branchName: isWithinGeofence ? nearestBranch?.name : undefined,
       });
 
       // 2) Check-in
@@ -512,7 +526,7 @@ export default function AttendanceCheckinView() {
       setSubmitting(false);
       setActionLoading(null);
     }
-  }, [capturedImage, pendingCheckin, user, geoLocation, geoAccuracy, enqueueSnackbar, closeFaceDialog, fetchData]);
+  }, [capturedImage, pendingCheckin, user, geoLocation, geoAccuracy, isWithinGeofence, nearestBranch, enqueueSnackbar, closeFaceDialog, fetchData]);
 
   const handleSmartCheckOut = async () => {
     try {
