@@ -4,6 +4,11 @@ services:
     image: satthuno99/core-fe:latest
     container_name: core-web
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     expose:
       - "3000"
     deploy:
@@ -18,6 +23,11 @@ services:
     image: nginx:alpine
     container_name: core-nginx
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - VIRTUAL_HOST=cici21chualang.vn,www.cici21chualang.vn,ql-quy-pickleball.online,www.ql-quy-pickleball.online
       - LETSENCRYPT_HOST=cici21chualang.vn,www.cici21chualang.vn,ql-quy-pickleball.online,www.ql-quy-pickleball.online
