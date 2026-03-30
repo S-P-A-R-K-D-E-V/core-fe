@@ -39,7 +39,7 @@ import {
   IUnitOfMeasure,
   IVariantAttribute,
 } from 'src/types/corecms-api';
-import { createProduct, updateProduct } from 'src/api/products';
+import { createProduct, updateProduct, getProductById } from 'src/api/products';
 import { getAllCategories } from 'src/api/categories';
 import { getAllUnitOfMeasures } from 'src/api/unit-of-measures';
 import { getAllVariantAttributes } from 'src/api/variant-attributes';
@@ -67,9 +67,10 @@ type Props = {
   isDialog?: boolean;
   onDialogClose?: () => void;
   onDialogSaved?: () => void;
+  onProductCreated?: (product: IProduct) => void;
 };
 
-export default function ProductNewEditForm({ currentProduct, isDialog, onDialogClose, onDialogSaved }: Props) {
+export default function ProductNewEditForm({ currentProduct, isDialog, onDialogClose, onDialogSaved, onProductCreated }: Props) {
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
 
@@ -252,15 +253,15 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
 
     const attrDimension =
       productAttributes.length > 0
-        ? productAttributes.map((a) => a.value)
-        : [''];
+        ? productAttributes.map((a) => ({ name: a.attributeName, value: a.value }))
+        : [{ name: '', value: '' }];
 
     // Cartesian product
     let idx = 0;
     unitDimension.forEach((unit) => {
       attrDimension.forEach((attr) => {
-        const nameParts = [baseName, attr, unit.label].filter(Boolean);
-        const skuParts = [baseSku, attr.substring(0, 3).toUpperCase(), unit.label.substring(0, 3).toUpperCase()].filter(Boolean);
+        const nameParts = [baseName, attr.value, unit.label].filter(Boolean);
+        const skuParts = [baseSku, attr.value.substring(0, 3).toUpperCase(), unit.label.substring(0, 3).toUpperCase()].filter(Boolean);
 
         newVariants.push({
           sku: skuParts.join('-'),
@@ -269,7 +270,7 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
           costPrice: unit.costPrice || baseCost,
           sellingPrice: unit.sellingPrice || basePrice,
           imageUrl: '',
-          attributeValueIds: [],
+          attributeValueIds: attr.name ? [`${attr.name}:${attr.value}`] : [],
         });
         idx += 1;
       });
@@ -293,6 +294,54 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
   ) => {
     setUnitConversions(newUnits);
     setProductAttributes(newAttrs);
+
+    // Auto-generate variants when attributes exist
+    // Every attribute combo must map to a variant — no bare master product
+    if (newAttrs.length > 0 || newUnits.length > 0) {
+      const baseName = watch('name') || 'SP';
+      const baseSku = watch('sku') || '';
+      const baseCost = watch('costPrice') || 0;
+      const basePrice = watch('sellingPrice') || 0;
+
+      const newVariants: VariantFormItem[] = [];
+
+      const unitDimension =
+        newUnits.length > 0
+          ? newUnits.map((uc) => ({
+              label: uc.unitOfMeasureName,
+              costPrice: uc.costPrice,
+              sellingPrice: uc.sellingPrice,
+            }))
+          : [{ label: '', costPrice: baseCost, sellingPrice: basePrice }];
+
+      const attrDimension =
+        newAttrs.length > 0
+          ? newAttrs.map((a) => ({ name: a.attributeName, value: a.value }))
+          : [{ name: '', value: '' }];
+
+      unitDimension.forEach((unit) => {
+        attrDimension.forEach((attr) => {
+          const nameParts = [baseName, attr.value, unit.label].filter(Boolean);
+          const skuParts = [baseSku, attr.value.substring(0, 3).toUpperCase(), unit.label.substring(0, 3).toUpperCase()].filter(Boolean);
+          newVariants.push({
+            sku: skuParts.join('-'),
+            barcode: '',
+            name: nameParts.join(' - '),
+            costPrice: unit.costPrice || baseCost,
+            sellingPrice: unit.sellingPrice || basePrice,
+            imageUrl: '',
+            attributeValueIds: attr.name ? [`${attr.name}:${attr.value}`] : [],
+          });
+        });
+      });
+
+      setValue('variants', newVariants);
+      setValue('hasVariants', newVariants.length > 0);
+    } else {
+      // No attributes and no units → clear variants
+      setValue('variants', []);
+      setValue('hasVariants', false);
+    }
   };
 
   const onSubmit = handleSubmit(async (data) => {
@@ -321,6 +370,33 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
             }))
           : undefined;
 
+      // Validate: all variants must have attributes, no duplicates
+      if (variantsPayload && variantsPayload.length > 0) {
+        const missingAttrs = variantsPayload.some(
+          (v) => !v.attributeValueIds || v.attributeValueIds.length === 0
+        );
+        if (missingAttrs) {
+          enqueueSnackbar('Tất cả sản phẩm cùng loại phải có thuộc tính', { variant: 'error' });
+          return;
+        }
+        const attrKeys = variantsPayload.map((v) =>
+          [...(v.attributeValueIds || [])].sort().join('||').toLowerCase()
+        );
+        const uniqueKeys = new Set(attrKeys);
+        if (uniqueKeys.size !== attrKeys.length) {
+          enqueueSnackbar('Tồn tại sản phẩm cùng loại trùng thuộc tính. Mỗi sản phẩm phải có tổ hợp thuộc tính khác nhau.', { variant: 'error' });
+          return;
+        }
+      }
+
+      const attributesPayload =
+        productAttributes.length > 0
+          ? productAttributes.map((a) => ({
+              attributeName: a.attributeName,
+              attributeValue: a.value,
+            }))
+          : undefined;
+
       if (currentProduct) {
         await updateProduct(currentProduct.id, {
           name: data.name,
@@ -340,12 +416,13 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
           weightUnit: data.weightUnit || undefined,
           location: data.location || undefined,
           hasVariants: data.hasVariants,
+          attributes: attributesPayload,
           variants: variantsPayload,
           unitConversions: unitConversionPayload,
         });
         enqueueSnackbar('Cập nhật thành công!');
       } else {
-        await createProduct({
+        const result = await createProduct({
           name: data.name,
           sku: data.sku || undefined,
           code: data.sku || undefined,
@@ -363,10 +440,20 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
           weightUnit: data.weightUnit || undefined,
           location: data.location || undefined,
           hasVariants: data.hasVariants,
+          attributes: attributesPayload,
           variants: variantsPayload,
           unitConversions: unitConversionPayload,
         });
         enqueueSnackbar('Tạo thành công!');
+        // Fetch full product and notify parent
+        if (onProductCreated && result?.id) {
+          try {
+            const fullProduct = await getProductById(result.id);
+            onProductCreated(fullProduct);
+          } catch (e) {
+            console.error('Failed to fetch created product', e);
+          }
+        }
       }
       if (isDialog) {
         onDialogSaved?.();
@@ -580,7 +667,7 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
         </Stack>
 
         {/* Summary of configured units & attributes */}
-        {/* {(unitConversions.length > 0 || productAttributes.length > 0) && (
+        {(unitConversions.length > 0 || productAttributes.length > 0) && (
           <Stack spacing={1} sx={{ mt: 2 }}>
             {productAttributes.length > 0 && (
               <Stack direction="row" spacing={0.5} flexWrap="wrap">
@@ -611,7 +698,7 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
               </Button>
             )}
           </Stack>
-        )} */}
+        )}
       </Card>
 
       {/* Generated child products / variants */}

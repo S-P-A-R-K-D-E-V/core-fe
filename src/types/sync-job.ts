@@ -7,18 +7,18 @@ export interface ISyncJobStatus {
   status: 'Pending' | 'Running' | 'Completed' | 'Failed';
   type: string;
   createdAt: string;
-  updatedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
   steps: ISyncJobStep[];
-  error?: string;
+  error?: string | null;
 }
 
 export interface ISyncJobStep {
-  step: string;
-  success: boolean;
-  message: string;
-  createdCount: number;
-  updatedCount: number;
-  error?: string;
+  entity: string;
+  created: number;
+  updated: number;
+  total: number;
+  error: string | null;
 }
 
 export interface ISyncJobResponse {

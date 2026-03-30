@@ -270,7 +270,20 @@ export default function UnitAttributeDialog({
                   label="Thuộc tính"
                   value={attr.attributeName}
                   onChange={(e) => {
-                    setAttributes(attributes.map((a, i) => i === idx ? { ...a, attributeName: e.target.value } : a));
+                    const newName = e.target.value;
+                    const wouldDuplicate = attributes.some(
+                      (a, j) =>
+                        j !== idx &&
+                        a.attributeName.toLowerCase() === newName.trim().toLowerCase() &&
+                        a.value.toLowerCase() === attr.value.toLowerCase()
+                    );
+                    if (wouldDuplicate) {
+                      enqueueSnackbar(
+                        `Thuộc tính "${newName.trim()}: ${attr.value}" đã tồn tại cho sản phẩm này`,
+                        { variant: 'warning' }
+                      );
+                    }
+                    setAttributes(attributes.map((a, i) => i === idx ? { ...a, attributeName: newName } : a));
                   }}
                   sx={{ width: 160 }}
                 />
@@ -279,7 +292,20 @@ export default function UnitAttributeDialog({
                   label="Giá trị"
                   value={attr.value}
                   onChange={(e) => {
-                    setAttributes(attributes.map((a, i) => i === idx ? { ...a, value: e.target.value } : a));
+                    const newVal = e.target.value;
+                    const wouldDuplicate = attributes.some(
+                      (a, j) =>
+                        j !== idx &&
+                        a.attributeName.toLowerCase() === attr.attributeName.toLowerCase() &&
+                        a.value.toLowerCase() === newVal.trim().toLowerCase()
+                    );
+                    if (wouldDuplicate) {
+                      enqueueSnackbar(
+                        `Thuộc tính "${attr.attributeName}: ${newVal.trim()}" đã tồn tại cho sản phẩm này`,
+                        { variant: 'warning' }
+                      );
+                    }
+                    setAttributes(attributes.map((a, i) => i === idx ? { ...a, value: newVal } : a));
                   }}
                   sx={{ width: 200 }}
                 />
@@ -315,6 +341,19 @@ export default function UnitAttributeDialog({
                   size="small"
                   onClick={() => {
                     if (!newAttrName.trim() || !attrValue.trim()) return;
+                    // Check duplicate: same attributeName + same value
+                    const duplicate = attributes.some(
+                      (a) =>
+                        a.attributeName.toLowerCase() === newAttrName.trim().toLowerCase() &&
+                        a.value.toLowerCase() === attrValue.trim().toLowerCase()
+                    );
+                    if (duplicate) {
+                      enqueueSnackbar(
+                        `Thuộc tính "${newAttrName.trim()}: ${attrValue.trim()}" đã tồn tại cho sản phẩm này`,
+                        { variant: 'warning' }
+                      );
+                      return;
+                    }
                     setAttributes([
                       ...attributes,
                       {

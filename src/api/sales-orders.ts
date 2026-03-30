@@ -3,6 +3,7 @@ import {
   ISalesOrder,
   ICreateSalesOrderRequest,
   IAddPaymentRequest,
+  IUpdateSalesOrderRequest,
 } from 'src/types/corecms-api';
 
 export async function getAllSalesOrders(params?: {
@@ -24,6 +25,13 @@ export async function getSalesOrderById(id: string): Promise<ISalesOrder> {
 export async function createSalesOrder(data: ICreateSalesOrderRequest): Promise<{ id: string }> {
   const response = await axios.post<{ id: string }>(endpoints.salesOrders.create, data);
   return response.data;
+}
+
+export async function updateSalesOrder(
+  id: string,
+  data: IUpdateSalesOrderRequest
+): Promise<void> {
+  await axios.put(endpoints.salesOrders.update(id), data);
 }
 
 export async function cancelSalesOrder(id: string): Promise<void> {

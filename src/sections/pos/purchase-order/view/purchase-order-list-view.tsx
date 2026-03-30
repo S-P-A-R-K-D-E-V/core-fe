@@ -92,29 +92,33 @@ export default function PurchaseOrderListView() {
   const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
   const [filterSupplier, setFilterSupplier] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [totalCount, setTotalCount] = useState(0);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const fetchData = useCallback(async () => {
     try {
-      const [orders, sups] = await Promise.all([
+      const [pagedResult, sups] = await Promise.all([
         getAllPurchaseOrders({
           supplierId: filterSupplier || undefined,
           status: filterStatus || undefined,
+          pageNumber,
+          pageSize,
         }),
         getAllSuppliers(),
       ]);
-      setTableData(orders);
+      setTableData(pagedResult.items);
+      setTotalCount(pagedResult.totalCount);
       setSuppliers(sups);
     } catch (error) {
       console.error(error);
       enqueueSnackbar('Không thể tải đơn nhập hàng', { variant: 'error' });
     }
-  }, [enqueueSnackbar, filterSupplier, filterStatus]);
+  }, [enqueueSnackbar, filterSupplier, filterStatus, pageNumber, pageSize]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const dataFiltered = tableData;
-  const dataInPage = dataFiltered.slice(table.page * table.rowsPerPage, table.page * table.rowsPerPage + table.rowsPerPage);
-  const notFound = !dataFiltered.length;
+  const notFound = !tableData.length;
 
   const handleConfirmOrder = useCallback(async (id: string) => {
     try {
@@ -138,6 +142,10 @@ export default function PurchaseOrderListView() {
 
   const handleViewRow = useCallback((id: string) => {
     router.push(paths.dashboard.pos.purchaseOrder.details(id));
+  }, [router]);
+
+  const handleEditRow = useCallback((id: string) => {
+    router.push(paths.dashboard.pos.purchaseOrder.edit(id));
   }, [router]);
 
   return (
@@ -165,7 +173,7 @@ export default function PurchaseOrderListView() {
               fullWidth
               label="Nhà cung cấp"
               value={filterSupplier}
-              onChange={(e) => { table.onResetPage(); setFilterSupplier(e.target.value); }}
+              onChange={(e) => { setPageNumber(1); setFilterSupplier(e.target.value); }}
               sx={{ maxWidth: 240 }}
             >
               <MenuItem value="">Tất cả</MenuItem>
@@ -177,7 +185,7 @@ export default function PurchaseOrderListView() {
               fullWidth
               label="Trạng thái"
               value={filterStatus}
-              onChange={(e) => { table.onResetPage(); setFilterStatus(e.target.value); }}
+              onChange={(e) => { setPageNumber(1); setFilterStatus(e.target.value); }}
               sx={{ maxWidth: 200 }}
             >
               {STATUS_OPTIONS.map((opt) => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
@@ -191,11 +199,11 @@ export default function PurchaseOrderListView() {
                   order={table.order}
                   orderBy={table.orderBy}
                   headLabel={TABLE_HEAD}
-                  rowCount={dataFiltered.length}
+                  rowCount={totalCount}
                   onSort={table.onSort}
                 />
                 <TableBody>
-                  {dataInPage.map((row) => (
+                  {tableData.map((row) => (
                     <TableRow key={row.id} hover sx={{ cursor: 'pointer' }} onClick={() => handleViewRow(row.id)}>
                       <TableCell><strong>{row.orderNumber}</strong></TableCell>
                       <TableCell>{row.supplierName}</TableCell>
@@ -211,6 +219,11 @@ export default function PurchaseOrderListView() {
                       <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
                         {row.status === 'Draft' && (
                           <>
+                            <Tooltip title="Sửa đơn">
+                              <IconButton color="primary" onClick={() => handleEditRow(row.id)}>
+                                <Iconify icon="solar:pen-bold" />
+                              </IconButton>
+                            </Tooltip>
                             <Tooltip title="Duyệt">
                               <IconButton color="info" onClick={() => handleConfirmOrder(row.id)}>
                                 <Iconify icon="solar:check-circle-bold" />
@@ -233,18 +246,18 @@ export default function PurchaseOrderListView() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  <TableEmptyRows height={table.dense ? 56 : 76} emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)} />
+                  <TableEmptyRows height={table.dense ? 56 : 76} emptyRows={emptyRows(0, pageSize, tableData.length)} />
                   <TableNoData notFound={notFound} />
                 </TableBody>
               </Table>
             </Scrollbar>
           </TableContainer>
           <TablePaginationCustom
-            count={dataFiltered.length}
-            page={table.page}
-            rowsPerPage={table.rowsPerPage}
-            onPageChange={table.onChangePage}
-            onRowsPerPageChange={table.onChangeRowsPerPage}
+            count={totalCount}
+            page={pageNumber - 1}
+            rowsPerPage={pageSize}
+            onPageChange={(_, newPage) => setPageNumber(newPage + 1)}
+            onRowsPerPageChange={(e) => { setPageSize(parseInt(e.target.value, 10)); setPageNumber(1); }}
             dense={table.dense}
             onChangeDense={table.onChangeDense}
           />

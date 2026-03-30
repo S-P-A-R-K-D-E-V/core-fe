@@ -12,7 +12,7 @@ import PurchaseOrderNewForm from '../purchase-order-new-form';
 
 export default function PurchaseOrderCreateView() {
   return (
-    <Container maxWidth="lg">
+    <Container maxWidth="xl">
       <CustomBreadcrumbs
         heading="Tạo đơn nhập hàng"
         links={[

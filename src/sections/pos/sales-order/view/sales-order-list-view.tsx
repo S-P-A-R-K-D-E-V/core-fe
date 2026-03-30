@@ -80,7 +80,7 @@ const TABLE_HEAD = [
   { id: 'paymentStatus', label: 'Thanh toán', width: 130 },
   { id: 'createdByName', label: 'Người tạo', width: 150 },
   { id: 'createdAt', label: 'Ngày tạo', width: 170 },
-  { id: '', width: 60 },
+  { id: '', width: 100 },
 ];
 
 // ----------------------------------------------------------------------
@@ -116,6 +116,10 @@ export default function SalesOrderListView() {
 
   const handleViewRow = useCallback((id: string) => {
     router.push(paths.dashboard.pos.salesOrder.details(id));
+  }, [router]);
+
+  const handleEditRow = useCallback((id: string) => {
+    router.push(paths.dashboard.pos.salesOrder.edit(id));
   }, [router]);
 
   return (
@@ -181,6 +185,11 @@ export default function SalesOrderListView() {
                     <TableCell>{row.createdByName}</TableCell>
                     <TableCell>{fDateTime(row.createdAt)}</TableCell>
                     <TableCell align="right">
+                      <Tooltip title="Chỉnh sửa">
+                        <IconButton onClick={(e) => { e.stopPropagation(); handleEditRow(row.id); }}>
+                          <Iconify icon="solar:pen-bold" />
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title="Chi tiết">
                         <IconButton onClick={(e) => { e.stopPropagation(); handleViewRow(row.id); }}>
                           <Iconify icon="solar:eye-bold" />
