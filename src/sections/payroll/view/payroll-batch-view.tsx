@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -105,7 +106,6 @@ export default function PayrollBatchView() {
 
   // Track unfinalized record counts per cycle (populated after loading each cycle)
   const [cycleUnfinalizedCounts, setCycleUnfinalizedCounts] = useState<Record<string, number>>({});
-  const [showAllCycles, setShowAllCycles] = useState(false);
 
   // Dialog state
   const [openDialog, setOpenDialog] = useState(false);
@@ -476,11 +476,11 @@ export default function PayrollBatchView() {
   };
 
   // Cycles that still have unfinalized employees (or not yet loaded → show by default)
-  const visibleCycles = showAllCycles
-    ? cycles
-    : cycles.filter(
-        (c) => !(c.id in cycleUnfinalizedCounts) || cycleUnfinalizedCounts[c.id] > 0
-      );
+  const visibleCycles = cycles.filter(
+    (c) => !(c.id in cycleUnfinalizedCounts) || cycleUnfinalizedCounts[c.id] > 0
+  );
+
+  const selectedCycle = cycles.find((c) => c.id === selectedCycleId) ?? null;
 
   const records = cycleDetail?.records ?? [];
   const paginatedRecords = records.slice(
@@ -530,60 +530,40 @@ export default function PayrollBatchView() {
 
       {/* Cycle selector */}
       <Card sx={{ p: 3, mb: 3 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-          <Typography variant="subtitle1">Chọn chu kỳ lương</Typography>
-          <Button
-            size="small"
-            variant="text"
-            color="inherit"
-            startIcon={<Iconify icon={showAllCycles ? 'mingcute:eye-close-line' : 'mingcute:eye-2-line'} />}
-            onClick={() => setShowAllCycles((v) => !v)}
-          >
-            {showAllCycles ? 'Ẩn chu kỳ đã chốt' : 'Hiện chu kỳ đã chốt'}
-          </Button>
-        </Stack>
-        <Stack direction="row" flexWrap="wrap" spacing={1}>
-          {visibleCycles.map((cycle) => {
-            const unfinalizedCount = cycleUnfinalizedCounts[cycle.id];
-            return (
-              <Chip
-                key={cycle.id}
-                label={
-                  <>                    {cycle.name} ({cycle.fromDate} → {cycle.toDate})
-                    {unfinalizedCount !== undefined && (
-                      <Box
-                        component="span"
-                        sx={{
-                          ml: 0.75,
-                          px: 0.6,
-                          py: 0.1,
-                          borderRadius: '10px',
-                          fontSize: '0.65rem',
-                          fontWeight: 700,
-                          bgcolor: unfinalizedCount > 0 ? 'warning.main' : 'success.main',
-                          color: '#fff',
-                        }}
-                      >
-                        {unfinalizedCount > 0 ? `${unfinalizedCount} chưa chốt` : '✓ Đã chốt'}
-                      </Box>
-                    )}
-                  </>
-                }
-                color={selectedCycleId === cycle.id ? 'primary' : 'default'}
-                variant={selectedCycleId === cycle.id ? 'filled' : 'outlined'}
-                onClick={() => setSelectedCycleId(cycle.id)}
-                sx={{ height: 'auto', py: 0.5 }}
-              />
-            );
-          })}
-          {visibleCycles.length === 0 && (
-            <Typography variant="body2" color="text.secondary">
-              {cycles.length === 0
-                ? 'Chưa có chu kỳ lương nào. Hãy tạo bảng lương mới.'
-                : 'Tất cả chu kỳ đã được chốt lương. Nhấn "Hiện chu kỳ đã chốt" để xem.'}
-            </Typography>
+        <Autocomplete
+          options={visibleCycles}
+          getOptionLabel={(option) => {
+            const count = cycleUnfinalizedCounts[option.id];
+            const badge = count !== undefined && count > 0 ? ` (${count} chưa chốt)` : '';
+            return `${option.name} (${option.fromDate} → ${option.toDate})${badge}`;
+          }}
+          value={selectedCycle}
+          onChange={(_, newValue) => setSelectedCycleId(newValue?.id ?? null)}
+          isOptionEqualToValue={(option, value) => option.id === value.id}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Chọn chu kỳ lương"
+              placeholder="Tìm kiếm chu kỳ lương..."
+            />
           )}
-        </Stack>
+          renderOption={(props, option) => {
+            const count = cycleUnfinalizedCounts[option.id];
+            return (
+              <li {...props} key={option.id}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ width: '100%' }}>
+                  <Typography variant="body2">
+                    {option.name} ({option.fromDate} → {option.toDate})
+                  </Typography>
+                  {count !== undefined && count > 0 && (
+                    <Chip label={`${count} chưa chốt`} color="warning" size="small" />
+                  )}
+                </Stack>
+              </li>
+            );
+          }}
+          noOptionsText={cycles.length === 0 ? 'Chưa có chu kỳ lương nào. Hãy tạo bảng lương mới.' : 'Tất cả chu kỳ đã được chốt lương.'}
+        />
       </Card>
 
       {/* Payroll records table */}

@@ -49,17 +49,18 @@ import { getMyPayroll, getPayrollShiftDetails } from 'src/api/payroll';
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
-  { id: 'periodMonth', label: 'Tháng', width: 100 },
+  { id: 'periodMonth', label: 'Kỳ lương', width: 160 },
   { id: 'totalShifts', label: 'Tổng ca', width: 80 },
   { id: 'presentShifts', label: 'Có mặt', width: 80 },
-  { id: 'totalHours', label: 'Giờ làm', width: 100 },
-  { id: 'overtimeHours', label: 'Giờ OT', width: 100 },
-  { id: 'baseSalary', label: 'Lương CB', width: 150 },
-  { id: 'overtimeSalary', label: 'Lương OT', width: 150 },
-  { id: 'bonus', label: 'Thưởng', width: 120 },
-  { id: 'deduction', label: 'Khấu trừ', width: 120 },
-  { id: 'totalSalary', label: 'Tổng lương', width: 180 },
-  { id: 'status', label: 'Trạng thái', width: 120 },
+  { id: 'absentShifts', label: 'Nghỉ', width: 80 },
+  { id: 'wrongShifts', label: 'Sai ca', width: 80 },
+  { id: 'totalLateMinutes', label: 'Đi muộn (phút)', width: 110 },
+  { id: 'totalHoursWorked', label: 'Giờ làm', width: 100 },
+  { id: 'baseSalary', label: 'Lương CB', width: 140 },
+  { id: 'bonus', label: 'Thưởng lễ', width: 120 },
+  { id: 'penaltyAmount', label: 'Tiền phạt', width: 120 },
+  { id: 'totalSalary', label: 'Tổng lương', width: 150 },
+  { id: 'status', label: 'Trạng thái', width: 100 },
 ];
 
 // ----------------------------------------------------------------------
@@ -71,6 +72,13 @@ export default function MyPayrollView() {
 
   const [payrolls, setPayrolls] = useState<IPayrollRecord[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Only finalized records are visible to staff
+  const finalizedPayrolls = useMemo(() => payrolls.filter((p) => p.isFinalized), [payrolls]);
+  const paginatedPayrolls = finalizedPayrolls.slice(
+    table.page * table.rowsPerPage,
+    table.page * table.rowsPerPage + table.rowsPerPage
+  );
 
   // Shift detail dialog
   const [openShiftDetail, setOpenShiftDetail] = useState(false);
@@ -198,13 +206,21 @@ export default function MyPayrollView() {
           </Stack>
         ) : (
           <>
+            {finalizedPayrolls.length === 0 && !loading && (
+              <Stack alignItems="center" sx={{ py: 4 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Chưa có bảng lương nào được duyệt. Vui lòng liên hệ quản lý.
+                </Typography>
+              </Stack>
+            )}
+
             <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
               <Scrollbar>
                 <Table size={table.dense ? 'small' : 'medium'}>
                   <TableHeadCustom headLabel={TABLE_HEAD} />
 
                   <TableBody>
-                    {payrolls.map((row) => (
+                    {paginatedPayrolls.map((row) => (
                       <TableRow
                         key={row.id}
                         hover
@@ -212,33 +228,56 @@ export default function MyPayrollView() {
                         onClick={() => handleOpenShiftDetail(row)}
                       >
                         <TableCell>
-                          <strong>{row.periodMonth}</strong>
+                          <Stack>
+                            <strong>{row.periodMonth}</strong>
+                            <Typography variant="caption" color="text.secondary">
+                              {row.fromDate} → {row.toDate}
+                            </Typography>
+                          </Stack>
                         </TableCell>
                         <TableCell>{row.totalShifts}</TableCell>
                         <TableCell>
-                          <Chip label={row.presentShifts} color="primary" size="small" />
+                          <Chip label={row.presentShifts} color="success" size="small" />
                         </TableCell>
-                        <TableCell>{row.totalHoursWorked.toFixed(1)}h</TableCell>
                         <TableCell>
-                          {row.overtimeHours > 0 ? (
-                            <Chip
-                              label={`${row.overtimeHours.toFixed(1)}h`}
-                              color="warning"
-                              size="small"
-                            />
+                          {row.absentShifts > 0 ? (
+                            <Chip label={row.absentShifts} color="error" size="small" />
                           ) : (
-                            '-'
+                            '0'
                           )}
                         </TableCell>
-                        <TableCell>{formatCurrency(row.baseSalary)}</TableCell>
                         <TableCell>
-                          {row.overtimeSalary > 0 ? formatCurrency(row.overtimeSalary) : '-'}
+                          {row.wrongShifts > 0 ? (
+                            <Chip label={row.wrongShifts} color="warning" size="small" />
+                          ) : (
+                            '0'
+                          )}
                         </TableCell>
+                        <TableCell>
+                          {row.totalLateMinutes > 0 ? (
+                            <Chip
+                              label={`${row.totalLateMinutes} phút`}
+                              color="warning"
+                              size="small"
+                              variant="outlined"
+                            />
+                          ) : (
+                            '0'
+                          )}
+                        </TableCell>
+                        <TableCell>{row.totalHoursWorked.toFixed(1)}h</TableCell>
+                        <TableCell>{formatCurrency(row.baseSalary)}</TableCell>
                         <TableCell>
                           {row.bonus > 0 ? formatCurrency(row.bonus) : '-'}
                         </TableCell>
                         <TableCell>
-                          {row.deduction > 0 ? formatCurrency(row.deduction) : '-'}
+                          {row.penaltyAmount > 0 ? (
+                            <Typography color="error.main" variant="body2">
+                              -{formatCurrency(row.penaltyAmount)}
+                            </Typography>
+                          ) : (
+                            '-'
+                          )}
                         </TableCell>
                         <TableCell>
                           <strong style={{ color: '#00AB55' }}>
@@ -246,21 +285,19 @@ export default function MyPayrollView() {
                           </strong>
                         </TableCell>
                         <TableCell>
-                          <Label color={row.isFinalized ? 'success' : 'warning'}>
-                            {row.isFinalized ? 'Đã duyệt' : 'Chưa duyệt'}
-                          </Label>
+                          <Label color="success">Đã duyệt</Label>
                         </TableCell>
                       </TableRow>
                     ))}
 
-                    {payrolls.length === 0 && <TableNoData notFound />}
+                    {finalizedPayrolls.length === 0 && <TableNoData notFound />}
                   </TableBody>
                 </Table>
               </Scrollbar>
             </TableContainer>
 
             <TablePaginationCustom
-              count={payrolls.length}
+              count={finalizedPayrolls.length}
               page={table.page}
               rowsPerPage={table.rowsPerPage}
               onPageChange={table.onChangePage}
@@ -285,9 +322,12 @@ export default function MyPayrollView() {
             </IconButton>
           </Stack>
           {selectedPayroll && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Kỳ lương: {selectedPayroll.fromDate} → {selectedPayroll.toDate}
-            </Typography>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+              <Typography variant="body2" color="text.secondary">
+                Kỳ lương: {selectedPayroll.fromDate} → {selectedPayroll.toDate}
+              </Typography>
+              <Label color="success">Đã duyệt</Label>
+            </Stack>
           )}
           <Tabs
             value={shiftDetailTab}

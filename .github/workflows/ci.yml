@@ -28,7 +28,7 @@ jobs:
   deploy:
     runs-on: self-hosted
     needs: build-and-push
-    if: always()   # vẫn chạy kể cả build bị skip
+    if: always()   # vẫn chạy kể cả build bị skip.
 
     steps:
       - uses: actions/checkout@v4
