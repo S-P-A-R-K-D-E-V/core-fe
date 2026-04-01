@@ -306,6 +306,11 @@ export const endpoints = {
   bankAccounts: {
     list: '/bank-accounts',
   },
+  paymentQr: {
+    create: '/payment/qr/create',
+    cancel: (id: string) => `/payment/qr/${id}/cancel`,
+    status: (id: string) => `/payment/qr/${id}/status`,
+  },
   reports: {
     dashboard: '/reports/dashboard',
     revenue: '/reports/revenue',

@@ -3,6 +3,7 @@ import axios, { endpoints } from 'src/utils/axios';
 import type {
   ICreateSalaryConfigurationRequest,
   ISalaryConfiguration,
+  ISalaryConfigurationPagedResponse,
   IUpdateSalaryConfigurationRequest,
 } from 'src/types/corecms-api';
 
@@ -10,16 +11,20 @@ import type {
 
 // Admin/Manager endpoints
 
-export async function getAllSalaryConfigurations(
-  userId?: string,
-  asOfDate?: string
-): Promise<ISalaryConfiguration[]> {
-  const params = new URLSearchParams();
-  if (userId) params.append('userId', userId);
-  if (asOfDate) params.append('asOfDate', asOfDate);
+export async function getAllSalaryConfigurations(params?: {
+  userId?: string;
+  asOfDate?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}): Promise<ISalaryConfigurationPagedResponse> {
+  const query = new URLSearchParams();
+  if (params?.userId) query.append('userId', params.userId);
+  if (params?.asOfDate) query.append('asOfDate', params.asOfDate);
+  if (params?.pageNumber) query.append('pageNumber', String(params.pageNumber));
+  if (params?.pageSize) query.append('pageSize', String(params.pageSize));
 
-  const response = await axios.get<ISalaryConfiguration[]>(
-    `${endpoints.salary.list}?${params.toString()}`
+  const response = await axios.get<ISalaryConfigurationPagedResponse>(
+    `${endpoints.salary.list}?${query.toString()}`
   );
   return response.data;
 }

@@ -52,6 +52,7 @@ import PosDiscountPopover from '../pos-discount-popover';
 import PosProductDetailDrawer from '../pos-product-detail-drawer';
 import PosVariantPickerDrawer from '../pos-variant-picker-drawer';
 import PosPaymentDrawer, { PaymentLine } from '../pos-payment-drawer';
+import PosAcbQrPayment from '../pos-acb-qr-payment';
 import PosQrPayment from '../pos-qr-payment';
 
 // ======================================================================
@@ -202,6 +203,7 @@ export default function PosSaleView() {
   const [quickDiscountMode, setQuickDiscountMode] = useState<'amount' | 'percent'>('amount');
   const [quickDiscountInput, setQuickDiscountInput] = useState<string>('');
   const [quickPaymentLoading, setQuickPaymentLoading] = useState(false);
+  const [quickQrPaymentCompleted, setQuickQrPaymentCompleted] = useState(false);
 
   // Current time
   const [now, setNow] = useState(new Date());
@@ -700,6 +702,7 @@ export default function PosSaleView() {
       setQuickMethodRefs({});
       setQuickCustomerPayment(0);
       setQuickDiscountInput('');
+      setQuickQrPaymentCompleted(false);
     } finally {
       setQuickPaymentLoading(false);
     }
@@ -1485,7 +1488,14 @@ export default function PosSaleView() {
                               sx={{ mb: 0.5 }}
                             />
                             {pm.value === 'BankTransfer' && (
-                              <PosQrPayment amount={quickMethodAmounts[pm.value] || grandTotal} />
+                              <PosAcbQrPayment
+                                amount={quickMethodAmounts[pm.value] || grandTotal}
+                                onPaymentCompleted={(qrStatus) => {
+                                  setQuickQrPaymentCompleted(true);
+                                  setQuickMethodAmounts((prev) => ({ ...prev, BankTransfer: qrStatus.amount }));
+                                  setQuickMethodRefs((prev) => ({ ...prev, BankTransfer: qrStatus.traceNumber }));
+                                }}
+                              />
                             )}
                           </Box>
                         )}
@@ -1505,7 +1515,7 @@ export default function PosSaleView() {
                   disabled={activeOrder.items.length === 0 || quickPaymentLoading}
                   sx={{ py: 1.5, fontSize: '1rem', fontWeight: 700, borderRadius: 1.5 }}
                 >
-                  {quickPaymentLoading ? 'Đang xử lý...' : 'THANH TOÁN'}
+                  {quickPaymentLoading ? 'Đang xử lý...' : quickQrPaymentCompleted ? 'XÁC NHẬN ĐƠN HÀNG' : 'THANH TOÁN'}
                 </Button>
               </Box>
             </Box>

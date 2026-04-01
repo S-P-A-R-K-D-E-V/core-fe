@@ -22,13 +22,15 @@ import Iconify from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
 import { ICustomer } from 'src/types/corecms-api';
 
-import PosQrPayment from './pos-qr-payment';
+import PosAcbQrPayment from './pos-acb-qr-payment';
+import { IQrPaymentStatusResponse } from 'src/types/corecms-api';
 
 // ----------------------------------------------------------------------
 
 const PAYMENT_METHODS = [
   { value: 'Cash', label: 'Tiền mặt', icon: 'solar:wallet-money-bold' },
   { value: 'BankTransfer', label: 'Chuyển khoản', icon: 'solar:card-transfer-bold' },
+  { value: 'QRCodeACB', label: 'QR ACB', icon: 'solar:qr-code-bold' },
   { value: 'Card', label: 'Thẻ', icon: 'solar:card-bold' },
   { value: 'EWallet', label: 'Ví', icon: 'solar:smartphone-bold' },
 ];
@@ -53,6 +55,8 @@ type Props = {
   customers: ICustomer[];
   warehouseName?: string;
   sellerName?: string;
+  salesOrderId?: string;
+  orderCode?: string;
   onCustomerChange: (customer: ICustomer | null) => void;
   onDiscountChange: (discount: number) => void;
   onCouponChange: (coupon: string) => void;
@@ -74,6 +78,8 @@ export default function PosPaymentDrawer({
   customers,
   warehouseName,
   sellerName,
+  salesOrderId,
+  orderCode,
   onCustomerChange,
   onDiscountChange,
   onCouponChange,
@@ -81,6 +87,7 @@ export default function PosPaymentDrawer({
 }: Props) {
   const theme = useTheme();
   const [loading, setLoading] = useState(false);
+  const [qrPaymentCompleted, setQrPaymentCompleted] = useState(false);
   const [selectedMethods, setSelectedMethods] = useState<string[]>(['Cash']);
   const [methodAmounts, setMethodAmounts] = useState<Record<string, number>>({});
   const [methodRefs, setMethodRefs] = useState<Record<string, string>>({});
@@ -103,6 +110,7 @@ export default function PosPaymentDrawer({
       setMethodRefs({});
       setCustomerPayment(totalAmount);
       setLoading(false);
+      setQrPaymentCompleted(false);
       setDiscountInput(orderDiscount > 0 ? String(orderDiscount) : '');
     }
   }, [open, totalAmount, orderDiscount]);
@@ -446,8 +454,29 @@ export default function PosPaymentDrawer({
                       )}
 
                       {pm.value === 'BankTransfer' && (
-                        <PosQrPayment
+                        <PosAcbQrPayment
                           amount={methodAmounts[pm.value] || totalAmount}
+                          salesOrderId={salesOrderId}
+                          orderCode={orderCode}
+                          onPaymentCompleted={(qrStatus) => {
+                            setQrPaymentCompleted(true);
+                            handleAmountChange('BankTransfer', qrStatus.amount);
+                            handleRefChange('BankTransfer', qrStatus.traceNumber);
+                          }}
+                        />
+                      )}
+
+                      {pm.value === 'QRCodeACB' && (
+                        <PosAcbQrPayment
+                          amount={methodAmounts[pm.value] || totalAmount}
+                          salesOrderId={salesOrderId}
+                          orderCode={orderCode}
+                          onPaymentCompleted={(qrStatus) => {
+                            setQrPaymentCompleted(true);
+                            // Auto-fill amount from confirmed payment
+                            handleAmountChange('QRCodeACB', qrStatus.amount);
+                            handleRefChange('QRCodeACB', qrStatus.traceNumber);
+                          }}
                         />
                       )}
                     </Box>
@@ -503,10 +532,10 @@ export default function PosPaymentDrawer({
           size="large"
           loading={loading}
           onClick={handleConfirm}
-          disabled={paidTotal < totalAmount}
+          disabled={paidTotal < totalAmount && !qrPaymentCompleted}
           sx={{ py: 1.5, fontSize: '1rem', fontWeight: 700, borderRadius: 1.5 }}
         >
-          THANH TOÁN
+          {qrPaymentCompleted ? 'XÁC NHẬN ĐƠN HÀNG' : 'THANH TOÁN'}
         </LoadingButton>
       </Box>
     </Drawer>

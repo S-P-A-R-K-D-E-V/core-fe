@@ -498,6 +498,14 @@ export interface ISalaryConfiguration {
   createdAt: string;
 }
 
+export interface ISalaryConfigurationPagedResponse {
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+  items: ISalaryConfiguration[];
+}
+
 export interface ICreateSalaryConfigurationRequest {
   userId: string;
   salaryType: string;
@@ -1803,6 +1811,37 @@ export interface IUpdateSalesOrderRequest {
   note?: string;
   discount?: number;
   items?: IUpdateSalesOrderItemRequest[];
+}
+
+// ========== QR Payment (ACB Dynamic QR) ==========
+
+export interface ICreateQrPaymentRequest {
+  salesOrderId?: string;
+  amount: number;
+  description?: string;
+}
+
+export interface IQrPaymentResponse {
+  id: string;
+  bankOrderId: string;
+  traceNumber: string;
+  virtualAccount?: string;
+  qrDataUrl?: string;
+  amount: number;
+  status: string;
+  createdAt: string;
+}
+
+export interface IQrPaymentStatusResponse {
+  id: string;
+  bankOrderId: string;
+  traceNumber: string;
+  amount: number;
+  status: string;
+  virtualAccount?: string;
+  qrDataUrl?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface IUpdateSalesOrderItemRequest {
