@@ -143,6 +143,7 @@ export default function PurchaseOrderDetailView({ id }: Props) {
 
   const canConfirm = order.status === 'Draft';
   const canCancel = order.status === 'Draft';
+  const canEdit = order.status === 'Draft';
   const canReceive = order.status === 'Confirmed' || order.status === 'PartiallyReceived';
 
   return (
@@ -155,6 +156,13 @@ export default function PurchaseOrderDetailView({ id }: Props) {
             <Label color={STATUS_COLOR_MAP[order.status]}>{STATUS_LABEL_MAP[order.status] || order.status}</Label>
           </Stack>
           <Stack direction="row" spacing={1}>
+            {canEdit && (
+              <Button variant="contained" color="primary"
+                onClick={() => router.push(paths.dashboard.pos.purchaseOrder.edit(id))}
+                startIcon={<Iconify icon="solar:pen-bold" />}>
+                Sửa đơn
+              </Button>
+            )}
             {canConfirm && (
               <LoadingButton variant="contained" color="info" loading={actionLoading} onClick={handleConfirm}
                 startIcon={<Iconify icon="eva:checkmark-circle-2-fill" />}>

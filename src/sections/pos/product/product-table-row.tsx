@@ -114,7 +114,7 @@ type Props = {
   row: IProductListItem;
   onSelectRow: VoidFunction;
   onDeleteRow: VoidFunction;
-  onEditRow: VoidFunction;
+  onEditRow: (id: string) => void;
   onAddSameCategory: VoidFunction;
   visibleColumns: ColumnKey[];
   totalColSpan: number;
@@ -481,7 +481,7 @@ function ExpandedSubRow({
   totalColSpan: number;
   renderCellFn: (colKey: ColumnKey) => React.ReactNode;
   getAlignForColumn: (colKey: ColumnKey) => 'left' | 'right' | 'center' | undefined;
-  onEditRow: VoidFunction;
+  onEditRow: (id: string) => void;
   onDelete: VoidFunction;
   onAddSameCategory: VoidFunction;
 }) {
@@ -544,7 +544,7 @@ function ProductExpandedDetail({
 }: {
   row: IProduct;
   loading?: boolean;
-  onEdit: VoidFunction;
+  onEdit: (id: string) => void;
   onDelete: VoidFunction;
   onAddSameCategory: VoidFunction;
 }) {
@@ -724,7 +724,7 @@ function ProductExpandedDetail({
 
         <Box sx={{ flex: 1 }} />
 
-        <Button size="small" variant="contained" startIcon={<Iconify icon="solar:pen-bold" width={18} />} onClick={onEdit}>
+        <Button size="small" variant="contained" startIcon={<Iconify icon="solar:pen-bold" width={18} />} onClick={() => onEdit(row.id)}>
           Chỉnh sửa
         </Button>
         <Button size="small" variant="outlined" startIcon={<Iconify icon="solar:printer-bold" width={18} />}>

@@ -20,6 +20,9 @@ import Label from 'src/components/label';
 import { fCurrency } from 'src/utils/format-number';
 import { fDateTime } from 'src/utils/format-time';
 
+import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
+
 import { useSnackbar } from 'src/components/snackbar';
 import Iconify from 'src/components/iconify';
 
@@ -68,6 +71,7 @@ type Props = { id: string };
 
 export default function SalesOrderDetailView({ id }: Props) {
   const { enqueueSnackbar } = useSnackbar();
+  const router = useRouter();
 
   const [order, setOrder] = useState<ISalesOrder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,10 +123,19 @@ export default function SalesOrderDetailView({ id }: Props) {
           </Stack>
           <Stack direction="row" spacing={1}>
             {canCancel && order.status !== 'Cancelled' && (
-              <LoadingButton variant="outlined" color="error" loading={actionLoading} onClick={handleCancel}
-                startIcon={<Iconify icon="solar:close-circle-bold" />}>
-                Hủy đơn
-              </LoadingButton>
+              <>
+                <Button
+                  variant="outlined"
+                  onClick={() => router.push(paths.dashboard.pos.salesOrder.edit(id))}
+                  startIcon={<Iconify icon="solar:pen-bold" />}
+                >
+                  Chỉnh sửa
+                </Button>
+                <LoadingButton variant="outlined" color="error" loading={actionLoading} onClick={handleCancel}
+                  startIcon={<Iconify icon="solar:close-circle-bold" />}>
+                  Hủy đơn
+                </LoadingButton>
+              </>
             )}
           </Stack>
         </Stack>

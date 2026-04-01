@@ -201,6 +201,13 @@ export function useNavData() {
             icon: ICONS.mail,
             roles: ['Admin'],
           },
+          // KIOTVIET SYNC (Admin only)
+          {
+            title: 'Đồng bộ KiotViet',
+            path: paths.dashboard.kiotVietSync.root,
+            icon: ICONS.ecommerce,
+            roles: ['Admin'],
+          },
         ],
       },
       // POS / INVENTORY

@@ -39,7 +39,7 @@ import {
   IUnitOfMeasure,
   IVariantAttribute,
 } from 'src/types/corecms-api';
-import { createProduct, updateProduct } from 'src/api/products';
+import { createProduct, updateProduct, getProductById } from 'src/api/products';
 import { getAllCategories } from 'src/api/categories';
 import { getAllUnitOfMeasures } from 'src/api/unit-of-measures';
 import { getAllVariantAttributes } from 'src/api/variant-attributes';
@@ -67,9 +67,10 @@ type Props = {
   isDialog?: boolean;
   onDialogClose?: () => void;
   onDialogSaved?: () => void;
+  onProductCreated?: (product: IProduct) => void;
 };
 
-export default function ProductNewEditForm({ currentProduct, isDialog, onDialogClose, onDialogSaved }: Props) {
+export default function ProductNewEditForm({ currentProduct, isDialog, onDialogClose, onDialogSaved, onProductCreated }: Props) {
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
 
@@ -92,13 +93,16 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
   useEffect(() => {
     Promise.all([
       getAllCategories(true),
-      getAllUnitOfMeasures(),
-      getAllVariantAttributes(),
+      // getAllUnitOfMeasures(),
+      // getAllVariantAttributes(),
     ])
-      .then(([cats, uoms, attrs]) => {
+      .then(([cats, 
+        // uoms, 
+        // attrs
+      ]) => {
         setCategories(cats);
-        setUnits(uoms);
-        setVariantAttributes(attrs);
+        // setUnits(uoms);
+        // setVariantAttributes(attrs);
       })
       .catch(console.error);
   }, []);
@@ -136,34 +140,39 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
   });
 
   const defaultValues = useMemo(
-    () => ({
-      name: currentProduct?.name || '',
-      sku: currentProduct?.sku || currentProduct?.code || '',
-      barcode: currentProduct?.barcode || currentProduct?.barCode || '',
-      description: currentProduct?.description || '',
-      categoryId: currentProduct?.categoryId || '',
-      unitOfMeasureId: currentProduct?.unitOfMeasureId || '',
-      costPrice: currentProduct?.costPrice ?? currentProduct?.basePrice ?? 0,
-      sellingPrice: currentProduct?.sellingPrice ?? currentProduct?.basePrice ?? 0,
-      imageUrl: currentProduct?.imageUrl || currentProduct?.images?.[0]?.imageUrl || '',
-      lowStockThreshold: currentProduct?.lowStockThreshold ?? currentProduct?.minQuantity ?? 0,
-      highStockThreshold: currentProduct?.highStockThreshold ?? currentProduct?.maxQuantity ?? 999999999,
-      isLoyaltyPoints: currentProduct?.isLoyaltyPoints ?? currentProduct?.isRewardPoint ?? false,
-      weight: currentProduct?.weight || 0,
-      weightUnit: currentProduct?.weightUnit || 'g',
-      location: currentProduct?.location || '',
-      hasVariants: currentProduct?.hasVariants || false,
-      variants:
-        currentProduct?.variants?.map((v) => ({
-          sku: v.sku,
-          barcode: v.barcode || '',
-          name: v.name,
-          costPrice: v.costPrice || 0,
-          sellingPrice: v.sellingPrice || 0,
-          imageUrl: v.imageUrl || '',
-          attributeValueIds: v.combinations?.map((c) => c.valueId) || [],
-        })) || [],
-    }),
+    () => {
+      const avgCostPrice = currentProduct?.inventories && currentProduct.inventories.length > 0
+        ? Math.round(currentProduct.inventories.reduce((sum, inv) => sum + (inv.cost || 0), 0) / currentProduct.inventories.length)
+        : currentProduct?.costPrice ?? currentProduct?.basePrice ?? 0;
+      return ({
+        name: currentProduct?.name || '',
+        sku: currentProduct?.sku || currentProduct?.code || '',
+        barcode: currentProduct?.barcode || currentProduct?.barCode || '',
+        description: currentProduct?.description || '',
+        categoryId: currentProduct?.categoryId || '',
+        unitOfMeasureId: currentProduct?.unitOfMeasureId || '',
+        costPrice: avgCostPrice || currentProduct?.costPrice || currentProduct?.basePrice || 0,
+        sellingPrice: currentProduct?.sellingPrice ?? currentProduct?.basePrice ?? 0,
+        imageUrl: currentProduct?.imageUrl || currentProduct?.images?.[0]?.imageUrl || '',
+        lowStockThreshold: currentProduct?.lowStockThreshold ?? currentProduct?.minQuantity ?? 0,
+        highStockThreshold: currentProduct?.highStockThreshold ?? currentProduct?.maxQuantity ?? 999999999,
+        isLoyaltyPoints: currentProduct?.isLoyaltyPoints ?? currentProduct?.isRewardPoint ?? false,
+        weight: currentProduct?.weight || 0,
+        weightUnit: currentProduct?.weightUnit || 'g',
+        location: currentProduct?.location || '',
+        hasVariants: currentProduct?.hasVariants || false,
+        variants:
+          currentProduct?.variants?.map((v) => ({
+            sku: v.sku,
+            barcode: v.barcode || '',
+            name: v.name,
+            costPrice: v.costPrice || 0,
+            sellingPrice: v.sellingPrice || 0,
+            imageUrl: v.imageUrl || '',
+            attributeValueIds: v.combinations?.map((c) => c.valueId) || [],
+          })) || [],
+      })
+    },
     [currentProduct]
   );
 
@@ -186,41 +195,11 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
     if (currentProduct) {
       reset(defaultValues);
       setSelectedCategoryName(currentProduct.categoryName || '');
+      // In edit mode: don't map childProducts into unitConversions
+      setUnitConversions([]);
 
-      // Load unit conversions from product (mapped from childProducts by API layer)
-      if (currentProduct.unitConversions && currentProduct.unitConversions.length > 0) {
-        setUnitConversions(
-          currentProduct.unitConversions.map((uc) => ({
-            unitOfMeasureId: uc.unitOfMeasureId,
-            unitOfMeasureName: uc.unitOfMeasureName,
-            conversionRate: uc.conversionRate,
-            costPrice: uc.costPrice || 0,
-            sellingPrice: uc.sellingPrice || 0,
-            barcode: uc.barcode || '',
-          }))
-        );
-      } else {
-        setUnitConversions([]);
-      }
-
-      // Reverse-engineer product attributes from variant combinations (mapped from childProducts)
-      if (currentProduct.variants && currentProduct.variants.length > 0) {
-        const attrMap = new Map<string, AttributeFormItem>();
-        currentProduct.variants.forEach((v) => {
-          v.combinations?.forEach((c) => {
-            const key = `${c.attributeId}:${c.valueName}`;
-            if (!attrMap.has(key)) {
-              attrMap.set(key, {
-                attributeId: c.attributeId,
-                attributeName: c.attributeName,
-                value: c.valueName,
-              });
-            }
-          });
-        });
-        setProductAttributes(Array.from(attrMap.values()));
-      } else if (currentProduct.attributes && currentProduct.attributes.length > 0) {
-        // Fallback: use product-level attributes directly
+      // Use product-level attributes directly from API (ProductAttribute table)
+      if (currentProduct.attributes && currentProduct.attributes.length > 0) {
         setProductAttributes(
           currentProduct.attributes.map((a) => ({
             attributeId: a.id,
@@ -274,15 +253,15 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
 
     const attrDimension =
       productAttributes.length > 0
-        ? productAttributes.map((a) => a.value)
-        : [''];
+        ? productAttributes.map((a) => ({ name: a.attributeName, value: a.value }))
+        : [{ name: '', value: '' }];
 
     // Cartesian product
     let idx = 0;
     unitDimension.forEach((unit) => {
       attrDimension.forEach((attr) => {
-        const nameParts = [baseName, attr, unit.label].filter(Boolean);
-        const skuParts = [baseSku, attr.substring(0, 3).toUpperCase(), unit.label.substring(0, 3).toUpperCase()].filter(Boolean);
+        const nameParts = [baseName, attr.value, unit.label].filter(Boolean);
+        const skuParts = [baseSku, attr.value.substring(0, 3).toUpperCase(), unit.label.substring(0, 3).toUpperCase()].filter(Boolean);
 
         newVariants.push({
           sku: skuParts.join('-'),
@@ -291,7 +270,7 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
           costPrice: unit.costPrice || baseCost,
           sellingPrice: unit.sellingPrice || basePrice,
           imageUrl: '',
-          attributeValueIds: [],
+          attributeValueIds: attr.name ? [`${attr.name}:${attr.value}`] : [],
         });
         idx += 1;
       });
@@ -315,6 +294,54 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
   ) => {
     setUnitConversions(newUnits);
     setProductAttributes(newAttrs);
+
+    // Auto-generate variants when attributes exist
+    // Every attribute combo must map to a variant — no bare master product
+    if (newAttrs.length > 0 || newUnits.length > 0) {
+      const baseName = watch('name') || 'SP';
+      const baseSku = watch('sku') || '';
+      const baseCost = watch('costPrice') || 0;
+      const basePrice = watch('sellingPrice') || 0;
+
+      const newVariants: VariantFormItem[] = [];
+
+      const unitDimension =
+        newUnits.length > 0
+          ? newUnits.map((uc) => ({
+              label: uc.unitOfMeasureName,
+              costPrice: uc.costPrice,
+              sellingPrice: uc.sellingPrice,
+            }))
+          : [{ label: '', costPrice: baseCost, sellingPrice: basePrice }];
+
+      const attrDimension =
+        newAttrs.length > 0
+          ? newAttrs.map((a) => ({ name: a.attributeName, value: a.value }))
+          : [{ name: '', value: '' }];
+
+      unitDimension.forEach((unit) => {
+        attrDimension.forEach((attr) => {
+          const nameParts = [baseName, attr.value, unit.label].filter(Boolean);
+          const skuParts = [baseSku, attr.value.substring(0, 3).toUpperCase(), unit.label.substring(0, 3).toUpperCase()].filter(Boolean);
+          newVariants.push({
+            sku: skuParts.join('-'),
+            barcode: '',
+            name: nameParts.join(' - '),
+            costPrice: unit.costPrice || baseCost,
+            sellingPrice: unit.sellingPrice || basePrice,
+            imageUrl: '',
+            attributeValueIds: attr.name ? [`${attr.name}:${attr.value}`] : [],
+          });
+        });
+      });
+
+      setValue('variants', newVariants);
+      setValue('hasVariants', newVariants.length > 0);
+    } else {
+      // No attributes and no units → clear variants
+      setValue('variants', []);
+      setValue('hasVariants', false);
+    }
   };
 
   const onSubmit = handleSubmit(async (data) => {
@@ -343,10 +370,38 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
             }))
           : undefined;
 
+      // Validate: all variants must have attributes, no duplicates
+      if (variantsPayload && variantsPayload.length > 0) {
+        const missingAttrs = variantsPayload.some(
+          (v) => !v.attributeValueIds || v.attributeValueIds.length === 0
+        );
+        if (missingAttrs) {
+          enqueueSnackbar('Tất cả sản phẩm cùng loại phải có thuộc tính', { variant: 'error' });
+          return;
+        }
+        const attrKeys = variantsPayload.map((v) =>
+          [...(v.attributeValueIds || [])].sort().join('||').toLowerCase()
+        );
+        const uniqueKeys = new Set(attrKeys);
+        if (uniqueKeys.size !== attrKeys.length) {
+          enqueueSnackbar('Tồn tại sản phẩm cùng loại trùng thuộc tính. Mỗi sản phẩm phải có tổ hợp thuộc tính khác nhau.', { variant: 'error' });
+          return;
+        }
+      }
+
+      const attributesPayload =
+        productAttributes.length > 0
+          ? productAttributes.map((a) => ({
+              attributeName: a.attributeName,
+              attributeValue: a.value,
+            }))
+          : undefined;
+
       if (currentProduct) {
         await updateProduct(currentProduct.id, {
           name: data.name,
           sku: data.sku || undefined,
+          code: data.sku || undefined,
           barcode: data.barcode || undefined,
           description: data.description || undefined,
           categoryId: data.categoryId,
@@ -361,14 +416,16 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
           weightUnit: data.weightUnit || undefined,
           location: data.location || undefined,
           hasVariants: data.hasVariants,
+          attributes: attributesPayload,
           variants: variantsPayload,
           unitConversions: unitConversionPayload,
         });
         enqueueSnackbar('Cập nhật thành công!');
       } else {
-        await createProduct({
+        const result = await createProduct({
           name: data.name,
           sku: data.sku || undefined,
+          code: data.sku || undefined,
           barcode: data.barcode || undefined,
           description: data.description || undefined,
           categoryId: data.categoryId,
@@ -383,10 +440,20 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
           weightUnit: data.weightUnit || undefined,
           location: data.location || undefined,
           hasVariants: data.hasVariants,
+          attributes: attributesPayload,
           variants: variantsPayload,
           unitConversions: unitConversionPayload,
         });
         enqueueSnackbar('Tạo thành công!');
+        // Fetch full product and notify parent
+        if (onProductCreated && result?.id) {
+          try {
+            const fullProduct = await getProductById(result.id);
+            onProductCreated(fullProduct);
+          } catch (e) {
+            console.error('Failed to fetch created product', e);
+          }
+        }
       }
       if (isDialog) {
         onDialogSaved?.();
@@ -462,16 +529,16 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
             </IconButton>
           </Stack>
 
-          <RHFSelect name="unitOfMeasureId" label="Đơn vị tính">
+          {/* <RHFSelect name="unitOfMeasureId" label="Đơn vị tính">
             <MenuItem value="">— Chọn đơn vị —</MenuItem>
             {units.map((u) => (
               <MenuItem key={u.id} value={u.id}>
                 {u.name} {u.abbreviation ? `(${u.abbreviation})` : ''}
               </MenuItem>
             ))}
-          </RHFSelect>
+          </RHFSelect> */}
 
-          <RHFTextField name="imageUrl" label="URL hình ảnh" />
+          {/* <RHFTextField name="imageUrl" label="URL hình ảnh" /> */}
         </Box>
       </Card>
 
@@ -487,10 +554,22 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
             rowGap={2}
             columnGap={2}
             display="grid"
-            gridTemplateColumns={{ xs: '1fr', sm: '1fr 1fr' }}
+            gridTemplateColumns={{ xs: '1fr', sm: currentProduct ? '1fr 1fr 1fr' : '1fr 1fr' }}
           >
             <RHFTextField name="costPrice" label="Giá vốn" type="number" />
             <RHFTextField name="sellingPrice" label="Giá bán" type="number" />
+            {currentProduct && (
+              <TextField
+                label="Tồn kho"
+                value={
+                  currentProduct.inventories
+                    ? currentProduct.inventories.reduce((sum, inv) => sum + (inv.onHand || 0), 0)
+                    : 0
+                }
+                InputProps={{ readOnly: true }}
+                type="number"
+              />
+            )}
           </Box>
         </AccordionDetails>
       </Accordion>
@@ -588,7 +667,7 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
         </Stack>
 
         {/* Summary of configured units & attributes */}
-        {/* {(unitConversions.length > 0 || productAttributes.length > 0) && (
+        {(unitConversions.length > 0 || productAttributes.length > 0) && (
           <Stack spacing={1} sx={{ mt: 2 }}>
             {productAttributes.length > 0 && (
               <Stack direction="row" spacing={0.5} flexWrap="wrap">
@@ -619,7 +698,7 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
               </Button>
             )}
           </Stack>
-        )} */}
+        )}
       </Card>
 
       {/* Generated child products / variants */}

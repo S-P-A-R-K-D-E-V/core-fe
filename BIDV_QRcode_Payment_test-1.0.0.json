@@ -1,0 +1,877 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "version": "1.0.0",
+    "title": "BIDV QRcode Payment test",
+    "x-ibm-name": "bidvqrcodepayment-test",
+    "description": "BIDV QRcode Payment",
+    "x-ibm-languages": {
+      "title": {
+        "vi": "Thanh toán qua QR BIDV Code"
+      },
+      "description": {
+        "vi": "Thanh toán qua QR BIDV Code"
+      }
+    }
+  },
+  "basePath": "/bidv/sandbox/open-banking-test",
+  "x-ibm-configuration": {
+    "cors": {
+      "enabled": true
+    },
+    "type": "rest",
+    "phase": "realized",
+    "enforced": true,
+    "testable": true,
+    "application-authentication": {
+      "certificate": true
+    },
+    "application-authentication-source": [
+      "header"
+    ],
+    "servers": [
+      {
+        "url": "https://openapi.bidv.com.vn/bidv/sandbox/open-banking-test",
+        "type": [
+          "production",
+          "development"
+        ]
+      }
+    ],
+    "oauth-servers": {
+      "qrcode-auth": {
+        "tokenUrls": [
+          "https://openapi.bidv.com.vn/bidv/sandbox/paygate-oauth/oauth2/token"
+        ],
+        "authorizationUrls": [],
+        "refreshUrls": []
+      }
+    }
+  },
+  "paths": {
+    "/qrcode/initotp/v1": {
+      "parameters": [
+        {
+          "name": "Content-Type",
+          "in": "header",
+          "required": true,
+          "type": "string",
+          "description": "Content-Type"
+        },
+        {
+          "name": "X-Client-Certificate",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "format": "byte",
+          "description": "Client Certificate"
+        },
+        {
+          "name": "Authorization",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "Chuỗi Bearer Token",
+          "format": "Bearer AAIgZDdmODkyOTk3NTg0MjFhOTA5NDc5"
+        },
+        {
+          "name": "X-API-Interaction-ID",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "Request ID"
+        },
+        {
+          "name": "X-Idempotency-Key",
+          "required": false,
+          "in": "header",
+          "type": "string"
+        },
+        {
+          "name": "Timestamp",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "2023-02-21T08:09:09.336Z",
+          "format": "yyyy-MM-ddTHH:mm:ss.SSSZ"
+        },
+        {
+          "name": "X-Customer-IP-Address",
+          "required": false,
+          "in": "header",
+          "type": "string",
+          "description": "Địa chỉ IP máy khách"
+        },
+        {
+          "name": "Channel",
+          "in": "header",
+          "type": "string",
+          "description": "Kênh gọi"
+        },
+        {
+          "name": "X-JWS-Signature",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "Chuỗi ký số"
+        },
+        {
+          "name": "User-Agent",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "Thông tin User-Agent"
+        }
+      ],
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "success",
+            "schema": {
+              "$ref": "#/definitions/QrCodeInitOTPV1Res"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/QrCodeInitOTPV1Req"
+            }
+          }
+        ],
+        "description": "Generate OTP code",
+        "summary": "Initiate OTP",
+        "x-ibm-languages": {
+          "summary": {
+            "vi": "Khởi tạo OTP"
+          },
+          "description": {
+            "vi": "Khởi tạo OTP"
+          }
+        }
+      }
+    },
+    "/qrcode/payment/v1": {
+      "parameters": [
+        {
+          "name": "Content-Type",
+          "in": "header",
+          "required": true,
+          "type": "string",
+          "description": "Content-Type"
+        },
+        {
+          "name": "X-Client-Certificate",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "format": "byte",
+          "description": "Client Certificate"
+        },
+        {
+          "name": "Authorization",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "Chuỗi Bearer Token",
+          "format": "Bearer AAIgZDdmODkyOTk3NTg0MjFhOTA5NDc5"
+        },
+        {
+          "name": "X-API-Interaction-ID",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "Request ID"
+        },
+        {
+          "name": "X-Idempotency-Key",
+          "required": false,
+          "in": "header",
+          "type": "string"
+        },
+        {
+          "name": "Timestamp",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "2023-02-21T08:09:09.336Z",
+          "format": "yyyy-MM-ddTHH:mm:ss.SSSZ"
+        },
+        {
+          "name": "X-Customer-IP-Address",
+          "required": false,
+          "in": "header",
+          "type": "string",
+          "description": "Địa chỉ IP máy khách"
+        },
+        {
+          "name": "Channel",
+          "in": "header",
+          "type": "string",
+          "description": "Kênh gọi"
+        },
+        {
+          "name": "X-JWS-Signature",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "Chuỗi ký số"
+        },
+        {
+          "name": "User-Agent",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "Thông tin User-Agent"
+        }
+      ],
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "success",
+            "schema": {
+              "$ref": "#/definitions/QrCodePaymentV1Res"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/QrCodePaymentV1Req"
+            }
+          }
+        ],
+        "description": "Confirm QR code payment of merchant developed by BIDV",
+        "x-ibm-languages": {
+          "summary": {
+            "vi": "Xác nhận thanh toán QR code"
+          },
+          "description": {
+            "vi": "Xác nhận thanh toán mã QR của merchant do BIDV phát triển"
+          }
+        }
+      }
+    },
+    "/qrcode/check/v1": {
+      "parameters": [
+        {
+          "name": "Content-Type",
+          "in": "header",
+          "required": true,
+          "type": "string",
+          "description": "Content-Type"
+        },
+        {
+          "name": "X-Client-Certificate",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "format": "byte",
+          "description": "Client Certificate"
+        },
+        {
+          "name": "Authorization",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "Chuỗi Bearer Token",
+          "format": "Bearer AAIgZDdmODkyOTk3NTg0MjFhOTA5NDc5"
+        },
+        {
+          "name": "X-API-Interaction-ID",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "Request ID"
+        },
+        {
+          "name": "X-Idempotency-Key",
+          "required": false,
+          "in": "header",
+          "type": "string"
+        },
+        {
+          "name": "Timestamp",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "2023-02-21T08:09:09.336Z",
+          "format": "yyyy-MM-ddTHH:mm:ss.SSSZ"
+        },
+        {
+          "name": "X-Customer-IP-Address",
+          "required": false,
+          "in": "header",
+          "type": "string",
+          "description": "Địa chỉ IP máy khách"
+        },
+        {
+          "name": "Channel",
+          "in": "header",
+          "type": "string",
+          "description": "Kênh gọi"
+        },
+        {
+          "name": "X-JWS-Signature",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "Chuỗi ký số"
+        },
+        {
+          "name": "User-Agent",
+          "required": true,
+          "in": "header",
+          "type": "string",
+          "description": "Thông tin User-Agent"
+        }
+      ],
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "success",
+            "schema": {
+              "$ref": "#/definitions/QrCodeCheckV1Res"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/QrCodeCheckV1Req"
+            }
+          }
+        ],
+        "description": "Check QR code of merchant developed by BIDV",
+        "summary": "Check QRCode",
+        "x-ibm-languages": {
+          "summary": {
+            "vi": "Kiểm tra QR code"
+          },
+          "description": {
+            "vi": "Vấn tin thông tin mã QR của merchant do BIDV phát triển"
+          }
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "qrcode-auth": {
+      "type": "oauth2",
+      "x-ibm-oauth-provider": "paygateoauth",
+      "flow": "application",
+      "tokenUrl": "https://openapi.bidv.com.vn/bidv/sandbox/paygate-oauth/oauth2/token",
+      "scopes": {
+        "ewallet": "ewallet"
+      }
+    }
+  },
+  "security": [
+    {
+      "qrcode-auth": [
+        "ewallet"
+      ]
+    }
+  ],
+  "schemes": [
+    "https"
+  ],
+  "definitions": {
+    "QrCodeCheckV1Req": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "debitAmount": {
+          "type": "string",
+          "example": "38700",
+          "title": "Số tiền thực hiện thanh toán"
+        },
+        "mobile": {
+          "type": "string",
+          "example": "0965031298",
+          "title": "Số điện thoại khách hàng"
+        },
+        "voucherCode": {
+          "type": "string",
+          "example": "",
+          "title": ""
+        },
+        "bankCode": {
+          "type": "string",
+          "example": "970488",
+          "title": "Mã bank thanh toán"
+        },
+        "payType": {
+          "type": "string",
+          "example": "01",
+          "title": "Loại thanh toán"
+        },
+        "item": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ItemQrCode"
+          }
+        },
+        "checkSum": {
+          "type": "string",
+          "example": "",
+          "title": "CheckSum"
+        },
+        "payCode": {
+          "type": "string",
+          "example": "",
+          "title": ""
+        }
+      },
+      "required": [
+        "payType",
+        "mobile",
+        "bankCode",
+        "debitAmount",
+        "item",
+        "checkSum"
+      ]
+    },
+    "QrCodeCheckV1Res": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resCode": {
+          "type": "string",
+          "example": "00",
+          "title": "Mã lỗi trạng thái"
+        },
+        "resDesc": {
+          "type": "string",
+          "example": "Thành công",
+          "title": "Mô tả mã lỗi"
+        },
+        "addtionalData": {
+          "type": "string",
+          "example": "",
+          "title": ""
+        },
+        "promotionValue": {
+          "type": "string",
+          "example": "",
+          "title": ""
+        },
+        "enjoymentAccount": {
+          "type": "string",
+          "example": "",
+          "title": ""
+        },
+        "enjoymentFullName": {
+          "type": "string",
+          "example": "",
+          "title": ""
+        }
+      }
+    },
+    "QrCodeInitOTPV1Req": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "otpType": {
+          "type": "string",
+          "example": "SOFTOTP",
+          "title": "Loại otp"
+        },
+        "sms": {
+          "type": "string",
+          "example": "QK KHONG CAP MA OTP CHO NGUOI KHAC, KHONG NHAP TREN WEB,UNG DUNG KHAC. Ma OTP cua GD voi so tien 111111 VND tren BIDV Smartbanking cua QK la xxxxxx",
+          "title": ""
+        },
+        "otpInfo": {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "Thông tin khởi tạo OTP do smb gửi sang mms và gửi sang API SOA, không xử lý data này tại MMS",
+          "properties": {
+            "transId": {
+              "type": "string",
+              "example": "1212693",
+              "title": ""
+            },
+            "serviceCode": {
+              "type": "string",
+              "example": "1150",
+              "title": ""
+            },
+            "providerCode": {
+              "type": "string",
+              "example": "321000",
+              "title": ""
+            },
+            "fromAccount": {
+              "type": "string",
+              "example": "63110000797152",
+              "title": ""
+            },
+            "amount": {
+              "type": "string",
+              "example": "111111",
+              "title": ""
+            },
+            "toAccount": {
+              "type": "string",
+              "example": "0",
+              "title": ""
+            },
+            "userName": {
+              "type": "string",
+              "example": "0965031298",
+              "title": ""
+            },
+            "mobileNo": {
+              "type": "string",
+              "example": "0965031298",
+              "title": ""
+            },
+            "sessionId": {
+              "type": "string",
+              "example": "8ec454a2ec914913a198c3ead0cabb76",
+              "title": ""
+            },
+            "channel": {
+              "type": "string",
+              "example": "6015",
+              "title": ""
+            },
+            "deviceid": {
+              "type": "string",
+              "example": "1130370",
+              "title": ""
+            },
+            "clientid": {
+              "type": "string",
+              "example": "1130370",
+              "title": ""
+            },
+            "lang": {
+              "type": "string",
+              "example": "VN",
+              "title": ""
+            },
+            "signData": {
+              "type": "string",
+              "example": "cfWtDZ2a0q5M68BfNZUeqMiaXD1utshlfDcpdx8cYP8=",
+              "title": ""
+            }
+          },
+          "required": [
+            "amount",
+            "channel",
+            "clientid",
+            "fromAccount",
+            "lang",
+            "mobileNo",
+            "providerCode",
+            "serviceCode",
+            "sessionId",
+            "signData",
+            "toAccount",
+            "transId",
+            "userName"
+          ]
+        }
+      },
+      "required": [
+        "otpType",
+        "sms",
+        "otpInfo"
+      ]
+    },
+    "QrCodeInitOTPV1Res": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "type": "string",
+          "example": "",
+          "title": ""
+        },
+        "otpType": {
+          "type": "string",
+          "example": "SOFTOTP",
+          "title": "Loại otp"
+        },
+        "otpInfo": {
+          "type": "object",
+          "title": "Thông tin otp của SOA trả về",
+          "properties": {
+            "code": {
+              "type": "string",
+              "example": "00",
+              "title": "Mã lỗi"
+            },
+            "message": {
+              "type": "string",
+              "example": "Success",
+              "title": "Mô tả mã lỗi"
+            },
+            "data": {
+              "type": "string",
+              "example": "eyJrIjoiOUU3NTBDMEQ3RUE0Q0EyRTdFQkYwQ0JBNjNCNEM0MkY1N0IzQTgwNDE1MTkzNzdCRjVEMDkzMjk2MzI0REEyQzhENzgwRTlERTk0RTRDOUExNUZFQTk1NDQxNjkwNDZDMDFFREE3RDY0QTI3QzJEODZBOUQxNDQyNDA1MDhCNEE2MDRFQjczNDhBQjk0QTQ5MTExREExNTkwRUNDQjRERENGNzQ1QTRCREE2RTRDMjhDRDIyNDIwQUEyMjg1NTVCRTU0REQ1NjYwQjUwRjdERUUyQ0VFNEE3NEU0QjcwNTYiLCJlIjoiMTUwMjlFNzBDMDBEMjZFNjIwOEMxQTM4NkJEQTBDRjMyNTE4NUI5NzQ2OEUyQzdEOTYwREVDMEYwNEM2MUIwMzEyOTU5N0Y1NDA2NzBCMjcxNEQwQTkyNDFCQTVFMTBFQkE2RTg1MEQyNEZGMkM1MkEwRTREREJBQUZCNjQ2NDZDRjg3RDQ1MTYwODBDRDNBQzJGRjIyRTE4Q0VFNjE4ODBFMDg5QkExOTQxMDgyRjgyQjg1NTg2QTU3QzZGQUVDNjk5NTdFMEE2NjlFMkY3RDYwNzI3MEJDMzgxMkIyRDIxNjVBQ0YyQTk2N0M2NkEzMzU1OERCMjlGNjI5QUQxNCIsInQiOjE2OTIwMDgyOTYsImxpY2Vuc2VWZXJzaW9uIjo0NDg0OCwicyI6Ik1FUUNJQVhMZXR3UWJYeTNReDBuYmxhcUIwL2ZTdDd1UkM0VFprcUs2Uk9DLzJYcEFpQmE0TWtlQzMrRG00ZzdmVzdGZ0lxOUdUYmtCdFRTR3BJMnAyUHdRdkpkNlE9PSJ9",
+              "title": ""
+            }
+          }
+        }
+      }
+    },
+    "QrCodePaymentV1Req": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mobile": {
+          "type": "string",
+          "example": "0965031298",
+          "title": "Số điện thoại khách hàng"
+        },
+        "bankCode": {
+          "type": "string",
+          "example": "970488",
+          "title": "Mã bank thanh toán"
+        },
+        "accountNo": {
+          "type": "string",
+          "example": "63110000797152",
+          "title": "Số TK thực hiện thanh toán"
+        },
+        "payDate": {
+          "type": "string",
+          "example": "20221114100944",
+          "title": "Thời gian thực hiện thanh toán (format= yyyyMMddHHmmss)"
+        },
+        "debitAmount": {
+          "type": "string",
+          "example": "38700",
+          "title": "Số tiền thực hiện thanh toán"
+        },
+        "respCode": {
+          "type": "string",
+          "example": "00",
+          "title": "Mã trạng thái giao dịch hiện tại đến mms"
+        },
+        "respDesc": {
+          "type": "string",
+          "example": "Thanh cong",
+          "title": "Mô tả trạng thái giao dịch hiện tại đến mms"
+        },
+        "traceTransfer": {
+          "type": "string",
+          "example": "1207638",
+          "title": "Số trace seq tại core bidv "
+        },
+        "messageType": {
+          "type": "string",
+          "example": "1",
+          "title": "Kiểu message"
+        },
+        "orderCode": {
+          "type": "string",
+          "example": "1207638",
+          "title": "Mã đơn hàng"
+        },
+        "userName": {
+          "type": "string",
+          "example": "0965031298",
+          "title": "Tên của chủ tài khoản app banking"
+        },
+        "item": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ItemPayment"
+          }
+        },
+        "checkSum": {
+          "type": "string",
+          "example": "FC400D489EE546FF899D2809F80A10EC"
+        },
+        "realAmount": {
+          "type": "string",
+          "example": "38700.0",
+          "title": "Số tiền thực của giao dịch sau khi trừ hết các khuyến mại nếu có"
+        },
+        "rate": {
+          "type": "string",
+          "example": "",
+          "title": "Tỷ giá"
+        },
+        "otpInfo": {
+          "type": "object",
+          "title": "Thông tin bắt buộc cho các gd của smb bidv thanh toán qr code",
+          "properties": {
+            "mobileNo": {
+              "type": "string",
+              "example": "0965031298",
+              "title": "Số điện thoại của tk thanh toán"
+            },
+            "userName": {
+              "type": "string",
+              "example": "0965031298",
+              "title": "Tên đăng nhập của tk thanh toán"
+            },
+            "transId": {
+              "type": "string",
+              "example": "1207638",
+              "title": "Số tham chiếu giao dịch tại core bidv"
+            },
+            "sessionId": {
+              "type": "string",
+              "example": "e5187f66bd954da08bf2115fa0802fc4",
+              "title": ""
+            },
+            "data": {
+              "type": "string",
+              "example": "eyJrIjoiMDdEMUNFMTY2MjE5NzI1MDk0MjQ2QjYyMzhCNjQ0OUZDQzA0NkQ1MDExRjI5RTI5MzcxNEFFQzcwMzQ4MjhFRURCNUU3QTBCMURFQTE0QkZCMkM1MzdDMzA1NDhBMDBDODI3QUFEMDAwNUM1N0U1NkUwOUI2ODRCNzY5NzlEMDIzNjI0M0M0MDI1OTQwNzgxQkVDQTk2Mzk4ODM5MjQ3OTRDOUYiLCJlIjoiRDU3MEVFMDEwODFCNTEyNUMxNjFENjAyMDNDRUUwMjk4MUIxNTNFRjQxMTUwRDVGQTU3MzNGNzJGNDZDRkFDQTQ3RUVEOUU4NDM3Qzk0ODg2MUE0M0FCRTQ0NzRFMDBFQkFFQTcwRTNDREI2QUJGMkZFMjg1OUE2QTczOEVCMUVBOThBNjk4QTkxODUxNUE5RDk0NDY0NkYwMjVBRUI0NzEzRTk2MDA2QkI1NjgxNjdBQURBNjg3OTdEMzdBMjY0RjEwMkM4NzYwNTIzRkQxNDUyRDMzREFDNEYyMEQ2MzZFMTJCRTAwNUFGMTVFMTk5MzY4MDg4NjAyN0IyNjJGQ0IwOUU3MThBRENFNThDMzk4QzFDMTE1N0M2MkEyOUQ1MkJCRjg5ODNBRDZFN0Y4MDE4QUI2ODM0MjAzRDUwRTg5NDk1RkE3ODMyRTBFNjEzQjg0MzhDMUNBMjdGQzQwQzlCNEU3NjY1RjgyM0UxNTBCNEM3NzRDNTQ4MDg5MkE5REI1NDNBQ0FDMkU4Q0U4OEZGMEJGNkExNUI1ODQ5RUY3MkQxOUJCRTA1Q0U1OUMxOTFGQzA1QjIzMzAzNkEwQ0YyN0VEOUNDN0VFNTM3ODVCNTBDMTkzNEU0RDUyNjk5RTk2RjdFQ0FGMzk1QzRCRjVFRDExQzMwNEIzQzk0NEIxNTYyNDI5RDg5Q0Q2MDM0OERCNURDOTI3MDk1NTU0QkZDOTEwQjlFQTVCNEIwQUI0OUJDRjNFQTY4NzhDRUI2QUFEMUJCOTgyMUMwQzhDM0U0RjcwNjU0QUI4RTEwMjJGNDg0QzFENkZGRDRCMUJCNENEREEwMUJGNEVFOTAzOTExQzFBOTlBNEQ4MzMwRkI1NzNDOUEzMTUxN0E5MjI1ODUzNzZBOEQxMjZDOUYzMTJEOTIyQjA1NTY0M0Y2QzMiLCJzIjoiTUVRQ0lFY29OMXpxSTc4OXhHOGpYSm1ORlVVbkEreGxpZHIxWmp3UTRCSElrOHNRQWlEblBpM3M5M3hFVnFDdmdCQ0MwZ1U1MGpoWlwvYjlWTktjOUREblBOdkRPNmc9PSIsImxpY2Vuc2VWZXJzaW9uIjoiMzgzMTciLCJ0IjoxNjY4Mzk1MzIyfQ==",
+              "title": ""
+            },
+            "channel": {
+              "type": "string",
+              "example": "6015",
+              "title": "Kênh thanh toán"
+            },
+            "lang": {
+              "type": "string",
+              "example": "VN",
+              "title": "Ngôn ngữ"
+            }
+          },
+          "required": [
+            "mobileNo",
+            "userName",
+            "transId",
+            "sessionId",
+            "data",
+            "channel",
+            "lang"
+          ]
+        },
+        "otpType": {
+          "type": "string",
+          "example": "SOFTOTP",
+          "title": ""
+        }
+      },
+      "required": [
+        "mobile",
+        "bankCode",
+        "accountNo",
+        "payDate",
+        "debitAmount",
+        "respCode",
+        "respDesc",
+        "traceTransfer",
+        "messageType",
+        "item",
+        "checkSum",
+        "realAmount"
+      ]
+    },
+    "QrCodePaymentV1Res": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resCode": {
+          "type": "string",
+          "example": "00",
+          "title": "Mã lỗi trạng thái"
+        },
+        "resDesc": {
+          "type": "string",
+          "title": "Mô tả mã lỗi",
+          "example": "Thành công"
+        },
+        "tranid": {
+          "type": "string",
+          "title": "",
+          "example": ""
+        },
+        "mccCodeVnpay": {
+          "type": "string",
+          "example": "",
+          "title": ""
+        },
+        "mccDescVnpay": {
+          "type": "string",
+          "example": "",
+          "title": ""
+        },
+        "qrTrace": {
+          "type": "string",
+          "example": "",
+          "title": ""
+        }
+      }
+    },
+    "ItemQrCode": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "quantity": {
+          "type": "string",
+          "example": "1",
+          "title": "Số lượng"
+        },
+        "note": {
+          "type": "string",
+          "example": "",
+          "title": "Ghi chú"
+        },
+        "qrInfor": {
+          "type": "string",
+          "example": "0002010102122623000697048801091233211245204123453037045405387005802VN5918Trung tam the test6005HANOI62320105166160311BENH VIEN E0704BV01630441B1",
+          "title": "Chuỗi data qr code"
+        }
+      },
+      "required": [
+        "qrInfor",
+        "quantity"
+      ]
+    },
+    "ItemPayment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "quantity": {
+          "type": "string",
+          "example": "1",
+          "title": "Số lượng"
+        },
+        "qrInfor": {
+          "type": "string",
+          "example": "0002010102122623000697048801091233211245204123453037045405387005802VN5918Trung tam the test6005HANOI62320105166160311BENH VIEN E0704BV01630441B1",
+          "title": "Chuỗi data qr code"
+        }
+      }
+    }
+  },
+  "host": "openapi.bidv.com.vn"
+}

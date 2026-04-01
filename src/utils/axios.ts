@@ -202,6 +202,9 @@ export const endpoints = {
     syncInvoices: '/kiotviet/sync/invoices',
     syncPurchaseOrders: '/kiotviet/sync/purchase-orders',
     syncJobStatus: (jobId: string) => `/kiotviet/sync/jobs/${jobId}`,
+    syncRunning: '/kiotviet/sync/running',
+    transform: '/kiotviet/transform',
+    syncAndTransform: '/kiotviet/sync-and-transform',
   },
   shiftRegistrations: {
     register: '/shift-registrations/register',
@@ -284,6 +287,7 @@ export const endpoints = {
     confirm: (id: string) => `/purchase-orders/${id}/confirm`,
     receive: (id: string) => `/purchase-orders/${id}/receive`,
     cancel: (id: string) => `/purchase-orders/${id}/cancel`,
+    draft: '/purchase-orders/draft',
   },
   customers: {
     list: '/customers',
@@ -295,8 +299,17 @@ export const endpoints = {
     list: '/sales-orders',
     details: (id: string) => `/sales-orders/${id}`,
     create: '/sales-orders',
+    update: (id: string) => `/sales-orders/${id}`,
     cancel: (id: string) => `/sales-orders/${id}/cancel`,
     payment: (id: string) => `/sales-orders/${id}/payment`,
+  },
+  bankAccounts: {
+    list: '/bank-accounts',
+  },
+  paymentQr: {
+    create: '/payment/qr/create',
+    cancel: (id: string) => `/payment/qr/${id}/cancel`,
+    status: (id: string) => `/payment/qr/${id}/status`,
   },
   reports: {
     dashboard: '/reports/dashboard',

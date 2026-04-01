@@ -40,9 +40,12 @@ type SyncNotificationContextType = {
   // Sync notifications (ephemeral/real-time)
   notifications: SyncNotification[];
   totalUnRead: number;
-  startSync: (type?: 'all' | 'invoices' | 'purchase-orders') => Promise<string | null>;
+  startSync: (type?: 'all' | 'invoices' | 'purchase-orders' | 'transform' | 'sync-and-transform') => Promise<string | null>;
   markAllAsRead: () => void;
   removeNotification: (id: string) => void;
+  // Real-time job status via SignalR
+  subscribeToJob: (jobId: string) => void;
+  onJobUpdate: (callback: (status: ISyncJobStatus) => void) => () => void;
 };
 
 export const SyncNotificationContext = createContext<SyncNotificationContextType>({
@@ -58,6 +61,8 @@ export const SyncNotificationContext = createContext<SyncNotificationContextType
   startSync: async () => null,
   markAllAsRead: () => {},
   removeNotification: () => {},
+  subscribeToJob: () => {},
+  onJobUpdate: () => () => {},
 });
 
 // ----------------------------------------------------------------------
@@ -66,6 +71,8 @@ const SYNC_LABELS: Record<string, string> = {
   all: 'Đồng bộ toàn bộ KiotViet',
   invoices: 'Đồng bộ hóa đơn KiotViet',
   'purchase-orders': 'Đồng bộ đơn nhập hàng KiotViet',
+  transform: 'Chuyển đổi KiotViet → ERP',
+  'sync-and-transform': 'Đồng bộ & Chuyển đổi',
 };
 
 function getSyncEndpoint(type: string): string {
@@ -74,6 +81,10 @@ function getSyncEndpoint(type: string): string {
       return endpoints.kiotViet.syncInvoices;
     case 'purchase-orders':
       return endpoints.kiotViet.syncPurchaseOrders;
+    case 'transform':
+      return endpoints.kiotViet.transform;
+    case 'sync-and-transform':
+      return endpoints.kiotViet.syncAndTransform;
     default:
       return endpoints.kiotViet.sync;
   }
@@ -90,6 +101,8 @@ export function SyncNotificationProvider({ children }: Props) {
   const [notifications, setNotifications] = useState<SyncNotification[]>([]);
   const syncConnectionRef = useRef<signalR.HubConnection | null>(null);
   const subscribedJobs = useRef<Set<string>>(new Set());
+  const pendingSubscriptions = useRef<Set<string>>(new Set());
+  const jobUpdateListeners = useRef<Set<(status: ISyncJobStatus) => void>>(new Set());
 
   // DB notifications state (persistent)
   const [dbNotifications, setDbNotifications] = useState<INotification[]>([]);
@@ -192,6 +205,9 @@ export function SyncNotificationProvider({ children }: Props) {
       .build();
 
     connection.on('SyncUpdate', (status: ISyncJobStatus) => {
+      // Fire listeners for real-time subscribers (e.g., kiotviet-sync-view)
+      jobUpdateListeners.current.forEach((cb) => cb(status));
+
       setNotifications((prev) =>
         prev.map((n) => {
           if (n.jobId !== status.jobId) return n;
@@ -202,7 +218,7 @@ export function SyncNotificationProvider({ children }: Props) {
           if (status.status === 'Running') {
             const lastStep = status.steps?.[completedSteps - 1];
             message = lastStep
-              ? `Đang xử lý: ${lastStep.step} (${completedSteps} bước hoàn thành)`
+              ? `Đang xử lý: ${lastStep.entity} (${completedSteps} bước hoàn thành)`
               : 'Đang khởi tạo...';
           } else if (status.status === 'Completed') {
             message = `Hoàn thành ${completedSteps} bước đồng bộ`;
@@ -224,6 +240,14 @@ export function SyncNotificationProvider({ children }: Props) {
       .start()
       .then(() => {
         syncConnectionRef.current = connection;
+        // Flush any pending subscriptions that were queued before connection was ready
+        pendingSubscriptions.current.forEach((jobId) => {
+          if (!subscribedJobs.current.has(jobId)) {
+            connection.invoke('SubscribeToJob', jobId).catch(console.error);
+            subscribedJobs.current.add(jobId);
+          }
+        });
+        pendingSubscriptions.current.clear();
       })
       .catch((err) => console.error('Sync SignalR connect failed:', err));
 
@@ -233,38 +257,44 @@ export function SyncNotificationProvider({ children }: Props) {
   }, [authReady]);
 
   const subscribeToJob = useCallback((jobId: string) => {
+    if (subscribedJobs.current.has(jobId)) return;
     const conn = syncConnectionRef.current;
-    if (conn && conn.state === signalR.HubConnectionState.Connected && !subscribedJobs.current.has(jobId)) {
+    if (conn && conn.state === signalR.HubConnectionState.Connected) {
       conn.invoke('SubscribeToJob', jobId).catch(console.error);
       subscribedJobs.current.add(jobId);
+    } else {
+      // Queue subscription for when connection becomes ready
+      pendingSubscriptions.current.add(jobId);
     }
   }, []);
 
+  const onJobUpdate = useCallback((callback: (status: ISyncJobStatus) => void) => {
+    jobUpdateListeners.current.add(callback);
+    return () => {
+      jobUpdateListeners.current.delete(callback);
+    };
+  }, []);
+
   const startSync = useCallback(
-    async (type: 'all' | 'invoices' | 'purchase-orders' = 'all'): Promise<string | null> => {
-      try {
-        const endpoint = getSyncEndpoint(type);
-        const { data } = await axios.post<ISyncJobResponse>(endpoint);
-        const { jobId } = data;
+    async (type: 'all' | 'invoices' | 'purchase-orders' | 'transform' | 'sync-and-transform' = 'all'): Promise<string | null> => {
+      const endpoint = getSyncEndpoint(type);
+      const { data } = await axios.post<ISyncJobResponse>(endpoint);
+      const { jobId } = data;
 
-        const notification: SyncNotification = {
-          id: jobId,
-          jobId,
-          title: SYNC_LABELS[type] || 'Đồng bộ KiotViet',
-          message: 'Đang chờ xử lý...',
-          status: 'Pending',
-          createdAt: new Date(),
-          isUnRead: true,
-        };
+      const notification: SyncNotification = {
+        id: jobId,
+        jobId,
+        title: SYNC_LABELS[type] || 'Đồng bộ KiotViet',
+        message: 'Đang chờ xử lý...',
+        status: 'Pending',
+        createdAt: new Date(),
+        isUnRead: true,
+      };
 
-        setNotifications((prev) => [notification, ...prev]);
-        subscribeToJob(jobId);
+      setNotifications((prev) => [notification, ...prev]);
+      subscribeToJob(jobId);
 
-        return jobId;
-      } catch (error) {
-        console.error('Start sync failed:', error);
-        return null;
-      }
+      return jobId;
     },
     [subscribeToJob]
   );
@@ -337,6 +367,8 @@ export function SyncNotificationProvider({ children }: Props) {
       startSync,
       markAllAsRead,
       removeNotification,
+      subscribeToJob,
+      onJobUpdate,
     }),
     [
       dbNotifications,
@@ -351,6 +383,8 @@ export function SyncNotificationProvider({ children }: Props) {
       startSync,
       markAllAsRead,
       removeNotification,
+      subscribeToJob,
+      onJobUpdate,
     ]
   );
 

@@ -298,7 +298,7 @@ export default function ProductListView() {
                       selected={table.selected.includes(row.id)}
                       onSelectRow={() => table.onSelectRow(row.id)}
                       onDeleteRow={() => handleDeleteRow(row.id)}
-                      onEditRow={() => handleEditRow(row.id)}
+                      onEditRow={handleEditRow}
                       onAddSameCategory={() => handleAddSameCategory(row)}
                       visibleColumns={visibleColumns}
                       totalColSpan={totalColSpan}

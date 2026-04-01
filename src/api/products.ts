@@ -92,6 +92,34 @@ function mapProductListItem(p: IProductListItem): IProductListItem {
   const totalStock =
     p.totalStock ?? p.inventories?.reduce((sum, inv) => sum + (inv.onHand || 0), 0) ?? 0;
 
+  // Map childProducts → variants (same logic as mapProductResponse)
+  let { variants } = p;
+  if (!variants && p.childProducts && p.childProducts.length > 0) {
+    const variantChildren: IProductVariant[] = [];
+    p.childProducts.forEach((child) => {
+      if (child.attributes && child.attributes.length > 0) {
+        const childStock = child.inventories?.reduce((s, inv) => s + (inv.onHand || 0), 0) ?? 0;
+        variantChildren.push({
+          id: child.id,
+          name: child.name,
+          sku: child.code,
+          barcode: child.barCode,
+          costPrice: child.basePrice,
+          sellingPrice: child.basePrice,
+          totalStock: childStock,
+          isActive: child.isActive,
+          combinations: child.attributes.map((a) => ({
+            attributeId: a.id,
+            attributeName: a.attributeName,
+            valueId: a.id,
+            valueName: a.attributeValue,
+          })),
+        });
+      }
+    });
+    if (variantChildren.length > 0) variants = variantChildren;
+  }
+
   return {
     ...p,
     sku: p.sku ?? p.code,
@@ -99,6 +127,7 @@ function mapProductListItem(p: IProductListItem): IProductListItem {
     costPrice: p.costPrice ?? p.basePrice,
     sellingPrice: p.sellingPrice ?? p.basePrice,
     totalStock,
+    variants,
   };
 }
 
@@ -127,12 +156,89 @@ export async function getProductById(id: string): Promise<IProduct> {
 }
 
 export async function createProduct(data: ICreateProductRequest): Promise<{ id: string }> {
-  const response = await axios.post<{ id: string }>(endpoints.products.create, data);
+  // Map frontend extended field names to backend field names
+  const payload = {
+    code: data.code || data.sku || '',
+    name: data.name,
+    barCode: data.barCode || data.barcode,
+    fullName: data.fullName,
+    description: data.description,
+    categoryId: data.categoryId,
+    allowsSale: data.allowsSale ?? true,
+    hasVariants: data.hasVariants ?? false,
+    unit: data.unit,
+    masterProductId: data.masterProductId,
+    basePrice: data.basePrice ?? data.sellingPrice ?? 0,
+    weight: data.weight,
+    productType: data.productType ?? 2,
+    isRewardPoint: data.isRewardPoint ?? data.isLoyaltyPoints,
+    isLotSerialControl: data.isLotSerialControl,
+    isBatchExpireControl: data.isBatchExpireControl,
+    orderTemplate: data.orderTemplate,
+    minQuantity: data.minQuantity ?? data.lowStockThreshold ?? 0,
+    maxQuantity: data.maxQuantity ?? data.highStockThreshold ?? 999999999,
+    taxType: data.taxType,
+    taxRate: data.taxRate,
+    taxRateDirect: data.taxRateDirect ?? data.vatRate,
+    attributes: data.attributes,
+    images: data.images,
+    variants: data.variants?.map((v) => ({
+      code: v.sku,
+      name: v.name,
+      barCode: v.barcode,
+      costPrice: v.costPrice,
+      sellingPrice: v.sellingPrice,
+      attributes: v.attributeValueIds?.map((aid) => ({
+        attributeName: aid.split(':')[0] || '',
+        attributeValue: aid.split(':')[1] || aid,
+      })),
+    })),
+  };
+  const response = await axios.post<{ id: string }>(endpoints.products.create, payload);
   return response.data;
 }
 
 export async function updateProduct(id: string, data: IUpdateProductRequest): Promise<void> {
-  await axios.put(endpoints.products.update(id), data);
+  // Map frontend extended field names to backend field names
+  const payload = {
+    code: data.code || data.sku,
+    name: data.name,
+    barCode: data.barCode || data.barcode,
+    fullName: data.fullName,
+    description: data.description,
+    categoryId: data.categoryId,
+    allowsSale: data.allowsSale ?? true,
+    hasVariants: data.hasVariants ?? false,
+    unit: data.unit,
+    masterProductId: data.masterProductId,
+    basePrice: data.basePrice ?? data.sellingPrice ?? 0,
+    weight: data.weight,
+    productType: data.productType ?? 2,
+    isActive: data.isActive ?? true,
+    isRewardPoint: data.isRewardPoint ?? data.isLoyaltyPoints,
+    isLotSerialControl: data.isLotSerialControl,
+    isBatchExpireControl: data.isBatchExpireControl,
+    orderTemplate: data.orderTemplate,
+    minQuantity: data.minQuantity ?? data.lowStockThreshold ?? 0,
+    maxQuantity: data.maxQuantity ?? data.highStockThreshold ?? 999999999,
+    taxType: data.taxType,
+    taxRate: data.taxRate,
+    taxRateDirect: data.taxRateDirect ?? data.vatRate,
+    attributes: data.attributes,
+    images: data.images,
+    variants: data.variants?.map((v) => ({
+      code: v.sku,
+      name: v.name,
+      barCode: v.barcode,
+      costPrice: v.costPrice,
+      sellingPrice: v.sellingPrice,
+      attributes: v.attributeValueIds?.map((aid) => ({
+        attributeName: aid.split(':')[0] || '',
+        attributeValue: aid.split(':')[1] || aid,
+      })),
+    })),
+  };
+  await axios.put(endpoints.products.update(id), payload);
 }
 
 export async function deleteProduct(id: string): Promise<void> {

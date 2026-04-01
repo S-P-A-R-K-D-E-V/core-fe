@@ -498,6 +498,14 @@ export interface ISalaryConfiguration {
   createdAt: string;
 }
 
+export interface ISalaryConfigurationPagedResponse {
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+  items: ISalaryConfiguration[];
+}
+
 export interface ICreateSalaryConfigurationRequest {
   userId: string;
   salaryType: string;
@@ -1312,6 +1320,8 @@ export interface IUpdateProductRequest {
   taxType?: string;
   taxRate?: string;
   taxRateDirect?: number;
+  attributes?: ICreateProductAttributeRequest[];
+  images?: ICreateProductImageRequest[];
   // Extended fields
   sku?: string;
   barcode?: string;
@@ -1431,6 +1441,9 @@ export interface IVietQRBank {
 export interface IKiotVietBankAccount {
   id: number;
   bankName?: string;
+  shortName?: string;
+  code?: string;
+  bin?: string;
   accountNumber?: string;
   description?: string;
 }
@@ -1589,6 +1602,14 @@ export interface IUpdateSupplierRequest {
 }
 
 // --- Purchase Order ---
+export interface IPurchaseOrderPagedResponse {
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+  items: IPurchaseOrder[];
+}
+
 export interface IPurchaseOrder {
   id: string;
   orderNumber: string;
@@ -1748,28 +1769,34 @@ export interface IPayment {
 }
 
 export interface ICreateSalesOrderRequest {
+  branchId?: number;
+  purchaseDate?: string;
   customerId?: string;
-  warehouseId: string;
-  note?: string;
-  discountAmount: number;
-  items: ICreateSalesOrderItemRequest[];
-  payments?: ICreatePaymentRequest[];
+  discount?: number;
+  totalPayment: number;
+  method?: string;
+  invoiceDetails: ICreateInvoiceDetailRequest[];
+  payments?: ICreateInvoicePaymentRequest[];
 }
 
-export interface ICreateSalesOrderItemRequest {
+export interface ICreateInvoiceDetailRequest {
   productId: string;
-  productVariantId?: string;
+  productCode?: string;
+  productName?: string;
   quantity: number;
-  unitPrice: number;
-  vatRate: number;
-  discountAmount: number;
+  price: number;
+  discount?: number;
+  discountRatio?: number;
+  note?: string;
+  serialNumbers?: string;
 }
 
-export interface ICreatePaymentRequest {
+export interface ICreateInvoicePaymentRequest {
   method: string;
   amount: number;
-  transactionRef?: string;
-  note?: string;
+  accountId?: number;
+  voucherId?: number;
+  voucherCampaignId?: number;
 }
 
 export interface IAddPaymentRequest {
@@ -1777,6 +1804,54 @@ export interface IAddPaymentRequest {
   amount: number;
   transactionRef?: string;
   note?: string;
+}
+
+export interface IUpdateSalesOrderRequest {
+  customerId?: string;
+  note?: string;
+  discount?: number;
+  items?: IUpdateSalesOrderItemRequest[];
+}
+
+// ========== QR Payment (ACB Dynamic QR) ==========
+
+export interface ICreateQrPaymentRequest {
+  salesOrderId?: string;
+  amount: number;
+  description?: string;
+}
+
+export interface IQrPaymentResponse {
+  id: string;
+  bankOrderId: string;
+  traceNumber: string;
+  virtualAccount?: string;
+  qrDataUrl?: string;
+  amount: number;
+  status: string;
+  createdAt: string;
+}
+
+export interface IQrPaymentStatusResponse {
+  id: string;
+  bankOrderId: string;
+  traceNumber: string;
+  amount: number;
+  status: string;
+  virtualAccount?: string;
+  qrDataUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IUpdateSalesOrderItemRequest {
+  id?: string;
+  productId: string;
+  productCode?: string;
+  productName?: string;
+  quantity: number;
+  price: number;
+  discount?: number;
 }
 
 // ==================== Reports ====================

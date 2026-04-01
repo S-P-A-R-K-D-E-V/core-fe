@@ -178,6 +178,9 @@ export const paths = {
     notificationConfig: {
       root: `${ROOTS.DASHBOARD}/notification-config`,
     },
+    kiotVietSync: {
+      root: `${ROOTS.DASHBOARD}/kiotviet-sync`,
+    },
     // POS / Inventory
     pos: {
       root: `${ROOTS.DASHBOARD}/pos`,
@@ -224,6 +227,7 @@ export const paths = {
         list: `${ROOTS.DASHBOARD}/pos/purchase-order/list`,
         new: `${ROOTS.DASHBOARD}/pos/purchase-order/new`,
         details: (id: string) => `${ROOTS.DASHBOARD}/pos/purchase-order/${id}`,
+        edit: (id: string) => `${ROOTS.DASHBOARD}/pos/purchase-order/${id}/edit`,
       },
       customer: {
         root: `${ROOTS.DASHBOARD}/pos/customer`,
@@ -239,6 +243,7 @@ export const paths = {
         list: `${ROOTS.DASHBOARD}/pos/sales-order/list`,
         new: `${ROOTS.DASHBOARD}/pos/sales-order/new`,
         details: (id: string) => `${ROOTS.DASHBOARD}/pos/sales-order/${id}`,
+        edit: (id: string) => `${ROOTS.DASHBOARD}/pos/sales-order/${id}/edit`,
       },
       report: {
         root: `${ROOTS.DASHBOARD}/pos/report`,

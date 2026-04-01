@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import Autocomplete from '@mui/material/Autocomplete';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -32,7 +33,6 @@ import {
   TableHeadCustom,
   TableNoData,
   TablePaginationCustom,
-  useTable,
 } from 'src/components/table';
 
 import type { ISalaryConfiguration } from 'src/types/corecms-api';
@@ -80,7 +80,6 @@ const EMPTY_FORM = {
 // ----------------------------------------------------------------------
 
 export default function SalaryConfigurationView() {
-  const table = useTable();
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
 
@@ -88,9 +87,15 @@ export default function SalaryConfigurationView() {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<any[]>([]);
 
+  // Server-side pagination
+  const [pageNumber, setPageNumber] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+
   // Create dialog
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
   const [formData, setFormData] = useState(EMPTY_FORM);
+  const [userInputValue, setUserInputValue] = useState('');
 
   // Edit dialog
   const [editRow, setEditRow] = useState<ISalaryConfiguration | null>(null);
@@ -106,15 +111,12 @@ export default function SalaryConfigurationView() {
   const [deleteRow, setDeleteRow] = useState<ISalaryConfiguration | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const fetchData = useCallback(async () => {
+  const fetchSalaries = useCallback(async (page: number, size: number) => {
     try {
       setLoading(true);
-      const [salaryData, userData] = await Promise.all([
-        getAllSalaryConfigurations(),
-        getAllUsers(),
-      ]);
-      setSalaries(salaryData);
-      setUsers(userData);
+      const data = await getAllSalaryConfigurations({ pageNumber: page, pageSize: size });
+      setSalaries(data.items);
+      setTotalCount(data.totalCount);
     } catch (error) {
       console.error('Failed to fetch data:', error);
       enqueueSnackbar('Không thể tải dữ liệu', { variant: 'error' });
@@ -124,8 +126,12 @@ export default function SalaryConfigurationView() {
   }, [enqueueSnackbar]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchSalaries(pageNumber, pageSize);
+  }, [fetchSalaries, pageNumber, pageSize]);
+
+  useEffect(() => {
+    getAllUsers().then(setUsers).catch(console.error);
+  }, []);
 
   // --- Create ---
   const handleOpenCreateDialog = () => {
@@ -135,6 +141,7 @@ export default function SalaryConfigurationView() {
   const handleCloseCreateDialog = () => {
     setOpenCreateDialog(false);
     setFormData(EMPTY_FORM);
+    setUserInputValue('');
   };
 
   const handleSubmitCreate = async () => {
@@ -146,7 +153,7 @@ export default function SalaryConfigurationView() {
       });
       enqueueSnackbar('Tạo cấu hình lương thành công!', { variant: 'success' });
       handleCloseCreateDialog();
-      fetchData();
+      fetchSalaries(pageNumber, pageSize);
     } catch (error: any) {
       console.error(error);
       const msg = error?.title || error?.message || 'Tạo cấu hình lương thất bại!';
@@ -182,7 +189,7 @@ export default function SalaryConfigurationView() {
       });
       enqueueSnackbar('Cập nhật cấu hình lương thành công!', { variant: 'success' });
       handleCloseEdit();
-      fetchData();
+      fetchSalaries(pageNumber, pageSize);
     } catch (error: any) {
       console.error(error);
       const msg = error?.title || error?.message || 'Cập nhật cấu hình lương thất bại!';
@@ -206,7 +213,7 @@ export default function SalaryConfigurationView() {
       await deleteSalaryConfiguration(deleteRow.id);
       enqueueSnackbar('Xóa cấu hình lương thành công!', { variant: 'success' });
       handleCloseDelete();
-      fetchData();
+      fetchSalaries(pageNumber, pageSize);
     } catch (error: any) {
       console.error(error);
       const msg = error?.title || error?.message || 'Xóa cấu hình lương thất bại!';
@@ -260,7 +267,7 @@ export default function SalaryConfigurationView() {
           <>
             <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
               <Scrollbar>
-                <Table size={table.dense ? 'small' : 'medium'}>
+                <Table size="medium">
                   <TableHeadCustom headLabel={TABLE_HEAD} />
 
                   <TableBody>
@@ -303,11 +310,14 @@ export default function SalaryConfigurationView() {
             </TableContainer>
 
             <TablePaginationCustom
-              count={salaries.length}
-              page={table.page}
-              rowsPerPage={table.rowsPerPage}
-              onPageChange={table.onChangePage}
-              onRowsPerPageChange={table.onChangeRowsPerPage}
+              count={totalCount}
+              page={pageNumber - 1}
+              rowsPerPage={pageSize}
+              onPageChange={(_, newPage) => setPageNumber(newPage + 1)}
+              onRowsPerPageChange={(e) => {
+                setPageSize(parseInt(e.target.value, 10));
+                setPageNumber(1);
+              }}
             />
           </>
         )}
@@ -318,19 +328,18 @@ export default function SalaryConfigurationView() {
         <DialogTitle>Thêm cấu hình lương mới</DialogTitle>
         <DialogContent>
           <Stack spacing={3} sx={{ pt: 2 }}>
-            <TextField
-              select
+            <Autocomplete
               fullWidth
-              label="Nhân viên"
-              value={formData.userId}
-              onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
-            >
-              {users.map((user) => (
-                <MenuItem key={user.id} value={user.id}>
-                  {user.fullName} - {user.email}
-                </MenuItem>
-              ))}
-            </TextField>
+              options={users}
+              getOptionLabel={(option) => `${option.fullName} - ${option.email}`}
+              value={users.find((u) => u.id === formData.userId) || null}
+              onChange={(_, newValue) =>
+                setFormData({ ...formData, userId: newValue?.id ?? '' })
+              }
+              inputValue={userInputValue}
+              onInputChange={(_, newInputValue) => setUserInputValue(newInputValue)}
+              renderInput={(params) => <TextField {...params} label="Nhân viên" />}
+            />
 
             <TextField
               select
@@ -478,4 +487,3 @@ export default function SalaryConfigurationView() {
     </Container>
   );
 }
-
