@@ -29,8 +29,8 @@ services:
         max-size: "10m"
         max-file: "3"
     environment:
-      - VIRTUAL_HOST=cici21chualang.vn,www.cici21chualang.vn,ql-quy-pickleball.online,www.ql-quy-pickleball.online
-      - LETSENCRYPT_HOST=cici21chualang.vn,www.cici21chualang.vn,ql-quy-pickleball.online,www.ql-quy-pickleball.online
+      - VIRTUAL_HOST=cici21chualang.vn,www.cici21chualang.vn,ql-quy-pickleball.online,www.ql-quy-pickleball.online,openclaw-gateway.cici21chualang.vn,www.openclaw-gateway.cici21chualang.vn
+      - LETSENCRYPT_HOST=cici21chualang.vn,www.cici21chualang.vn,ql-quy-pickleball.online,www.ql-quy-pickleball.online,openclaw-gateway.cici21chualang.vn,www.openclaw-gateway.cici21chualang.vn
       - LETSENCRYPT_EMAIL=core@cici21chualang.vn
     volumes:
       - ../docker/nginx.conf:/etc/nginx/nginx.conf:ro
