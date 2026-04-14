@@ -198,6 +198,8 @@ export const endpoints = {
     invoiceDetail: (id: number) => `/kiotviet/invoices/${id}`,
     bankAccounts: '/kiotviet/bank-accounts',
     exportExcel: '/kiotviet/export-excel',
+    salesQuery: '/kiotviet/sales/query',
+    salesExportExcel: '/kiotviet/sales/export-excel',
     sync: '/kiotviet/sync',
     syncInvoices: '/kiotviet/sync/invoices',
     syncPurchaseOrders: '/kiotviet/sync/purchase-orders',

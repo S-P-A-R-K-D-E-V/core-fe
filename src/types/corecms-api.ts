@@ -1448,6 +1448,45 @@ export interface IKiotVietBankAccount {
   description?: string;
 }
 
+// --- KiotViet Sales Query (Admin) ---
+
+export interface IKiotVietSalesQueryParams {
+  fromDate: string;          // yyyy-MM-dd
+  toDate: string;            // yyyy-MM-dd
+  code?: string;             // search mã hóa đơn (contains)
+  paymentMethod?: string;    // 'Cash' | 'Transfer' | 'Card'
+  bankAccountId?: number;    // KiotViet bank account id
+}
+
+export interface IKiotVietSalesQueryItem {
+  id: number;
+  code: string;
+  purchaseDate: string;
+  createdDate: string;
+  customerName?: string;
+  total: number;
+  totalPayment: number;
+  paymentMethod: string;
+  paymentMethodDisplay: string;
+  bankAccountId?: number;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
+  status: number;
+  statusValue?: string;
+  description?: string;
+}
+
+export interface IKiotVietSalesQueryResponse {
+  fromDate: string;
+  toDate: string;
+  totalCount: number;
+  totalAmount: number;
+  totalCash: number;
+  totalTransfer: number;
+  totalCard: number;
+  items: IKiotVietSalesQueryItem[];
+}
+
 // ======================================================================
 // Shift Registration Types
 

@@ -208,6 +208,13 @@ export function useNavData() {
             icon: ICONS.ecommerce,
             roles: ['Admin'],
           },
+          // KIOTVIET SALES QUERY (Admin only)
+          {
+            title: 'Bán hàng KiotViet',
+            path: paths.dashboard.kiotVietSales.root,
+            icon: ICONS.invoice,
+            roles: ['Admin'],
+          },
         ],
       },
       // POS / INVENTORY
