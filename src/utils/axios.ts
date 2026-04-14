@@ -198,8 +198,6 @@ export const endpoints = {
     invoiceDetail: (id: number) => `/kiotviet/invoices/${id}`,
     bankAccounts: '/kiotviet/bank-accounts',
     exportExcel: '/kiotviet/export-excel',
-    salesQuery: '/kiotviet/sales/query',
-    salesExportExcel: '/kiotviet/sales/export-excel',
     sync: '/kiotviet/sync',
     syncInvoices: '/kiotviet/sync/invoices',
     syncPurchaseOrders: '/kiotviet/sync/purchase-orders',
@@ -304,6 +302,7 @@ export const endpoints = {
     update: (id: string) => `/sales-orders/${id}`,
     cancel: (id: string) => `/sales-orders/${id}/cancel`,
     payment: (id: string) => `/sales-orders/${id}/payment`,
+    exportExcel: '/sales-orders/export-excel',
   },
   bankAccounts: {
     list: '/bank-accounts',

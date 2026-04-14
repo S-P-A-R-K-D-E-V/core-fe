@@ -6,15 +6,42 @@ import {
   IUpdateSalesOrderRequest,
 } from 'src/types/corecms-api';
 
-export async function getAllSalesOrders(params?: {
+export interface ISalesOrdersQueryParams {
   keyword?: string;
   customerId?: string;
   status?: string;
   fromDate?: string;
   toDate?: string;
-}): Promise<ISalesOrder[]> {
+  paymentMethod?: string; // "Cash" | "Transfer" | "Card" | ...
+  bankAccountId?: number;
+}
+
+export async function getAllSalesOrders(params?: ISalesOrdersQueryParams): Promise<ISalesOrder[]> {
   const response = await axios.get<ISalesOrder[]>(endpoints.salesOrders.list, { params });
   return response.data;
+}
+
+/**
+ * Tải file Excel báo cáo hóa đơn theo filter. Trigger browser download.
+ */
+export async function exportSalesOrdersExcel(params?: ISalesOrdersQueryParams): Promise<void> {
+  const response = await axios.get(endpoints.salesOrders.exportExcel, {
+    params,
+    responseType: 'blob',
+  });
+  const blob = new Blob([response.data], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  const from = params?.fromDate ?? 'all';
+  const to = params?.toDate ?? 'all';
+  link.download = `HoaDon_${from}_${to}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 export async function getSalesOrderById(id: string): Promise<ISalesOrder> {

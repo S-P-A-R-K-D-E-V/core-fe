@@ -15,6 +15,7 @@ import TextField from '@mui/material/TextField';
 import Stack from '@mui/material/Stack';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
+import MenuItem from '@mui/material/MenuItem';
 import Label from 'src/components/label';
 
 import { paths } from 'src/routes/paths';
@@ -37,8 +38,13 @@ import {
   TablePaginationCustom,
 } from 'src/components/table';
 
-import { ISalesOrder } from 'src/types/corecms-api';
-import { getAllSalesOrders } from 'src/api/sales-orders';
+import { ISalesOrder, IKiotVietBankAccount } from 'src/types/corecms-api';
+import { getAllSalesOrders, exportSalesOrdersExcel } from 'src/api/sales-orders';
+import { getBankAccounts } from 'src/api/bank-accounts';
+
+// Dữ liệu bank account trả về có cả `id` (Guid) và `kiotVietId` (int) — dùng kiotVietId
+// làm giá trị filter để khớp với KiotVietPayment.AccountId trong DB.
+type BankAccountOption = IKiotVietBankAccount & { kiotVietId?: number };
 
 // ----------------------------------------------------------------------
 
@@ -92,18 +98,55 @@ export default function SalesOrderListView() {
 
   const [tableData, setTableData] = useState<ISalesOrder[]>([]);
   const [filterName, setFilterName] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [bankAccountId, setBankAccountId] = useState<number | ''>('');
+  const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
+  const [exporting, setExporting] = useState(false);
+
+  const buildParams = useCallback(() => ({
+    keyword: filterName || undefined,
+    fromDate: fromDate || undefined,
+    toDate: toDate || undefined,
+    paymentMethod: paymentMethod || undefined,
+    bankAccountId: bankAccountId === '' ? undefined : bankAccountId,
+  }), [filterName, fromDate, toDate, paymentMethod, bankAccountId]);
 
   const fetchData = useCallback(async () => {
     try {
-      const orders = await getAllSalesOrders({ keyword: filterName || undefined });
+      const orders = await getAllSalesOrders(buildParams());
       setTableData(orders);
     } catch (error) {
       console.error(error);
       enqueueSnackbar('Không thể tải đơn hàng', { variant: 'error' });
     }
-  }, [enqueueSnackbar, filterName]);
+  }, [enqueueSnackbar, buildParams]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const accs = (await getBankAccounts()) as BankAccountOption[];
+        setBankAccounts(accs);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, []);
+
+  const handleExport = useCallback(async () => {
+    try {
+      setExporting(true);
+      await exportSalesOrdersExcel(buildParams());
+    } catch (e) {
+      console.error(e);
+      enqueueSnackbar('Không thể xuất Excel', { variant: 'error' });
+    } finally {
+      setExporting(false);
+    }
+  }, [buildParams, enqueueSnackbar]);
 
   const dataFiltered = tableData;
   const dataInPage = dataFiltered.slice(table.page * table.rowsPerPage, table.page * table.rowsPerPage + table.rowsPerPage);
@@ -140,20 +183,81 @@ export default function SalesOrderListView() {
       />
 
       <Card>
-        <Stack spacing={2} direction="row" alignItems="center" sx={{ p: 2.5 }}>
-          <TextField
-            fullWidth
-            value={filterName}
-            onChange={handleFilterName}
-            placeholder="Tìm theo mã đơn, tên khách hàng..."
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
-                </InputAdornment>
-              ),
-            }}
-          />
+        <Stack spacing={2} sx={{ p: 2.5 }}>
+          <Stack spacing={2} direction={{ xs: 'column', md: 'row' }} alignItems="center">
+            <TextField
+              fullWidth
+              value={filterName}
+              onChange={handleFilterName}
+              placeholder="Tìm theo mã đơn, tên khách hàng..."
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Button
+              variant="outlined"
+              color="primary"
+              startIcon={<Iconify icon="solar:export-bold" />}
+              onClick={handleExport}
+              disabled={exporting}
+              sx={{ minWidth: 160, whiteSpace: 'nowrap' }}
+            >
+              {exporting ? 'Đang xuất...' : 'Xuất Excel'}
+            </Button>
+          </Stack>
+          <Stack spacing={2} direction={{ xs: 'column', md: 'row' }}>
+            <TextField
+              type="date"
+              label="Từ ngày"
+              InputLabelProps={{ shrink: true }}
+              value={fromDate}
+              onChange={(e) => { table.onResetPage(); setFromDate(e.target.value); }}
+              sx={{ minWidth: 160 }}
+            />
+            <TextField
+              type="date"
+              label="Đến ngày"
+              InputLabelProps={{ shrink: true }}
+              value={toDate}
+              onChange={(e) => { table.onResetPage(); setToDate(e.target.value); }}
+              sx={{ minWidth: 160 }}
+            />
+            <TextField
+              select
+              label="Phương thức"
+              value={paymentMethod}
+              onChange={(e) => { table.onResetPage(); setPaymentMethod(e.target.value); }}
+              sx={{ minWidth: 180 }}
+            >
+              <MenuItem value="">Tất cả</MenuItem>
+              <MenuItem value="Cash">Tiền mặt</MenuItem>
+              <MenuItem value="Transfer">Chuyển khoản</MenuItem>
+              <MenuItem value="Card">Thẻ</MenuItem>
+            </TextField>
+            <TextField
+              select
+              label="Tài khoản nhận"
+              value={bankAccountId === '' ? '' : String(bankAccountId)}
+              onChange={(e) => {
+                table.onResetPage();
+                setBankAccountId(e.target.value === '' ? '' : Number(e.target.value));
+              }}
+              sx={{ minWidth: 240, flex: 1 }}
+            >
+              <MenuItem value="">Tất cả</MenuItem>
+              {bankAccounts
+                .filter((a) => a.kiotVietId != null)
+                .map((a) => (
+                  <MenuItem key={a.kiotVietId} value={String(a.kiotVietId)}>
+                    {a.bankName} {a.accountNumber ? `- ${a.accountNumber}` : ''}
+                  </MenuItem>
+                ))}
+            </TextField>
+          </Stack>
         </Stack>
 
         <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
