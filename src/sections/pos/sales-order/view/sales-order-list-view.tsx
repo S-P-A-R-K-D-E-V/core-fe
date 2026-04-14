@@ -38,6 +38,9 @@ import {
   TablePaginationCustom,
 } from 'src/components/table';
 
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { parseDateStr, toDateStr } from 'src/utils/format-time';
+
 import { ISalesOrder, IKiotVietBankAccount } from 'src/types/corecms-api';
 import { getAllSalesOrders, exportSalesOrdersExcel } from 'src/api/sales-orders';
 import { getBankAccounts } from 'src/api/bank-accounts';
@@ -210,21 +213,19 @@ export default function SalesOrderListView() {
             </Button>
           </Stack>
           <Stack spacing={2} direction={{ xs: 'column', md: 'row' }}>
-            <TextField
-              type="date"
+            <DatePicker
               label="Từ ngày"
-              InputLabelProps={{ shrink: true }}
-              value={fromDate}
-              onChange={(e) => { table.onResetPage(); setFromDate(e.target.value); }}
-              sx={{ minWidth: 160 }}
+              value={parseDateStr(fromDate)}
+              onChange={(val) => { table.onResetPage(); setFromDate(toDateStr(val)); }}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { sx: { minWidth: 160 } } }}
             />
-            <TextField
-              type="date"
+            <DatePicker
               label="Đến ngày"
-              InputLabelProps={{ shrink: true }}
-              value={toDate}
-              onChange={(e) => { table.onResetPage(); setToDate(e.target.value); }}
-              sx={{ minWidth: 160 }}
+              value={parseDateStr(toDate)}
+              onChange={(val) => { table.onResetPage(); setToDate(toDateStr(val)); }}
+              format="dd/MM/yyyy"
+              slotProps={{ textField: { sx: { minWidth: 160 } } }}
             />
             <TextField
               select
