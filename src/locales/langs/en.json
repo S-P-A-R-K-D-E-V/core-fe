@@ -69,5 +69,7 @@
   "shiftSwap": "Shift Swap",
   "myRequests": "My Requests",
   "pendingApproval": "Pending Approval",
-  "shiftCash": "Shift Cash Reconciliation"
+  "shiftCash": "Shift Cash Reconciliation",
+  "taxReport": "Tax Report",
+  "taxReportMonthly": "Monthly Tax Report"
 }
