@@ -96,6 +96,9 @@ export default function SalesOrderListView() {
   const router = useRouter();
 
   const [tableData, setTableData] = useState<ISalesOrder[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [filterName, setFilterName] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -104,7 +107,7 @@ export default function SalesOrderListView() {
   const [bankAccounts, setBankAccounts] = useState<IKiotVietBankAccount[]>([]);
   const [exporting, setExporting] = useState(false);
 
-  const buildParams = useCallback(() => ({
+  const buildExportParams = useCallback(() => ({
     keyword: filterName || undefined,
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
@@ -114,13 +117,18 @@ export default function SalesOrderListView() {
 
   const fetchData = useCallback(async () => {
     try {
-      const orders = await getAllSalesOrders(buildParams());
-      setTableData(orders);
+      const paged = await getAllSalesOrders({
+        ...buildExportParams(),
+        pageNumber,
+        pageSize,
+      });
+      setTableData(paged.items);
+      setTotalCount(paged.totalCount);
     } catch (error) {
       console.error(error);
       enqueueSnackbar('Không thể tải đơn hàng', { variant: 'error' });
     }
-  }, [enqueueSnackbar, buildParams]);
+  }, [enqueueSnackbar, buildExportParams, pageNumber, pageSize]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -138,23 +146,21 @@ export default function SalesOrderListView() {
   const handleExport = useCallback(async () => {
     try {
       setExporting(true);
-      await exportSalesOrdersExcel(buildParams());
+      await exportSalesOrdersExcel(buildExportParams());
     } catch (e) {
       console.error(e);
       enqueueSnackbar('Không thể xuất Excel', { variant: 'error' });
     } finally {
       setExporting(false);
     }
-  }, [buildParams, enqueueSnackbar]);
+  }, [buildExportParams, enqueueSnackbar]);
 
-  const dataFiltered = tableData;
-  const dataInPage = dataFiltered.slice(table.page * table.rowsPerPage, table.page * table.rowsPerPage + table.rowsPerPage);
-  const notFound = !dataFiltered.length;
+  const notFound = !tableData.length;
 
   const handleFilterName = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    table.onResetPage();
+    setPageNumber(1);
     setFilterName(event.target.value);
-  }, [table]);
+  }, []);
 
   const handleViewRow = useCallback((id: string) => {
     router.push(paths.dashboard.pos.salesOrder.details(id));
@@ -212,14 +218,14 @@ export default function SalesOrderListView() {
             <DatePicker
               label="Từ ngày"
               value={parseDateStr(fromDate)}
-              onChange={(val) => { table.onResetPage(); setFromDate(toDateStr(val)); }}
+              onChange={(val) => { setPageNumber(1); setFromDate(toDateStr(val)); }}
               format="dd/MM/yyyy"
               slotProps={{ textField: { sx: { minWidth: 160 } } }}
             />
             <DatePicker
               label="Đến ngày"
               value={parseDateStr(toDate)}
-              onChange={(val) => { table.onResetPage(); setToDate(toDateStr(val)); }}
+              onChange={(val) => { setPageNumber(1); setToDate(toDateStr(val)); }}
               format="dd/MM/yyyy"
               slotProps={{ textField: { sx: { minWidth: 160 } } }}
             />
@@ -227,7 +233,7 @@ export default function SalesOrderListView() {
               select
               label="Phương thức"
               value={paymentMethod}
-              onChange={(e) => { table.onResetPage(); setPaymentMethod(e.target.value); }}
+              onChange={(e) => { setPageNumber(1); setPaymentMethod(e.target.value); }}
               sx={{ minWidth: 180 }}
             >
               <MenuItem value="">Tất cả</MenuItem>
@@ -239,7 +245,7 @@ export default function SalesOrderListView() {
               select
               label="Tài khoản nhận"
               value={bankAccountId}
-              onChange={(e) => { table.onResetPage(); setBankAccountId(e.target.value); }}
+              onChange={(e) => { setPageNumber(1); setBankAccountId(e.target.value); }}
               sx={{ minWidth: 240, flex: 1 }}
             >
               <MenuItem value="">Tất cả</MenuItem>
@@ -259,11 +265,11 @@ export default function SalesOrderListView() {
                 order={table.order}
                 orderBy={table.orderBy}
                 headLabel={TABLE_HEAD}
-                rowCount={dataFiltered.length}
+                rowCount={totalCount}
                 onSort={table.onSort}
               />
               <TableBody>
-                {dataInPage.map((row) => (
+                {tableData.map((row) => (
                   <TableRow key={row.id} hover sx={{ cursor: 'pointer' }} onClick={() => handleViewRow(row.id)}>
                     <TableCell><strong>{row.orderNumber}</strong></TableCell>
                     <TableCell>{row.customerName || 'Khách lẻ'}</TableCell>
@@ -294,18 +300,18 @@ export default function SalesOrderListView() {
                     </TableCell>
                   </TableRow>
                 ))}
-                <TableEmptyRows height={table.dense ? 56 : 76} emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)} />
+                <TableEmptyRows height={table.dense ? 56 : 76} emptyRows={emptyRows(0, pageSize, tableData.length)} />
                 <TableNoData notFound={notFound} />
               </TableBody>
             </Table>
           </Scrollbar>
         </TableContainer>
         <TablePaginationCustom
-          count={dataFiltered.length}
-          page={table.page}
-          rowsPerPage={table.rowsPerPage}
-          onPageChange={table.onChangePage}
-          onRowsPerPageChange={table.onChangeRowsPerPage}
+          count={totalCount}
+          page={pageNumber - 1}
+          rowsPerPage={pageSize}
+          onPageChange={(_, newPage) => setPageNumber(newPage + 1)}
+          onRowsPerPageChange={(e) => { setPageSize(parseInt(e.target.value, 10)); setPageNumber(1); }}
           dense={table.dense}
           onChangeDense={table.onChangeDense}
         />

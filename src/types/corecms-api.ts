@@ -1765,6 +1765,14 @@ export interface IUpdateCustomerRequest {
 }
 
 // ==================== SalesOrder ====================
+export interface ISalesOrderPagedResponse {
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+  items: ISalesOrder[];
+}
+
 export interface ISalesOrder {
   id: string;
   orderNumber: string;

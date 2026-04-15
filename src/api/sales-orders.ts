@@ -1,6 +1,7 @@
 import axios, { endpoints } from 'src/utils/axios';
 import {
   ISalesOrder,
+  ISalesOrderPagedResponse,
   ICreateSalesOrderRequest,
   IAddPaymentRequest,
   IUpdateSalesOrderRequest,
@@ -14,10 +15,16 @@ export interface ISalesOrdersQueryParams {
   toDate?: string;
   paymentMethod?: string; // "Cash" | "Transfer" | "Card" | ...
   bankAccountId?: string; // Guid của KiotVietBankAccount
+  pageNumber?: number;
+  pageSize?: number;
 }
 
-export async function getAllSalesOrders(params?: ISalesOrdersQueryParams): Promise<ISalesOrder[]> {
-  const response = await axios.get<ISalesOrder[]>(endpoints.salesOrders.list, { params });
+export async function getAllSalesOrders(
+  params?: ISalesOrdersQueryParams
+): Promise<ISalesOrderPagedResponse> {
+  const response = await axios.get<ISalesOrderPagedResponse>(endpoints.salesOrders.list, {
+    params,
+  });
   return response.data;
 }
 
