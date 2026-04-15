@@ -108,46 +108,30 @@ export default function TaxReportFilter({
             ))}
           </TextField>
 
-          {/* Tài khoản nhận tiền */}
-          {bankAccounts.length > 0 ? (
-            <TextField
-              select
-              label="Tài khoản nhận tiền"
-              value={query.bankAccountId ?? ''}
-              onChange={(e) =>
-                onChange({
-                  ...query,
-                  bankAccountId: e.target.value !== '' ? Number(e.target.value) : undefined,
-                })
-              }
-              size="small"
-              sx={{ minWidth: 220 }}
-            >
-              <MenuItem value="">Tất cả tài khoản</MenuItem>
-              {bankAccounts.map((ba) => (
-                <MenuItem key={ba.id} value={ba.id}>
-                  {ba.bankName ?? ba.shortName ?? `TK #${ba.id}`}
+          {/* Tài khoản nhận tiền — value là kiotVietId (int) để khớp với BE filter */}
+          <TextField
+            select
+            label="Tài khoản nhận tiền"
+            value={query.bankAccountId ?? ''}
+            onChange={(e) =>
+              onChange({
+                ...query,
+                bankAccountId: e.target.value !== '' ? Number(e.target.value) : undefined,
+              })
+            }
+            size="small"
+            sx={{ minWidth: 240 }}
+          >
+            <MenuItem value="">Tất cả tài khoản</MenuItem>
+            {bankAccounts
+              .filter((ba) => ba.kiotVietId != null)
+              .map((ba) => (
+                <MenuItem key={ba.kiotVietId} value={ba.kiotVietId!}>
+                  {ba.bankName ?? ba.shortName ?? `TK #${ba.kiotVietId}`}
                   {ba.accountNumber ? ` — ${ba.accountNumber}` : ''}
                 </MenuItem>
               ))}
-            </TextField>
-          ) : (
-            // TODO: replace with bank account select when API is available
-            <TextField
-              label="ID tài khoản nhận tiền"
-              type="number"
-              value={query.bankAccountId ?? ''}
-              onChange={(e) =>
-                onChange({
-                  ...query,
-                  bankAccountId: e.target.value !== '' ? Number(e.target.value) : undefined,
-                })
-              }
-              size="small"
-              placeholder="Để trống = tất cả"
-              sx={{ minWidth: 200 }}
-            />
-          )}
+          </TextField>
 
           {/* Buttons */}
           <Stack direction="row" spacing={1} sx={{ ml: { sm: 'auto' } }}>

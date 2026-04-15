@@ -26,7 +26,7 @@ export default function PosQrPayment({ amount, orderCode }: Props) {
   const theme = useTheme();
   const [bankAccounts, setBankAccounts] = useState<IKiotVietBankAccount[]>([]);
   const [vietQRBanks, setVietQRBanks] = useState<IVietQRBank[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState<number | ''>('');
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export default function PosQrPayment({ amount, orderCode }: Props) {
         setBankAccounts(accounts);
         setVietQRBanks(banks);
         if (accounts.length > 0) {
-          setSelectedAccountId(accounts[0].id);
+          setSelectedAccountId(accounts[0].id); // Guid string, dùng để chọn TK hiển thị QR
         }
       })
       .catch(console.error)
@@ -94,7 +94,7 @@ export default function PosQrPayment({ amount, orderCode }: Props) {
         label="Tài khoản ngân hàng"
         value={selectedAccountId}
         onChange={(e) => {
-          setSelectedAccountId(Number(e.target.value));
+          setSelectedAccountId(e.target.value);
         }}
         sx={{ mb: 1.5 }}
       >

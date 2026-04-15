@@ -578,7 +578,7 @@ export default function ShiftCashDashboardView() {
 
   const getBankInfoForPayment = (accountId?: number) => {
     if (!accountId) return null;
-    const kiotAccount = kiotBankAccounts.find((a) => a.id === accountId);
+    const kiotAccount = kiotBankAccounts.find((a) => a.kiotVietId === accountId);
     if (!kiotAccount?.bankName) return null;
 
     // Try to match VietQR bank by shortName or code contained in KiotViet bankName

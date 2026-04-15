@@ -1439,7 +1439,10 @@ export interface IVietQRBank {
 // --- KiotViet Bank Account ---
 
 export interface IKiotVietBankAccount {
-  id: number;
+  /** Guid của bản ghi trong DB */
+  id: string;
+  /** KiotViet integer id — dùng làm giá trị filter bankAccountId */
+  kiotVietId?: number;
   bankName?: string;
   shortName?: string;
   code?: string;

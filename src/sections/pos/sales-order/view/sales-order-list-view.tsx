@@ -45,10 +45,6 @@ import { ISalesOrder, IKiotVietBankAccount } from 'src/types/corecms-api';
 import { getAllSalesOrders, exportSalesOrdersExcel } from 'src/api/sales-orders';
 import { getBankAccounts } from 'src/api/bank-accounts';
 
-// Dữ liệu bank account trả về có cả `id` (Guid) và `kiotVietId` (int) — dùng kiotVietId
-// làm giá trị filter để khớp với KiotVietPayment.AccountId trong DB.
-type BankAccountOption = IKiotVietBankAccount & { kiotVietId?: number };
-
 // ----------------------------------------------------------------------
 
 const STATUS_COLOR_MAP: Record<string, 'default' | 'info' | 'success' | 'error' | 'warning'> = {
@@ -105,7 +101,7 @@ export default function SalesOrderListView() {
   const [toDate, setToDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [bankAccountId, setBankAccountId] = useState<number | ''>('');
-  const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<IKiotVietBankAccount[]>([]);
   const [exporting, setExporting] = useState(false);
 
   const buildParams = useCallback(() => ({
@@ -131,7 +127,7 @@ export default function SalesOrderListView() {
   useEffect(() => {
     (async () => {
       try {
-        const accs = (await getBankAccounts()) as BankAccountOption[];
+        const accs = await getBankAccounts();
         setBankAccounts(accs);
       } catch (e) {
         console.error(e);
