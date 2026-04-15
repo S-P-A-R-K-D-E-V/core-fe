@@ -325,6 +325,8 @@ export const endpoints = {
     paymentMethods: '/reports/payment-methods',
     salesOrdersExport: '/reports/sales-orders/export',
     barcodeLookup: (barcode: string) => `/reports/barcode/${barcode}`,
+    tax: '/reports/tax',
+    taxExport: '/reports/tax/export',
   },
 };
 

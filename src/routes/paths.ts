@@ -252,6 +252,7 @@ export const paths = {
         productSales: `${ROOTS.DASHBOARD}/pos/report/product-sales`,
         customers: `${ROOTS.DASHBOARD}/pos/report/customers`,
         inventory: `${ROOTS.DASHBOARD}/pos/report/inventory`,
+        tax: `${ROOTS.DASHBOARD}/pos/report/tax`,
       },
     },
     general: {

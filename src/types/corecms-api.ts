@@ -1994,3 +1994,30 @@ export interface IBarcodeLookup {
   vatRate: number;
   availableStock: number;
 }
+
+// --- Tax Report ---
+
+export type PaymentMethod = 'Cash' | 'Card' | 'Transfer' | 'KiotVietVoucher';
+
+export interface TaxReportQuery {
+  month: number; // 1-12
+  year: number;
+  paymentMethod?: PaymentMethod;
+  bankAccountId?: number;
+}
+
+export interface TaxReportDailyItem {
+  date: string; // ISO "yyyy-MM-dd"
+  totalAmount: number;
+  transactionCount: number;
+}
+
+export interface TaxReportResult {
+  month: number;
+  year: number;
+  paymentMethod: string | null;
+  bankAccountId: number | null;
+  totalAmount: number;
+  totalTransactions: number;
+  days: TaxReportDailyItem[];
+}
