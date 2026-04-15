@@ -13,7 +13,7 @@ export interface ISalesOrdersQueryParams {
   fromDate?: string;
   toDate?: string;
   paymentMethod?: string; // "Cash" | "Transfer" | "Card" | ...
-  bankAccountId?: number;
+  bankAccountId?: string; // Guid của KiotVietBankAccount
 }
 
 export async function getAllSalesOrders(params?: ISalesOrdersQueryParams): Promise<ISalesOrder[]> {

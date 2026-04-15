@@ -108,7 +108,7 @@ export default function TaxReportFilter({
             ))}
           </TextField>
 
-          {/* Tài khoản nhận tiền — value là kiotVietId (int) để khớp với BE filter */}
+          {/* Tài khoản nhận tiền — value là Guid của KiotVietBankAccount */}
           <TextField
             select
             label="Tài khoản nhận tiền"
@@ -116,21 +116,19 @@ export default function TaxReportFilter({
             onChange={(e) =>
               onChange({
                 ...query,
-                bankAccountId: e.target.value !== '' ? Number(e.target.value) : undefined,
+                bankAccountId: e.target.value || undefined,
               })
             }
             size="small"
             sx={{ minWidth: 240 }}
           >
             <MenuItem value="">Tất cả tài khoản</MenuItem>
-            {bankAccounts
-              .filter((ba) => ba.kiotVietId != null)
-              .map((ba) => (
-                <MenuItem key={ba.kiotVietId} value={ba.kiotVietId!}>
-                  {ba.bankName ?? ba.shortName ?? `TK #${ba.kiotVietId}`}
-                  {ba.accountNumber ? ` — ${ba.accountNumber}` : ''}
-                </MenuItem>
-              ))}
+            {bankAccounts.map((ba) => (
+              <MenuItem key={ba.id} value={ba.id}>
+                {ba.bankName ?? ba.shortName ?? `TK #${ba.id}`}
+                {ba.accountNumber ? ` — ${ba.accountNumber}` : ''}
+              </MenuItem>
+            ))}
           </TextField>
 
           {/* Buttons */}

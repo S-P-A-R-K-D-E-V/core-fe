@@ -2006,7 +2006,7 @@ export interface TaxReportQuery {
   month: number; // 1-12
   year: number;
   paymentMethod?: PaymentMethod;
-  bankAccountId?: number;
+  bankAccountId?: string; // Guid của KiotVietBankAccount
 }
 
 export interface TaxReportDailyItem {
@@ -2019,7 +2019,7 @@ export interface TaxReportResult {
   month: number;
   year: number;
   paymentMethod: string | null;
-  bankAccountId: number | null;
+  bankAccountId: string | null; // Guid
   totalAmount: number;
   totalTransactions: number;
   days: TaxReportDailyItem[];

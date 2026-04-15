@@ -100,7 +100,7 @@ export default function SalesOrderListView() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
-  const [bankAccountId, setBankAccountId] = useState<number | ''>('');
+  const [bankAccountId, setBankAccountId] = useState('');
   const [bankAccounts, setBankAccounts] = useState<IKiotVietBankAccount[]>([]);
   const [exporting, setExporting] = useState(false);
 
@@ -109,7 +109,7 @@ export default function SalesOrderListView() {
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
     paymentMethod: paymentMethod || undefined,
-    bankAccountId: bankAccountId === '' ? undefined : bankAccountId,
+    bankAccountId: bankAccountId || undefined,
   }), [filterName, fromDate, toDate, paymentMethod, bankAccountId]);
 
   const fetchData = useCallback(async () => {
@@ -238,21 +238,16 @@ export default function SalesOrderListView() {
             <TextField
               select
               label="Tài khoản nhận"
-              value={bankAccountId === '' ? '' : String(bankAccountId)}
-              onChange={(e) => {
-                table.onResetPage();
-                setBankAccountId(e.target.value === '' ? '' : Number(e.target.value));
-              }}
+              value={bankAccountId}
+              onChange={(e) => { table.onResetPage(); setBankAccountId(e.target.value); }}
               sx={{ minWidth: 240, flex: 1 }}
             >
               <MenuItem value="">Tất cả</MenuItem>
-              {bankAccounts
-                .filter((a) => a.kiotVietId != null)
-                .map((a) => (
-                  <MenuItem key={a.kiotVietId} value={String(a.kiotVietId)}>
-                    {a.bankName} {a.accountNumber ? `- ${a.accountNumber}` : ''}
-                  </MenuItem>
-                ))}
+              {bankAccounts.map((a) => (
+                <MenuItem key={a.id} value={a.id}>
+                  {a.bankName ?? a.shortName} {a.accountNumber ? `- ${a.accountNumber}` : ''}
+                </MenuItem>
+              ))}
             </TextField>
           </Stack>
         </Stack>
