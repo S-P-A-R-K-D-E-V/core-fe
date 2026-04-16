@@ -9,6 +9,7 @@ import Alert from '@mui/material/Alert';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
+import CircularProgress from '@mui/material/CircularProgress';
 import LoadingButton from '@mui/lab/LoadingButton';
 
 import { paths } from 'src/routes/paths';
@@ -153,7 +154,7 @@ export default function KiotVietSyncView() {
             ? 'info'
             : 'warning';
 
-    const completedSteps = job.steps?.filter((s) => s.error === null).length || 0;
+    const completedSteps = job.steps?.filter((s) => !s.isRunning && s.error === null).length || 0;
     const totalSteps = job.steps?.length || 0;
     const progress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
 
@@ -161,10 +162,10 @@ export default function KiotVietSyncView() {
       <Box sx={{ mt: 2 }}>
         <Alert severity={statusColor} sx={{ mb: 1 }}>
           <strong>{label}:</strong> {job.status}
-          {job.status === 'Running' && totalSteps > 0 && ` (${completedSteps}/${totalSteps})`}
+          {job.status === 'Running' && totalSteps > 0 && ` (${completedSteps}/${totalSteps} bước)`}
         </Alert>
 
-        {job.status === 'Running' && <LinearProgress variant="determinate" value={progress} />}
+        {job.status === 'Running' && <LinearProgress variant="determinate" value={progress} sx={{ mb: 1 }} />}
 
         {job.steps && job.steps.length > 0 && (
           <Box sx={{ mt: 1, maxHeight: 300, overflow: 'auto' }}>
@@ -176,15 +177,25 @@ export default function KiotVietSyncView() {
                 spacing={1}
                 sx={{ py: 0.5, px: 1, fontSize: 13 }}
               >
-                <Iconify
-                  icon={step.error === null ? 'eva:checkmark-circle-2-fill' : 'eva:close-circle-fill'}
-                  sx={{ color: step.error === null ? 'success.main' : 'error.main', width: 18 }}
-                />
+                {step.isRunning ? (
+                  <CircularProgress size={16} color="info" />
+                ) : (
+                  <Iconify
+                    icon={step.error === null ? 'eva:checkmark-circle-2-fill' : 'eva:close-circle-fill'}
+                    sx={{ color: step.error === null ? 'success.main' : 'error.main', width: 18 }}
+                  />
+                )}
                 <Typography variant="body2" sx={{ flexGrow: 1 }}>
                   {step.entity}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  +{step.created} / ~{step.updated}
+                  {step.isRunning
+                    ? step.totalKnown > 0
+                      ? `${step.totalKnown} bản ghi...`
+                      : '...'
+                    : step.error
+                      ? step.error
+                      : `+${step.created} ~${step.updated}${step.totalKnown > 0 ? ` / ${step.totalKnown}` : ''}`}
                 </Typography>
               </Stack>
             ))}
