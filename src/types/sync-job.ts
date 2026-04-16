@@ -18,6 +18,8 @@ export interface ISyncJobStep {
   created: number;
   updated: number;
   total: number;
+  totalKnown: number;
+  isRunning: boolean;
   error: string | null;
 }
 
