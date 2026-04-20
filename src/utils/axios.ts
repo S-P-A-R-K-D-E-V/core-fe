@@ -328,5 +328,13 @@ export const endpoints = {
     tax: '/reports/tax',
     taxExport: '/reports/tax/export',
   },
+  chatbot: {
+    startSession: '/chatbot/sessions',
+    messages: (sessionId: string) => `/chatbot/sessions/${sessionId}/messages`,
+    sendMessage: '/chatbot/messages',
+    stockContext: '/chatbot/context/stock',
+    customerContext: '/chatbot/context/customer',
+    callbackOrder: '/chatbot/callback-order',
+  },
 };
 

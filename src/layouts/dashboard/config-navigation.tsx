@@ -107,6 +107,14 @@ export function useNavData() {
       {
         subheader: t('management'),
         items: [
+          // CHATBOT ADMIN (internal)
+          {
+            title: 'Chatbot nội bộ',
+            path: paths.dashboard.chatbotAdmin,
+            icon: ICONS.chat,
+            roles: ['Admin'],
+          },
+
           // USER
           {
             title: t('user'),
