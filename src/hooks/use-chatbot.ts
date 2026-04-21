@@ -132,6 +132,19 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
       setError(ev.error);
     });
 
+    // Re-join the session group whenever SignalR reconnects.
+    // withAutomaticReconnect() reconnects the transport but does NOT
+    // re-invoke hub methods — without this, all chunks after a drop are lost.
+    connection.onreconnected(async () => {
+      try {
+        await connection.invoke('JoinSession', session.sessionId);
+        joinedSessionRef.current = session.sessionId;
+        console.info('[Chatbot] SignalR reconnected, re-joined session', session.sessionId);
+      } catch (err) {
+        console.error('[Chatbot] Re-join session failed after reconnect', err);
+      }
+    });
+
     connection
       .start()
       .then(() => {
@@ -168,7 +181,9 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
           content,
           phone: phone ?? opts?.phone ?? null,
         });
+
         if (res.fromCache && res.cachedAnswer) {
+          // Cache hit — answer is already complete, no streaming needed.
           setTyping(false);
           setMessages((prev) => [
             ...prev,
@@ -178,6 +193,19 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
               content: res.cachedAnswer ?? '',
               createdAt: new Date().toISOString(),
               fromCache: true,
+            },
+          ]);
+        } else {
+          // Not cached — add an empty placeholder so that incoming SignalR
+          // `chunk` events append to the correct message by ID instead of
+          // creating a duplicate entry when the first chunk arrives.
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: res.assistantMessageId,
+              role: 'assistant',
+              content: '',
+              createdAt: new Date().toISOString(),
             },
           ]);
         }
