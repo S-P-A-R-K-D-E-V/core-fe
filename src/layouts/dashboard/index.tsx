@@ -5,6 +5,7 @@ import { useResponsive } from 'src/hooks/use-responsive';
 import { SyncNotificationProvider } from 'src/hooks/use-sync-notification';
 
 import { useSettingsContext } from 'src/components/settings';
+import { ChatbotWidget } from 'src/components/chatbot';
 
 import Main from './main';
 import Header from './header';
@@ -43,6 +44,7 @@ export default function DashboardLayout({ children }: Props) {
         {lgUp ? renderHorizontal : renderNavVertical}
 
         <Main>{children}</Main>
+        <ChatbotWidget />
       </SyncNotificationProvider>
     );
   }
@@ -63,6 +65,7 @@ export default function DashboardLayout({ children }: Props) {
 
           <Main>{children}</Main>
         </Box>
+        <ChatbotWidget />
       </SyncNotificationProvider>
     );
   }
@@ -82,6 +85,7 @@ export default function DashboardLayout({ children }: Props) {
 
         <Main>{children}</Main>
       </Box>
+      <ChatbotWidget />
     </SyncNotificationProvider>
   );
 }
