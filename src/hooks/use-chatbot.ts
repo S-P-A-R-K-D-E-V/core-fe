@@ -82,6 +82,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
       .build();
 
     connection.on('chunk', (ev: ChunkEvent) => {
+      console.debug('[Chatbot] chunk', { msgId: ev.messageId, len: ev.content.length });
       if (ev.sessionId !== session.sessionId) return;
       setTyping(true);
       setMessages((prev) => {
@@ -104,6 +105,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
     });
 
     connection.on('completed', (ev: CompletedEvent) => {
+      console.info('[Chatbot] completed', { msgId: ev.messageId, len: ev.content.length, fromCache: ev.fromCache });
       if (ev.sessionId !== session.sessionId) return;
       setTyping(false);
       setMessages((prev) => {
@@ -127,6 +129,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
     });
 
     connection.on('error', (ev: ErrorEvent) => {
+      console.warn('[Chatbot] error event', ev);
       if (ev.sessionId !== session.sessionId) return;
       setTyping(false);
       setError(ev.error);
@@ -150,10 +153,14 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
       .then(() => {
         connRef.current = connection;
         joinedSessionRef.current = session.sessionId;
+        console.info('[Chatbot] SignalR connected, joining session', session.sessionId);
         return connection.invoke('JoinSession', session.sessionId);
       })
+      .then(() => {
+        console.info('[Chatbot] joined session group', session.sessionId);
+      })
       .catch((err) => {
-        console.error('Chatbot SignalR connect failed', err);
+        console.error('[Chatbot] SignalR connect failed', err);
       });
 
     return () => {
@@ -175,12 +182,14 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
       setMessages((prev) => [...prev, optimistic]);
       setTyping(true);
       setError(null);
+      console.info('[Chatbot] sending message', { session: session.sessionId, len: content.length });
       try {
         const res = await sendChatbotMessage({
           sessionId: session.sessionId,
           content,
           phone: phone ?? opts?.phone ?? null,
         });
+        console.info('[Chatbot] sendMessage ACK', res);
 
         if (res.fromCache && res.cachedAnswer) {
           // Cache hit — answer is already complete, no streaming needed.
