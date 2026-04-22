@@ -889,6 +889,8 @@ export interface IAuditLogEntry {
   oldData?: string;
   newData?: string;
   delta: IAuditDeltaField[];
+  totalCashBefore?: number;
+  totalCashAfter?: number;
 }
 
 export interface IAddShiftCashTransactionRequest {
