@@ -866,9 +866,29 @@ export interface IShiftCashSummary {
 
 export interface IShiftCashFinalization {
   id: string;
+  openingBalance: number;
   closingBalance: number;
   finalizedAt?: string;
   finalizedByName?: string;
+}
+
+export interface IAuditDeltaField {
+  field: string;
+  oldValue?: string;
+  newValue?: string;
+}
+
+export interface IAuditLogEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  actionType: string;
+  entityType: string;
+  date: string;
+  timestamp: string;
+  oldData?: string;
+  newData?: string;
+  delta: IAuditDeltaField[];
 }
 
 export interface IAddShiftCashTransactionRequest {

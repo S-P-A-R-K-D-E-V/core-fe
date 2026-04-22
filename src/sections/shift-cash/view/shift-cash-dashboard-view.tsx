@@ -57,6 +57,7 @@ import {
   IShiftCashTransaction,
   IShiftCashDenomination,
   IShiftCashLog,
+  IAuditLogEntry,
   IKiotVietDailySummary,
   IKiotVietInvoice,
   IKiotVietReturn,
@@ -73,6 +74,7 @@ import {
   finalizeShiftCash,
   openCounter,
   getShiftCashLogs,
+  getShiftCashAuditLogs,
   getKiotVietDailySummary,
   getKiotVietInvoiceDetail,
   getKiotVietBankAccounts,
@@ -228,6 +230,8 @@ export default function ShiftCashDashboardView() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<IShiftCashSummary | null>(null);
   const [logs, setLogs] = useState<IShiftCashLog[]>([]);
+  const [auditLogs, setAuditLogs] = useState<IAuditLogEntry[]>([]);
+  const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
   const [kiotData, setKiotData] = useState<IKiotVietDailySummary | null>(null);
   const [kiotLoading, setKiotLoading] = useState(false);
   const [kiotTab, setKiotTab] = useState(0); // 0=Cash, 1=Bank, 2=Card, 3=Returns
@@ -287,12 +291,14 @@ export default function ShiftCashDashboardView() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryData, logsData] = await Promise.all([
+      const [summaryData, logsData, auditLogsData] = await Promise.all([
         getShiftCashSummary(currentDate),
         getShiftCashLogs(currentDate),
+        getShiftCashAuditLogs(currentDate),
       ]);
       setSummary(summaryData);
       setLogs(logsData);
+      setAuditLogs(auditLogsData);
 
       // Init denomination quantities
       const denomMap: Record<number, number> = {};
@@ -947,52 +953,66 @@ export default function ShiftCashDashboardView() {
                   </Box>
 
                   {summary?.finalizations && summary.finalizations.length > 0 && (
-                    <Stack spacing={1} style={{ maxHeight: 159, overflowY: "auto"}}>
+                    <Stack spacing={1} style={{ maxHeight: 220, overflowY: 'auto' }}>
                       <Typography variant="caption" color="text.secondary" fontWeight={600}>
                         Lịch sử chốt ({summary.finalizations.length} lần)
                       </Typography>
-                      {summary.finalizations.map((f, idx) => (
-                        <Box
-                          key={f.id}
-                          sx={{
-                            p: 1.5,
-                            borderRadius: 1,
-                            bgcolor: alpha(theme.palette.success.main, idx === 0 ? 0.08 : 0.04),
-                            border: `1px solid ${alpha(theme.palette.success.main, idx === 0 ? 0.24 : 0.12)}`,
-                          }}
-                        >
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Iconify
-                              icon="solar:check-circle-bold"
-                              width={18}
-                              sx={{ color: idx === 0 ? 'success.main' : 'text.disabled' }}
-                            />
-                            <Typography
-                              variant="caption"
-                              color={idx === 0 ? 'success.main' : 'text.secondary'}
-                            >
-                              {idx === 0 ? 'Lần chốt cuối: ' : ''}
-                              {f.finalizedAt
-                                ? new Date(f.finalizedAt).toLocaleString('vi-VN', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                  })
-                                : ''}
-                              {f.finalizedByName && ` bởi ${f.finalizedByName}`}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              color={idx === 0 ? 'primary.main' : 'text.disabled'}
-                              fontWeight={idx === 0 ? 700 : 400}
-                              sx={{ ml: 'auto !important' }}
-                            >
-                              {formatCurrency(f.closingBalance)}
-                            </Typography>
-                          </Stack>
-                        </Box>
-                      ))}
+                      {summary.finalizations.map((f, idx) => {
+                        const diff = f.closingBalance - f.openingBalance;
+                        const isFirst = idx === 0;
+                        return (
+                          <Box
+                            key={f.id}
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 1,
+                              bgcolor: alpha(theme.palette.success.main, isFirst ? 0.08 : 0.04),
+                              border: `1px solid ${alpha(theme.palette.success.main, isFirst ? 0.24 : 0.12)}`,
+                            }}
+                          >
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75 }}>
+                              <Iconify
+                                icon="solar:check-circle-bold"
+                                width={18}
+                                sx={{ color: isFirst ? 'success.main' : 'text.disabled' }}
+                              />
+                              <Typography variant="caption" color={isFirst ? 'success.main' : 'text.secondary'}>
+                                {isFirst ? 'Lần chốt cuối: ' : ''}
+                                {f.finalizedAt
+                                  ? new Date(f.finalizedAt).toLocaleString('vi-VN', {
+                                      hour: '2-digit', minute: '2-digit',
+                                      day: '2-digit', month: '2-digit',
+                                    })
+                                  : ''}
+                                {f.finalizedByName && ` bởi ${f.finalizedByName}`}
+                              </Typography>
+                            </Stack>
+                            <Stack direction="row" spacing={1} sx={{ pl: 3.5 }}>
+                              <Stack flex={1} alignItems="center">
+                                <Typography variant="caption" color="text.disabled">Trước chốt</Typography>
+                                <Typography variant="caption" fontWeight={500}>{formatCurrency(f.openingBalance)}</Typography>
+                              </Stack>
+                              <Iconify icon="solar:arrow-right-bold" width={14} sx={{ color: 'text.disabled', mt: 1.5 }} />
+                              <Stack flex={1} alignItems="center">
+                                <Typography variant="caption" color="text.disabled">Sau chốt</Typography>
+                                <Typography variant="caption" fontWeight={700} color={isFirst ? 'primary.main' : 'text.secondary'}>
+                                  {formatCurrency(f.closingBalance)}
+                                </Typography>
+                              </Stack>
+                              <Stack flex={1} alignItems="center">
+                                <Typography variant="caption" color="text.disabled">Chênh lệch</Typography>
+                                <Typography
+                                  variant="caption"
+                                  fontWeight={600}
+                                  color={diff >= 0 ? 'success.main' : 'error.main'}
+                                >
+                                  {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+                                </Typography>
+                              </Stack>
+                            </Stack>
+                          </Box>
+                        );
+                      })}
                     </Stack>
                   )}
                 </Stack>
@@ -1030,8 +1050,8 @@ export default function ShiftCashDashboardView() {
                     <Stack direction="row" spacing={0.5} alignItems="center">
                       <Iconify icon="solar:document-text-bold-duotone" width={20} />
                       <span>Nhật ký chỉnh sửa</span>
-                      {logs.length > 0 && (
-                        <Chip label={logs.length} size="small" variant="outlined" />
+                      {auditLogs.length > 0 && (
+                        <Chip label={auditLogs.length} size="small" variant="outlined" />
                       )}
                     </Stack>
                   }
@@ -1468,83 +1488,165 @@ export default function ShiftCashDashboardView() {
                   </>
                 )}
 
-                {/* Tab 2: Nhật ký chỉnh sửa */}
+                {/* Tab 2: Nhật ký chỉnh sửa (MongoDB audit logs) */}
                 {tab === 2 && (
                   <Scrollbar>
                     <TableContainer>
-                      <Table size="small" sx={{ minWidth: 700 }}>
+                      <Table size="small" sx={{ minWidth: 720 }}>
                         <TableHead>
                           <TableRow>
-                            <TableCell>Vị trí</TableCell>
-                            <TableCell>Loại</TableCell>
-                            <TableCell>Thời gian</TableCell>
-                            <TableCell align="right">OLD</TableCell>
-                            <TableCell align="right">NEW</TableCell>
-                            <TableCell>Người thực hiện</TableCell>
+                            <TableCell sx={{ width: 32 }} />
+                            <TableCell>Ai</TableCell>
+                            <TableCell>Lúc nào</TableCell>
+                            <TableCell>Thao tác</TableCell>
+                            <TableCell>Chi tiết thay đổi</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {logs.length === 0 && (
+                          {auditLogs.length === 0 && (
                             <TableRow>
-                              <TableCell colSpan={6} align="center">
+                              <TableCell colSpan={5} align="center">
                                 <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
                                   Chưa có nhật ký
                                 </Typography>
                               </TableCell>
                             </TableRow>
                           )}
-                          {logs.map((log) => (
-                            <TableRow key={log.id} hover>
-                              <TableCell>
-                                <Chip
-                                  label={log.fieldName || '—'}
-                                  size="small"
-                                  color={
-                                    log.actionType === 'FinalizeShift'
-                                      ? 'success'
-                                      : log.actionType === 'OpenCounter'
-                                        ? 'primary'
-                                        : log.actionType.includes('Denomination')
-                                          ? 'info'
-                                          : 'warning'
+                          {auditLogs.map((entry) => {
+                            const isExpanded = expandedAuditId === entry.id;
+                            const actionMeta: Record<string, { label: string; color: 'success' | 'warning' | 'error' | 'info' | 'primary' | 'default' }> = {
+                              CREATE:              { label: 'Thêm thu/chi',     color: 'success' },
+                              UPDATE:              { label: 'Sửa thu/chi',      color: 'warning' },
+                              DELETE:              { label: 'Xóa thu/chi',      color: 'error'   },
+                              FINALIZE_SHIFT:      { label: 'Chốt tiền ca',     color: 'primary' },
+                              UPDATE_DENOMINATION: { label: 'Cập nhật mệnh giá', color: 'info'  },
+                              OPEN_COUNTER:        { label: 'Mở quầy',          color: 'default' },
+                            };
+                            const meta = actionMeta[entry.actionType] ?? { label: entry.actionType, color: 'default' as const };
+                            const timeVn = new Date(entry.timestamp).toLocaleString('vi-VN', {
+                              hour: '2-digit', minute: '2-digit', second: '2-digit',
+                              day: '2-digit', month: '2-digit',
+                            });
+                            const firstDelta = entry.delta[0];
+
+                            return (
+                              <>
+                                <TableRow
+                                  key={entry.id}
+                                  hover
+                                  sx={{ cursor: entry.delta.length > 0 ? 'pointer' : 'default' }}
+                                  onClick={() =>
+                                    entry.delta.length > 0
+                                      ? setExpandedAuditId(isExpanded ? null : entry.id)
+                                      : undefined
                                   }
-                                  variant="outlined"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant="caption">
-                                  {log.actionType === 'UpdateDenomination' && 'Kiểm tra tiền mặt'}
-                                  {log.actionType === 'AddTransaction' && 'Chi tiêu quầy - ghi chú'}
-                                  {log.actionType === 'UpdateTransaction' && 'Sửa thu chi'}
-                                  {log.actionType === 'DeleteTransaction' && 'Xoá thu chi'}
-                                  {log.actionType === 'FinalizeShift' && 'Chốt tiền ca'}
-                                  {log.actionType === 'OpenCounter' && 'Mở quầy'}
-                                </Typography>
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant="caption">
-                                  {new Date(log.timestamp).toLocaleTimeString('vi-VN', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    second: '2-digit',
-                                  })}
-                                </Typography>
-                              </TableCell>
-                              <TableCell align="right">
-                                <Typography variant="body2" color="text.secondary">
-                                  {log.oldValue || ''}
-                                </Typography>
-                              </TableCell>
-                              <TableCell align="right">
-                                <Typography variant="body2" fontWeight={600}>
-                                  {log.newValue || ''}
-                                </Typography>
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant="caption">{log.userName}</Typography>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                                >
+                                  <TableCell sx={{ pr: 0 }}>
+                                    {entry.delta.length > 0 && (
+                                      <IconButton size="small">
+                                        <Iconify
+                                          icon={isExpanded ? 'solar:alt-arrow-up-bold' : 'solar:alt-arrow-down-bold'}
+                                          width={16}
+                                        />
+                                      </IconButton>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="body2" fontWeight={600}>
+                                      {entry.userName}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {timeVn}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Chip
+                                      label={meta.label}
+                                      size="small"
+                                      color={meta.color}
+                                      variant="soft"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    {firstDelta ? (
+                                      <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap">
+                                        <Typography variant="caption" color="text.secondary">
+                                          {firstDelta.field}:
+                                        </Typography>
+                                        {firstDelta.oldValue && (
+                                          <>
+                                            <Typography variant="caption" color="error.main" sx={{ textDecoration: 'line-through' }}>
+                                              {firstDelta.oldValue}
+                                            </Typography>
+                                            <Iconify icon="solar:arrow-right-bold" width={12} sx={{ color: 'text.disabled' }} />
+                                          </>
+                                        )}
+                                        <Typography variant="caption" color="success.main" fontWeight={600}>
+                                          {firstDelta.newValue ?? '—'}
+                                        </Typography>
+                                        {entry.delta.length > 1 && (
+                                          <Typography variant="caption" color="text.disabled">
+                                            +{entry.delta.length - 1} nữa
+                                          </Typography>
+                                        )}
+                                      </Stack>
+                                    ) : (
+                                      <Typography variant="caption" color="text.disabled">—</Typography>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+
+                                {/* Expanded delta detail */}
+                                {isExpanded && (
+                                  <TableRow key={`${entry.id}-detail`}>
+                                    <TableCell colSpan={5} sx={{ py: 0, bgcolor: 'background.neutral' }}>
+                                      <Collapse in={isExpanded}>
+                                        <Box sx={{ py: 1.5, px: 2 }}>
+                                          <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mb: 1, display: 'block' }}>
+                                            Chi tiết thay đổi ({entry.delta.length} trường)
+                                          </Typography>
+                                          <Table size="small">
+                                            <TableHead>
+                                              <TableRow>
+                                                <TableCell sx={{ py: 0.5 }}>Trường</TableCell>
+                                                <TableCell sx={{ py: 0.5 }} align="right">Cũ</TableCell>
+                                                <TableCell sx={{ py: 0.5, width: 24 }} />
+                                                <TableCell sx={{ py: 0.5 }} align="right">Mới</TableCell>
+                                              </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                              {entry.delta.map((d, idx) => (
+                                                <TableRow key={idx}>
+                                                  <TableCell sx={{ py: 0.5 }}>
+                                                    <Typography variant="caption">{d.field}</Typography>
+                                                  </TableCell>
+                                                  <TableCell align="right" sx={{ py: 0.5 }}>
+                                                    <Typography variant="caption" color="error.main" sx={{ textDecoration: d.oldValue ? 'line-through' : 'none' }}>
+                                                      {d.oldValue ?? '—'}
+                                                    </Typography>
+                                                  </TableCell>
+                                                  <TableCell sx={{ py: 0.5 }}>
+                                                    <Iconify icon="solar:arrow-right-bold" width={12} sx={{ color: 'text.disabled' }} />
+                                                  </TableCell>
+                                                  <TableCell align="right" sx={{ py: 0.5 }}>
+                                                    <Typography variant="caption" color="success.main" fontWeight={600}>
+                                                      {d.newValue ?? '—'}
+                                                    </Typography>
+                                                  </TableCell>
+                                                </TableRow>
+                                              ))}
+                                            </TableBody>
+                                          </Table>
+                                        </Box>
+                                      </Collapse>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </TableContainer>

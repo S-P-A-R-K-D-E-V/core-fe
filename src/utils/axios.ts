@@ -192,6 +192,7 @@ export const endpoints = {
     finalize: '/shift-cash/finalize',
     open: '/shift-cash/open',
     logs: '/shift-cash/logs',
+    auditLogs: '/shift-cash/audit-logs',
   },
   kiotViet: {
     dailySummary: '/kiotviet/daily-summary',

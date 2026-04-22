@@ -4,6 +4,7 @@ import {
   IShiftCashTransaction,
   IShiftCashDenomination,
   IShiftCashLog,
+  IAuditLogEntry,
   IAddShiftCashTransactionRequest,
   IUpdateShiftCashTransactionRequest,
   IUpdateDenominationRequest,
@@ -85,6 +86,14 @@ export async function openCounter(date: string): Promise<void> {
 
 export async function getShiftCashLogs(date: string): Promise<IShiftCashLog[]> {
   const res = await axios.get(endpoints.shiftCash.logs, { params: { date } });
+  return res.data;
+}
+
+export async function getShiftCashAuditLogs(
+  date: string,
+  limit = 200
+): Promise<IAuditLogEntry[]> {
+  const res = await axios.get(endpoints.shiftCash.auditLogs, { params: { date, limit } });
   return res.data;
 }
 
