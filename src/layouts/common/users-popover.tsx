@@ -28,7 +28,7 @@ export default function UsersPopover() {
   const { user: me } = useAuthContext();
   const { users, loading, onlineCount } = usePresence();
 
-  const { openQuickChat } = useMessengerStore();
+  const openQuickChat = useMessengerStore((s) => s.openQuickChat);
 
   const handleClickUser = async (userId: string) => {
     popover.onClose();

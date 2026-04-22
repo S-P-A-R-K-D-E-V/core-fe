@@ -7,16 +7,12 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Paper from '@mui/material/Paper';
 import Avatar from '@mui/material/Avatar';
-import Divider from '@mui/material/Divider';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 
 import Iconify from 'src/components/iconify';
 
-import { useMessengerStore, selectMessages, selectTyping } from 'src/store/messenger-store';
-import { sendMessage as apiSendMessage } from 'src/api/messenger';
-import { useMessengerCtx } from './messenger-provider';
+import { useMessengerStore } from 'src/store/messenger-store';
 
 import QuickChatWindow from './quick-chat-window';
 
@@ -25,8 +21,11 @@ import QuickChatWindow from './quick-chat-window';
 type Props = { currentUserId: string | null };
 
 export default function QuickChatLayer({ currentUserId }: Props) {
-  const { openQuickChats, notifQueue, openQuickChat, closeQuickChat, dismissNotif } =
-    useMessengerStore();
+  const openQuickChats = useMessengerStore((s) => s.openQuickChats);
+  const notifQueue = useMessengerStore((s) => s.notifQueue);
+  const openQuickChat = useMessengerStore((s) => s.openQuickChat);
+  const closeQuickChat = useMessengerStore((s) => s.closeQuickChat);
+  const dismissNotif = useMessengerStore((s) => s.dismissNotif);
 
   // Auto-dismiss notifications after 5 s
   useEffect(() => {
