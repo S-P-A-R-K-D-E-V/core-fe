@@ -1,6 +1,7 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -40,6 +41,16 @@ export default function MessengerView() {
   const [draft, setDraft] = useState('');
   const [newOpen, setNewOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const searchParams = useSearchParams();
+
+  // Auto-open conversation when coming from UsersPopover (?conv=...)
+  useEffect(() => {
+    const convId = searchParams.get('conv');
+    if (convId && !activeId) {
+      openConversation(convId).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     if (scrollRef.current) {

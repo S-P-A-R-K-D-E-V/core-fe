@@ -345,6 +345,7 @@ export const endpoints = {
       `/messenger/conversations/${conversationId}/members/${memberId}`,
     messages: (conversationId: string) => `/messenger/conversations/${conversationId}/messages`,
     markRead: (conversationId: string) => `/messenger/conversations/${conversationId}/read`,
+    users: '/messenger/users',
   },
 };
 
