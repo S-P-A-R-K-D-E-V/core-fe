@@ -61,8 +61,12 @@ export default function MessengerView() {
   const [newOpen, setNewOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  const messages = useMessengerStore((s) => activeId ? s.messagesByConv[activeId] ?? [] : []);
-  const typingUsers = useMessengerStore((s) => activeId ? s.typingByConv[activeId] ?? [] : []);
+  // Selectors must return stable store references — never create new arrays inside them.
+  // The ?? [] fallback is applied in render body to avoid useSyncExternalStore tearing loops.
+  const messagesByConv = useMessengerStore((s) => s.messagesByConv);
+  const typingByConv = useMessengerStore((s) => s.typingByConv);
+  const messages = (activeId && messagesByConv[activeId]) || [];
+  const typingUsers = (activeId && typingByConv[activeId]) || [];
 
   // Auto-scroll on new messages
   useEffect(() => {

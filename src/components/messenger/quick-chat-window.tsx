@@ -37,8 +37,10 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const { openConversation, sendTyping } = useMessengerCtx();
-  const messages = useMessengerStore((s) => s.messagesByConv[convId] ?? []);
-  const typing = useMessengerStore((s) => s.typingByConv[convId] ?? []);
+  // ?? [] must NOT be inside the selector — it creates a new array on every call,
+  // making useSyncExternalStore see perpetual tearing → infinite re-render loop.
+  const messages = useMessengerStore((s) => s.messagesByConv[convId]) ?? [];
+  const typing = useMessengerStore((s) => s.typingByConv[convId]) ?? [];
   const conversations = useMessengerStore((s) => s.conversations);
   const userCache = useMessengerStore((s) => s.userCache);
   const conv = conversations.find((c) => c.id === convId);
