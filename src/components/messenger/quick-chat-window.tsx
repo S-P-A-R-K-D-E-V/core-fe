@@ -62,6 +62,11 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
 
   useEffect(() => {
     openConversation(convId).catch(() => {});
+    // Request browser notification permission when user opens a chat window.
+    // Must happen inside a useEffect (client-only) and is triggered by user action.
+    if (typeof window !== 'undefined' && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convId]);
 
@@ -210,7 +215,14 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
                 setDraft(e.target.value);
                 sendTyping(convId);
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend(e as any);
+                }
+              }}
               autoComplete="off"
+              autoFocus
               variant="standard"
               InputProps={{ disableUnderline: true }}
               sx={{ px: 1 }}
