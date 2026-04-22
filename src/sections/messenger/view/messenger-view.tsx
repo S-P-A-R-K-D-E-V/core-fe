@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -10,23 +10,35 @@ import Badge from '@mui/material/Badge';
 import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
 import Divider from '@mui/material/Divider';
+import Tooltip from '@mui/material/Tooltip';
 import TextField from '@mui/material/TextField';
 import Container from '@mui/material/Container';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import ListItemText from '@mui/material/ListItemText';
 import ListItemButton from '@mui/material/ListItemButton';
-import CircularProgress from '@mui/material/CircularProgress';
 
-import { fDateTime } from 'src/utils/format-time';
+import { fTimeShort } from 'src/utils/format-time';
 
 import { useAuthContext } from 'src/auth/hooks';
-import { useMessenger } from 'src/hooks/use-messenger';
 import { useSettingsContext } from 'src/components/settings';
-
 import Iconify from 'src/components/iconify';
+import Scrollbar from 'src/components/scrollbar';
+
+import { sendMessage as apiSendMessage } from 'src/api/messenger';
+import { useMessengerStore } from 'src/store/messenger-store';
+import { useMessengerCtx } from 'src/components/messenger/messenger-provider';
+import MessageBubble from 'src/components/messenger/message-bubble';
 
 import NewConversationDialog from '../new-conversation-dialog';
+
+// ----------------------------------------------------------------------
+
+const AVATAR_COLORS = ['#1976d2','#388e3c','#f57c00','#7b1fa2','#c2185b','#0097a7','#5d4037','#455a64'];
+function colorFor(id: string) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xffffffff;
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
 
 // ----------------------------------------------------------------------
 
@@ -34,41 +46,88 @@ export default function MessengerView() {
   const settings = useSettingsContext();
   const { user } = useAuthContext();
   const currentUserId: string | null = user?.id ?? null;
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
-  const { conversations, activeId, messages, loading, openConversation, send, reloadConversations } =
-    useMessenger(currentUserId);
+  const { openConversation, sendTyping } = useMessengerCtx();
 
+  const conversations = useMessengerStore((s) => s.conversations);
+  const userCache = useMessengerStore((s) => s.userCache);
+  const onlineIds = useMessengerStore((s) => s.onlineIds);
+
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const searchParams = useSearchParams();
 
-  // Auto-open conversation when coming from UsersPopover (?conv=...)
+  const messages = useMessengerStore((s) => activeId ? s.messagesByConv[activeId] ?? [] : []);
+  const typingUsers = useMessengerStore((s) => activeId ? s.typingByConv[activeId] ?? [] : []);
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages.length, activeId]);
+
+  // Open conv from ?conv= query param (from UsersPopover)
   useEffect(() => {
     const convId = searchParams.get('conv');
-    if (convId && !activeId) {
-      openConversation(convId).catch(() => {});
+    if (convId && convId !== activeId) {
+      handleSelectConv(convId);
+      router.replace('/dashboard/messenger', { scroll: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages.length, activeId]);
+  const handleSelectConv = useCallback(async (convId: string) => {
+    setActiveId(convId);
+    openConversation(convId).catch(() => {});
+  }, [openConversation]);
 
-  const active = conversations.find((c) => c.id === activeId) ?? null;
+  const activeConv = conversations.find((c) => c.id === activeId);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const convTitle = (convId: string) => {
+    const c = conversations.find((x) => x.id === convId);
+    if (!c) return '';
+    if (c.type === 'Group') return c.name ?? `Nhóm ${c.participantIds.length} thành viên`;
+    const otherId = c.participantIds.find((id) => id !== currentUserId);
+    return otherId ? userCache[otherId]?.fullName ?? otherId : 'Chat';
+  };
+
+  const convAvatar = (convId: string) => {
+    const c = conversations.find((x) => x.id === convId);
+    if (!c) return null;
+    if (c.type === 'Group') return null;
+    const otherId = c.participantIds.find((id) => id !== currentUserId);
+    return otherId ? userCache[otherId]?.avatarUrl ?? null : null;
+  };
+
+  const convInitial = (convId: string) => convTitle(convId).charAt(0).toUpperCase();
+
+  const convOnline = (convId: string) => {
+    const c = conversations.find((x) => x.id === convId);
+    if (!c || c.type === 'Group') return false;
+    const otherId = c.participantIds.find((id) => id !== currentUserId);
+    return otherId ? onlineIds.includes(otherId) : false;
+  };
+
+  const typingLabel = typingUsers
+    .filter((id) => id !== currentUserId)
+    .map((id) => userCache[id]?.fullName?.split(' ').at(-1) ?? '...')
+    .join(', ');
+
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!activeId || !draft.trim() || sending) return;
     const text = draft.trim();
-    if (!text) return;
     setDraft('');
+    setSending(true);
     try {
-      await send(text);
+      await apiSendMessage(activeId, text);
     } catch {
       setDraft(text);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -85,35 +144,63 @@ export default function MessengerView() {
         </Button>
       </Stack>
 
-      <Paper variant="outlined" sx={{ height: '70vh', display: 'flex', overflow: 'hidden' }}>
+      <Paper variant="outlined" sx={{ height: 'calc(100vh - 200px)', display: 'flex', overflow: 'hidden', minHeight: 500 }}>
         {/* LEFT — conversation list */}
-        <Box sx={{ width: 320, borderRight: 1, borderColor: 'divider', overflowY: 'auto' }}>
+        <Box sx={{ width: { xs: 72, sm: 280 }, borderRight: 1, borderColor: 'divider', overflowY: 'auto', flexShrink: 0 }}>
           {conversations.length === 0 && (
-            <Box sx={{ p: 3, color: 'text.secondary' }}>
+            <Box sx={{ p: 2, color: 'text.secondary', display: { xs: 'none', sm: 'block' } }}>
               <Typography variant="body2">Chưa có cuộc hội thoại nào.</Typography>
             </Box>
           )}
           {conversations.map((c) => {
-            const title =
-              c.type === 'Group'
-                ? c.name ?? `Nhóm ${c.participantIds.length} thành viên`
-                : c.participantIds.find((id) => id !== currentUserId) ?? 'Hội thoại';
+            const title = convTitle(c.id);
+            const online = convOnline(c.id);
             return (
               <ListItemButton
                 key={c.id}
                 selected={c.id === activeId}
-                onClick={() => openConversation(c.id)}
-                sx={{ py: 1.5 }}
+                onClick={() => handleSelectConv(c.id)}
+                sx={{ py: 1.5, px: { xs: 1, sm: 1.5 } }}
               >
-                <Badge color="error" badgeContent={c.unreadCount} sx={{ mr: 2 }}>
-                  <Avatar>{c.type === 'Group' ? 'G' : (title[0] ?? '?').toUpperCase()}</Avatar>
+                <Badge
+                  overlap="circular"
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                  badgeContent={
+                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: online ? 'success.main' : 'text.disabled', border: '2px solid', borderColor: 'background.paper' }} />
+                  }
+                  sx={{ mr: { xs: 0, sm: 1.5 } }}
+                >
+                  <Avatar
+                    src={convAvatar(c.id) ?? undefined}
+                    sx={{ width: 40, height: 40, bgcolor: colorFor(c.id) }}
+                  >
+                    {convInitial(c.id)}
+                  </Avatar>
                 </Badge>
-                <ListItemText
-                  primary={title}
-                  primaryTypographyProps={{ noWrap: true, fontWeight: c.unreadCount > 0 ? 700 : 500 }}
-                  secondary={c.lastMessagePreview ?? '(Chưa có tin nhắn)'}
-                  secondaryTypographyProps={{ noWrap: true, variant: 'caption' }}
-                />
+                <Box sx={{ display: { xs: 'none', sm: 'block' }, minWidth: 0, flex: 1 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography
+                      variant="subtitle2"
+                      noWrap
+                      fontWeight={c.unreadCount > 0 ? 700 : 500}
+                    >
+                      {title}
+                    </Typography>
+                    <Typography variant="caption" color="text.disabled" sx={{ ml: 0.5, flexShrink: 0 }}>
+                      {fTimeShort(c.lastMessageAt)}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1 }}>
+                      {c.lastMessagePreview ?? '(Chưa có tin nhắn)'}
+                    </Typography>
+                    {c.unreadCount > 0 && (
+                      <Box sx={{ ml: 0.5, minWidth: 18, height: 18, borderRadius: 9, bgcolor: 'error.main', color: 'white', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 0.5 }}>
+                        {c.unreadCount > 99 ? '99+' : c.unreadCount}
+                      </Box>
+                    )}
+                  </Stack>
+                </Box>
               </ListItemButton>
             );
           })}
@@ -121,94 +208,106 @@ export default function MessengerView() {
 
         {/* RIGHT — chat window */}
         <Stack sx={{ flex: 1, minWidth: 0 }}>
-          {active ? (
+          {activeConv ? (
             <>
-              <Stack direction="row" alignItems="center" spacing={2} sx={{ p: 2 }}>
-                <Avatar>
-                  {active.type === 'Group'
-                    ? 'G'
-                    : (active.participantIds.find((id) => id !== currentUserId) ?? '?')[0]?.toUpperCase()}
-                </Avatar>
+              {/* Chat header */}
+              <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+                <Badge
+                  overlap="circular"
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                  badgeContent={
+                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: convOnline(activeId!) ? 'success.main' : 'text.disabled', border: '2px solid', borderColor: 'background.paper' }} />
+                  }
+                >
+                  <Avatar src={convAvatar(activeId!) ?? undefined} sx={{ width: 40, height: 40, bgcolor: colorFor(activeId!) }}>
+                    {convInitial(activeId!)}
+                  </Avatar>
+                </Badge>
                 <Stack sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography noWrap fontWeight={600}>
-                    {active.type === 'Group'
-                      ? active.name ?? `Nhóm ${active.participantIds.length} thành viên`
-                      : active.participantIds.find((id) => id !== currentUserId)}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {active.type === 'Group' ? `${active.participantIds.length} thành viên` : 'Chat 1:1'}
+                  <Typography fontWeight={600} noWrap>{convTitle(activeId!)}</Typography>
+                  <Typography variant="caption" color={convOnline(activeId!) ? 'success.main' : 'text.secondary'}>
+                    {activeConv.type === 'Group'
+                      ? `${activeConv.participantIds.length} thành viên`
+                      : convOnline(activeId!) ? 'Đang online' : 'Offline'}
                   </Typography>
                 </Stack>
               </Stack>
-              <Divider />
 
-              <Box ref={scrollRef} sx={{ flex: 1, overflowY: 'auto', p: 2, bgcolor: 'background.neutral' }}>
-                {loading && <CircularProgress size={20} />}
-                {messages.map((m) => {
-                  const mine = m.senderId === currentUserId;
-                  return (
-                    <Stack
-                      key={m.id}
-                      direction="row"
-                      justifyContent={mine ? 'flex-end' : 'flex-start'}
-                      sx={{ mb: 1 }}
-                    >
+              {/* Messages */}
+              <Scrollbar scrollableNodeProps={{ ref: scrollRef }} sx={{ flex: 1, p: 2, bgcolor: 'background.neutral' }}>
+                {messages.map((msg) => (
+                  <MessageBubble
+                    key={msg.id}
+                    message={msg}
+                    mine={msg.senderId === currentUserId}
+                    senderUser={userCache[msg.senderId]}
+                    showName={activeConv.type === 'Group'}
+                    currentUserId={currentUserId ?? undefined}
+                  />
+                ))}
+              </Scrollbar>
+
+              {/* Typing indicator */}
+              {typingLabel && (
+                <Stack direction="row" alignItems="center" spacing={0.75} sx={{ px: 2, py: 0.75 }}>
+                  <Box sx={{ display: 'flex', gap: 0.4 }}>
+                    {[0, 1, 2].map((i) => (
                       <Box
+                        key={i}
+                        component={m => <span {...m} />}
                         sx={{
-                          maxWidth: '70%',
-                          px: 1.5,
-                          py: 1,
-                          borderRadius: 2,
-                          bgcolor: mine ? 'primary.main' : 'background.paper',
-                          color: mine ? 'primary.contrastText' : 'text.primary',
-                          boxShadow: 1,
+                          width: 6, height: 6, borderRadius: '50%', bgcolor: 'text.disabled',
+                          animation: 'typing-dot 1.2s infinite',
+                          animationDelay: `${i * 0.2}s`,
+                          '@keyframes typing-dot': {
+                            '0%, 80%, 100%': { transform: 'scale(1)', opacity: 0.5 },
+                            '40%': { transform: 'scale(1.3)', opacity: 1 },
+                          },
                         }}
-                      >
-                        {!mine && (
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            {m.senderId}
-                          </Typography>
-                        )}
-                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                          {m.content}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{ display: 'block', opacity: 0.7, mt: 0.5, textAlign: 'right' }}
-                        >
-                          {fDateTime(m.createdAt)}
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  );
-                })}
-              </Box>
+                      />
+                    ))}
+                  </Box>
+                  <Typography variant="caption" color="text.secondary">
+                    {typingLabel} đang nhập...
+                  </Typography>
+                </Stack>
+              )}
 
               <Divider />
-              <Box component="form" onSubmit={handleSubmit} sx={{ p: 2 }}>
-                <Stack direction="row" spacing={1}>
+
+              {/* Input */}
+              <Box component="form" onSubmit={handleSend} sx={{ p: 1.5 }}>
+                <Stack direction="row" spacing={1} alignItems="flex-end">
                   <TextField
                     fullWidth
                     size="small"
                     placeholder="Nhập tin nhắn..."
                     value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
+                    onChange={(e) => {
+                      setDraft(e.target.value);
+                      if (activeId) sendTyping(activeId);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend(e as any);
+                      }
+                    }}
+                    multiline
+                    maxRows={4}
                     autoComplete="off"
                   />
-                  <IconButton color="primary" type="submit" disabled={!draft.trim()}>
+                  <IconButton color="primary" type="submit" disabled={!draft.trim() || sending}>
                     <Iconify icon="eva:paper-plane-fill" />
                   </IconButton>
                 </Stack>
               </Box>
             </>
           ) : (
-            <Stack
-              alignItems="center"
-              justifyContent="center"
-              sx={{ flex: 1, color: 'text.secondary' }}
-            >
-              <Iconify icon="eva:message-circle-outline" width={64} />
-              <Typography sx={{ mt: 1 }}>Chọn một cuộc hội thoại để bắt đầu</Typography>
+            <Stack alignItems="center" justifyContent="center" sx={{ flex: 1, color: 'text.secondary', gap: 1 }}>
+              <Iconify icon="eva:message-circle-outline" width={72} sx={{ opacity: 0.4 }} />
+              <Typography variant="h6" sx={{ opacity: 0.6 }}>Chọn một cuộc hội thoại</Typography>
+              <Typography variant="body2" sx={{ opacity: 0.4 }}>hoặc tạo mới để bắt đầu nhắn tin</Typography>
             </Stack>
           )}
         </Stack>
@@ -217,10 +316,9 @@ export default function MessengerView() {
       <NewConversationDialog
         open={newOpen}
         onClose={() => setNewOpen(false)}
-        onCreated={async (conversationId) => {
+        onCreated={async (convId) => {
           setNewOpen(false);
-          await reloadConversations();
-          openConversation(conversationId);
+          await handleSelectConv(convId);
         }}
       />
     </Container>
