@@ -82,13 +82,38 @@ export default function MessengerProvider({ children }: Props) {
       s.setTyping(ev.conversationId, ev.senderId, false);
 
       const uid = currentUserIdRef.current;
-      if (!s.openQuickChats.includes(ev.conversationId) && ev.senderId !== uid) {
-        const sender = s.userCache[ev.senderId];
-        s.pushNotif({
-          convId: ev.conversationId,
-          senderName: sender?.fullName ?? 'Tin nhắn mới',
-          preview: ev.content.slice(0, 80),
-        });
+      if (ev.senderId === uid) return; // own message, skip notifications
+
+      const sender = s.userCache[ev.senderId];
+      const senderName = sender?.fullName ?? 'Tin nhắn mới';
+      const preview = ev.content.slice(0, 80);
+
+      // In-app toast when quick-chat window is NOT open
+      if (!s.openQuickChats.includes(ev.conversationId)) {
+        s.pushNotif({ convId: ev.conversationId, senderName, preview });
+      }
+
+      // Desktop notification when user is on another tab (document.hidden)
+      if (
+        typeof window !== 'undefined' &&
+        typeof Notification !== 'undefined' &&
+        Notification.permission === 'granted' &&
+        document.hidden
+      ) {
+        try {
+          const n = new Notification(senderName, {
+            body: preview,
+            icon: '/favicon/favicon-32x32.png',
+            tag: ev.conversationId, // one notif per conversation (deduplicates)
+          });
+          n.onclick = () => {
+            window.focus();
+            useMessengerStore.getState().openQuickChat(ev.conversationId);
+            n.close();
+          };
+        } catch {
+          // Notification API may be unavailable in some browser configurations
+        }
       }
     });
 
