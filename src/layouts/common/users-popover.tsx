@@ -1,7 +1,6 @@
 'use client';
 
 import { m } from 'framer-motion';
-import { useRouter } from 'next/navigation';
 
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
@@ -12,8 +11,6 @@ import Typography from '@mui/material/Typography';
 import ListItemText from '@mui/material/ListItemText';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { paths } from 'src/routes/paths';
-
 import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
 import { varHover } from 'src/components/animate';
@@ -22,20 +19,22 @@ import CustomPopover, { usePopover } from 'src/components/custom-popover';
 import { useAuthContext } from 'src/auth/hooks';
 import { usePresence } from 'src/hooks/use-presence';
 import { openPrivateConversation } from 'src/api/messenger';
+import { useMessengerStore } from 'src/store/messenger-store';
 
 // ----------------------------------------------------------------------
 
 export default function UsersPopover() {
   const popover = usePopover();
-  const router = useRouter();
   const { user: me } = useAuthContext();
   const { users, loading, onlineCount } = usePresence();
+
+  const { openQuickChat } = useMessengerStore();
 
   const handleClickUser = async (userId: string) => {
     popover.onClose();
     try {
       const conv = await openPrivateConversation(userId);
-      router.push(`${paths.dashboard.messenger}?conv=${conv.id}`);
+      openQuickChat(conv.id);
     } catch (err) {
       console.error('[UsersPopover] open private conv error', err);
     }

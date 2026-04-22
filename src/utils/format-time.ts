@@ -23,6 +23,17 @@ export function fDateTime(date: InputValue, newFormat?: string) {
   return date ? format(new Date(date), fm, { locale: viLocale }) : '';
 }
 
+export function fTimeShort(date: InputValue): string {
+  if (!date) return '';
+  const d = new Date(date);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = diffMs / 86400000;
+  if (diffDays < 1 && d.getDate() === now.getDate()) return format(d, 'HH:mm', { locale: viLocale });
+  if (diffDays < 7) return format(d, 'EEE HH:mm', { locale: viLocale });
+  return format(d, 'dd/MM HH:mm', { locale: viLocale });
+}
+
 export function fTimestamp(date: InputValue) {
   return date ? getTime(new Date(date)) : '';
 }

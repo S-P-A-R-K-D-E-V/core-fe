@@ -6,6 +6,7 @@ import { SyncNotificationProvider } from 'src/hooks/use-sync-notification';
 
 import { useSettingsContext } from 'src/components/settings';
 import { ChatbotWidget } from 'src/components/chatbot';
+import MessengerProvider from 'src/components/messenger/messenger-provider';
 
 import Main from './main';
 import Header from './header';
@@ -39,12 +40,12 @@ export default function DashboardLayout({ children }: Props) {
   if (isHorizontal) {
     return (
       <SyncNotificationProvider>
-        <Header onOpenNav={nav.onTrue} />
-
-        {lgUp ? renderHorizontal : renderNavVertical}
-
-        <Main>{children}</Main>
-        <ChatbotWidget />
+        <MessengerProvider>
+          <Header onOpenNav={nav.onTrue} />
+          {lgUp ? renderHorizontal : renderNavVertical}
+          <Main>{children}</Main>
+          <ChatbotWidget />
+        </MessengerProvider>
       </SyncNotificationProvider>
     );
   }
@@ -52,8 +53,28 @@ export default function DashboardLayout({ children }: Props) {
   if (isMini) {
     return (
       <SyncNotificationProvider>
-        <Header onOpenNav={nav.onTrue} />
+        <MessengerProvider>
+          <Header onOpenNav={nav.onTrue} />
+          <Box
+            sx={{
+              minHeight: 1,
+              display: 'flex',
+              flexDirection: { xs: 'column', lg: 'row' },
+            }}
+          >
+            {lgUp ? renderNavMini : renderNavVertical}
+            <Main>{children}</Main>
+          </Box>
+          <ChatbotWidget />
+        </MessengerProvider>
+      </SyncNotificationProvider>
+    );
+  }
 
+  return (
+    <SyncNotificationProvider>
+      <MessengerProvider>
+        <Header onOpenNav={nav.onTrue} />
         <Box
           sx={{
             minHeight: 1,
@@ -61,31 +82,11 @@ export default function DashboardLayout({ children }: Props) {
             flexDirection: { xs: 'column', lg: 'row' },
           }}
         >
-          {lgUp ? renderNavMini : renderNavVertical}
-
+          {renderNavVertical}
           <Main>{children}</Main>
         </Box>
         <ChatbotWidget />
-      </SyncNotificationProvider>
-    );
-  }
-
-  return (
-    <SyncNotificationProvider>
-      <Header onOpenNav={nav.onTrue} />
-
-      <Box
-        sx={{
-          minHeight: 1,
-          display: 'flex',
-          flexDirection: { xs: 'column', lg: 'row' },
-        }}
-      >
-        {renderNavVertical}
-
-        <Main>{children}</Main>
-      </Box>
-      <ChatbotWidget />
+      </MessengerProvider>
     </SyncNotificationProvider>
   );
 }
