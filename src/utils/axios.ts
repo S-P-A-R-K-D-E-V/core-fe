@@ -336,5 +336,15 @@ export const endpoints = {
     customerContext: '/chatbot/context/customer',
     callbackOrder: '/chatbot/callback-order',
   },
+  messenger: {
+    conversations: '/messenger/conversations',
+    openPrivate: '/messenger/conversations/private',
+    createGroup: '/messenger/conversations/group',
+    members: (conversationId: string) => `/messenger/conversations/${conversationId}/members`,
+    member: (conversationId: string, memberId: string) =>
+      `/messenger/conversations/${conversationId}/members/${memberId}`,
+    messages: (conversationId: string) => `/messenger/conversations/${conversationId}/messages`,
+    markRead: (conversationId: string) => `/messenger/conversations/${conversationId}/read`,
+  },
 };
 
