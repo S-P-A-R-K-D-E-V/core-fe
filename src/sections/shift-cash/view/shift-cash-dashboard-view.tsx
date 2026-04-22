@@ -1515,12 +1515,12 @@ export default function ShiftCashDashboardView() {
                           {auditLogs.map((entry) => {
                             const isExpanded = expandedAuditId === entry.id;
                             const actionMeta: Record<string, { label: string; color: 'success' | 'warning' | 'error' | 'info' | 'primary' | 'default' }> = {
-                              CREATE:              { label: 'Thêm thu/chi',     color: 'success' },
-                              UPDATE:              { label: 'Sửa thu/chi',      color: 'warning' },
-                              DELETE:              { label: 'Xóa thu/chi',      color: 'error'   },
-                              FINALIZE_SHIFT:      { label: 'Chốt tiền ca',     color: 'primary' },
-                              UPDATE_DENOMINATION: { label: 'Cập nhật mệnh giá', color: 'info'  },
-                              OPEN_COUNTER:        { label: 'Mở quầy',          color: 'default' },
+                              CREATE:              { label: 'Thêm thu/chi',      color: 'success' },
+                              UPDATE:              { label: 'Sửa thu/chi',       color: 'warning' },
+                              DELETE:              { label: 'Xóa thu/chi',       color: 'error'   },
+                              FINALIZE_SHIFT:      { label: 'Chốt tiền ca',      color: 'primary' },
+                              UPDATE_DENOMINATION: { label: 'Cập nhật mệnh giá', color: 'info'    },
+                              OPEN_COUNTER:        { label: 'Mở quầy',           color: 'default' },
                             };
                             const meta = actionMeta[entry.actionType] ?? { label: entry.actionType, color: 'default' as const };
                             const timeVn = new Date(entry.timestamp).toLocaleString('vi-VN', {
@@ -1529,20 +1529,25 @@ export default function ShiftCashDashboardView() {
                             });
                             const firstDelta = entry.delta[0];
 
+                            const hasCash = entry.totalCashBefore != null || entry.totalCashAfter != null;
+                            const cashDiff = hasCash && entry.totalCashAfter != null && entry.totalCashBefore != null
+                              ? entry.totalCashAfter - entry.totalCashBefore
+                              : null;
+
+                            const canExpand = entry.delta.length > 0 || hasCash;
+
                             return (
                               <>
                                 <TableRow
                                   key={entry.id}
                                   hover
-                                  sx={{ cursor: entry.delta.length > 0 ? 'pointer' : 'default' }}
+                                  sx={{ cursor: canExpand ? 'pointer' : 'default' }}
                                   onClick={() =>
-                                    entry.delta.length > 0
-                                      ? setExpandedAuditId(isExpanded ? null : entry.id)
-                                      : undefined
+                                    canExpand ? setExpandedAuditId(isExpanded ? null : entry.id) : undefined
                                   }
                                 >
                                   <TableCell sx={{ pr: 0 }}>
-                                    {entry.delta.length > 0 && (
+                                    {canExpand && (
                                       <IconButton size="small">
                                         <Iconify
                                           icon={isExpanded ? 'solar:alt-arrow-up-bold' : 'solar:alt-arrow-down-bold'}
@@ -1562,12 +1567,36 @@ export default function ShiftCashDashboardView() {
                                     </Typography>
                                   </TableCell>
                                   <TableCell>
-                                    <Chip
-                                      label={meta.label}
-                                      size="small"
-                                      color={meta.color}
-                                      variant="soft"
-                                    />
+                                    <Stack spacing={0.5}>
+                                      <Chip
+                                        label={meta.label}
+                                        size="small"
+                                        color={meta.color}
+                                        variant="soft"
+                                      />
+                                      {hasCash && (
+                                        <Stack direction="row" spacing={0.5} alignItems="center">
+                                          <Iconify icon="solar:wallet-bold-duotone" width={12} sx={{ color: 'text.disabled' }} />
+                                          <Typography variant="caption" color="text.disabled">
+                                            {entry.totalCashBefore != null ? formatCurrency(entry.totalCashBefore) : '—'}
+                                            {' → '}
+                                            <Typography component="span" variant="caption" fontWeight={700} color="primary.main">
+                                              {entry.totalCashAfter != null ? formatCurrency(entry.totalCashAfter) : '—'}
+                                            </Typography>
+                                            {cashDiff != null && (
+                                              <Typography
+                                                component="span"
+                                                variant="caption"
+                                                color={cashDiff >= 0 ? 'success.main' : 'error.main'}
+                                                fontWeight={600}
+                                              >
+                                                {' '}({cashDiff >= 0 ? '+' : ''}{formatCurrency(cashDiff)})
+                                              </Typography>
+                                            )}
+                                          </Typography>
+                                        </Stack>
+                                      )}
+                                    </Stack>
                                   </TableCell>
                                   <TableCell>
                                     {firstDelta ? (
@@ -1604,6 +1633,47 @@ export default function ShiftCashDashboardView() {
                                     <TableCell colSpan={5} sx={{ py: 0, bgcolor: 'background.neutral' }}>
                                       <Collapse in={isExpanded}>
                                         <Box sx={{ py: 1.5, px: 2 }}>
+                                          {/* Total cash summary banner */}
+                                          {hasCash && (
+                                            <Box
+                                              sx={{
+                                                mb: 1.5,
+                                                p: 1.5,
+                                                borderRadius: 1,
+                                                bgcolor: 'background.paper',
+                                                border: '1px solid',
+                                                borderColor: 'divider',
+                                              }}
+                                            >
+                                              <Stack direction="row" spacing={3} alignItems="center" justifyContent="center">
+                                                <Stack alignItems="center">
+                                                  <Typography variant="caption" color="text.disabled">💰 Trước thao tác</Typography>
+                                                  <Typography variant="body2" fontWeight={500}>
+                                                    {entry.totalCashBefore != null ? formatCurrency(entry.totalCashBefore) : '—'}
+                                                  </Typography>
+                                                </Stack>
+                                                <Iconify icon="solar:arrow-right-bold" width={20} sx={{ color: 'text.disabled' }} />
+                                                <Stack alignItems="center">
+                                                  <Typography variant="caption" color="text.disabled">💰 Sau thao tác</Typography>
+                                                  <Typography variant="body2" fontWeight={700} color="primary.main">
+                                                    {entry.totalCashAfter != null ? formatCurrency(entry.totalCashAfter) : '—'}
+                                                  </Typography>
+                                                </Stack>
+                                                {cashDiff != null && (
+                                                  <Stack alignItems="center">
+                                                    <Typography variant="caption" color="text.disabled">Chênh lệch</Typography>
+                                                    <Typography
+                                                      variant="body2"
+                                                      fontWeight={700}
+                                                      color={cashDiff >= 0 ? 'success.main' : 'error.main'}
+                                                    >
+                                                      {cashDiff >= 0 ? '+' : ''}{formatCurrency(cashDiff)}
+                                                    </Typography>
+                                                  </Stack>
+                                                )}
+                                              </Stack>
+                                            </Box>
+                                          )}
                                           <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mb: 1, display: 'block' }}>
                                             Chi tiết thay đổi ({entry.delta.length} trường)
                                           </Typography>
