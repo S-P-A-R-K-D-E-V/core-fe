@@ -6,9 +6,11 @@ import { m } from 'framer-motion';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Paper from '@mui/material/Paper';
+import Badge from '@mui/material/Badge';
 import Avatar from '@mui/material/Avatar';
 import Divider from '@mui/material/Divider';
 import Collapse from '@mui/material/Collapse';
+import Tooltip from '@mui/material/Tooltip';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
@@ -16,7 +18,6 @@ import Typography from '@mui/material/Typography';
 import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
 
-import { fTimeShort } from 'src/utils/format-time';
 import { sendMessage as apiSendMessage } from 'src/api/messenger';
 import { useMessengerStore } from 'src/store/messenger-store';
 import { useMessengerCtx } from './messenger-provider';
@@ -37,21 +38,27 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const { openConversation, sendTyping } = useMessengerCtx();
-  // ?? [] must NOT be inside the selector — it creates a new array on every call,
-  // making useSyncExternalStore see perpetual tearing → infinite re-render loop.
+
+  // Stable store selectors — no ?? [] or transformations inside selector
   const messages = useMessengerStore((s) => s.messagesByConv[convId]) ?? [];
   const typing = useMessengerStore((s) => s.typingByConv[convId]) ?? [];
   const conversations = useMessengerStore((s) => s.conversations);
   const userCache = useMessengerStore((s) => s.userCache);
+  // onlineIds is a stable array ref updated by userOnline/userOffline SignalR events
+  const onlineIds = useMessengerStore((s) => s.onlineIds);
+
   const conv = conversations.find((c) => c.id === convId);
+
+  // Compute in render body (not inside selector) to avoid useSyncExternalStore tearing
+  const otherUserId = conv?.type !== 'Group'
+    ? conv?.participantIds.find((id) => id !== currentUserId) ?? null
+    : null;
+  const isOnline = otherUserId ? onlineIds.includes(otherUserId) : false;
 
   const title =
     conv?.type === 'Group'
       ? conv?.name ?? `Nhóm ${conv.participantIds.length} thành viên`
-      : (() => {
-          const otherId = conv?.participantIds.find((id) => id !== currentUserId);
-          return otherId ? userCache[otherId]?.fullName ?? otherId : 'Chat';
-        })();
+      : (otherUserId ? userCache[otherUserId]?.fullName ?? otherUserId : 'Chat');
 
   useEffect(() => {
     openConversation(convId).catch(() => {});
@@ -116,12 +123,46 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
           }}
           onClick={() => setMinimized((v) => !v)}
         >
-          <Avatar sx={{ width: 28, height: 28, fontSize: 13, bgcolor: 'primary.dark' }}>
-            {title.charAt(0).toUpperCase()}
-          </Avatar>
-          <Typography variant="subtitle2" noWrap sx={{ flex: 1 }}>
-            {title}
-          </Typography>
+          {/* Avatar with online dot */}
+          <Tooltip
+            title={conv?.type !== 'Group' ? (isOnline ? 'Đang online' : 'Offline') : ''}
+            placement="top"
+          >
+            <Badge
+              overlap="circular"
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              badgeContent={
+                conv?.type !== 'Group' ? (
+                  <Box
+                    sx={{
+                      width: 9,
+                      height: 9,
+                      borderRadius: '50%',
+                      bgcolor: isOnline ? 'success.main' : 'grey.400',
+                      border: '1.5px solid',
+                      borderColor: 'primary.main',
+                    }}
+                  />
+                ) : null
+              }
+            >
+              <Avatar sx={{ width: 28, height: 28, fontSize: 13, bgcolor: 'primary.dark' }}>
+                {title.charAt(0).toUpperCase()}
+              </Avatar>
+            </Badge>
+          </Tooltip>
+
+          <Stack sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="subtitle2" noWrap>
+              {title}
+            </Typography>
+            {conv?.type !== 'Group' && (
+              <Typography variant="caption" sx={{ opacity: 0.8, lineHeight: 1 }}>
+                {isOnline ? 'Đang online' : 'Offline'}
+              </Typography>
+            )}
+          </Stack>
+
           <IconButton size="small" sx={{ color: 'inherit' }} onClick={(e) => { e.stopPropagation(); setMinimized((v) => !v); }}>
             <Iconify icon={minimized ? 'eva:chevron-up-fill' : 'eva:chevron-down-fill'} width={18} />
           </IconButton>
@@ -143,6 +184,7 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
                 mine={msg.senderId === currentUserId}
                 senderUser={userCache[msg.senderId]}
                 showName={conv?.type === 'Group'}
+                currentUserId={currentUserId ?? undefined}
                 compact
               />
             ))}
