@@ -40,6 +40,14 @@ export type DirectMessage = {
   readBy?: { userId: string; readAt: string }[];
 };
 
+export type InternalUser = {
+  id: string;
+  fullName: string;
+  email: string;
+  avatarUrl: string | null;
+  online: boolean;
+};
+
 export async function fetchConversations(): Promise<ConversationSummary[]> {
   const res = await axios.get(endpoints.messenger.conversations);
   return res.data;
@@ -82,4 +90,9 @@ export async function sendMessage(conversationId: string, content: string): Prom
 
 export async function markRead(conversationId: string): Promise<void> {
   await axios.post(endpoints.messenger.markRead(conversationId));
+}
+
+export async function fetchUsers(): Promise<InternalUser[]> {
+  const res = await axios.get(endpoints.messenger.users);
+  return res.data;
 }
