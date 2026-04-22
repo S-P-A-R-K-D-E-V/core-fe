@@ -254,7 +254,6 @@ export default function MessengerView() {
                     {[0, 1, 2].map((i) => (
                       <Box
                         key={i}
-                        component={m => <span {...m} />}
                         sx={{
                           width: 6, height: 6, borderRadius: '50%', bgcolor: 'text.disabled',
                           animation: 'typing-dot 1.2s infinite',
