@@ -115,6 +115,13 @@ export function useNavData() {
             roles: ['Admin'],
           },
 
+          // INTERNAL MESSENGER
+          {
+            title: 'Tin nhắn nội bộ',
+            path: paths.dashboard.messenger,
+            icon: ICONS.chat,
+          },
+
           // USER
           {
             title: t('user'),
