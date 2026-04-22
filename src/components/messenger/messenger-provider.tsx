@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, createContext, useContext, useMemo } from 'react';
+import { useRef, useEffect, useCallback, createContext, useContext, useMemo } from 'react';
 import * as signalR from '@microsoft/signalr';
 
 import { HOST_API } from 'src/config-global';
@@ -45,19 +45,20 @@ export default function MessengerProvider({ children }: Props) {
   const connRef = useRef<signalR.HubConnection | null>(null);
   const joinedRef = useRef<Set<string>>(new Set());
   const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const typingSent = useRef<Record<string, number>>({});
+  const currentUserIdRef = useRef(currentUserId);
 
-  const store = useMessengerStore();
+  // Keep ref in sync without triggering re-renders
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
 
   // ── Bootstrap: load users + conversations ──────────────────────────────
   useEffect(() => {
     if (!currentUserId) return;
-    fetchUsers()
-      .then((users) => store.setUserCache(users))
-      .catch(() => {});
-    fetchConversations()
-      .then((list) => store.setConversations(list))
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const { setUserCache, setConversations } = useMessengerStore.getState();
+    fetchUsers().then(setUserCache).catch(() => {});
+    fetchConversations().then(setConversations).catch(() => {});
   }, [currentUserId]);
 
   // ── SignalR connection ─────────────────────────────────────────────────
@@ -76,15 +77,14 @@ export default function MessengerProvider({ children }: Props) {
 
     // ── Event handlers ─────────────────────────────────────────────────
     conn.on('message', (ev: { id: string; conversationId: string; senderId: string; content: string; createdAt: string }) => {
-      store.addMessage(ev as any);
-      // Clear typing for this sender
-      store.setTyping(ev.conversationId, ev.senderId, false);
+      const s = useMessengerStore.getState();
+      s.addMessage(ev as any);
+      s.setTyping(ev.conversationId, ev.senderId, false);
 
-      // Notify if the quick-chat window is NOT open
-      const state = useMessengerStore.getState();
-      if (!state.openQuickChats.includes(ev.conversationId) && ev.senderId !== currentUserId) {
-        const sender = state.userCache[ev.senderId];
-        store.pushNotif({
+      const uid = currentUserIdRef.current;
+      if (!s.openQuickChats.includes(ev.conversationId) && ev.senderId !== uid) {
+        const sender = s.userCache[ev.senderId];
+        s.pushNotif({
           convId: ev.conversationId,
           senderName: sender?.fullName ?? 'Tin nhắn mới',
           preview: ev.content.slice(0, 80),
@@ -93,34 +93,41 @@ export default function MessengerProvider({ children }: Props) {
     });
 
     conn.on('conversationTouched', (ev: any) => {
-      store.touchConversation({ ...ev, incrementsUnreadForSelf: ev.incrementsUnreadForSelf && ev.lastMessageSenderId !== currentUserId });
+      const uid = currentUserIdRef.current;
+      useMessengerStore.getState().touchConversation({
+        ...ev,
+        incrementsUnreadForSelf: ev.incrementsUnreadForSelf && ev.lastMessageSenderId !== uid,
+      });
     });
 
     conn.on('conversationUpdated', () => {
-      fetchConversations().then((list) => store.setConversations(list)).catch(() => {});
+      const { setConversations } = useMessengerStore.getState();
+      fetchConversations().then(setConversations).catch(() => {});
     });
 
     conn.on('userTyping', (ev: { conversationId: string; userId: string }) => {
-      store.setTyping(ev.conversationId, ev.userId, true);
-      // Auto-expire typing after 3 s
-      clearTimeout(typingTimers.current[`${ev.conversationId}:${ev.userId}`]);
-      typingTimers.current[`${ev.conversationId}:${ev.userId}`] = setTimeout(() => {
-        store.setTyping(ev.conversationId, ev.userId, false);
+      const { setTyping } = useMessengerStore.getState();
+      setTyping(ev.conversationId, ev.userId, true);
+      const key = `${ev.conversationId}:${ev.userId}`;
+      clearTimeout(typingTimers.current[key]);
+      typingTimers.current[key] = setTimeout(() => {
+        useMessengerStore.getState().setTyping(ev.conversationId, ev.userId, false);
       }, 3000);
     });
 
     conn.on('readReceipt', (ev: { conversationId: string; userId: string; readAt: string }) => {
-      store.applyReadReceipt(ev.conversationId, ev.userId, ev.readAt);
+      useMessengerStore.getState().applyReadReceipt(ev.conversationId, ev.userId, ev.readAt);
     });
 
-    conn.on('userOnline', (userId: string) => store.setOnline(userId, true));
-    conn.on('userOffline', (userId: string) => store.setOnline(userId, false));
+    conn.on('userOnline', (userId: string) => useMessengerStore.getState().setOnline(userId, true));
+    conn.on('userOffline', (userId: string) => useMessengerStore.getState().setOnline(userId, false));
 
     conn.onreconnected(async () => {
       for (const convId of Array.from(joinedRef.current)) {
         try { await conn.invoke('JoinConversation', convId); } catch { /* ignore */ }
       }
-      fetchConversations().then((list) => store.setConversations(list)).catch(() => {});
+      const { setConversations } = useMessengerStore.getState();
+      fetchConversations().then(setConversations).catch(() => {});
     });
 
     conn.start()
@@ -137,11 +144,11 @@ export default function MessengerProvider({ children }: Props) {
   }, [currentUserId]);
 
   // ── Open conversation: join hub group + load messages ──────────────────
-  const openConversation = async (convId: string) => {
+  const openConversation = useCallback(async (convId: string) => {
     const state = useMessengerStore.getState();
     if (!state.messagesByConv[convId]) {
       const msgs = await fetchMessages(convId, { limit: 50 });
-      store.setMessages(convId, msgs);
+      useMessengerStore.getState().setMessages(convId, msgs);
     }
     const conn = connRef.current;
     if (conn?.state === signalR.HubConnectionState.Connected && !joinedRef.current.has(convId)) {
@@ -149,15 +156,14 @@ export default function MessengerProvider({ children }: Props) {
       joinedRef.current.add(convId);
     }
     await markRead(convId);
-    store.clearUnread(convId);
+    useMessengerStore.getState().clearUnread(convId);
     if (conn?.state === signalR.HubConnectionState.Connected) {
       conn.invoke('ReadReceiptAsync', convId).catch(() => {});
     }
-  };
+  }, []);
 
   // ── Typing debounce ────────────────────────────────────────────────────
-  const typingSent = useRef<Record<string, number>>({});
-  const sendTyping = (convId: string) => {
+  const sendTyping = useCallback((convId: string) => {
     const conn = connRef.current;
     if (conn?.state !== signalR.HubConnectionState.Connected) return;
     const now = Date.now();
@@ -165,14 +171,13 @@ export default function MessengerProvider({ children }: Props) {
       typingSent.current[convId] = now;
       conn.invoke('TypingAsync', convId).catch(() => {});
     }
-  };
+  }, []);
 
   const value = useMemo(() => ({
     connection: connRef.current,
     openConversation,
     sendTyping,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), []);
+  }), [openConversation, sendTyping]);
 
   return (
     <MessengerCtx.Provider value={value}>

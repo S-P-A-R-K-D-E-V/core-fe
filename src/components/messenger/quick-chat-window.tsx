@@ -134,12 +134,12 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
             scrollableNodeProps={{ ref: scrollRef }}
             sx={{ height: 280, p: 1.5, bgcolor: 'background.neutral' }}
           >
-            {messages.map((m) => (
+            {messages.map((msg) => (
               <MessageBubble
-                key={m.id}
-                message={m}
-                mine={m.senderId === currentUserId}
-                senderUser={userCache[m.senderId]}
+                key={msg.id}
+                message={msg}
+                mine={msg.senderId === currentUserId}
+                senderUser={userCache[msg.senderId]}
                 showName={conv?.type === 'Group'}
                 compact
               />
