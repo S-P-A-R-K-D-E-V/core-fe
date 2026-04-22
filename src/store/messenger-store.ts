@@ -79,9 +79,10 @@ export const useMessengerStore = create<State & Actions>()(
           s.conversations[idx].lastMessageSenderId = ev.lastMessageSenderId;
           s.conversations[idx].lastMessageAt = ev.lastMessageAt;
           if (ev.incrementsUnreadForSelf) s.conversations[idx].unreadCount += 1;
-          // Bubble to top
-          const [conv] = s.conversations.splice(idx, 1);
-          s.conversations.unshift(conv);
+          // Bubble to top — spread to plain object to avoid immer draft proxy issue
+          const conv = { ...s.conversations[idx] };
+          s.conversations.splice(idx, 1);
+          s.conversations.unshift(conv as any);
         }
       }),
 

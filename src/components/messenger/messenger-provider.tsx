@@ -63,11 +63,12 @@ export default function MessengerProvider({ children }: Props) {
   // ── SignalR connection ─────────────────────────────────────────────────
   useEffect(() => {
     if (!currentUserId || !HOST_API) return undefined;
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
+    if (!token) return undefined;
 
     const conn = new signalR.HubConnectionBuilder()
       .withUrl(`${HOST_API}/hubs/messenger`, {
-        accessTokenFactory: () =>
-          (typeof window !== 'undefined' && sessionStorage.getItem('accessToken')) || '',
+        accessTokenFactory: () => sessionStorage.getItem('accessToken') ?? '',
       })
       .withAutomaticReconnect()
       .configureLogging(signalR.LogLevel.Warning)
