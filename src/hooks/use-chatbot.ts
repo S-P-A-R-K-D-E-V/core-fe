@@ -15,6 +15,7 @@ import {
 
 const STORAGE_KEY = 'chatbot.sessionId';
 
+type StreamingStartedEvent = { sessionId: string; messageId: string };
 type ChunkEvent = { sessionId: string; messageId: string; content: string };
 type CompletedEvent = { sessionId: string; messageId: string; content: string; fromCache: boolean };
 type ErrorEvent = { sessionId: string; messageId: string; error: string };
@@ -24,6 +25,7 @@ export type ChatbotPanelState = {
   session: ChatbotSession | null;
   messages: ChatbotMessage[];
   typing: boolean;
+  streamingMessageId: string | null;
   error: string | null;
   sendMessage: (content: string, phone?: string | null) => Promise<void>;
   resetSession: () => Promise<void>;
@@ -33,6 +35,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
   const [session, setSession] = useState<ChatbotSession | null>(null);
   const [messages, setMessages] = useState<ChatbotMessage[]>([]);
   const [typing, setTyping] = useState(false);
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -55,7 +58,12 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
         if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, s.sessionId);
 
         const history = await getChatbotMessages(s.sessionId, 50);
-        if (!cancelled) setMessages(history);
+        // Filter out orphaned empty assistant placeholders from interrupted streams.
+        // Without this they render as a stuck "…" bubble when the page reloads.
+        const cleaned = history.filter(
+          (m) => !(m.role === 'assistant' && (!m.content || m.content.trim() === ''))
+        );
+        if (!cancelled) setMessages(cleaned);
         if (!cancelled) setReady(true);
       } catch (err) {
         console.error('Chatbot init failed', err);
@@ -81,10 +89,33 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
       .configureLogging(signalR.LogLevel.Warning)
       .build();
 
+    connection.on('streamingStarted', (ev: StreamingStartedEvent) => {
+      console.info('[Chatbot] streamingStarted', ev);
+      if (ev.sessionId !== session.sessionId) return;
+      setTyping(true);
+      setStreamingMessageId(ev.messageId);
+      // Ensure a placeholder exists for this messageId so the very first chunk
+      // can append to it. Idempotent — won't duplicate if sendMessage already
+      // added the optimistic placeholder.
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === ev.messageId)) return prev;
+        return [
+          ...prev,
+          {
+            id: ev.messageId,
+            role: 'assistant',
+            content: '',
+            createdAt: new Date().toISOString(),
+          },
+        ];
+      });
+    });
+
     connection.on('chunk', (ev: ChunkEvent) => {
       console.debug('[Chatbot] chunk', { msgId: ev.messageId, len: ev.content.length });
       if (ev.sessionId !== session.sessionId) return;
       setTyping(true);
+      setStreamingMessageId(ev.messageId);
       setMessages((prev) => {
         const idx = prev.findIndex((m) => m.id === ev.messageId);
         if (idx >= 0) {
@@ -108,6 +139,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
       console.info('[Chatbot] completed', { msgId: ev.messageId, len: ev.content.length, fromCache: ev.fromCache });
       if (ev.sessionId !== session.sessionId) return;
       setTyping(false);
+      setStreamingMessageId(null);
       setMessages((prev) => {
         const idx = prev.findIndex((m) => m.id === ev.messageId);
         if (idx >= 0) {
@@ -132,6 +164,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
       console.warn('[Chatbot] error event', ev);
       if (ev.sessionId !== session.sessionId) return;
       setTyping(false);
+      setStreamingMessageId(null);
       setError(ev.error);
     });
 
@@ -205,9 +238,9 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
             },
           ]);
         } else {
-          // Not cached — add an empty placeholder so that incoming SignalR
-          // `chunk` events append to the correct message by ID instead of
-          // creating a duplicate entry when the first chunk arrives.
+          // Not cached — eagerly set streamingMessageId so the placeholder
+          // renders a spinner immediately, before SignalR streamingStarted fires.
+          setStreamingMessageId(res.assistantMessageId);
           setMessages((prev) => [
             ...prev,
             {
@@ -221,6 +254,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
       } catch (err) {
         console.error('Chatbot sendMessage failed', err);
         setTyping(false);
+        setStreamingMessageId(null);
         setError('Không gửi được tin nhắn');
       }
     },
@@ -238,5 +272,5 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
     setReady(true);
   }, [opts?.phone]);
 
-  return { ready, session, messages, typing, error, sendMessage, resetSession };
+  return { ready, session, messages, typing, streamingMessageId, error, sendMessage, resetSession };
 }
