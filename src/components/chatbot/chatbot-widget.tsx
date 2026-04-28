@@ -34,7 +34,7 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
   const [draft, setDraft] = useState('');
   const [phone, setPhone] = useState('');
 
-  const { ready, session, messages, typing, error, sendMessage, resetSession } = useChatbot({
+  const { ready, session, messages, typing, streamingMessageId, error, sendMessage, resetSession } = useChatbot({
     phone: user?.phoneNumber ?? null,
     displayName: user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : null,
   });
@@ -148,7 +148,16 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
                     whiteSpace: 'pre-wrap',
                   }}
                 >
-                  <Typography variant="body2">{m.content || '…'}</Typography>
+                  {!m.content && m.role === 'assistant' && m.id === streamingMessageId ? (
+                    <Stack direction="row" alignItems="center" spacing={0.75} sx={{ py: 0.25 }}>
+                      <CircularProgress size={12} thickness={5} />
+                      <Typography variant="caption" color="text.secondary">
+                        đang trả lời…
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2">{m.content || '…'}</Typography>
+                  )}
                   {m.fromCache && (
                     <Typography variant="caption" color="text.secondary">
                       ⚡ trả lời từ cache
