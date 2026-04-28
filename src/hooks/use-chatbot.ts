@@ -112,7 +112,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
     });
 
     connection.on('chunk', (ev: ChunkEvent) => {
-      console.info('[Chatbot] chunk RX', { msgId: ev.messageId, len: ev.content?.length, evSession: ev.sessionId, mySession: session.sessionId });
+      console.info('[Chatbot] chunk RX', { msgId: ev.messageId, len: ev.content?.length, preview: ev.content?.substring(0, 30), evSession: ev.sessionId, mySession: session.sessionId });
       if (ev.sessionId !== session.sessionId) {
         console.warn('[Chatbot] chunk DROPPED — session mismatch', { evSession: ev.sessionId, mySession: session.sessionId });
         return;
@@ -139,7 +139,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
     });
 
     connection.on('completed', (ev: CompletedEvent) => {
-      console.info('[Chatbot] completed RX', { msgId: ev.messageId, len: ev.content.length, evSession: ev.sessionId, mySession: session.sessionId });
+      console.info('[Chatbot] completed RX', { msgId: ev.messageId, len: ev.content?.length ?? 0, evSession: ev.sessionId, mySession: session.sessionId, content: ev.content?.substring(0, 100) });
       if (ev.sessionId !== session.sessionId) {
         console.warn('[Chatbot] completed DROPPED — session mismatch', { evSession: ev.sessionId, mySession: session.sessionId });
         return;
@@ -150,7 +150,12 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
         const idx = prev.findIndex((m) => m.id === ev.messageId);
         if (idx >= 0) {
           const next = prev.slice();
-          next[idx] = { ...next[idx], content: ev.content, fromCache: ev.fromCache };
+          // Keep accumulated chunk content if server sends empty fullReply (defensive fallback)
+          const finalContent = ev.content || next[idx].content || '';
+          if (!ev.content && next[idx].content) {
+            console.warn('[Chatbot] completed.content empty — keeping accumulated chunk content len=', next[idx].content.length);
+          }
+          next[idx] = { ...next[idx], content: finalContent, fromCache: ev.fromCache };
           return next;
         }
         return [
@@ -158,7 +163,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
           {
             id: ev.messageId,
             role: 'assistant',
-            content: ev.content,
+            content: ev.content || '',
             createdAt: new Date().toISOString(),
             fromCache: ev.fromCache,
           },
