@@ -1,5 +1,7 @@
 'use client';
 
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useRef, useState, useEffect } from 'react';
 
 import Fab from '@mui/material/Fab';
@@ -145,7 +147,6 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
                     bgcolor: m.role === 'user' ? 'primary.main' : 'background.paper',
                     color: m.role === 'user' ? 'primary.contrastText' : 'text.primary',
                     borderRadius: 1.5,
-                    whiteSpace: 'pre-wrap',
                   }}
                 >
                   {!m.content && m.role === 'assistant' && m.id === streamingMessageId ? (
@@ -155,8 +156,52 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
                         đang trả lời…
                       </Typography>
                     </Stack>
+                  ) : m.role === 'assistant' ? (
+                    <Box
+                      sx={{
+                        fontSize: 14,
+                        lineHeight: 1.6,
+                        '& p': { m: 0, mb: 0.75, '&:last-child': { mb: 0 } },
+                        '& ul, & ol': { pl: 2.5, my: 0.5 },
+                        '& li': { mb: 0.25 },
+                        '& code': {
+                          bgcolor: 'action.hover',
+                          px: 0.5,
+                          borderRadius: 0.5,
+                          fontFamily: 'monospace',
+                          fontSize: 13,
+                        },
+                        '& pre': {
+                          bgcolor: 'action.hover',
+                          p: 1,
+                          borderRadius: 1,
+                          overflowX: 'auto',
+                          my: 0.75,
+                          '& code': { bgcolor: 'transparent', p: 0 },
+                        },
+                        '& strong': { fontWeight: 700 },
+                        '& a': { color: 'primary.main', wordBreak: 'break-word' },
+                        '& hr': { my: 1, borderColor: 'divider' },
+                        '& table': { borderCollapse: 'collapse', width: '100%', fontSize: 13 },
+                        '& th, & td': { border: '1px solid', borderColor: 'divider', p: '4px 8px' },
+                        '& blockquote': {
+                          borderLeft: '3px solid',
+                          borderColor: 'primary.main',
+                          pl: 1,
+                          ml: 0,
+                          my: 0.5,
+                          color: 'text.secondary',
+                        },
+                      }}
+                    >
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {m.content || '…'}
+                      </ReactMarkdown>
+                    </Box>
                   ) : (
-                    <Typography variant="body2">{m.content || '…'}</Typography>
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {m.content}
+                    </Typography>
                   )}
                   {m.fromCache && (
                     <Typography variant="caption" color="text.secondary">
