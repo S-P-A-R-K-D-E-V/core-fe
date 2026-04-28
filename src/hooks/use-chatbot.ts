@@ -86,7 +86,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
           (typeof window !== 'undefined' && sessionStorage.getItem('accessToken')) || '',
       })
       .withAutomaticReconnect()
-      .configureLogging(signalR.LogLevel.Warning)
+      .configureLogging(signalR.LogLevel.Information)
       .build();
 
     connection.on('streamingStarted', (ev: StreamingStartedEvent) => {
@@ -112,8 +112,11 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
     });
 
     connection.on('chunk', (ev: ChunkEvent) => {
-      console.debug('[Chatbot] chunk', { msgId: ev.messageId, len: ev.content.length });
-      if (ev.sessionId !== session.sessionId) return;
+      console.info('[Chatbot] chunk RX', { msgId: ev.messageId, len: ev.content?.length, evSession: ev.sessionId, mySession: session.sessionId });
+      if (ev.sessionId !== session.sessionId) {
+        console.warn('[Chatbot] chunk DROPPED — session mismatch', { evSession: ev.sessionId, mySession: session.sessionId });
+        return;
+      }
       setTyping(true);
       setStreamingMessageId(ev.messageId);
       setMessages((prev) => {
@@ -136,8 +139,11 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
     });
 
     connection.on('completed', (ev: CompletedEvent) => {
-      console.info('[Chatbot] completed', { msgId: ev.messageId, len: ev.content.length, fromCache: ev.fromCache });
-      if (ev.sessionId !== session.sessionId) return;
+      console.info('[Chatbot] completed RX', { msgId: ev.messageId, len: ev.content.length, evSession: ev.sessionId, mySession: session.sessionId });
+      if (ev.sessionId !== session.sessionId) {
+        console.warn('[Chatbot] completed DROPPED — session mismatch', { evSession: ev.sessionId, mySession: session.sessionId });
+        return;
+      }
       setTyping(false);
       setStreamingMessageId(null);
       setMessages((prev) => {
