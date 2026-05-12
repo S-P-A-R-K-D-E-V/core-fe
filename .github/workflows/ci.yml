@@ -25,7 +25,7 @@ jobs:
           push: true
           tags: satthuno99/core-fe:latest
 
- deploy:
+  deploy:
     runs-on: self-hosted
     needs: build-and-push
     if: always()
