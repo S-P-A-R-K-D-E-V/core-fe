@@ -38,6 +38,7 @@ export const endpoints = {
     verifyOtp: '/auth/verify-otp',
     resendOtp: '/auth/resend-otp',
     restoreSession: '/auth/restore-session',
+    oauthLogin: '/auth/oauth-login',
   },
   users: {
     list: '/users',
