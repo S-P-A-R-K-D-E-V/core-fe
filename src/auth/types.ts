@@ -58,6 +58,7 @@ export type JWTContextType = CanRemove & {
   verifyOtp: (email: string, otpCode: string) => Promise<void>;
   resendOtp: (email: string) => Promise<void>;
   restoreSession: (sessionToken: string) => Promise<void>;
+  loginWithOAuth: (provider: 'google' | 'facebook', token: string) => Promise<void>;
   pendingVerification: { email: string } | null;
 };
 

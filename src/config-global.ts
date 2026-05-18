@@ -35,5 +35,8 @@ export const SUPABASE_API = {
 
 export const MAPBOX_API = process.env.NEXT_PUBLIC_MAPBOX_API;
 
+export const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '';
+export const FACEBOOK_APP_ID = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID ?? '';
+
 // ROOT PATH AFTER LOGIN SUCCESSFUL
 export const PATH_AFTER_LOGIN = paths.dashboard.shiftCash.root; // as '/dashboard'

@@ -105,6 +105,11 @@ export interface ILogoutRequest {
   userId: string;
 }
 
+export interface IOAuthLoginRequest {
+  provider: 'google' | 'facebook';
+  token: string;
+}
+
 // RBAC Types
 export interface IRole {
   id: string;

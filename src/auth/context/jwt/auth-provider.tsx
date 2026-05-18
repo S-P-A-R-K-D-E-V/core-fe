@@ -11,6 +11,7 @@ import {
   IVerifyOtpRequest,
   IResendOtpRequest,
   IRestoreSessionRequest,
+  IOAuthLoginRequest,
 } from 'src/types/corecms-api';
 
 import { AuthContext } from './auth-context';
@@ -298,6 +299,22 @@ export function AuthProvider({ children }: Props) {
     dispatch({ type: Types.LOGIN, payload: { user } });
   }, []);
 
+  // OAUTH LOGIN (Google / Facebook)
+  const loginWithOAuth = useCallback(async (provider: 'google' | 'facebook', token: string) => {
+    const data: IOAuthLoginRequest = { provider, token };
+    const res = await axios.post<IAuthResponse>(endpoints.auth.oauthLogin, data);
+    const { token: accessToken, refreshToken, sessionToken } = res.data;
+
+    setSession(accessToken, refreshToken);
+
+    if (sessionToken) {
+      localStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
+    }
+
+    const user = buildUserFromResponse(res.data);
+    dispatch({ type: Types.LOGIN, payload: { user } });
+  }, []);
+
   // LOGOUT
   const logout = useCallback(async () => {
     try {
@@ -338,9 +355,10 @@ export function AuthProvider({ children }: Props) {
       verifyOtp,
       resendOtp,
       restoreSession,
+      loginWithOAuth,
       pendingVerification,
     }),
-    [login, logout, register, verifyOtp, resendOtp, restoreSession, state.user, status, pendingVerification]
+    [login, logout, register, verifyOtp, resendOtp, restoreSession, loginWithOAuth, state.user, status, pendingVerification]
   );
 
   return <AuthContext.Provider value={memoizedValue}>{children}</AuthContext.Provider>;

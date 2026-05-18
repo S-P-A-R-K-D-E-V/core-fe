@@ -4,10 +4,14 @@ import * as Yup from 'yup';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
+import { GoogleLogin } from '@react-oauth/google';
+import FacebookLogin from 'react-facebook-login/dist/facebook-login-render-props';
 
 import Link from '@mui/material/Link';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
@@ -20,7 +24,7 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 import { useBoolean } from 'src/hooks/use-boolean';
 
 import { useAuthContext } from 'src/auth/hooks';
-import { PATH_AFTER_LOGIN } from 'src/config-global';
+import { PATH_AFTER_LOGIN, FACEBOOK_APP_ID } from 'src/config-global';
 
 import Iconify from 'src/components/iconify';
 import FormProvider, { RHFTextField } from 'src/components/hook-form';
@@ -28,7 +32,7 @@ import FormProvider, { RHFTextField } from 'src/components/hook-form';
 // ----------------------------------------------------------------------
 
 export default function JwtLoginView() {
-  const { login, resendOtp, verifyOtp } = useAuthContext();
+  const { login, resendOtp, verifyOtp, loginWithOAuth } = useAuthContext();
 
   const router = useRouter();
 
@@ -142,6 +146,56 @@ export default function JwtLoginView() {
       >
         Login
       </LoadingButton>
+
+      <Divider sx={{ my: 0.5 }}>
+        <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+          OR
+        </Typography>
+      </Divider>
+
+      <GoogleLogin
+        onSuccess={async (resp) => {
+          try {
+            await loginWithOAuth?.('google', resp.credential!);
+            router.push(returnTo || PATH_AFTER_LOGIN);
+          } catch (err) {
+            setErrorMsg('Đăng nhập Google thất bại');
+          }
+        }}
+        onError={() => setErrorMsg('Đăng nhập Google thất bại')}
+        width="100%"
+        text="continue_with"
+        shape="rectangular"
+        size="large"
+        locale="vi"
+      />
+
+      <FacebookLogin
+        appId={FACEBOOK_APP_ID}
+        fields="name,email,first_name,last_name,picture"
+        callback={async (resp: any) => {
+          if (!resp?.accessToken) return;
+          try {
+            await loginWithOAuth?.('facebook', resp.accessToken);
+            router.push(returnTo || PATH_AFTER_LOGIN);
+          } catch (err) {
+            setErrorMsg('Đăng nhập Facebook thất bại');
+          }
+        }}
+        render={(renderProps: any) => (
+          <Button
+            fullWidth
+            variant="outlined"
+            size="large"
+            startIcon={<Iconify icon="logos:facebook" width={22} />}
+            onClick={renderProps.onClick}
+            disabled={renderProps.isDisabled}
+            sx={{ borderColor: '#1877F2', color: '#1877F2', '&:hover': { borderColor: '#1877F2', bgcolor: 'rgba(24,119,242,0.04)' } }}
+          >
+            Continue with Facebook
+          </Button>
+        )}
+      />
     </Stack>
   );
 
