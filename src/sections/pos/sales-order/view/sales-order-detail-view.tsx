@@ -114,7 +114,7 @@ export default function SalesOrderDetailView({ id }: Props) {
   return (
     <Grid container spacing={3}>
       {/* Header */}
-      <Grid xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
           <Stack direction="row" alignItems="center" spacing={2}>
             <Typography variant="h4">Đơn bán hàng #{order.orderNumber}</Typography>
@@ -142,7 +142,7 @@ export default function SalesOrderDetailView({ id }: Props) {
       </Grid>
 
       {/* Info */}
-      <Grid xs={12} md={8}>
+      <Grid size={{ xs: 12, md: 8 }}>
         <Card sx={{ p: 3 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Thông tin chung</Typography>
           <Box rowGap={2} columnGap={2} display="grid" gridTemplateColumns={{ xs: '1fr', sm: '1fr 1fr' }}>
@@ -173,7 +173,7 @@ export default function SalesOrderDetailView({ id }: Props) {
       </Grid>
 
       {/* Totals */}
-      <Grid xs={12} md={4}>
+      <Grid size={{ xs: 12, md: 4 }}>
         <Card sx={{ p: 3 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Tổng hợp</Typography>
           <Stack spacing={1.5}>
@@ -209,7 +209,7 @@ export default function SalesOrderDetailView({ id }: Props) {
       </Grid>
 
       {/* Items table */}
-      <Grid xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Card sx={{ p: 3 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Chi tiết sản phẩm</Typography>
           <Table size="small">
@@ -243,7 +243,7 @@ export default function SalesOrderDetailView({ id }: Props) {
 
       {/* Payments */}
       {order.payments.length > 0 && (
-        <Grid xs={12}>
+        <Grid size={{ xs: 12 }}>
           <Card sx={{ p: 3 }}>
             <Typography variant="h6" sx={{ mb: 2 }}>Thanh toán</Typography>
             <Table size="small">

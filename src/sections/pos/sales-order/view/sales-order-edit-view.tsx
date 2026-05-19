@@ -164,7 +164,7 @@ export default function SalesOrderEditView({ id }: Props) {
       <form onSubmit={onSubmit}>
         <Grid container spacing={3}>
           {/* Info */}
-          <Grid xs={12} md={8}>
+          <Grid size={{ xs: 12, md: 8 }}>
             <Card sx={{ p: 3 }}>
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Thông tin chung
@@ -198,7 +198,7 @@ export default function SalesOrderEditView({ id }: Props) {
           </Grid>
 
           {/* Totals */}
-          <Grid xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Card sx={{ p: 3 }}>
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Tổng hợp
@@ -237,7 +237,7 @@ export default function SalesOrderEditView({ id }: Props) {
           </Grid>
 
           {/* Items */}
-          <Grid xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Card sx={{ p: 3 }}>
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Sản phẩm
@@ -326,7 +326,7 @@ export default function SalesOrderEditView({ id }: Props) {
           </Grid>
 
           {/* Actions */}
-          <Grid xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Stack direction="row" justifyContent="flex-end" spacing={2}>
               <Button
                 variant="outlined"

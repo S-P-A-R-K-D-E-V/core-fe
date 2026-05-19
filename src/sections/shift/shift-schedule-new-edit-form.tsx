@@ -147,7 +147,7 @@ export default function ShiftScheduleNewEditForm({ currentSchedule }: Props) {
   return (
     <FormProvider methods={methods} onSubmit={onSubmit}>
       <Grid container spacing={3}>
-        <Grid xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Card sx={{ p: 3 }}>
             <Box
               rowGap={3}

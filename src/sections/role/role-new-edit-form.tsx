@@ -149,7 +149,7 @@ export default function RoleNewEditForm({ currentRole }: Props) {
   return (
     <FormProvider methods={methods} onSubmit={onSubmit}>
       <Grid container spacing={3}>
-        <Grid xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Card sx={{ p: 3 }}>
             <Box
               rowGap={3}
@@ -170,7 +170,7 @@ export default function RoleNewEditForm({ currentRole }: Props) {
           </Card>
         </Grid>
 
-        <Grid xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Card sx={{ p: 3 }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               Permissions

@@ -1,12 +1,11 @@
-import AttendanceCheckinView from 'src/sections/attendance/view/attendance-checkin-view';
-import { OverviewAppView } from 'src/sections/overview/app/view';
+import { redirect } from 'next/navigation';
+
+import { paths } from 'src/routes/paths';
+
+export const dynamic = 'force-dynamic';
 
 // ----------------------------------------------------------------------
 
-export const metadata = {
-  title: 'Dashboard: App',
-};
-
-export default function OverviewAppPage() {
-  return <AttendanceCheckinView />;
+export default function DashboardRootPage() {
+  redirect(paths.dashboard.shiftCash.root);
 }

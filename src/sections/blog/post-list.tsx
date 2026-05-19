@@ -21,7 +21,7 @@ export default function PostList({ posts, loading, disabledIndex }: Props) {
   const renderSkeleton = (
     <>
       {[...Array(16)].map((_, index) => (
-        <Grid key={index} xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }} key={index}>
           <PostItemSkeleton />
         </Grid>
       ))}
@@ -31,7 +31,7 @@ export default function PostList({ posts, loading, disabledIndex }: Props) {
   const renderList = (
     <>
       {posts.map((post, index) => (
-        <Grid key={post.id} xs={12} sm={6} md={!disabledIndex && index === 0 ? 6 : 3}>
+        <Grid size={{ xs: 12, sm: 6 }} key={post.id} md={!disabledIndex && index === 0 ? 6 : 3}>
           <PostItem post={post} index={!disabledIndex ? index : undefined} />
         </Grid>
       ))}

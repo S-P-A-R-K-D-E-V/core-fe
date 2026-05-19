@@ -242,7 +242,7 @@ export default function WalktourView() {
         </Stack>
 
         <Grid container spacing={3}>
-          <Grid xs={12} md={8}>
+          <Grid size={{ xs: 12, md: 8 }}>
             <EcommerceWelcome
               id="demo__1"
               title={`Congratulations! \n Jaydon Frankie`}
@@ -256,11 +256,11 @@ export default function WalktourView() {
             />
           </Grid>
 
-          <Grid xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <EcommerceNewProducts id="demo__2" list={_ecommerceNewProducts} />
           </Grid>
 
-          <Grid xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <EcommerceWidgetSummary
               title="Product Sold"
               percent={2.6}
@@ -271,7 +271,7 @@ export default function WalktourView() {
             />
           </Grid>
 
-          <Grid xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <EcommerceWidgetSummary
               id="demo__3"
               title="Total Balance"
@@ -284,7 +284,7 @@ export default function WalktourView() {
             />
           </Grid>
 
-          <Grid xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <EcommerceWidgetSummary
               title="Sales Profit"
               percent={0.6}
@@ -296,7 +296,7 @@ export default function WalktourView() {
             />
           </Grid>
 
-          <Grid xs={12} md={6} lg={4}>
+          <Grid size={{ xs: 12, md: 6, lg: 4 }}>
             <EcommerceSaleByGender
               title="Sale By Gender"
               total={2324}
@@ -309,7 +309,7 @@ export default function WalktourView() {
             />
           </Grid>
 
-          <Grid xs={12} md={6} lg={8}>
+          <Grid size={{ xs: 12, md: 6, lg: 8 }}>
             <EcommerceYearlySales
               id="demo__4"
               title="Yearly Sales"
@@ -361,11 +361,11 @@ export default function WalktourView() {
             />
           </Grid>
 
-          <Grid xs={12} md={6} lg={8}>
+          <Grid size={{ xs: 12, md: 6, lg: 8 }}>
             <EcommerceSalesOverview title="Sales Overview" data={_ecommerceSalesOverview} />
           </Grid>
 
-          <Grid xs={12} md={6} lg={4}>
+          <Grid size={{ xs: 12, md: 6, lg: 4 }}>
             <EcommerceCurrentBalance
               title="Current Balance"
               currentBalance={187650}
@@ -373,7 +373,7 @@ export default function WalktourView() {
             />
           </Grid>
 
-          <Grid xs={12} md={6} lg={8}>
+          <Grid size={{ xs: 12, md: 6, lg: 8 }}>
             <EcommerceBestSalesman
               title="Best Salesman"
               tableData={_ecommerceBestSalesman}
@@ -387,7 +387,7 @@ export default function WalktourView() {
             />
           </Grid>
 
-          <Grid xs={12} md={6} lg={4}>
+          <Grid size={{ xs: 12, md: 6, lg: 4 }}>
             <EcommerceLatestProducts
               id="demo__5"
               title="Latest Products"

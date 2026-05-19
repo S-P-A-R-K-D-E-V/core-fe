@@ -78,7 +78,7 @@ export default function MultiLanguageView() {
 
       <Container sx={{ my: 10 }}>
         <Grid container spacing={5} disableEqualOverflow>
-          <Grid xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Card>
               <CardHeader title="Langs" />
 
@@ -100,7 +100,7 @@ export default function MultiLanguageView() {
             </Card>
           </Grid>
 
-          <Grid xs={12} md={8}>
+          <Grid size={{ xs: 12, md: 8 }}>
             <Stack spacing={5}>
               <Card>
                 <CardHeader title="Flexible" />

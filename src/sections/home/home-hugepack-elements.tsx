@@ -454,16 +454,16 @@ export default function HomeHugePackElements() {
       }}
     >
       <Grid container direction={{ xs: 'column', md: 'row-reverse' }} spacing={5}>
-        <Grid xs={12} md={5}>
+        <Grid size={{ xs: 12, md: 5 }}>
           {renderDescription}
         </Grid>
 
-        <Grid xs={12} md={7}>
+        <Grid size={{ xs: 12, md: 7 }}>
           {renderContent}
         </Grid>
 
         {!mdUp && (
-          <Grid xs={12} sx={{ textAlign: 'center' }}>
+          <Grid size={{ xs: 12 }} sx={{ textAlign: 'center' }}>
             {viewAllBtn}
           </Grid>
         )}

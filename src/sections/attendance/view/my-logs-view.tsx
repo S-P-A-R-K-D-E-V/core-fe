@@ -347,7 +347,7 @@ export default function MyLogsView() {
       {/* Summary cards */}
       {report && (
         <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid xs={6} sm={4} md={2}>
+          <Grid size={{ xs: 6, sm: 4, md: 2 }}>
             <Card sx={{ p: 2, textAlign: 'center' }}>
               <Iconify icon="solar:clock-circle-bold-duotone" width={28} color="primary.main" />
               <Typography variant="h5" mt={0.5}>
@@ -361,7 +361,7 @@ export default function MyLogsView() {
               </Typography>
             </Card>
           </Grid>
-          <Grid xs={6} sm={4} md={2}>
+          <Grid size={{ xs: 6, sm: 4, md: 2 }}>
             <Card sx={{ p: 2, textAlign: 'center' }}>
               <Iconify icon="solar:calendar-bold-duotone" width={28} color="success.main" />
               <Typography variant="h5" mt={0.5}>
@@ -372,7 +372,7 @@ export default function MyLogsView() {
               </Typography>
             </Card>
           </Grid>
-          <Grid xs={6} sm={4} md={2}>
+          <Grid size={{ xs: 6, sm: 4, md: 2 }}>
             <Card sx={{ p: 2, textAlign: 'center' }}>
               <Iconify icon="solar:alarm-bold-duotone" width={28} color="warning.main" />
               <Typography variant="h5" mt={0.5}>
@@ -383,7 +383,7 @@ export default function MyLogsView() {
               </Typography>
             </Card>
           </Grid>
-          <Grid xs={6} sm={4} md={2}>
+          <Grid size={{ xs: 6, sm: 4, md: 2 }}>
             <Card sx={{ p: 2, textAlign: 'center' }}>
               <Iconify icon="solar:close-circle-bold-duotone" width={28} color="error.main" />
               <Typography variant="h5" mt={0.5}>
@@ -394,7 +394,7 @@ export default function MyLogsView() {
               </Typography>
             </Card>
           </Grid>
-          <Grid xs={6} sm={4} md={2}>
+          <Grid size={{ xs: 6, sm: 4, md: 2 }}>
             <Card sx={{ p: 2, textAlign: 'center' }}>
               <Iconify icon="solar:moon-bold-duotone" width={28} color="secondary.main" />
               <Typography variant="h5" mt={0.5}>
@@ -406,7 +406,7 @@ export default function MyLogsView() {
             </Card>
           </Grid>
           {report.overtimeHours > 0 && (
-            <Grid xs={6} sm={4} md={2}>
+            <Grid size={{ xs: 6, sm: 4, md: 2 }}>
               <Card sx={{ p: 2, textAlign: 'center' }}>
                 <Iconify icon="solar:sun-bold-duotone" width={28} color="info.main" />
                 <Typography variant="h5" mt={0.5}>

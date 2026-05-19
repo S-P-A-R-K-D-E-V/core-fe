@@ -44,7 +44,7 @@ export default function EditorView() {
 
       <Container sx={{ my: 10 }}>
         <Grid container spacing={3}>
-          <Grid xs={12} md={8}>
+          <Grid size={{ xs: 12, md: 8 }}>
             <Card sx={{ mb: 3 }}>
               <CardHeader title="Editor Simple" />
               <CardContent>
@@ -69,7 +69,7 @@ export default function EditorView() {
             </Card>
           </Grid>
 
-          <Grid xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Stack sx={{ p: 3, borderRadius: 2, bgcolor: 'background.neutral' }}>
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Preview Plain Text
