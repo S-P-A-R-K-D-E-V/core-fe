@@ -1577,6 +1577,8 @@ export interface ICheckinFaceRequest {
   deviceName?: string;
   time?: string;
   branchName?: string;
+  shiftName?: string;
+  checkInType?: string;
 }
 
 export interface ICheckinFaceResponse {
