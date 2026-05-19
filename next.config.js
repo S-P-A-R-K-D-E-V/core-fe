@@ -1,27 +1,2 @@
-module.exports = {
-  trailingSlash: true,
-  modularizeImports: {
-    '@mui/icons-material': {
-      transform: '@mui/icons-material/{{member}}',
-    },
-    '@mui/material': {
-      transform: '@mui/material/{{member}}',
-    },
-    '@mui/lab': {
-      transform: '@mui/lab/{{member}}',
-    },
-  },
-  webpack(config) {
-    config.module.rules.push({
-      test: /\.svg$/,
-      use: ['@svgr/webpack'],
-    });
-    return config;
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-};
+// Replaced by next.config.mjs — delete this file after confirming next.config.mjs works.
+module.exports = {};

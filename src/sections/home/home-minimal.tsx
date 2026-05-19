@@ -13,20 +13,22 @@ import { varFade, MotionViewport } from 'src/components/animate';
 
 const CARDS = [
   {
-    icon: ' /assets/icons/home/ic_make_brand.svg',
+    icon: '/assets/icons/home/ic_make_brand.svg',
     title: 'Quản lý ca làm việc',
-    description: 'Sắp xếp ca làm việc linh hoạt, theo dõi lịch trình nhân viên dễ dàng, tối ưu hóa nhân lực cho cửa hàng.',
-  },
-  {
-    icon: ' /assets/icons/home/ic_design.svg',
-    title: 'Chấm công & Lương',
     description:
-      'Hệ thống chấm công tự động với GPS, tính lương chính xác theo ca làm việc, phụ cấp và thưởng. Minh bạch và công bằng.',
+      'Sắp xếp ca làm việc linh hoạt, theo dõi lịch trình nhân viên dễ dàng, tối ưu hóa nhân lực cho cửa hàng.',
   },
   {
-    icon: ' /assets/icons/home/ic_development.svg',
+    icon: '/assets/icons/home/ic_design.svg',
+    title: 'Chấm công & Nhận diện khuôn mặt',
+    description:
+      'Chấm công tự động bằng nhận diện khuôn mặt, GPS check-in, lịch sử đầy đủ và báo cáo theo ca, theo tháng.',
+  },
+  {
+    icon: '/assets/icons/home/ic_development.svg',
     title: 'Kiểm tiền ca',
-    description: 'Quản lý tiền mặt quầy, đối chiếu doanh thu KiotViet, chốt ca nhanh chóng. Hạn chế sai sót và thất thoát.',
+    description:
+      'Quản lý tiền mặt quầy, đối chiếu doanh thu KiotViet, chốt ca nhanh chóng. Hạn chế sai sót và thất thoát.',
   },
 ];
 
@@ -56,6 +58,12 @@ export default function HomeMinimal() {
         <m.div variants={varFade().inDown}>
           <Typography variant="h2">
             Công cụ nội bộ <br /> giúp bạn điều gì?
+          </Typography>
+        </m.div>
+
+        <m.div variants={varFade().inUp}>
+          <Typography variant="body1" sx={{ color: 'text.secondary', maxWidth: 560, mx: 'auto' }}>
+            Tất cả tính năng cần thiết để vận hành cửa hàng phụ kiện hiệu quả, minh bạch và chính xác.
           </Typography>
         </m.div>
       </Stack>
