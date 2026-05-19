@@ -1,6 +1,9 @@
 'use client';
 
+import { GoogleOAuthProvider } from '@react-oauth/google';
+
 import { AuthGuard } from 'src/auth/guard';
+import { GOOGLE_CLIENT_ID } from 'src/config-global';
 import DashboardLayout from 'src/layouts/dashboard';
 
 // ----------------------------------------------------------------------
@@ -11,8 +14,10 @@ type Props = {
 
 export default function Layout({ children }: Props) {
   return (
-    <AuthGuard>
-      <DashboardLayout>{children}</DashboardLayout>
-    </AuthGuard>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <AuthGuard>
+        <DashboardLayout>{children}</DashboardLayout>
+      </AuthGuard>
+    </GoogleOAuthProvider>
   );
 }
