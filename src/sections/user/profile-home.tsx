@@ -11,7 +11,7 @@ import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import { alpha } from '@mui/material/styles';
 import InputBase from '@mui/material/InputBase';
-import Grid from '@mui/material/Unstable_Grid2';
+import Grid from '@mui/material/Grid2';
 import CardHeader from '@mui/material/CardHeader';
 
 import { fNumber } from 'src/utils/format-number';

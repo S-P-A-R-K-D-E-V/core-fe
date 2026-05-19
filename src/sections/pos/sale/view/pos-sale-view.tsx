@@ -16,7 +16,7 @@ import Divider from '@mui/material/Divider';
 import Chip from '@mui/material/Chip';
 import Badge from '@mui/material/Badge';
 import Card from '@mui/material/Card';
-import Grid from '@mui/material/Unstable_Grid2';
+import Grid from '@mui/material/Grid2';
 import Paper from '@mui/material/Paper';
 import Tooltip from '@mui/material/Tooltip';
 import Table from '@mui/material/Table';

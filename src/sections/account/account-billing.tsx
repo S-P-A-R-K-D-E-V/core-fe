@@ -1,4 +1,4 @@
-import Grid from '@mui/material/Unstable_Grid2';
+import Grid from '@mui/material/Grid2';
 
 import { IPaymentCard } from 'src/types/payment';
 import { IAddressItem } from 'src/types/address';
