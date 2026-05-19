@@ -29,13 +29,11 @@ const nextConfig = {
     BUILD_STATIC_EXPORT: isStaticExport,
   },
 
-  // Proxy API requests to the backend service.
-  // BACKEND_URL is a server-side env var (NOT NEXT_PUBLIC_) set in k8s/deployment.yaml.
-  // Local dev: set NEXT_PUBLIC_HOST_API=http://localhost:2510 in .env.local instead.
+  // Proxy API requests to the backend service (baked at build time into routes-manifest.json).
+  // BACKEND_URL defaults to the K8s internal service URL — override via env var if needed.
+  // Local dev: axios uses absolute NEXT_PUBLIC_HOST_API URL, so rewrites are never triggered.
   async rewrites() {
-    const backendUrl = process.env.BACKEND_URL;
-    if (!backendUrl) return [];
-
+    const backendUrl = process.env.BACKEND_URL || 'http://core-api:5000';
     return BACKEND_API_PREFIXES.map((prefix) => ({
       source: `/${prefix}/:path*`,
       destination: `${backendUrl}/${prefix}/:path*`,
