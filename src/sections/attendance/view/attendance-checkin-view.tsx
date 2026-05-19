@@ -94,6 +94,7 @@ export default function AttendanceCheckinView() {
   const watchIdRef = useRef<number | null>(null);
 
   const [faceDialogOpen, setFaceDialogOpen] = useState(false);
+  const [overtimeConfirmOpen, setOvertimeConfirmOpen] = useState(false);
   const [pendingCheckin, setPendingCheckin] = useState<{
     mode: 'smart' | 'overtime';
     shiftName?: string;
@@ -423,6 +424,11 @@ export default function AttendanceCheckinView() {
     setActionLoading(pendingCheckin.mode);
     try {
       const staffName = user?.displayName || user?.name || user?.email || 'N/A';
+      const shiftLabel =
+        pendingCheckin.mode === 'smart' && currentShiftDisplay
+          ? `${currentShiftDisplay.currentShift.shiftName || currentShiftDisplay.currentShift.scheduleName} (${currentShiftDisplay.currentShift.startTime}–${currentShiftDisplay.currentShift.endTime})`
+          : pendingCheckin.shiftName;
+
       await checkinFace({
         candidateName: staffName,
         imageBase64: capturedImage,
@@ -431,6 +437,8 @@ export default function AttendanceCheckinView() {
         deviceName: navigator.userAgent.slice(0, 80),
         time: new Date().toISOString(),
         branchName: isWithinGeofence ? nearestBranch?.name : undefined,
+        shiftName: shiftLabel,
+        checkInType: pendingCheckin.mode,
       });
 
       if (pendingCheckin.mode === 'overtime') {
@@ -877,7 +885,29 @@ export default function AttendanceCheckinView() {
                   <CurrentTime />
                 </Typography>
 
-                {todayAssignments.length > 0 && (
+                {/* Subtle notice when no shifts */}
+                {todayAssignments.length === 0 ? (
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="center"
+                    spacing={0.75}
+                    sx={{
+                      mb: 3,
+                      px: 2,
+                      py: 0.75,
+                      borderRadius: 2,
+                      bgcolor: 'rgba(255,171,0,0.2)',
+                      border: '1px solid rgba(255,171,0,0.35)',
+                      display: 'inline-flex',
+                    }}
+                  >
+                    <Iconify icon="mdi:clock-plus-outline" width={16} sx={{ color: '#FFD666' }} />
+                    <Typography variant="caption" sx={{ color: '#FFD666', fontWeight: 600 }}>
+                      Không có ca hôm nay — sẽ check-in ngoài giờ
+                    </Typography>
+                  </Stack>
+                ) : (
                   <Typography variant="body2" sx={{ opacity: 0.8, mb: 3 }}>
                     Hệ thống sẽ tự nhận diện ca phù hợp dựa vào thời gian hiện tại
                   </Typography>
@@ -895,7 +925,13 @@ export default function AttendanceCheckinView() {
                       variant="contained"
                       size="large"
                       fullWidth
-                      onClick={() => openFaceDialog('smart')}
+                      onClick={() => {
+                        if (todayAssignments.length === 0) {
+                          setOvertimeConfirmOpen(true);
+                        } else {
+                          openFaceDialog('smart');
+                        }
+                      }}
                       disabled={!!actionLoading || (branches.length > 0 && !gpsReadyForCheckin)}
                       startIcon={
                         actionLoading === 'smart' ? (
@@ -917,7 +953,7 @@ export default function AttendanceCheckinView() {
                         color: '#fff',
                       }}
                     >
-                      Chụp ảnh & Bắt đầu làm việc
+                      {todayAssignments.length === 0 ? 'Chụp ảnh & Check-in ngoài giờ' : 'Chụp ảnh & Bắt đầu làm việc'}
                     </Button>
                   </span>
                 </Tooltip>
@@ -1109,6 +1145,92 @@ export default function AttendanceCheckinView() {
           </Card>
         </Stack>
       )}
+
+      {/* ── Overtime Confirmation Dialog ── */}
+      <Dialog
+        open={overtimeConfirmOpen}
+        onClose={() => setOvertimeConfirmOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}
+      >
+        <DialogContent sx={{ textAlign: 'center', pt: 4, pb: 2, px: 3 }}>
+          {/* Icon */}
+          <Box
+            sx={{
+              width: 72,
+              height: 72,
+              borderRadius: '50%',
+              bgcolor: 'warning.lighter',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mx: 'auto',
+              mb: 2.5,
+            }}
+          >
+            <Iconify icon="mdi:clock-plus-outline" width={36} sx={{ color: 'warning.main' }} />
+          </Box>
+
+          <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
+            Không có ca hôm nay
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+            Bạn chưa được phân ca làm cho hôm nay.
+            <br />
+            Bạn có muốn tiếp tục{' '}
+            <Box component="span" sx={{ fontWeight: 700, color: 'warning.dark' }}>
+              check-in ngoài giờ
+            </Box>{' '}
+            không?
+          </Typography>
+
+          {/* Info chip */}
+          <Box
+            sx={{
+              mt: 2,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.5,
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 2,
+              bgcolor: 'info.lighter',
+            }}
+          >
+            <Iconify icon="mdi:information-outline" width={14} sx={{ color: 'info.main' }} />
+            <Typography variant="caption" sx={{ color: 'info.dark' }}>
+              Sẽ được ghi nhận là ca ngoài giờ (overtime)
+            </Typography>
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 3, gap: 1.5, flexDirection: 'column' }}>
+          <Button
+            variant="contained"
+            color="warning"
+            size="large"
+            fullWidth
+            startIcon={<Iconify icon="mdi:camera" />}
+            onClick={() => {
+              setOvertimeConfirmOpen(false);
+              openFaceDialog('overtime', 'Ngoài giờ');
+            }}
+            sx={{ borderRadius: 2, py: 1.25, fontWeight: 700 }}
+          >
+            Xác nhận — Check-in ngoài giờ
+          </Button>
+          <Button
+            variant="text"
+            color="inherit"
+            fullWidth
+            onClick={() => setOvertimeConfirmOpen(false)}
+            sx={{ color: 'text.secondary' }}
+          >
+            Hủy
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ── Face Capture Dialog ── */}
       <Dialog
