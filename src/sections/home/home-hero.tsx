@@ -2,10 +2,11 @@ import { m, useScroll } from 'framer-motion';
 import { useRef, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
-import Link from '@mui/material/Link';
+import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
-import Rating from '@mui/material/Rating';
 import Button from '@mui/material/Button';
+import Skeleton from '@mui/material/Skeleton';
 import Container from '@mui/material/Container';
 import Grid from '@mui/material/Grid2';
 import Typography from '@mui/material/Typography';
@@ -19,14 +20,27 @@ import { useResponsive } from 'src/hooks/use-responsive';
 import { HEADER } from 'src/layouts/config-layout';
 import { bgBlur, bgGradient, textGradient } from 'src/theme/css';
 
+import { fCurrency } from 'src/utils/format-number';
+
 import Iconify from 'src/components/iconify';
 import { varFade, MotionContainer } from 'src/components/animate';
+
+import type { IProductListItem } from 'src/types/corecms-api';
+
+// ----------------------------------------------------------------------
+
+const CARD_GRADIENTS = [
+  'linear-gradient(135deg, #F8C8DC 0%, #F4A0C0 100%)',
+  'linear-gradient(135deg, #EED6C4 0%, #DBAAA0 100%)',
+  'linear-gradient(135deg, #FFC8D5 0%, #E891A8 100%)',
+  'linear-gradient(135deg, #F5E6D3 0%, #EEC8A0 100%)',
+];
 
 // ----------------------------------------------------------------------
 
 const StyledRoot = styled('div')(({ theme }) => ({
   ...bgGradient({
-    color: 'rgba(255, 240, 245, 0.92)', // lavender blush pastel
+    color: 'rgba(255, 240, 245, 0.92)',
     imgUrl: '/assets/background/overlay_3.jpg',
   }),
   width: '100%',
@@ -51,9 +65,9 @@ const StyledWrapper = styled('div')(({ theme }) => ({
 const StyledTextGradient = styled(m.h1)(({ theme }) => ({
   ...textGradient(
     `300deg,
-    #F8C8DC 0%,      /* pastel pink */
-    #F4B6C2 25%,     /* soft rose */
-    #EED6C4 50%,     /* nude beige */
+    #F8C8DC 0%,
+    #F4B6C2 25%,
+    #EED6C4 50%,
     #F4B6C2 75%,
     #F8C8DC 100%`
   ),
@@ -127,7 +141,122 @@ const StyledPolygon = styled('div')<StyledPolygonProps>(
 
 // ----------------------------------------------------------------------
 
-export default function HomeHero() {
+type ProductMiniCardProps = {
+  product?: IProductListItem;
+  index: number;
+  loading?: boolean;
+};
+
+function ProductMiniCard({ product, index, loading }: ProductMiniCardProps) {
+  if (loading) {
+    return (
+      <Skeleton
+        variant="rectangular"
+        sx={{ borderRadius: 2, width: '100%', height: 190 }}
+        animation="wave"
+      />
+    );
+  }
+
+  const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
+  const price = product?.sellingPrice ?? product?.basePrice ?? 0;
+
+  return (
+    <m.div variants={varFade().inUp} style={{ width: '100%' }}>
+      <Card
+        sx={{
+          borderRadius: 2,
+          overflow: 'hidden',
+          transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+          '&:hover': {
+            transform: 'translateY(-6px)',
+            boxShadow: (theme) =>
+              `0 20px 40px ${alpha(theme.palette.primary.main, 0.25)}`,
+          },
+        }}
+      >
+        {/* Image / gradient banner */}
+        <Box
+          sx={{
+            height: 120,
+            background: gradient,
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+          }}
+        >
+          {product?.imageUrl ? (
+            <Box
+              component="img"
+              src={product.imageUrl}
+              alt={product.name}
+              sx={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                position: 'absolute',
+                inset: 0,
+              }}
+            />
+          ) : (
+            <Iconify
+              icon="solar:tag-price-bold-duotone"
+              width={44}
+              sx={{ color: 'rgba(255,255,255,0.55)' }}
+            />
+          )}
+
+          {product?.categoryName && (
+            <Chip
+              label={product.categoryName}
+              size="small"
+              sx={{
+                position: 'absolute',
+                top: 8,
+                left: 8,
+                bgcolor: 'rgba(255,255,255,0.88)',
+                fontSize: '0.6rem',
+                height: 18,
+                fontWeight: 600,
+                '& .MuiChip-label': { px: 0.75 },
+              }}
+            />
+          )}
+        </Box>
+
+        {/* Info */}
+        <Box sx={{ p: 1.25, bgcolor: 'background.paper' }}>
+          <Typography
+            variant="caption"
+            fontWeight={700}
+            noWrap
+            display="block"
+            sx={{ mb: 0.25 }}
+          >
+            {product?.name ?? '—'}
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{ color: 'primary.main', fontWeight: 700 }}
+          >
+            {price > 0 ? fCurrency(price) : 'Liên hệ'}
+          </Typography>
+        </Box>
+      </Card>
+    </m.div>
+  );
+}
+
+// ----------------------------------------------------------------------
+
+type Props = {
+  products?: IProductListItem[];
+  productsLoading?: boolean;
+};
+
+export default function HomeHero({ products = [], productsLoading = true }: Props) {
   const mdUp = useResponsive('up', 'md');
 
   const theme = useTheme();
@@ -138,8 +267,6 @@ export default function HomeHero() {
 
   const [percent, setPercent] = useState(0);
 
-  const lightMode = theme.palette.mode === 'light';
-
   const getScroll = useCallback(() => {
     let heroHeight = 0;
 
@@ -149,7 +276,6 @@ export default function HomeHero() {
 
     scrollY.on('change', (scrollHeight) => {
       const scrollPercent = (scrollHeight * 100) / heroHeight;
-
       setPercent(Math.floor(scrollPercent));
     });
   }, [scrollY]);
@@ -158,16 +284,17 @@ export default function HomeHero() {
     getScroll();
   }, [getScroll]);
 
-  const transition = {
-    repeatType: 'loop',
-    ease: 'linear',
-    duration: 60 * 4,
-    repeat: Infinity,
-  } as const;
-
   const opacity = 1 - percent / 100;
-
   const hide = percent > 120;
+
+  // Determine card items: skeleton × 4 while loading, real products, or gradient placeholders
+  const cardItems: Array<IProductListItem | null> = productsLoading
+    ? [null, null, null, null]
+    : products.length > 0
+      ? [...products.slice(0, 4), ...Array(Math.max(0, 4 - products.length)).fill(null)]
+      : [null, null, null, null];
+
+  // ----------------------------------------------------------------------
 
   const renderDescription = (
     <Stack
@@ -186,10 +313,7 @@ export default function HomeHero() {
       <m.div variants={varFade().in}>
         <Typography
           variant="h2"
-          sx={{
-            textAlign: 'center',
-            fontWeight: 700,
-          }}
+          sx={{ textAlign: 'center', fontWeight: 700 }}
         >
           Cici Accessories
         </Typography>
@@ -212,10 +336,7 @@ export default function HomeHero() {
       <m.div variants={varFade().in}>
         <Typography
           variant="body1"
-          sx={{
-            textAlign: 'center',
-            color: 'text.secondary',
-          }}
+          sx={{ textAlign: 'center', color: 'text.secondary' }}
         >
           Nền tảng quản lý nội bộ dành cho hệ thống cửa hàng Cici Accessories.
           Quản lý ca làm việc, chấm công, kiểm tiền ca, lương và phê duyệt yêu cầu
@@ -224,7 +345,11 @@ export default function HomeHero() {
       </m.div>
 
       <m.div variants={varFade().in}>
-        <Stack spacing={1.5} direction={{ xs: 'column', sm: 'row' }} sx={{ my: 5 }}>
+        <Stack
+          spacing={1.5}
+          direction={{ xs: 'column', sm: 'row' }}
+          sx={{ my: 5 }}
+        >
           <Button
             component={RouterLink}
             href={paths.dashboard.root}
@@ -251,86 +376,66 @@ export default function HomeHero() {
     </Stack>
   );
 
-  const renderSlides = (
+  // ----------------------------------------------------------------------
+
+  const renderProductCards = (
     <Stack
-      direction="row"
-      alignItems="flex-start"
+      alignItems="center"
+      justifyContent="center"
       sx={{
-        height: '150%',
-        position: 'absolute',
+        height: 1,
         opacity: opacity > 0 ? opacity : 0,
-        transform: `skew(${-16 - percent / 24}deg, ${4 - percent / 16}deg)`,
+        transform: `skew(${-8 - percent / 32}deg, ${2 - percent / 24}deg)`,
         ...(theme.direction === 'rtl' && {
-          transform: `skew(${16 + percent / 24}deg, ${4 + percent / 16}deg)`,
+          transform: `skew(${8 + percent / 32}deg, ${2 + percent / 24}deg)`,
         }),
       }}
     >
-      <Stack
-        component={m.div}
-        variants={varFade().in}
-        sx={{
-          width: 344,
-          position: 'relative',
-        }}
-      >
-        <Box
-          component={m.img}
-          animate={{ y: ['0%', '100%'] }}
-          transition={transition}
-          alt={lightMode ? 'light_1' : 'dark_1'}
-          src={
-            lightMode
-              ? `/assets/images/home/hero/light_1.webp`
-              : `/assets/images/home/hero/dark_1.webp`
-          }
-          sx={{ position: 'absolute', mt: -5 }}
-        />
-        <Box
-          component={m.img}
-          animate={{ y: ['-100%', '0%'] }}
-          transition={transition}
-          alt={lightMode ? 'light_1' : 'dark_1'}
-          src={
-            lightMode
-              ? `/assets/images/home/hero/light_1.webp`
-              : `/assets/images/home/hero/dark_1.webp`
-          }
-          sx={{ position: 'absolute' }}
-        />
-      </Stack>
+      <m.div variants={varFade().inDown}>
+        <Typography
+          variant="overline"
+          sx={{
+            display: 'block',
+            textAlign: 'center',
+            color: 'text.disabled',
+            mb: 2,
+            letterSpacing: 2,
+          }}
+        >
+          Sản phẩm nổi bật
+        </Typography>
+      </m.div>
 
-      <Stack
-        component={m.div}
-        variants={varFade().in}
-        sx={{ width: 720, position: 'relative', ml: -5 }}
+      <Grid
+        container
+        spacing={1.5}
+        sx={{ maxWidth: 340 }}
       >
-        <Box
-          component={m.img}
-          animate={{ y: ['100%', '0%'] }}
-          transition={transition}
-          alt={lightMode ? 'light_2' : 'dark_2'}
-          src={
-            lightMode
-              ? `/assets/images/home/hero/light_2.webp`
-              : `/assets/images/home/hero/dark_2.webp`
-          }
-          sx={{ position: 'absolute', mt: -5 }}
-        />
-        <Box
-          component={m.img}
-          animate={{ y: ['0%', '-100%'] }}
-          transition={transition}
-          alt={lightMode ? 'light_2' : 'dark_2'}
-          src={
-            lightMode
-              ? `/assets/images/home/hero/light_2.webp`
-              : `/assets/images/home/hero/dark_2.webp`
-          }
-          sx={{ position: 'absolute' }}
-        />
-      </Stack>
+        {cardItems.map((product, index) => (
+          <Grid key={product?.id ?? `placeholder-${index}`} size={{ xs: 6 }}>
+            <ProductMiniCard
+              product={product ?? undefined}
+              index={index}
+              loading={productsLoading}
+            />
+          </Grid>
+        ))}
+      </Grid>
+
+      {!productsLoading && products.length === 0 && (
+        <m.div variants={varFade().in}>
+          <Typography
+            variant="caption"
+            sx={{ display: 'block', textAlign: 'center', color: 'text.disabled', mt: 1.5 }}
+          >
+            Đăng nhập để xem sản phẩm
+          </Typography>
+        </m.div>
+      )}
     </Stack>
   );
+
+  // ----------------------------------------------------------------------
 
   const renderPolygons = (
     <>
@@ -353,19 +458,21 @@ export default function HomeHero() {
       <StyledRoot
         ref={heroRef}
         sx={{
-          ...(hide && {
-            opacity: 0,
-          }),
+          ...(hide && { opacity: 0 }),
         }}
       >
         <StyledWrapper>
           <Container component={MotionContainer} sx={{ height: 1 }}>
-            <Grid container columnSpacing={{ md: 10 }} sx={{ height: 1 }}>
+            <Grid container columnSpacing={{ md: 6 }} sx={{ height: 1 }}>
               <Grid size={{ xs: 12, md: 6 }}>
                 {renderDescription}
               </Grid>
 
-              {mdUp && <Grid size={{ md: 6 }}>{renderSlides}</Grid>}
+              {mdUp && (
+                <Grid size={{ md: 6 }}>
+                  {renderProductCards}
+                </Grid>
+              )}
             </Grid>
           </Container>
 
