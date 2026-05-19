@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 
 import Card from '@mui/material/Card';
-import Grid from '@mui/material/Unstable_Grid2';
+import Grid from '@mui/material/Grid2';
 
 import Toolbar from './toolbar';
 import ContainerView from './container';

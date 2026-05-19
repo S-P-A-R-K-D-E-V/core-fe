@@ -9,7 +9,7 @@ import Stack from '@mui/material/Stack';
 import { CardContent } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import Container from '@mui/material/Container';
-import Grid from '@mui/material/Unstable_Grid2';
+import Grid from '@mui/material/Grid2';
 import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
 import RadioGroup from '@mui/material/RadioGroup';
