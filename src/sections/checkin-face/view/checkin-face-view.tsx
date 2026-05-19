@@ -103,7 +103,11 @@ export default function CheckinFaceView() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Mirror horizontally for front camera so the saved image is natural
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     // Add overlay: time + location
     const now = new Date();
@@ -260,10 +264,10 @@ export default function CheckinFaceView() {
                   sx={{
                     position: 'relative',
                     width: '100%',
-                    maxWidth: 640,
                     borderRadius: 2,
                     overflow: 'hidden',
                     bgcolor: 'black',
+                    aspectRatio: '4/3',
                   }}
                 >
                   <video
@@ -271,8 +275,38 @@ export default function CheckinFaceView() {
                     autoPlay
                     playsInline
                     muted
-                    style={{ width: '100%', display: 'block' }}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'block',
+                      objectFit: 'cover',
+                      transform: 'scaleX(-1)',
+                    }}
                   />
+                  {/* Face oval guide */}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 180,
+                        height: 220,
+                        borderRadius: '50%',
+                        border: '3px solid rgba(255,255,255,0.75)',
+                        boxShadow: '0 0 0 9999px rgba(0,0,0,0.3)',
+                      }}
+                    />
+                  </Box>
                 </Box>
                 <Stack direction="row" spacing={2}>
                   <Button
