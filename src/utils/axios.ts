@@ -39,6 +39,9 @@ export const endpoints = {
     resendOtp: '/auth/resend-otp',
     restoreSession: '/auth/restore-session',
     oauthLogin: '/auth/oauth-login',
+    oauthConnections: '/auth/oauth-connections',
+    oauthConnect: '/auth/oauth-connect',
+    oauthDisconnect: (provider: string) => `/auth/oauth-connections/${provider}`,
   },
   users: {
     list: '/users',
