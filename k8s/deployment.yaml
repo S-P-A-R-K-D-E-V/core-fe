@@ -54,6 +54,10 @@ spec:
           env:
             - name: NODE_ENV
               value: "production"
+            # Server-side proxy target — NOT exposed to browser (not NEXT_PUBLIC_)
+            # Next.js rewrites forward /auth/*, /users/*, etc. → this URL
+            - name: BACKEND_URL
+              value: "http://core-api.app.svc.cluster.local:2510"
       # Đảm bảo 2 pod không chạy cùng node (nếu có nhiều node)
       affinity:
         podAntiAffinity:

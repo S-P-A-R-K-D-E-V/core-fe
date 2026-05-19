@@ -43,8 +43,6 @@ jobs:
             ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.image_tag }}
             ${{ env.IMAGE_NAME }}:latest
           build-args: |
-            NEXT_PUBLIC_HOST_API=${{ secrets.NEXT_PUBLIC_HOST_API }}
-            NEXT_PUBLIC_ASSETS_API=${{ secrets.NEXT_PUBLIC_ASSETS_API }}
             NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
             NEXT_PUBLIC_FACEBOOK_APP_ID=${{ secrets.NEXT_PUBLIC_FACEBOOK_APP_ID }}
 
