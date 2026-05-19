@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-fe
+  namespace: app
+  labels:
+    app: core-fe
+spec:
+  # 2 replica: 1 đang chạy + 1 standby → zero-downtime rolling update
+  replicas: 2
+  # Giữ 2 ReplicaSet cũ → kubectl rollout undo có thể rollback về 2 version trước
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: core-fe
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Tại mỗi thời điểm rolling: tối đa 1 pod bị terminate, tối đa 1 pod mới spin up
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: core-fe
+    spec:
+      containers:
+        - name: core-fe
+          # Image tag sẽ được kubectl set image ghi đè mỗi lần deploy
+          image: satthuno99/core-fe:latest
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          env:
+            - name: NODE_ENV
+              value: "production"
+      # Đảm bảo 2 pod không chạy cùng node (nếu có nhiều node)
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - core-fe
+                topologyKey: "kubernetes.io/hostname"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-fe
+  namespace: app
+spec:
+  selector:
+    app: core-fe
+  ports:
+    - port: 3000
+      targetPort: 3000
+  type: ClusterIP

@@ -6,6 +6,11 @@ import 'src/locales/i18n';
 
 // ----------------------------------------------------------------------
 
+import type { Metadata, Viewport } from 'next';
+
+import InitColorSchemeScript from '@mui/material/InitColorSchemeScript';
+import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter';
+
 import ThemeProvider from 'src/theme';
 import { LocalizationProvider } from 'src/locales';
 import { primaryFont } from 'src/theme/typography';
@@ -25,18 +30,18 @@ import { AuthProvider } from 'src/auth/context/jwt';
 
 // ----------------------------------------------------------------------
 
-export const viewport = {
+export const viewport: Viewport = {
   themeColor: '#000000',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
 };
 
-export const metadata = {
-  title: 'Minimal UI Kit',
+export const metadata: Metadata = {
+  title: 'CiCi Accessories - Hệ thống quản lý nội bộ',
   description:
-    'The starting point for your next project with Minimal UI Kit, built on the newest version of Material-UI ©, ready to be customized to your style',
-  keywords: 'react,material,kit,application,dashboard,admin,template',
+    'Nền tảng quản lý nội bộ dành cho hệ thống cửa hàng CiCi Accessories. Quản lý ca làm việc, chấm công, kiểm tiền ca, lương và phê duyệt yêu cầu.',
+  keywords: 'cici,accessories,quản lý,nội bộ,ca làm việc,lương,chấm công',
   manifest: '/manifest.json',
   icons: [
     { rel: 'icon', url: '/favicon/favicon.ico' },
@@ -52,8 +57,10 @@ type Props = {
 
 export default function RootLayout({ children }: Props) {
   return (
-    <html lang="en" className={primaryFont.className}>
+    <html lang="vi" className={primaryFont.className} suppressHydrationWarning>
       <body>
+        <InitColorSchemeScript defaultMode="light" />
+
         <AuthProvider>
           <LocalizationProvider>
             <SettingsProvider
@@ -66,17 +73,19 @@ export default function RootLayout({ children }: Props) {
                 themeStretch: false,
               }}
             >
-              <ThemeProvider>
-                <MotionLazy>
-                  <SnackbarProvider>
-                    <CheckoutProvider>
-                      <SettingsDrawer />
-                      <ProgressBar />
-                      {children}
-                    </CheckoutProvider>
-                  </SnackbarProvider>
-                </MotionLazy>
-              </ThemeProvider>
+              <AppRouterCacheProvider options={{ key: 'css' }}>
+                <ThemeProvider>
+                  <MotionLazy>
+                    <SnackbarProvider>
+                      <CheckoutProvider>
+                        <SettingsDrawer />
+                        <ProgressBar />
+                        {children}
+                      </CheckoutProvider>
+                    </SnackbarProvider>
+                  </MotionLazy>
+                </ThemeProvider>
+              </AppRouterCacheProvider>
             </SettingsProvider>
           </LocalizationProvider>
         </AuthProvider>

@@ -237,10 +237,12 @@ export default function HomeHero() {
           </Button>
 
           <Button
+            component={RouterLink}
+            href={paths.dashboard.shift.root}
             color="inherit"
             size="large"
             variant="outlined"
-            startIcon={<Iconify icon="eva:settings-2-outline" width={24} />}
+            startIcon={<Iconify icon="eva:calendar-outline" width={24} />}
           >
             Quản lý ca & lương
           </Button>
