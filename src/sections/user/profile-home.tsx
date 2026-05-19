@@ -180,7 +180,7 @@ export default function ProfileHome({ info, posts }: Props) {
 
   return (
     <Grid container spacing={3}>
-      <Grid xs={12} md={4}>
+      <Grid size={{ xs: 12, md: 4 }}>
         <Stack spacing={3}>
           {renderFollows}
 
@@ -190,7 +190,7 @@ export default function ProfileHome({ info, posts }: Props) {
         </Stack>
       </Grid>
 
-      <Grid xs={12} md={8}>
+      <Grid size={{ xs: 12, md: 8 }}>
         <Stack spacing={3}>
           {renderPostInput}
 

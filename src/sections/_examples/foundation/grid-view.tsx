@@ -73,7 +73,7 @@ export default function GridView() {
 
               <Grid container spacing={spacing}>
                 {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((value) => (
-                  <Grid key={value} xs={1}>
+                  <Grid size={{ xs: 1 }} key={value}>
                     <Paper
                       sx={{
                         height: 80,

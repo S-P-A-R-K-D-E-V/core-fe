@@ -611,7 +611,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
       <FormProvider methods={methods} onSubmit={onSubmit}>
         <Grid container spacing={3}>
           {/* ====== LEFT PANEL: Product search + Items table ====== */}
-          <Grid xs={12} md={8}>
+          <Grid size={{ xs: 12, md: 8 }}>
             <Card sx={{ p: 3 }}>
               {/* Product search bar */}
               <Stack direction="row" spacing={1} sx={{ mb: 3 }}>
@@ -883,7 +883,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
           </Grid>
 
           {/* ====== RIGHT PANEL: Order info + Totals ====== */}
-          <Grid xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Stack spacing={3}>
               {/* Supplier & Warehouse */}
               <Card sx={{ p: 3 }}>

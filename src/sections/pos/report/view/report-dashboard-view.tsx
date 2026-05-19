@@ -71,7 +71,7 @@ export default function ReportDashboardView() {
 
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
             <CardContent>
               <Typography variant="subtitle2" color="text.secondary">
@@ -87,7 +87,7 @@ export default function ReportDashboardView() {
           </Card>
         </Grid>
 
-        <Grid xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
             <CardContent>
               <Typography variant="subtitle2" color="text.secondary">
@@ -103,7 +103,7 @@ export default function ReportDashboardView() {
           </Card>
         </Grid>
 
-        <Grid xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
             <CardContent>
               <Typography variant="subtitle2" color="text.secondary">
@@ -119,7 +119,7 @@ export default function ReportDashboardView() {
           </Card>
         </Grid>
 
-        <Grid xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
             <CardContent>
               <Typography variant="subtitle2" color="text.secondary">
@@ -138,7 +138,7 @@ export default function ReportDashboardView() {
 
       {/* Top Selling Products & Recent Orders */}
       <Grid container spacing={3}>
-        <Grid xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2 }}>
@@ -177,7 +177,7 @@ export default function ReportDashboardView() {
           </Card>
         </Grid>
 
-        <Grid xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2 }}>

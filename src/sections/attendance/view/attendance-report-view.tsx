@@ -205,7 +205,7 @@ export default function AttendanceReportView() {
 
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid xs={6} md={3}>
+        <Grid size={{ xs: 6, md: 3 }}>
           <Card sx={{ p: 3, textAlign: 'center' }}>
             <Iconify icon="mdi:clock-outline" width={40} sx={{ color: 'primary.main', mb: 1 }} />
             <Typography variant="h4">{totalHours.toFixed(1)}h</Typography>
@@ -214,7 +214,7 @@ export default function AttendanceReportView() {
             </Typography>
           </Card>
         </Grid>
-        <Grid xs={6} md={3}>
+        <Grid size={{ xs: 6, md: 3 }}>
           <Card sx={{ p: 3, textAlign: 'center' }}>
             <Iconify icon="mdi:clock-alert" width={40} sx={{ color: 'warning.main', mb: 1 }} />
             <Typography variant="h4">{totalLate}</Typography>
@@ -223,7 +223,7 @@ export default function AttendanceReportView() {
             </Typography>
           </Card>
         </Grid>
-        <Grid xs={6} md={3}>
+        <Grid size={{ xs: 6, md: 3 }}>
           <Card sx={{ p: 3, textAlign: 'center' }}>
             <Iconify icon="mdi:account-off" width={40} sx={{ color: 'error.main', mb: 1 }} />
             <Typography variant="h4">{totalAbsent}</Typography>
@@ -232,7 +232,7 @@ export default function AttendanceReportView() {
             </Typography>
           </Card>
         </Grid>
-        <Grid xs={6} md={3}>
+        <Grid size={{ xs: 6, md: 3 }}>
           <Card sx={{ p: 3, textAlign: 'center' }}>
             <Iconify icon="mdi:timer-plus" width={40} sx={{ color: 'success.main', mb: 1 }} />
             <Typography variant="h4">{totalOvertime.toFixed(1)}h</Typography>

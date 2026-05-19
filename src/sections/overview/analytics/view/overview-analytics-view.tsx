@@ -40,7 +40,7 @@ export default function OverviewAnalyticsView() {
       </Typography>
 
       <Grid container spacing={3}>
-        <Grid xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <AnalyticsWidgetSummary
             title="Weekly Sales"
             total={714000}
@@ -48,7 +48,7 @@ export default function OverviewAnalyticsView() {
           />
         </Grid>
 
-        <Grid xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <AnalyticsWidgetSummary
             title="New Users"
             total={1352831}
@@ -57,7 +57,7 @@ export default function OverviewAnalyticsView() {
           />
         </Grid>
 
-        <Grid xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <AnalyticsWidgetSummary
             title="Item Orders"
             total={1723315}
@@ -66,7 +66,7 @@ export default function OverviewAnalyticsView() {
           />
         </Grid>
 
-        <Grid xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <AnalyticsWidgetSummary
             title="Bug Reports"
             total={234}
@@ -75,7 +75,7 @@ export default function OverviewAnalyticsView() {
           />
         </Grid>
 
-        <Grid xs={12} md={6} lg={8}>
+        <Grid size={{ xs: 12, md: 6, lg: 8 }}>
           <AnalyticsWebsiteVisits
             title="Website Visits"
             subheader="(+43%) than last year"
@@ -117,7 +117,7 @@ export default function OverviewAnalyticsView() {
           />
         </Grid>
 
-        <Grid xs={12} md={6} lg={4}>
+        <Grid size={{ xs: 12, md: 6, lg: 4 }}>
           <AnalyticsCurrentVisits
             title="Current Visits"
             chart={{
@@ -131,7 +131,7 @@ export default function OverviewAnalyticsView() {
           />
         </Grid>
 
-        <Grid xs={12} md={6} lg={8}>
+        <Grid size={{ xs: 12, md: 6, lg: 8 }}>
           <AnalyticsConversionRates
             title="Conversion Rates"
             subheader="(+43%) than last year"
@@ -152,7 +152,7 @@ export default function OverviewAnalyticsView() {
           />
         </Grid>
 
-        <Grid xs={12} md={6} lg={4}>
+        <Grid size={{ xs: 12, md: 6, lg: 4 }}>
           <AnalyticsCurrentSubject
             title="Current Subject"
             chart={{
@@ -166,19 +166,19 @@ export default function OverviewAnalyticsView() {
           />
         </Grid>
 
-        <Grid xs={12} md={6} lg={8}>
+        <Grid size={{ xs: 12, md: 6, lg: 8 }}>
           <AnalyticsNews title="News" list={_analyticPosts} />
         </Grid>
 
-        <Grid xs={12} md={6} lg={4}>
+        <Grid size={{ xs: 12, md: 6, lg: 4 }}>
           <AnalyticsOrderTimeline title="Order Timeline" list={_analyticOrderTimeline} />
         </Grid>
 
-        <Grid xs={12} md={6} lg={4}>
+        <Grid size={{ xs: 12, md: 6, lg: 4 }}>
           <AnalyticsTrafficBySite title="Traffic by Site" list={_analyticTraffic} />
         </Grid>
 
-        <Grid xs={12} md={6} lg={8}>
+        <Grid size={{ xs: 12, md: 6, lg: 8 }}>
           <AnalyticsTasks title="Tasks" list={_analyticTasks} />
         </Grid>
       </Grid>

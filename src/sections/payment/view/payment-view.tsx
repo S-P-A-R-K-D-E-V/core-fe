@@ -29,7 +29,7 @@ export default function PaymentView() {
       </Typography>
 
       <Grid container rowSpacing={{ xs: 5, md: 0 }} columnSpacing={{ xs: 0, md: 5 }}>
-        <Grid xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Box
             gap={5}
             display="grid"
@@ -51,7 +51,7 @@ export default function PaymentView() {
           </Box>
         </Grid>
 
-        <Grid xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <PaymentSummary />
         </Grid>
       </Grid>

@@ -149,7 +149,7 @@ export default function PurchaseOrderDetailView({ id }: Props) {
   return (
     <Grid container spacing={3}>
       {/* Header */}
-      <Grid xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
           <Stack direction="row" alignItems="center" spacing={2}>
             <Typography variant="h4">Đơn nhập hàng #{order.orderNumber}</Typography>
@@ -186,7 +186,7 @@ export default function PurchaseOrderDetailView({ id }: Props) {
       </Grid>
 
       {/* Info */}
-      <Grid xs={12} md={8}>
+      <Grid size={{ xs: 12, md: 8 }}>
         <Card sx={{ p: 3 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Thông tin chung</Typography>
           <Box rowGap={2} columnGap={2} display="grid" gridTemplateColumns={{ xs: '1fr', sm: '1fr 1fr' }}>
@@ -225,7 +225,7 @@ export default function PurchaseOrderDetailView({ id }: Props) {
       </Grid>
 
       {/* Totals */}
-      <Grid xs={12} md={4}>
+      <Grid size={{ xs: 12, md: 4 }}>
         <Card sx={{ p: 3 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Tổng hợp</Typography>
           <Stack spacing={1.5}>
@@ -251,7 +251,7 @@ export default function PurchaseOrderDetailView({ id }: Props) {
       </Grid>
 
       {/* Items table */}
-      <Grid xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Card sx={{ p: 3 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>
             Chi tiết sản phẩm {receiveMode && <Chip label="Chế độ nhận hàng" color="warning" size="small" sx={{ ml: 1 }} />}

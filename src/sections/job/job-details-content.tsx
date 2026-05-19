@@ -135,11 +135,11 @@ export default function JobDetailsContent({ job }: Props) {
 
   return (
     <Grid container spacing={3}>
-      <Grid xs={12} md={8}>
+      <Grid size={{ xs: 12, md: 8 }}>
         {renderContent}
       </Grid>
 
-      <Grid xs={12} md={4}>
+      <Grid size={{ xs: 12, md: 4 }}>
         {renderOverview}
 
         {renderCompany}

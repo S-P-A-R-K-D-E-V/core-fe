@@ -1610,7 +1610,7 @@ export default function PosSaleView() {
                 ) : (
                   <Grid container spacing={1}>
                     {filteredProducts.map((product) => (
-                      <Grid xs={6} key={product.id}>
+                      <Grid size={{ xs: 6 }} key={product.id}>
                         <Card
                           onClick={() => handleAddProduct(product)}
                           sx={{

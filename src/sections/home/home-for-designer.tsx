@@ -102,11 +102,11 @@ export default function HomeForDesigner() {
     >
       <Container component={MotionViewport}>
         <Grid container>
-          <Grid xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             {renderDescription}
           </Grid>
 
-          {mdUp && <Grid md={6}>{renderImg}</Grid>}
+          {mdUp && <Grid size={{ md: 6 }}>{renderImg}</Grid>}
         </Grid>
       </Container>
     </Box>

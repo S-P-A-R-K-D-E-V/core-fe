@@ -176,7 +176,7 @@ export default function SalesOrderNewForm() {
     <FormProvider methods={methods} onSubmit={onSubmit}>
       <Grid container spacing={3}>
         {/* Order Info */}
-        <Grid xs={12}>
+        <Grid size={{ xs: 12 }}>
           <Card sx={{ p: 3 }}>
             <Typography variant="h6" sx={{ mb: 3 }}>Thông tin đơn hàng</Typography>
             <Box rowGap={3} columnGap={2} display="grid" gridTemplateColumns={{ xs: '1fr', sm: '1fr 1fr 1fr' }}>
@@ -198,7 +198,7 @@ export default function SalesOrderNewForm() {
         </Grid>
 
         {/* Items */}
-        <Grid xs={12}>
+        <Grid size={{ xs: 12 }}>
           <Card sx={{ p: 3 }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
               <Typography variant="h6">Sản phẩm</Typography>
@@ -296,7 +296,7 @@ export default function SalesOrderNewForm() {
         </Grid>
 
         {/* Payment */}
-        <Grid xs={12}>
+        <Grid size={{ xs: 12 }}>
           <Card sx={{ p: 3 }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
               <Typography variant="h6">Thanh toán</Typography>

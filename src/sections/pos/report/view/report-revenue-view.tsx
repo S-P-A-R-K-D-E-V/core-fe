@@ -126,7 +126,7 @@ export default function ReportRevenueView() {
       {data && (
         <>
           <Grid container spacing={3} sx={{ mb: 3 }}>
-            <Grid xs={12} sm={4} md={2}>
+            <Grid size={{ xs: 12, sm: 4, md: 2 }}>
               <Card>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">Tổng doanh thu</Typography>
@@ -134,7 +134,7 @@ export default function ReportRevenueView() {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid xs={12} sm={4} md={2}>
+            <Grid size={{ xs: 12, sm: 4, md: 2 }}>
               <Card>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">Tổng đơn</Typography>
@@ -142,7 +142,7 @@ export default function ReportRevenueView() {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid xs={12} sm={4} md={2}>
+            <Grid size={{ xs: 12, sm: 4, md: 2 }}>
               <Card>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">SP đã bán</Typography>
@@ -150,7 +150,7 @@ export default function ReportRevenueView() {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid xs={12} sm={4} md={2}>
+            <Grid size={{ xs: 12, sm: 4, md: 2 }}>
               <Card>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">TB/đơn</Typography>
@@ -158,7 +158,7 @@ export default function ReportRevenueView() {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid xs={12} sm={4} md={2}>
+            <Grid size={{ xs: 12, sm: 4, md: 2 }}>
               <Card>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">Lợi nhuận</Typography>

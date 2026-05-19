@@ -104,7 +104,7 @@ export default function CategoryNewEditForm({ currentCategory }: Props) {
   return (
     <FormProvider methods={methods} onSubmit={onSubmit}>
       <Grid container spacing={3}>
-        <Grid xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Card sx={{ p: 3 }}>
             <Box rowGap={3} columnGap={2} display="grid" gridTemplateColumns={{ xs: '1fr', sm: '1fr 1fr' }}>
               <RHFTextField name="name" label="Tên danh mục" />

@@ -119,9 +119,9 @@ export default function OverviewFileView() {
     <>
       <Container maxWidth={settings.themeStretch ? false : 'xl'}>
         <Grid container spacing={3}>
-          {smDown && <Grid xs={12}>{renderStorageOverview}</Grid>}
+          {smDown && <Grid size={{ xs: 12 }}>{renderStorageOverview}</Grid>}
 
-          <Grid xs={12} sm={6} md={4}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <FileWidget
               title="Dropbox"
               value={GB / 10}
@@ -130,7 +130,7 @@ export default function OverviewFileView() {
             />
           </Grid>
 
-          <Grid xs={12} sm={6} md={4}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <FileWidget
               title="Drive"
               value={GB / 5}
@@ -139,7 +139,7 @@ export default function OverviewFileView() {
             />
           </Grid>
 
-          <Grid xs={12} sm={6} md={4}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <FileWidget
               title="OneDrive"
               value={GB / 2}
@@ -148,7 +148,7 @@ export default function OverviewFileView() {
             />
           </Grid>
 
-          <Grid xs={12} md={6} lg={8}>
+          <Grid size={{ xs: 12, md: 6, lg: 8 }}>
             <FileDataActivity
               title="Data Activity"
               chart={{
@@ -247,7 +247,7 @@ export default function OverviewFileView() {
             </div>
           </Grid>
 
-          <Grid xs={12} md={6} lg={4}>
+          <Grid size={{ xs: 12, md: 6, lg: 4 }}>
             <UploadBox
               onDrop={handleDrop}
               placeholder={
