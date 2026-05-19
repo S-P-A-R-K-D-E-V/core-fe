@@ -158,8 +158,9 @@ export default function JwtLoginView() {
           try {
             await loginWithOAuth?.('google', resp.credential!);
             router.push(returnTo || PATH_AFTER_LOGIN);
-          } catch (err) {
-            setErrorMsg('Đăng nhập Google thất bại');
+          } catch (err: any) {
+            const msg = err?.response?.data?.title || err?.response?.data?.detail || err?.message || 'Đăng nhập Google thất bại';
+            setErrorMsg(msg);
           }
         }}
         onError={() => setErrorMsg('Đăng nhập Google thất bại')}
@@ -178,8 +179,9 @@ export default function JwtLoginView() {
           try {
             await loginWithOAuth?.('facebook', resp.accessToken);
             router.push(returnTo || PATH_AFTER_LOGIN);
-          } catch (err) {
-            setErrorMsg('Đăng nhập Facebook thất bại');
+          } catch (err: any) {
+            const msg = err?.response?.data?.title || err?.response?.data?.detail || err?.message || 'Đăng nhập Facebook thất bại';
+            setErrorMsg(msg);
           }
         }}
         render={(renderProps: any) => (

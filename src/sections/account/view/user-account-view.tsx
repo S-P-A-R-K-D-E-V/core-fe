@@ -19,6 +19,7 @@ import AccountBilling from '../account-billing';
 import AccountSocialLinks from '../account-social-links';
 import AccountNotifications from '../account-notifications';
 import AccountChangePassword from '../account-change-password';
+import AccountConnectedAccounts from '../account-connected-accounts';
 
 // ----------------------------------------------------------------------
 
@@ -47,6 +48,11 @@ const TABS = [
     value: 'security',
     label: 'Security',
     icon: <Iconify icon="ic:round-vpn-key" width={24} />,
+  },
+  {
+    value: 'connected',
+    label: 'Connected',
+    icon: <Iconify icon="solar:link-bold" width={24} />,
   },
 ];
 
@@ -103,6 +109,8 @@ export default function AccountView() {
       {currentTab === 'social' && <AccountSocialLinks socialLinks={_userAbout.socialLinks} />}
 
       {currentTab === 'security' && <AccountChangePassword />}
+
+      {currentTab === 'connected' && <AccountConnectedAccounts />}
     </Container>
   );
 }
