@@ -126,6 +126,8 @@ function mapProductListItem(p: IProductListItem): IProductListItem {
     barcode: p.barcode ?? p.barCode,
     costPrice: p.costPrice ?? p.basePrice,
     sellingPrice: p.sellingPrice ?? p.basePrice,
+    // imageUrl is not in list shape by default; backend may return it directly
+    imageUrl: p.imageUrl,
     totalStock,
     variants,
   };
