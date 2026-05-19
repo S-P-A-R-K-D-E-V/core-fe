@@ -8,24 +8,14 @@ env:
   IMAGE_NAME: satthuno99/core-fe
   DEPLOYMENT: core-fe
   NAMESPACE: app
-  CONTAINER: core-fe
 
 jobs:
   build-and-push:
     if: "!contains(github.event.head_commit.message, 'skip-build')"
     runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.meta.outputs.image_tag }}
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Generate image tag
-        id: meta
-        run: |
-          SHORT_SHA=${GITHUB_SHA::7}
-          echo "image_tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
-          echo "Image tag: ${SHORT_SHA}"
 
       - name: Login DockerHub
         uses: docker/login-action@v3
@@ -38,10 +28,7 @@ jobs:
         with:
           context: .
           push: true
-          # Push cả 2 tag: versioned (để rollback) + latest (tiện dùng)
-          tags: |
-            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.image_tag }}
-            ${{ env.IMAGE_NAME }}:latest
+          tags: ${{ env.IMAGE_NAME }}:latest
           build-args: |
             NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
             NEXT_PUBLIC_FACEBOOK_APP_ID=${{ secrets.NEXT_PUBLIC_FACEBOOK_APP_ID }}
@@ -49,41 +36,16 @@ jobs:
   deploy:
     runs-on: self-hosted
     needs: build-and-push
-    # Chỉ deploy khi build thành công
     if: ${{ needs.build-and-push.result == 'success' }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Login DockerHub
-        run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-
-      - name: Pull versioned image
-        run: docker pull ${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image_tag }}
-
-      - name: Import image vào K3s containerd
-        run: docker save ${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image_tag }} | k3s ctr images import -
-
-      - name: Apply K8s manifest (tạo nếu chưa tồn tại)
+      - name: Apply K8s manifest
         run: kubectl apply -f k8s/deployment.yaml
 
-      - name: Deploy lên K8s với tag cụ thể
-        run: |
-          kubectl set image deployment/${{ env.DEPLOYMENT }} \
-            ${{ env.CONTAINER }}=${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image_tag }} \
-            -n ${{ env.NAMESPACE }}
+      - name: Restart để pull image latest mới nhất
+        run: kubectl rollout restart deployment/${{ env.DEPLOYMENT }} -n ${{ env.NAMESPACE }}
 
       - name: Chờ rollout hoàn tất
         timeout-minutes: 5
         run: kubectl rollout status deployment/${{ env.DEPLOYMENT }} -n ${{ env.NAMESPACE }}
-
-      - name: Xác nhận version đang chạy
-        run: |
-          echo "=== Deployed image ==="
-          kubectl get deployment/${{ env.DEPLOYMENT }} -n ${{ env.NAMESPACE }} \
-            -o jsonpath='{.spec.template.spec.containers[0].image}' && echo
-          echo "=== Rollout history (giữ 2 revision) ==="
-          kubectl rollout history deployment/${{ env.DEPLOYMENT }} -n ${{ env.NAMESPACE }}
-
-      - name: Cleanup Docker cache (KHÔNG ảnh hưởng K3s containerd)
-        if: always()
-        run: docker image prune -f
