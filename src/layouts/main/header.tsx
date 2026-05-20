@@ -22,7 +22,7 @@ import NavMobile from './nav/mobile';
 import NavDesktop from './nav/desktop';
 import { HEADER } from '../config-layout';
 import { navConfig } from './config-navigation';
-import LoginButton from '../common/login-button';
+import LoginOrAccount from '../common/login-or-account';
 import HeaderShadow from '../common/header-shadow';
 import SettingsButton from '../common/settings-button';
 
@@ -87,7 +87,7 @@ export default function Header() {
           {mdUp && <NavDesktop data={navConfig} />}
 
           <Stack alignItems="center" direction={{ xs: 'row', md: 'row-reverse' }}>
-            {mdUp && <LoginButton />}
+            {mdUp && <LoginOrAccount />}
 
             <SettingsButton
               sx={{
