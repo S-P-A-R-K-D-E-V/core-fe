@@ -13,7 +13,7 @@ import { useSettingsContext } from 'src/components/settings';
 // system
 import { palette } from './palette';
 import { shadows } from './shadows';
-import { typography } from './typography';
+import { typography, getFontFamily } from './typography';
 // options
 import RTL from './options/right-to-left';
 import { customShadows } from './custom-shadows';
@@ -49,11 +49,18 @@ export default function ThemeProvider({ children }: Props) {
       direction: settings.themeDirection,
       shadows: shadows(settings.themeMode),
       shape: { borderRadius: 8 },
-      typography,
+      typography: {
+        ...typography,
+        // Override font family when user selects a different font
+        ...(settings.themeFont && {
+          fontFamily: getFontFamily(settings.themeFont),
+        }),
+      },
     }),
     [
       settings.themeMode,
       settings.themeDirection,
+      settings.themeFont,
       presets.palette,
       presets.customShadows,
       contrast.palette,
@@ -62,7 +69,18 @@ export default function ThemeProvider({ children }: Props) {
 
   const theme = createTheme(memoizedValue as ThemeOptions);
 
-  theme.components = merge(componentsOverrides(theme), contrast.components);
+  // Apply font size via CssBaseline html override (rem scaling)
+  const fontSizeOverride = settings.themeFontSize
+    ? {
+        MuiCssBaseline: {
+          styleOverrides: {
+            html: { fontSize: settings.themeFontSize },
+          },
+        },
+      }
+    : {};
+
+  theme.components = merge(componentsOverrides(theme), contrast.components, fontSizeOverride);
 
   const themeWithLocale = useMemo(
     () => createTheme(theme, currentLang.systemValue),

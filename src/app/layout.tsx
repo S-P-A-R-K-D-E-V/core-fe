@@ -12,7 +12,7 @@ import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter';
 
 import ThemeProvider from 'src/theme';
 import { LocalizationProvider } from 'src/locales';
-import { primaryFont } from 'src/theme/typography';
+import { primaryFont, interFont, dmSansFont, nunitoSansFont } from 'src/theme/typography';
 
 import ProgressBar from 'src/components/progress-bar';
 import { MotionLazy } from 'src/components/animate/motion-lazy';
@@ -72,7 +72,11 @@ type Props = {
 
 export default function RootLayout({ children }: Props) {
   return (
-    <html lang="vi" className={primaryFont.className} suppressHydrationWarning>
+    <html
+      lang="vi"
+      className={`${primaryFont.className} ${interFont.variable} ${dmSansFont.variable} ${nunitoSansFont.variable}`}
+      suppressHydrationWarning
+    >
       <body>
         <AuthProvider>
           <LocalizationProvider>
@@ -84,6 +88,8 @@ export default function RootLayout({ children }: Props) {
                 themeLayout: 'vertical', // 'vertical' | 'horizontal' | 'mini'
                 themeColorPresets: 'default', // 'default' | 'cyan' | 'purple' | 'blue' | 'orange' | 'red'
                 themeStretch: false,
+                themeFont: 'Public Sans', // v6.3.0: font family selector
+                themeFontSize: 16, // v6.3.0: base font size (12-20px)
               }}
             >
               <AppRouterCacheProvider options={{ key: 'css' }}>

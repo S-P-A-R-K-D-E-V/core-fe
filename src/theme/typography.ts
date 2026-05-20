@@ -1,4 +1,4 @@
-import { Barlow, Public_Sans } from 'next/font/google';
+import { Inter, DM_Sans, Nunito_Sans, Barlow, Public_Sans } from 'next/font/google';
 
 // ----------------------------------------------------------------------
 
@@ -31,6 +31,9 @@ declare module '@mui/material/styles' {
   }
 }
 
+// ----------------------------------------------------------------------
+// Primary & secondary fonts (loaded at build, no CSS variable needed)
+
 export const primaryFont = Public_Sans({
   weight: ['400', '500', '600', '700', '800', '900'],
   subsets: ['latin'],
@@ -46,9 +49,57 @@ export const secondaryFont = Barlow({
 });
 
 // ----------------------------------------------------------------------
+// Variable-font alternatives exposed via CSS custom properties
+// Apply their .variable classNames to <html> in layout.tsx
 
-// LEARN MORE
-// https://nextjs.org/docs/basic-features/font-optimization#google-fonts
+export const interFont = Inter({
+  variable: '--font-inter',
+  subsets: ['latin'],
+  display: 'swap',
+  fallback: ['Helvetica', 'Arial', 'sans-serif'],
+});
+
+export const dmSansFont = DM_Sans({
+  variable: '--font-dm-sans',
+  subsets: ['latin'],
+  display: 'swap',
+  fallback: ['Helvetica', 'Arial', 'sans-serif'],
+});
+
+export const nunitoSansFont = Nunito_Sans({
+  variable: '--font-nunito-sans',
+  subsets: ['latin'],
+  display: 'swap',
+  fallback: ['Helvetica', 'Arial', 'sans-serif'],
+});
+
+// ----------------------------------------------------------------------
+// Font options exposed in Settings drawer
+
+export const FONT_OPTIONS = [
+  { label: 'Public Sans', value: 'Public Sans' },
+  { label: 'Inter', value: 'Inter' },
+  { label: 'DM Sans', value: 'DM Sans' },
+  { label: 'Nunito Sans', value: 'Nunito Sans' },
+] as const;
+
+export type FontOption = (typeof FONT_OPTIONS)[number]['value'];
+
+/** Returns a CSS font-family string for a given font name. */
+export function getFontFamily(fontName?: string): string {
+  switch (fontName) {
+    case 'Inter':
+      return 'var(--font-inter), Helvetica, Arial, sans-serif';
+    case 'DM Sans':
+      return 'var(--font-dm-sans), Helvetica, Arial, sans-serif';
+    case 'Nunito Sans':
+      return 'var(--font-nunito-sans), Helvetica, Arial, sans-serif';
+    default:
+      return primaryFont.style.fontFamily;
+  }
+}
+
+// ----------------------------------------------------------------------
 
 export const typography = {
   fontFamily: primaryFont.style.fontFamily,
