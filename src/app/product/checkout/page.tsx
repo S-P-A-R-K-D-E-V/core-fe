@@ -1,11 +1,14 @@
+'use client';
+
+import { AuthGuard } from 'src/auth/guard';
 import { CheckoutView } from 'src/sections/checkout/view';
 
 // ----------------------------------------------------------------------
 
-export const metadata = {
-  title: 'Checkout',
-};
-
 export default function CheckoutPage() {
-  return <CheckoutView />;
+  return (
+    <AuthGuard>
+      <CheckoutView />
+    </AuthGuard>
+  );
 }
