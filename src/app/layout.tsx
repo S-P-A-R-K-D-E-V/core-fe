@@ -8,12 +8,11 @@ import 'src/locales/i18n';
 
 import type { Metadata, Viewport } from 'next';
 
-import InitColorSchemeScript from '@mui/material/InitColorSchemeScript';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter';
 
 import ThemeProvider from 'src/theme';
 import { LocalizationProvider } from 'src/locales';
-import { primaryFont } from 'src/theme/typography';
+import { primaryFont, interFont, dmSansFont, nunitoSansFont } from 'src/theme/typography';
 
 import ProgressBar from 'src/components/progress-bar';
 import { MotionLazy } from 'src/components/animate/motion-lazy';
@@ -31,18 +30,34 @@ import { AuthProvider } from 'src/auth/context/jwt';
 // ----------------------------------------------------------------------
 
 export const viewport: Viewport = {
-  themeColor: '#000000',
+  themeColor: '#00A76F', // CiCi primary brand color
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
 };
 
 export const metadata: Metadata = {
-  title: 'CiCi Accessories - Hệ thống quản lý nội bộ',
+  title: {
+    template: '%s | CiCi Accessories',
+    default: 'CiCi Accessories — Phụ kiện thời trang nữ',
+  },
   description:
-    'Nền tảng quản lý nội bộ dành cho hệ thống cửa hàng CiCi Accessories. Quản lý ca làm việc, chấm công, kiểm tiền ca, lương và phê duyệt yêu cầu.',
-  keywords: 'cici,accessories,quản lý,nội bộ,ca làm việc,lương,chấm công',
+    'CiCi Accessories chuyên cung cấp phụ kiện thời trang nữ: trang sức, kẹp tóc, túi mini, ví da. Hàng trăm mẫu mới, giao hàng toàn quốc, đổi trả miễn phí 7 ngày.',
+  keywords: 'cici accessories,phụ kiện thời trang,trang sức nữ,kẹp tóc,túi mini,ví da,đồ trang sức,vòng tay,nhẫn bạc',
   manifest: '/manifest.json',
+  openGraph: {
+    type: 'website',
+    locale: 'vi_VN',
+    siteName: 'CiCi Accessories',
+    title: 'CiCi Accessories — Phụ kiện thời trang nữ',
+    description:
+      'Hàng trăm mẫu trang sức, kẹp tóc, túi mini. Giao hàng toàn quốc — đổi trả miễn phí 7 ngày.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'CiCi Accessories — Phụ kiện thời trang nữ',
+    description: 'Hàng trăm mẫu trang sức, kẹp tóc, túi mini. Giao hàng toàn quốc.',
+  },
   icons: [
     { rel: 'icon', url: '/favicon/favicon.ico' },
     { rel: 'icon', type: 'image/png', sizes: '16x16', url: '/favicon/favicon-16x16.png' },
@@ -57,10 +72,12 @@ type Props = {
 
 export default function RootLayout({ children }: Props) {
   return (
-    <html lang="vi" className={primaryFont.className} suppressHydrationWarning>
+    <html
+      lang="vi"
+      className={`${primaryFont.className} ${interFont.variable} ${dmSansFont.variable} ${nunitoSansFont.variable}`}
+      suppressHydrationWarning
+    >
       <body>
-        <InitColorSchemeScript defaultMode="light" />
-
         <AuthProvider>
           <LocalizationProvider>
             <SettingsProvider
@@ -71,6 +88,8 @@ export default function RootLayout({ children }: Props) {
                 themeLayout: 'vertical', // 'vertical' | 'horizontal' | 'mini'
                 themeColorPresets: 'default', // 'default' | 'cyan' | 'purple' | 'blue' | 'orange' | 'red'
                 themeStretch: false,
+                themeFont: 'Public Sans', // v6.3.0: font family selector
+                themeFontSize: 16, // v6.3.0: base font size (12-20px)
               }}
             >
               <AppRouterCacheProvider options={{ key: 'css' }}>
