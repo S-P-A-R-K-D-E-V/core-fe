@@ -34,19 +34,19 @@ import ProductDetailsDescription from '../product-details-description';
 
 const SUMMARY = [
   {
-    title: '100% Original',
-    description: 'Chocolate bar candy canes ice cream toffee cookie halvah.',
+    title: 'Hàng kiểm định kỹ',
+    description: 'Mỗi sản phẩm được kiểm tra chất lượng kỹ lưỡng trước khi đến tay bạn.',
     icon: 'solar:verified-check-bold',
   },
   {
-    title: '10 Day Replacement',
-    description: 'Marshmallow biscuit donut dragée fruitcake wafer.',
-    icon: 'solar:clock-circle-bold',
+    title: 'Tư vấn miễn phí',
+    description: 'Ghé cửa hàng tại 21 Chùa Láng hoặc nhắn tin để được tư vấn trực tiếp.',
+    icon: 'solar:chat-round-dots-bold',
   },
   {
-    title: 'Year Warranty',
-    description: 'Cotton candy gingerbread cake I love sugar sweet.',
-    icon: 'solar:shield-check-bold',
+    title: 'Thanh toán linh hoạt',
+    description: 'Tiền mặt, chuyển khoản, MoMo / ZaloPay — thanh toán theo cách bạn thích.',
+    icon: 'solar:wallet-bold',
   },
 ];
 
@@ -82,7 +82,7 @@ export default function ProductShopDetailsView({ id }: Props) {
           startIcon={<Iconify icon="eva:arrow-ios-back-fill" width={16} />}
           sx={{ mt: 3 }}
         >
-          Back to List
+          Quay lại danh sách
         </Button>
       }
       sx={{ py: 10 }}
@@ -93,9 +93,9 @@ export default function ProductShopDetailsView({ id }: Props) {
     <>
       <CustomBreadcrumbs
         links={[
-          { name: 'Home', href: '/' },
+          { name: 'Trang chủ', href: '/' },
           {
-            name: 'Shop',
+            name: 'Sản phẩm',
             href: paths.product.root,
           },
           { name: product?.name },
@@ -154,11 +154,11 @@ export default function ProductShopDetailsView({ id }: Props) {
           {[
             {
               value: 'description',
-              label: 'Description',
+              label: 'Mô tả sản phẩm',
             },
             {
               value: 'reviews',
-              label: `Reviews (${product.reviews.length})`,
+              label: `Đánh giá (${product.reviews.length})`,
             },
           ].map((tab) => (
             <Tab key={tab.value} value={tab.value} label={tab.label} />

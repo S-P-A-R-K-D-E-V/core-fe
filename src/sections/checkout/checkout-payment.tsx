@@ -9,8 +9,9 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import Iconify from 'src/components/iconify';
 import FormProvider from 'src/components/hook-form';
 
+import { createSalesOrder } from 'src/api/sales-orders';
+
 import {
-  ICheckoutCardOption,
   ICheckoutPaymentOption,
   ICheckoutDeliveryOption,
 } from 'src/types/checkout';
@@ -26,50 +27,34 @@ import CheckoutPaymentMethods from './checkout-payment-methods';
 const DELIVERY_OPTIONS: ICheckoutDeliveryOption[] = [
   {
     value: 0,
-    label: 'Free',
-    description: '5-7 Days delivery',
-  },
-  {
-    value: 10,
-    label: 'Standard',
-    description: '3-5 Days delivery',
-  },
-  {
-    value: 20,
-    label: 'Express',
-    description: '2-3 Days delivery',
+    label: 'Nhận tại cửa hàng',
+    description: '21 Chùa Láng, Hà Nội — Miễn phí',
   },
 ];
 
 const PAYMENT_OPTIONS: ICheckoutPaymentOption[] = [
   {
-    value: 'paypal',
-    label: 'Pay with Paypal',
-    description: 'You will be redirected to PayPal website to complete your purchase securely.',
-  },
-  {
-    value: 'credit',
-    label: 'Credit / Debit Card',
-    description: 'We support Mastercard, Visa, Discover and Stripe.',
-  },
-  {
     value: 'cash',
-    label: 'Cash',
-    description: 'Pay with cash when your order is delivered.',
+    label: 'Tiền mặt tại cửa hàng',
+    description: 'Thanh toán khi đến nhận hàng tại 21 Chùa Láng, Hà Nội.',
   },
-];
-
-const CARDS_OPTIONS: ICheckoutCardOption[] = [
-  { value: 'ViSa1', label: '**** **** **** 1212 - Jimmy Holland' },
-  { value: 'ViSa2', label: '**** **** **** 2424 - Shawn Stokes' },
-  { value: 'MasterCard', label: '**** **** **** 4545 - Cole Armstrong' },
+  {
+    value: 'transfer',
+    label: 'Chuyển khoản ngân hàng',
+    description: 'Vietcombank / MB Bank / Techcombank — shop xác nhận sau khi nhận tiền.',
+  },
+  {
+    value: 'momo',
+    label: 'Ví MoMo / ZaloPay / VNPay',
+    description: 'Chuyển qua ví điện tử — shop gửi QR code sau khi xác nhận đơn.',
+  },
 ];
 
 export default function CheckoutPayment() {
   const checkout = useCheckoutContext();
 
   const PaymentSchema = Yup.object().shape({
-    payment: Yup.string().required('Payment is required'),
+    payment: Yup.string().required('Vui lòng chọn phương thức thanh toán'),
   });
 
   const defaultValues = {
@@ -89,9 +74,20 @@ export default function CheckoutPayment() {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
-      checkout.onNextStep();
-      checkout.onReset();
-      console.info('DATA', data);
+      const invoiceDetails = checkout.items.map((item) => ({
+        productId: item.id,
+        productName: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      }));
+
+      const result = await createSalesOrder({
+        totalPayment: checkout.total,
+        method: data.payment,
+        invoiceDetails,
+      });
+
+      checkout.onCompleteWithOrder(result.id);
     } catch (error) {
       console.error(error);
     }
@@ -104,7 +100,7 @@ export default function CheckoutPayment() {
           <CheckoutDelivery onApplyShipping={checkout.onApplyShipping} options={DELIVERY_OPTIONS} />
 
           <CheckoutPaymentMethods
-            cardOptions={CARDS_OPTIONS}
+            cardOptions={[]}
             options={PAYMENT_OPTIONS}
             sx={{ my: 3 }}
           />
@@ -115,7 +111,7 @@ export default function CheckoutPayment() {
             onClick={checkout.onBackStep}
             startIcon={<Iconify icon="eva:arrow-ios-back-fill" />}
           >
-            Back
+            Quay lại
           </Button>
         </Grid>
 
@@ -137,7 +133,7 @@ export default function CheckoutPayment() {
             variant="contained"
             loading={isSubmitting}
           >
-            Complete Order
+            Hoàn tất đơn hàng
           </LoadingButton>
         </Grid>
       </Grid>

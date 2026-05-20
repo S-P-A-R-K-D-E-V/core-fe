@@ -33,7 +33,7 @@ export default function CheckoutPaymentMethods({ options, cardOptions, ...other 
   return (
     <>
       <Card {...other}>
-        <CardHeader title="Payment" />
+        <CardHeader title="Phương thức thanh toán" />
 
         <Controller
           name="payment"

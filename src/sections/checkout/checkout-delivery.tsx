@@ -23,7 +23,7 @@ export default function CheckoutDelivery({ options, onApplyShipping, ...other }:
 
   return (
     <Card {...other}>
-      <CardHeader title="Delivery" />
+      <CardHeader title="Hình thức nhận hàng" />
 
       <Controller
         name="delivery"

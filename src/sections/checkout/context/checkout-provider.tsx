@@ -28,6 +28,7 @@ const initialState = {
   shipping: 0,
   billing: null,
   totalItems: 0,
+  orderId: undefined as string | undefined,
 };
 
 type Props = {
@@ -179,6 +180,14 @@ export function CheckoutProvider({ children }: Props) {
 
   const completed = state.activeStep === PRODUCT_CHECKOUT_STEPS.length;
 
+  const onCompleteWithOrder = useCallback(
+    (orderId: string) => {
+      update('orderId', orderId);
+      update('activeStep', PRODUCT_CHECKOUT_STEPS.length);
+    },
+    [update]
+  );
+
   // Reset
   const onReset = useCallback(() => {
     if (completed) {
@@ -202,10 +211,13 @@ export function CheckoutProvider({ children }: Props) {
       onApplyDiscount,
       onApplyShipping,
       //
+      onCompleteWithOrder,
+      //
       onBackStep,
       onNextStep,
       onGotoStep,
       //
+      canReset: false,
       onReset,
     }),
     [
@@ -214,6 +226,7 @@ export function CheckoutProvider({ children }: Props) {
       onApplyDiscount,
       onApplyShipping,
       onBackStep,
+      onCompleteWithOrder,
       onCreateBilling,
       onDecreaseQuantity,
       onDeleteCart,

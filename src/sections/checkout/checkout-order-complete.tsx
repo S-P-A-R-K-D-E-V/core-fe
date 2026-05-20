@@ -17,11 +17,12 @@ import { varFade } from 'src/components/animate';
 // ----------------------------------------------------------------------
 
 interface Props extends DialogProps {
+  orderId?: string;
   onReset: VoidFunction;
   onDownloadPDF: VoidFunction;
 }
 
-export default function CheckoutOrderComplete({ open, onReset, onDownloadPDF }: Props) {
+export default function CheckoutOrderComplete({ open, orderId, onReset }: Props) {
   const renderContent = (
     <Stack
       spacing={5}
@@ -32,20 +33,27 @@ export default function CheckoutOrderComplete({ open, onReset, onDownloadPDF }: 
         px: { xs: 2, sm: 0 },
       }}
     >
-      <Typography variant="h4">Thank you for your purchase!</Typography>
+      <Typography variant="h4">Cảm ơn bạn đã đặt hàng!</Typography>
 
       <OrderCompleteIllustration sx={{ height: 260 }} />
 
       <Typography>
-        Thanks for placing order
+        Đơn hàng của bạn đã được tiếp nhận thành công.
+        {orderId && (
+          <>
+            <br />
+            <br />
+            Mã đơn hàng:{' '}
+            <Link component="span" fontWeight="bold">
+              {orderId}
+            </Link>
+          </>
+        )}
         <br />
         <br />
-        <Link>01dc1370-3df6-11eb-b378-0242ac130002</Link>
+        Shop sẽ liên hệ xác nhận trong vòng 30 phút.
         <br />
-        <br />
-        We will send you a notification within 5 days when it ships.
-        <br /> If you have any question or queries then fell to get in contact us. <br /> <br />
-        All the best,
+        Nếu có thắc mắc, nhắn tin cho CiCi qua Messenger nhé!
       </Typography>
 
       <Divider sx={{ borderStyle: 'dashed' }} />
@@ -63,17 +71,20 @@ export default function CheckoutOrderComplete({ open, onReset, onDownloadPDF }: 
           onClick={onReset}
           startIcon={<Iconify icon="eva:arrow-ios-back-fill" />}
         >
-          Continue Shopping
+          Tiếp tục mua sắm
         </Button>
 
         <Button
           fullWidth
           size="large"
           variant="contained"
-          startIcon={<Iconify icon="eva:cloud-download-fill" />}
-          onClick={onDownloadPDF}
+          component="a"
+          href="https://m.me/ciciaccessories"
+          target="_blank"
+          rel="noopener"
+          startIcon={<Iconify icon="logos:messenger" width={20} />}
         >
-          Download as PDF
+          Nhắn tin với shop
         </Button>
       </Stack>
     </Stack>

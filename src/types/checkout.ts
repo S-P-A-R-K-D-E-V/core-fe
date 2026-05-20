@@ -40,6 +40,7 @@ export type ICheckoutValue = {
   totalItems: number;
   items: ICheckoutItem[];
   billing: IAddressItem | null;
+  orderId?: string;
 };
 
 export type CheckoutContextProps = ICheckoutValue & {
@@ -58,6 +59,8 @@ export type CheckoutContextProps = ICheckoutValue & {
   onCreateBilling: (billing: IAddressItem) => void;
   onApplyDiscount: (discount: number) => void;
   onApplyShipping: (discount: number) => void;
+  //
+  onCompleteWithOrder: (orderId: string) => void;
   //
   canReset: boolean;
   onReset: VoidFunction;

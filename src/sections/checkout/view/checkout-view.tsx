@@ -25,7 +25,7 @@ export default function CheckoutView() {
   return (
     <Container maxWidth={settings.themeStretch ? false : 'lg'} sx={{ mb: 10 }}>
       <Typography variant="h4" sx={{ my: { xs: 3, md: 5 } }}>
-        Checkout
+        Thanh toán
       </Typography>
 
       <Grid container justifyContent={checkout.completed ? 'center' : 'flex-start'}>
@@ -37,6 +37,7 @@ export default function CheckoutView() {
       {checkout.completed ? (
         <CheckoutOrderComplete
           open={checkout.completed}
+          orderId={checkout.orderId}
           onReset={checkout.onReset}
           onDownloadPDF={() => {}}
         />
