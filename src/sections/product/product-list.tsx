@@ -11,9 +11,12 @@ import { ProductItemSkeleton } from './product-skeleton';
 type Props = BoxProps & {
   products: IProductItem[];
   loading?: boolean;
+  totalPages?: number;
+  page?: number;
+  onPageChange?: (page: number) => void;
 };
 
-export default function ProductList({ products, loading, ...other }: Props) {
+export default function ProductList({ products, loading, totalPages, page, onPageChange, ...other }: Props) {
   const renderSkeleton = (
     <>
       {[...Array(16)].map((_, index) => (
@@ -46,9 +49,11 @@ export default function ProductList({ products, loading, ...other }: Props) {
         {loading ? renderSkeleton : renderList}
       </Box>
 
-      {products.length > 8 && (
+      {!!totalPages && totalPages > 1 && (
         <Pagination
-          count={8}
+          count={totalPages}
+          page={page ?? 1}
+          onChange={(_, value) => onPageChange?.(value)}
           sx={{
             mt: 8,
             [`& .${paginationClasses.ul}`]: {
