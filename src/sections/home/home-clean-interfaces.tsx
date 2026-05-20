@@ -24,13 +24,13 @@ const REASONS = [
   {
     icon: 'solar:shield-check-bold-duotone',
     title: 'Chất lượng đảm bảo',
-    desc: 'Kiểm định kỹ từng sản phẩm trước khi đến tay khách — không hài lòng hoàn tiền 100%.',
+    desc: 'Kiểm định kỹ từng sản phẩm trước khi đến tay khách — chỉ bán hàng đạt chuẩn, chắc chắn về mẫu mã và chất liệu.',
     color: '#EC4899',
   },
   {
-    icon: 'solar:refresh-bold-duotone',
-    title: 'Đổi trả dễ dàng',
-    desc: 'Đổi trả miễn phí trong 7 ngày, không cần lý do. Quy trình đơn giản, nhanh chóng.',
+    icon: 'solar:map-point-bold-duotone',
+    title: 'Dễ tìm, dễ ghé',
+    desc: 'Cửa hàng duy nhất tại 21 Chùa Láng, Hà Nội. Ghé xem hàng thực tế, được tư vấn trực tiếp miễn phí.',
     color: '#8B5CF6',
   },
   {

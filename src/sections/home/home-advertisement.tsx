@@ -62,8 +62,8 @@ export default function HomeAdvertisement({ sx, ...other }: BoxProps) {
         variants={varFade('inDown', { distance: 24 })}
         sx={{ color: 'rgba(255,255,255,0.72)', mb: 5, typography: 'body1' }}
       >
-        Hàng trăm mẫu phụ kiện thời trang nữ — trang sức, kẹp tóc, túi mini. Giao hàng toàn quốc,
-        đổi trả miễn phí trong 7 ngày.
+        Hàng trăm mẫu phụ kiện thời trang nữ — trang sức, kẹp tóc, túi mini. Ghé thăm cửa hàng
+        tại 21 Chùa Láng, Hà Nội hoặc nhắn tin để được tư vấn.
       </Box>
 
       <Stack

@@ -332,8 +332,8 @@ export default function HomeHero({ sx, products = [], productsLoading = true, ..
       >
         {[
           { icon: 'solar:star-bold-duotone', label: '2,000+ khách hàng' },
-          { icon: 'solar:delivery-bold-duotone', label: 'Ship toàn quốc' },
-          { icon: 'solar:shield-check-bold-duotone', label: 'Đổi trả 7 ngày' },
+          { icon: 'solar:map-point-bold-duotone', label: '21 Chùa Láng, Hà Nội' },
+          { icon: 'solar:chat-round-bold-duotone', label: 'Tư vấn miễn phí' },
         ].map((b) => (
           <Chip
             key={b.label}

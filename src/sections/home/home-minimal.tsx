@@ -30,13 +30,13 @@ const ITEMS = [
     icon: `/assets/icons/home/ic-design.svg`,
     title: 'Chất lượng đảm bảo',
     description:
-      'Sản phẩm được tuyển chọn kỹ lưỡng, chất liệu an toàn, bền đẹp — cam kết hoàn tiền nếu không hài lòng.',
+      'Sản phẩm được tuyển chọn kỹ lưỡng, chất liệu an toàn, bền đẹp. Đội ngũ kiểm định kỹ trước khi đến tay khách hàng.',
   },
   {
     icon: `/assets/icons/home/ic-development.svg`,
-    title: 'Giao hàng toàn quốc',
+    title: 'Cửa hàng tại Hà Nội',
     description:
-      'Ship nhanh toàn quốc, đóng gói cẩn thận. Đặt hàng trước 12h, nhận hàng ngay trong ngày tại TP.HCM.',
+      'Ghé thăm trực tiếp tại 21 Chùa Láng, Hà Nội để xem và chọn hàng. Tư vấn phụ kiện miễn phí ngay tại cửa hàng.',
   },
 ];
 

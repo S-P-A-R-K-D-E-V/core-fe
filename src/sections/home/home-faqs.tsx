@@ -33,27 +33,27 @@ const FAQs = [
   {
     question: 'Làm thế nào để đặt hàng?',
     answer:
-      'Bạn có thể đặt hàng qua nhiều kênh: nhắn tin trực tiếp qua Facebook Messenger / Zalo của shop, hoặc inbox fanpage CiCi Accessories. Đội ngũ tư vấn sẽ hỗ trợ bạn chọn sản phẩm và chốt đơn trong vài phút. Chúng tôi đang phát triển thêm tính năng đặt hàng online.',
+      'Bạn có thể nhắn tin trực tiếp qua Facebook Messenger / Zalo của shop để chọn hàng và hẹn giờ đến nhận tại 21 Chùa Láng, Hà Nội. Hoặc ghé thẳng cửa hàng trong giờ mở cửa 9:00 – 21:00 hàng ngày.',
   },
   {
-    question: 'Shop có giao hàng toàn quốc không?',
+    question: 'Cửa hàng CiCi Accessories ở đâu?',
     answer:
-      'Có! CiCi Accessories giao hàng toàn quốc qua các đơn vị vận chuyển uy tín. Đặt hàng trước 12h00 tại TP.HCM nhận hàng trong ngày. Các tỉnh thành khác từ 1–3 ngày làm việc tùy khu vực. Phí ship từ 15,000đ – 35,000đ.',
+      'CiCi Accessories có cửa hàng duy nhất tại 21 Chùa Láng, Hà Nội. Bạn có thể ghé trực tiếp để xem hàng thực tế và được tư vấn miễn phí. Ngoài ra bạn cũng có thể đặt hàng qua Messenger / Zalo và đến lấy tại cửa hàng.',
   },
   {
-    question: 'Chính sách đổi trả như thế nào?',
+    question: 'Giờ mở cửa của shop như thế nào?',
     answer:
-      'CiCi hỗ trợ đổi trả miễn phí trong 7 ngày kể từ ngày nhận hàng nếu sản phẩm bị lỗi kỹ thuật hoặc khác với mô tả. Sản phẩm cần còn nguyên vẹn, chưa qua sử dụng và có đầy đủ hộp/túi đựng. Liên hệ qua Messenger để được xử lý nhanh nhất.',
+      'CiCi Accessories mở cửa từ 9:00 – 21:00 tất cả các ngày trong tuần, kể cả cuối tuần và ngày lễ. Ngoài giờ mở cửa bạn vẫn có thể nhắn tin đặt hàng qua Messenger / Zalo và đến nhận hàng vào ngày hôm sau.',
   },
   {
     question: 'Có thể xem hàng trực tiếp không?',
     answer:
-      'Shop hiện hoạt động chủ yếu online. Bạn có thể nhắn tin yêu cầu video/ảnh thực tế sản phẩm, shop sẽ quay và gửi ngay. Chúng tôi cam kết hình ảnh trung thực, không photoshop quá mức.',
+      'Hoàn toàn có thể! Cửa hàng tại 21 Chùa Láng, Hà Nội mở cửa 9:00 – 21:00 mỗi ngày. Bạn có thể ghé xem hàng thực tế và thử trực tiếp trước khi mua. Nếu chưa tiện đến, nhắn tin để shop gửi video/ảnh thực tế sản phẩm.',
   },
   {
     question: 'Phương thức thanh toán nào được chấp nhận?',
     answer:
-      'Shop chấp nhận: chuyển khoản ngân hàng (Vietcombank, MB Bank, Techcombank...), ví điện tử MoMo / ZaloPay / VNPay, và thanh toán khi nhận hàng (COD) áp dụng trong TP.HCM và một số tỉnh thành lớn.',
+      'Shop chấp nhận: tiền mặt tại cửa hàng, chuyển khoản ngân hàng (Vietcombank, MB Bank, Techcombank...) và ví điện tử MoMo / ZaloPay / VNPay.',
   },
 ];
 
