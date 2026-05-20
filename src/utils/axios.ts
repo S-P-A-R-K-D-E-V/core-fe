@@ -79,9 +79,9 @@ export const endpoints = {
     search: '/api/post/search',
   },
   product: {
-    list: '/api/product/list',
-    details: '/api/product/details',
-    search: '/api/product/search',
+    list: '/products',
+    details: (id: string) => `/products/${id}`,
+    search: '/products',
   },
   shifts: {
     list: '/shifts',
