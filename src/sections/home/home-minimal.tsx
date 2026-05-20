@@ -1,117 +1,141 @@
+'use client';
+
+import type { BoxProps } from '@mui/material/Box';
+
 import { m } from 'framer-motion';
 
 import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
+import Grid from '@mui/material/Grid2';
 import Stack from '@mui/material/Stack';
-import { alpha } from '@mui/material/styles';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
+import { alpha } from '@mui/material/styles';
 
+import SvgColor from 'src/components/svg-color';
 import { varFade, MotionViewport } from 'src/components/animate';
+
+import { SectionTitle } from './components/section-title';
+import { CircleSvg, FloatLine, FloatPlusIcon } from './components/svg-elements';
 
 // ----------------------------------------------------------------------
 
-const CARDS = [
+const ITEMS = [
   {
-    icon: '/assets/icons/home/ic_make_brand.svg',
-    title: 'Quản lý ca làm việc',
+    icon: `/assets/icons/home/ic-make-brand.svg`,
+    title: 'Đa dạng mẫu mã',
     description:
-      'Sắp xếp ca làm việc linh hoạt, theo dõi lịch trình nhân viên dễ dàng, tối ưu hóa nhân lực cho cửa hàng.',
+      'Hàng trăm mẫu trang sức, kẹp tóc, túi mini và phụ kiện thời trang mới nhất — cập nhật liên tục theo xu hướng.',
   },
   {
-    icon: '/assets/icons/home/ic_design.svg',
-    title: 'Chấm công & Nhận diện khuôn mặt',
+    icon: `/assets/icons/home/ic-design.svg`,
+    title: 'Chất lượng đảm bảo',
     description:
-      'Chấm công tự động bằng nhận diện khuôn mặt, GPS check-in, lịch sử đầy đủ và báo cáo theo ca, theo tháng.',
+      'Sản phẩm được tuyển chọn kỹ lưỡng, chất liệu an toàn, bền đẹp — cam kết hoàn tiền nếu không hài lòng.',
   },
   {
-    icon: '/assets/icons/home/ic_development.svg',
-    title: 'Kiểm tiền ca',
+    icon: `/assets/icons/home/ic-development.svg`,
+    title: 'Giao hàng toàn quốc',
     description:
-      'Quản lý tiền mặt quầy, đối chiếu doanh thu KiotViet, chốt ca nhanh chóng. Hạn chế sai sót và thất thoát.',
+      'Ship nhanh toàn quốc, đóng gói cẩn thận. Đặt hàng trước 12h, nhận hàng ngay trong ngày tại TP.HCM.',
   },
 ];
 
 // ----------------------------------------------------------------------
 
-export default function HomeMinimal() {
-  return (
-    <Container
-      component={MotionViewport}
-      sx={{
-        py: { xs: 10, md: 15 },
-      }}
-    >
-      <Stack
-        spacing={3}
-        sx={{
-          textAlign: 'center',
-          mb: { xs: 5, md: 10 },
-        }}
-      >
-        <m.div variants={varFade().inUp}>
-          <Typography component="div" variant="overline" sx={{ color: 'text.disabled' }}>
-            CiCi Accessories
-          </Typography>
-        </m.div>
+const renderLines = () => (
+  <>
+    <FloatPlusIcon sx={{ top: 72, left: 72 }} />
+    <FloatPlusIcon sx={{ bottom: 72, left: 72 }} />
+    <FloatLine sx={{ top: 80, left: 0 }} />
+    <FloatLine sx={{ bottom: 80, left: 0 }} />
+    <FloatLine vertical sx={{ top: 0, left: 80 }} />
+  </>
+);
 
-        <m.div variants={varFade().inDown}>
-          <Typography variant="h2">
-            Công cụ nội bộ <br /> giúp bạn điều gì?
-          </Typography>
-        </m.div>
+export default function HomeMinimal({ sx, ...other }: BoxProps) {
+  const renderDescription = () => (
+    <>
+      <SectionTitle
+        caption="Về chúng tôi"
+        title="Phụ kiện thời trang"
+        txtGradient="chính hãng"
+        sx={{ mb: { xs: 5, md: 8 }, textAlign: { xs: 'center', md: 'left' } }}
+      />
 
-        <m.div variants={varFade().inUp}>
-          <Typography variant="body1" sx={{ color: 'text.secondary', maxWidth: 560, mx: 'auto' }}>
-            Tất cả tính năng cần thiết để vận hành cửa hàng phụ kiện hiệu quả, minh bạch và chính xác.
-          </Typography>
-        </m.div>
-      </Stack>
-
-      <Box
-        gap={{ xs: 3, lg: 10 }}
-        display="grid"
-        alignItems="center"
-        gridTemplateColumns={{
-          xs: 'repeat(1, 1fr)',
-          md: 'repeat(3, 1fr)',
-        }}
-      >
-        {CARDS.map((card, index) => (
-          <m.div variants={varFade().inUp} key={card.title}>
-            <Card
-              sx={{
-                textAlign: 'center',
-                boxShadow: { md: 'none' },
-                bgcolor: 'background.default',
-                p: (theme) => theme.spacing(10, 5),
-                ...(index === 1 && {
-                  boxShadow: (theme) => ({
-                    md: `-40px 40px 80px ${
-                      theme.palette.mode === 'light'
-                        ? alpha(theme.palette.grey[500], 0.16)
-                        : alpha(theme.palette.common.black, 0.4)
-                    }`,
-                  }),
-                }),
-              }}
-            >
-              <Box
-                component="img"
-                src={card.icon}
-                alt={card.title}
-                sx={{ mx: 'auto', width: 48, height: 48 }}
-              />
-
-              <Typography variant="h5" sx={{ mt: 8, mb: 2 }}>
-                {card.title}
+      <Stack spacing={6} sx={{ maxWidth: { sm: 560, md: 400 }, mx: { xs: 'auto', md: 'unset' } }}>
+        {ITEMS.map((item) => (
+          <Box
+            component={m.div}
+            variants={varFade('inUp', { distance: 24 })}
+            key={item.title}
+            sx={[{ gap: 3, display: 'flex' }]}
+          >
+            <SvgColor src={item.icon} sx={{ width: 40, height: 40, flexShrink: 0, color: 'primary.main' }} />
+            <Stack spacing={1}>
+              <Typography variant="h5" component="h6">
+                {item.title}
               </Typography>
-
-              <Typography sx={{ color: 'text.secondary' }}>{card.description}</Typography>
-            </Card>
-          </m.div>
+              <Typography sx={{ color: 'text.secondary' }}>{item.description}</Typography>
+            </Stack>
+          </Box>
         ))}
+      </Stack>
+    </>
+  );
+
+  const renderImage = () => (
+    <Stack
+      component={m.div}
+      variants={varFade('inRight', { distance: 24 })}
+      sx={{ height: 1, alignItems: 'center', position: 'relative', justifyContent: 'center' }}
+    >
+      <Box
+        sx={[
+          (theme) => ({
+            left: 0,
+            width: 720,
+            borderRadius: 2,
+            position: 'absolute',
+            bgcolor: 'background.default',
+            boxShadow: `-40px 40px 80px 0px ${alpha(theme.palette.grey[500], 0.16)}`,
+          }),
+        ]}
+      >
+        <Box
+          component="img"
+          alt="Sản phẩm CiCi Accessories"
+          src="/assets/images/home/home-chart.webp"
+          sx={{ width: 720, borderRadius: 2 }}
+        />
       </Box>
-    </Container>
+    </Stack>
+  );
+
+  return (
+    <Box
+      component="section"
+      id="ve-chung-toi"
+      sx={[
+        { overflow: 'hidden', position: 'relative', py: { xs: 10, md: 20 } },
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
+      {...other}
+    >
+      <MotionViewport>
+        {renderLines()}
+
+        <Container sx={{ position: 'relative' }}>
+          <Grid container columnSpacing={{ xs: 0, md: 8 }} sx={{ position: 'relative', zIndex: 9 }}>
+            <Grid size={{ xs: 12, md: 6, lg: 7 }}>{renderDescription()}</Grid>
+
+            <Grid sx={{ display: { xs: 'none', md: 'block' } }} size={{ md: 6, lg: 5 }}>
+              {renderImage()}
+            </Grid>
+          </Grid>
+
+          <CircleSvg variants={varFade('in')} sx={{ display: { xs: 'none', md: 'block' } }} />
+        </Container>
+      </MotionViewport>
+    </Box>
   );
 }

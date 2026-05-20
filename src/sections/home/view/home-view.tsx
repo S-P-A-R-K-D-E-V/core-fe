@@ -18,6 +18,8 @@ import HomeHero from '../home-hero';
 import HomeMinimal from '../home-minimal';
 import HomeFeatures from '../home-features';
 import HomeCleanInterfaces from '../home-clean-interfaces';
+import HomeTestimonials from '../home-testimonials';
+import HomeFAQs from '../home-faqs';
 import HomeAdvertisement from '../home-advertisement';
 
 // ----------------------------------------------------------------------
@@ -25,8 +27,15 @@ import HomeAdvertisement from '../home-advertisement';
 export default function HomeView() {
   const { scrollYProgress } = useScroll();
 
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const [products, setProducts] = useState<IProductListItem[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
+
+  useEffect(() => {
+    const handleScroll = () => setShowBackToTop(window.scrollY > 300);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     getAllProducts({ page: 1, pageSize: 4, isActive: true })
@@ -54,22 +63,29 @@ export default function HomeView() {
 
         <HomeCleanInterfaces />
 
+        <HomeTestimonials />
+
+        <HomeFAQs />
+
         <HomeAdvertisement />
       </Box>
 
-      <Fab
-        size="small"
-        aria-label="Lên đầu trang"
-        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        sx={{
-          position: 'fixed',
-          bottom: { xs: 24, md: 32 },
-          right: { xs: 24, md: 32 },
-          zIndex: (theme) => theme.zIndex.speedDial,
-        }}
-      >
-        <Iconify icon="eva:arrow-up-fill" width={20} />
-      </Fab>
+      {showBackToTop && (
+        <Fab
+          size="small"
+          color="primary"
+          aria-label="Lên đầu trang"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          sx={{
+            position: 'fixed',
+            bottom: { xs: 24, md: 32 },
+            right: { xs: 24, md: 32 },
+            zIndex: (theme) => theme.zIndex.speedDial,
+          }}
+        >
+          <Iconify icon="eva:arrow-up-fill" width={20} />
+        </Fab>
+      )}
     </MainLayout>
   );
 }

@@ -1,84 +1,136 @@
+'use client';
+
+import type { BoxProps } from '@mui/material/Box';
+
 import { m } from 'framer-motion';
+import { alpha } from '@mui/material/styles';
+
 
 import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid2';
 import Stack from '@mui/material/Stack';
-import { alpha } from '@mui/material/styles';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 
-import Image from 'src/components/image';
 import { varFade, MotionViewport } from 'src/components/animate';
+import Iconify from 'src/components/iconify';
+
+import { SectionTitle } from './components/section-title';
+import { FloatLine, FloatPlusIcon } from './components/svg-elements';
 
 // ----------------------------------------------------------------------
 
-export default function HomeCleanInterfaces() {
-  const renderDescription = (
-    <Stack
-      spacing={3}
-      sx={{
-        maxWidth: 520,
-        mx: 'auto',
-        zIndex: { md: 99 },
-        position: { md: 'absolute' },
-        textAlign: { xs: 'center', md: 'left' },
-      }}
-    >
-      <m.div variants={varFade().inUp}>
-        <Typography component="div" variant="overline" sx={{ color: 'text.disabled' }}>
-          Giao diện hiện đại
-        </Typography>
-      </m.div>
+const REASONS = [
+  {
+    icon: 'solar:shield-check-bold-duotone',
+    title: 'Chất lượng đảm bảo',
+    desc: 'Kiểm định kỹ từng sản phẩm trước khi đến tay khách — không hài lòng hoàn tiền 100%.',
+    color: '#EC4899',
+  },
+  {
+    icon: 'solar:refresh-bold-duotone',
+    title: 'Đổi trả dễ dàng',
+    desc: 'Đổi trả miễn phí trong 7 ngày, không cần lý do. Quy trình đơn giản, nhanh chóng.',
+    color: '#8B5CF6',
+  },
+  {
+    icon: 'solar:heart-bold-duotone',
+    title: 'Chăm sóc tận tình',
+    desc: 'Tư vấn phụ kiện miễn phí qua Messenger. Đội ngũ nhiệt tình, phản hồi trong vòng 30 phút.',
+    color: '#F59E0B',
+  },
+  {
+    icon: 'solar:tag-price-bold-duotone',
+    title: 'Giá hợp lý',
+    desc: 'Cam kết giá tốt nhất thị trường. Khách hàng thân thiết hưởng ưu đãi tích điểm đặc biệt.',
+    color: '#10B981',
+  },
+];
 
-      <m.div variants={varFade().inUp}>
-        <Typography
-          variant="h2"
-          sx={{
-            textShadow: (theme) =>
-              theme.palette.mode === 'light'
-                ? 'unset'
-                : `4px 4px 16px ${alpha(theme.palette.grey[800], 0.48)}`,
-          }}
-        >
-          Thiết kế đẹp mắt, dễ sử dụng cho nhân viên và quản lý
-        </Typography>
-      </m.div>
-    </Stack>
-  );
+// ----------------------------------------------------------------------
 
-  const renderContent = (
-    <Box sx={{ position: 'relative' }}>
-      {[...Array(10)].map((_, index) => (
-        <Box
-          key={index}
-          component={m.div}
-          variants={varFade().inUp}
-          sx={{
-            top: 0,
-            left: 0,
-            position: 'absolute',
-            ...(index === 0 && { zIndex: 8 }),
-            ...(index === 9 && { position: 'relative', zIndex: 9 }),
-          }}
-        >
-          <Image
-            disabledEffect
-            alt={`clean-${index + 1}`}
-            src={`/assets/images/home/clean/page_${index + 1}.webp`}
-          />
-        </Box>
-      ))}
-    </Box>
-  );
+const renderLines = () => (
+  <>
+    <FloatPlusIcon sx={{ top: 72, right: 72 }} />
+    <FloatLine sx={{ top: 80, left: 0 }} />
+    <FloatLine vertical sx={{ top: 0, right: 80 }} />
+  </>
+);
 
+export default function HomeCleanInterfaces({ sx, ...other }: BoxProps) {
   return (
-    <Container
-      component={MotionViewport}
-      sx={{
-        py: { xs: 10, md: 15 },
-      }}
+    <Box
+      component="section"
+      sx={[
+        { overflow: 'hidden', position: 'relative', py: { xs: 10, md: 20 } },
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
+      {...other}
     >
-      {renderDescription}
-      {renderContent}
-    </Container>
+      <MotionViewport>
+        {renderLines()}
+
+        <Container sx={{ position: 'relative' }}>
+          <SectionTitle
+            caption="Tại sao chọn CiCi"
+            title="Cam kết"
+            txtGradient="từ chúng tôi"
+            sx={{ mb: { xs: 6, md: 10 }, textAlign: 'center', alignItems: 'center' }}
+          />
+
+          <Grid container spacing={3}>
+            {REASONS.map((item, index) => (
+              <Grid key={item.title} size={{ xs: 12, sm: 6, md: 3 }}>
+                <Box
+                  component={m.div}
+                  variants={varFade('inUp', { distance: 24 })}
+                  sx={[
+                    (theme) => ({
+                      p: 4,
+                      height: 1,
+                      borderRadius: 2,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      textAlign: 'center',
+                      bgcolor: alpha(theme.palette.grey[500], 0.04),
+                      border: `1px solid ${alpha(theme.palette.grey[500], 0.08)}`,
+                      transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+                      '&:hover': {
+                        transform: 'translateY(-6px)',
+                        boxShadow: `0 20px 40px ${alpha(item.color, 0.12)}`,
+                        bgcolor: alpha(theme.palette.grey[500], 0.07),
+                      },
+                    }),
+                  ]}
+                >
+                  <Box
+                    sx={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      mb: 2.5,
+                      bgcolor: `${item.color}18`,
+                    }}
+                  >
+                    <Iconify icon={item.icon} width={32} sx={{ color: item.color }} />
+                  </Box>
+
+                  <Typography variant="h6" sx={{ mb: 1.5 }}>
+                    {item.title}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    {item.desc}
+                  </Typography>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+        </Container>
+      </MotionViewport>
+    </Box>
   );
 }

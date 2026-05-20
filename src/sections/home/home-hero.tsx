@@ -1,27 +1,30 @@
-import { m, useScroll } from 'framer-motion';
-import { useRef, useState, useEffect, useCallback } from 'react';
+'use client';
+
+import type { BoxProps } from '@mui/material/Box';
+import type { Breakpoint } from '@mui/material/styles';
+import type { MotionProps, MotionValue, SpringOptions } from 'framer-motion';
+
+import { useRef, useState } from 'react';
+import { m, useScroll, useSpring, useTransform, useMotionValueEvent } from 'framer-motion';
 
 import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
+import Card from '@mui/material/Card';
+import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Skeleton from '@mui/material/Skeleton';
 import Container from '@mui/material/Container';
-import Grid from '@mui/material/Grid2';
 import Typography from '@mui/material/Typography';
-import { alpha, styled, useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
-import { useResponsive } from 'src/hooks/use-responsive';
-
-import { HEADER } from 'src/layouts/config-layout';
-import { bgBlur, bgGradient, textGradient } from 'src/theme/css';
-
 import { fCurrency } from 'src/utils/format-number';
 
+import { bgGradient, textGradient } from 'src/theme/css';
 import Iconify from 'src/components/iconify';
 import { varFade, MotionContainer } from 'src/components/animate';
 
@@ -29,131 +32,106 @@ import type { IProductListItem } from 'src/types/corecms-api';
 
 // ----------------------------------------------------------------------
 
+const smKey: Breakpoint = 'sm';
+const mdKey: Breakpoint = 'md';
+const lgKey: Breakpoint = 'lg';
+
+const motionProps: MotionProps = {
+  variants: varFade('inUp', { distance: 24 }),
+};
+
 const CARD_GRADIENTS = [
-  'linear-gradient(135deg, #F8C8DC 0%, #F4A0C0 100%)',
-  'linear-gradient(135deg, #EED6C4 0%, #DBAAA0 100%)',
-  'linear-gradient(135deg, #FFC8D5 0%, #E891A8 100%)',
-  'linear-gradient(135deg, #F5E6D3 0%, #EEC8A0 100%)',
+  'linear-gradient(135deg, #FADADD 0%, #F4A0C0 100%)',
+  'linear-gradient(135deg, #FDE8D8 0%, #FBBFA0 100%)',
+  'linear-gradient(135deg, #E8D5F5 0%, #C4A0E8 100%)',
+  'linear-gradient(135deg, #D4F0E8 0%, #A0D4C4 100%)',
 ];
 
 // ----------------------------------------------------------------------
 
-const StyledRoot = styled('div')(({ theme }) => ({
-  ...bgGradient({
-    color: 'rgba(255, 240, 245, 0.92)',
-    imgUrl: '/assets/background/overlay_3.jpg',
-  }),
-  width: '100%',
-  height: '100vh',
-  position: 'relative',
-  [theme.breakpoints.up('md')]: {
-    top: 0,
-    left: 0,
-    position: 'fixed',
-  },
-}));
+function HeroBg() {
+  return (
+    <Box
+      sx={{
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 0,
+        position: 'absolute',
+        overflow: 'hidden',
+      }}
+    >
+      <Box
+        sx={() => ({
+          ...bgGradient({
+            color: 'rgba(255, 245, 248, 0.94)',
+            imgUrl: '/assets/background/overlay_3.jpg',
+          }),
+          width: '100%',
+          height: '100%',
+          position: 'absolute',
+        })}
+      />
 
-const StyledWrapper = styled('div')(({ theme }) => ({
-  height: '100%',
-  overflow: 'hidden',
-  position: 'relative',
-  [theme.breakpoints.up('md')]: {
-    marginTop: HEADER.H_DESKTOP_OFFSET,
-  },
-}));
+      {/* Subtle grid pattern */}
+      <Box
+        component="svg"
+        sx={{ top: 0, left: 0, width: '100%', height: '100%', position: 'absolute', opacity: 0.05 }}
+      >
+        <defs>
+          <pattern id="shopGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#F472B6" strokeWidth="1" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#shopGrid)" />
+      </Box>
 
-const StyledTextGradient = styled(m.h1)(({ theme }) => ({
-  ...textGradient(
-    `300deg,
-    #F8C8DC 0%,
-    #F4B6C2 25%,
-    #EED6C4 50%,
-    #F4B6C2 75%,
-    #F8C8DC 100%`
-  ),
-  padding: 0,
-  marginTop: 8,
-  lineHeight: 1,
-  fontWeight: 900,
-  marginBottom: 24,
-  letterSpacing: 6,
-  textAlign: 'center',
-  backgroundSize: '400%',
-  fontSize: `${64 / 16}rem`,
-}));
-
-const StyledEllipseTop = styled('div')(({ theme }) => ({
-  top: -80,
-  width: 480,
-  right: -80,
-  height: 480,
-  borderRadius: '50%',
-  position: 'absolute',
-  filter: 'blur(100px)',
-  WebkitFilter: 'blur(100px)',
-  backgroundColor: 'rgba(248, 200, 220, 0.25)',
-}));
-
-const StyledEllipseBottom = styled('div')(({ theme }) => ({
-  height: 400,
-  bottom: -200,
-  left: '10%',
-  right: '10%',
-  borderRadius: '50%',
-  position: 'absolute',
-  filter: 'blur(100px)',
-  WebkitFilter: 'blur(100px)',
-  backgroundColor: alpha(theme.palette.primary.darker, 0.12),
-}));
-
-type StyledPolygonProps = {
-  opacity?: number;
-  anchor?: 'left' | 'right';
-};
-
-const StyledPolygon = styled('div')<StyledPolygonProps>(
-  ({ opacity = 1, anchor = 'left', theme }) => ({
-    ...bgBlur({
-      opacity,
-      color: theme.palette.background.default,
-    }),
-    zIndex: 9,
-    bottom: 0,
-    height: 80,
-    width: '50%',
-    position: 'absolute',
-    clipPath: 'polygon(0% 0%, 100% 100%, 0% 100%)',
-    ...(anchor === 'left' && {
-      left: 0,
-      ...(theme.direction === 'rtl' && {
-        transform: 'scale(-1, 1)',
-      }),
-    }),
-    ...(anchor === 'right' && {
-      right: 0,
-      transform: 'scaleX(-1)',
-      ...(theme.direction === 'rtl' && {
-        transform: 'scaleX(1)',
-      }),
-    }),
-  })
-);
+      {/* Blur glow top-right */}
+      <Box
+        sx={{
+          top: -100,
+          right: -100,
+          width: 500,
+          height: 500,
+          borderRadius: '50%',
+          position: 'absolute',
+          filter: 'blur(120px)',
+          backgroundColor: 'rgba(248, 200, 220, 0.35)',
+        }}
+      />
+      {/* Blur glow bottom-left */}
+      <Box
+        sx={{
+          bottom: -150,
+          left: '5%',
+          width: 400,
+          height: 400,
+          borderRadius: '50%',
+          position: 'absolute',
+          filter: 'blur(100px)',
+          backgroundColor: 'rgba(200, 220, 255, 0.2)',
+        }}
+      />
+    </Box>
+  );
+}
 
 // ----------------------------------------------------------------------
 
-type ProductMiniCardProps = {
+type ProductCardProps = {
   product?: IProductListItem;
   index: number;
   loading?: boolean;
 };
 
-function ProductMiniCard({ product, index, loading }: ProductMiniCardProps) {
+function ProductCard({ product, index, loading }: ProductCardProps) {
   if (loading) {
     return (
       <Skeleton
         variant="rectangular"
-        sx={{ borderRadius: 2, width: '100%', height: 190 }}
         animation="wave"
+        sx={{ borderRadius: 2, width: '100%', height: 200 }}
       />
     );
   }
@@ -162,23 +140,23 @@ function ProductMiniCard({ product, index, loading }: ProductMiniCardProps) {
   const price = product?.sellingPrice ?? product?.basePrice ?? 0;
 
   return (
-    <m.div variants={varFade().inUp} style={{ width: '100%' }}>
+    <m.div variants={varFade('inUp', { distance: 16 })} style={{ width: '100%' }}>
       <Card
         sx={{
-          borderRadius: 2,
+          borderRadius: 2.5,
           overflow: 'hidden',
+          cursor: 'pointer',
           transition: 'transform 0.25s ease, box-shadow 0.25s ease',
           '&:hover': {
             transform: 'translateY(-6px)',
-            boxShadow: (theme) =>
-              `0 20px 40px ${alpha(theme.palette.primary.main, 0.25)}`,
+            boxShadow: (theme) => `0 20px 40px ${alpha(theme.palette.primary.main, 0.2)}`,
           },
         }}
       >
         {/* Image / gradient banner */}
         <Box
           sx={{
-            height: 120,
+            height: 130,
             background: gradient,
             position: 'relative',
             display: 'flex',
@@ -192,19 +170,13 @@ function ProductMiniCard({ product, index, loading }: ProductMiniCardProps) {
               component="img"
               src={product.imageUrl}
               alt={product.name}
-              sx={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                position: 'absolute',
-                inset: 0,
-              }}
+              sx={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }}
             />
           ) : (
             <Iconify
-              icon="solar:tag-price-bold-duotone"
-              width={44}
-              sx={{ color: 'rgba(255,255,255,0.55)' }}
+              icon="solar:bag-heart-bold-duotone"
+              width={48}
+              sx={{ color: 'rgba(255,255,255,0.6)' }}
             />
           )}
 
@@ -216,31 +188,41 @@ function ProductMiniCard({ product, index, loading }: ProductMiniCardProps) {
                 position: 'absolute',
                 top: 8,
                 left: 8,
-                bgcolor: 'rgba(255,255,255,0.88)',
+                bgcolor: 'rgba(255,255,255,0.9)',
                 fontSize: '0.6rem',
                 height: 18,
-                fontWeight: 600,
+                fontWeight: 700,
                 '& .MuiChip-label': { px: 0.75 },
               }}
             />
           )}
+
+          {/* New badge */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              bgcolor: 'error.main',
+              color: 'white',
+              borderRadius: 1,
+              px: 0.75,
+              py: 0.25,
+              fontSize: '0.6rem',
+              fontWeight: 700,
+              lineHeight: 1.4,
+            }}
+          >
+            MỚI
+          </Box>
         </Box>
 
         {/* Info */}
-        <Box sx={{ p: 1.25, bgcolor: 'background.paper' }}>
-          <Typography
-            variant="caption"
-            fontWeight={700}
-            noWrap
-            display="block"
-            sx={{ mb: 0.25 }}
-          >
-            {product?.name ?? '—'}
+        <Box sx={{ p: 1.5, bgcolor: 'background.paper' }}>
+          <Typography variant="caption" fontWeight={700} noWrap display="block" sx={{ mb: 0.5 }}>
+            {product?.name ?? 'Sản phẩm nổi bật'}
           </Typography>
-          <Typography
-            variant="caption"
-            sx={{ color: 'primary.main', fontWeight: 700 }}
-          >
+          <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 700 }}>
             {price > 0 ? fCurrency(price) : 'Liên hệ'}
           </Typography>
         </Box>
@@ -251,44 +233,32 @@ function ProductMiniCard({ product, index, loading }: ProductMiniCardProps) {
 
 // ----------------------------------------------------------------------
 
-type Props = {
+type Props = BoxProps & {
   products?: IProductListItem[];
   productsLoading?: boolean;
 };
 
-export default function HomeHero({ products = [], productsLoading = true }: Props) {
-  const mdUp = useResponsive('up', 'md');
-
+export default function HomeHero({ sx, products = [], productsLoading = true, ...other }: Props) {
+  const scrollProgress = useScrollPercent();
   const theme = useTheme();
+  const mdUp = useMediaQuery(theme.breakpoints.up(mdKey));
 
-  const heroRef = useRef<HTMLDivElement | null>(null);
+  const distance = mdUp ? scrollProgress.percent : 0;
 
-  const { scrollY } = useScroll();
+  const y1 = useTransformY(scrollProgress.scrollY, distance * -7);
+  const y2 = useTransformY(scrollProgress.scrollY, distance * -6);
+  const y3 = useTransformY(scrollProgress.scrollY, distance * -5);
+  const y4 = useTransformY(scrollProgress.scrollY, distance * -4);
+  const y5 = useTransformY(scrollProgress.scrollY, distance * -3);
 
-  const [percent, setPercent] = useState(0);
+  const opacity: MotionValue<number> = useTransform(
+    scrollProgress.scrollY,
+    [0, 1],
+    [1, mdUp ? Number((1 - scrollProgress.percent / 100).toFixed(1)) : 1]
+  );
 
-  const getScroll = useCallback(() => {
-    let heroHeight = 0;
-
-    if (heroRef.current) {
-      heroHeight = heroRef.current.offsetHeight;
-    }
-
-    scrollY.on('change', (scrollHeight) => {
-      const scrollPercent = (scrollHeight * 100) / heroHeight;
-      setPercent(Math.floor(scrollPercent));
-    });
-  }, [scrollY]);
-
-  useEffect(() => {
-    getScroll();
-  }, [getScroll]);
-
-  const opacity = 1 - percent / 100;
-  const hide = percent > 120;
-
-  // Determine card items: skeleton × 4 while loading, real products, or gradient placeholders
-  const cardItems: Array<IProductListItem | null> = productsLoading
+  // Card slots: 4 items
+  const cardSlots: Array<IProductListItem | null> = productsLoading
     ? [null, null, null, null]
     : products.length > 0
       ? [...products.slice(0, 4), ...Array(Math.max(0, 4 - products.length)).fill(null)]
@@ -296,139 +266,195 @@ export default function HomeHero({ products = [], productsLoading = true }: Prop
 
   // ----------------------------------------------------------------------
 
-  const renderDescription = (
-    <Stack
-      alignItems="center"
-      justifyContent="center"
-      sx={{
-        height: 1,
-        mx: 'auto',
-        maxWidth: 520,
-        opacity: opacity > 0 ? opacity : 0,
-        mt: {
-          md: `-${HEADER.H_DESKTOP + percent * 2.5}px`,
-        },
-      }}
-    >
-      <m.div variants={varFade().in}>
-        <Typography
-          variant="h2"
-          sx={{ textAlign: 'center', fontWeight: 700 }}
-        >
-          Cici Accessories
-        </Typography>
-      </m.div>
-
-      <m.div variants={varFade().in}>
-        <StyledTextGradient
+  const renderHeading = () => (
+    <m.div {...motionProps}>
+      <Box
+        component="h1"
+        sx={{
+          my: 0,
+          mx: 'auto',
+          maxWidth: 680,
+          display: 'flex',
+          flexWrap: 'wrap',
+          typography: 'h2',
+          justifyContent: 'center',
+          [theme.breakpoints.up(lgKey)]: {
+            fontSize: theme.typography.pxToRem(64),
+            lineHeight: '80px',
+          },
+        }}
+      >
+        <Box component="span" sx={{ width: 1, opacity: 0.45, textAlign: 'center' }}>
+          Khám phá thế giới
+        </Box>
+        <Box
+          component={m.span}
           animate={{ backgroundPosition: '200% center' }}
-          transition={{
-            repeatType: 'reverse',
-            ease: 'linear',
-            duration: 20,
-            repeat: Infinity,
+          transition={{ duration: 20, ease: 'linear', repeat: Infinity, repeatType: 'reverse' }}
+          sx={{
+            ...textGradient(`300deg, #F43F5E 0%, #EC4899 30%, #A855F7 60%, #EC4899 80%, #F43F5E 100%`),
+            backgroundSize: '400%',
+            ml: { xs: 0.5, md: 1 },
           }}
         >
-          Màu mè
-        </StyledTextGradient>
-      </m.div>
-
-      <m.div variants={varFade().in}>
-        <Typography
-          variant="body1"
-          sx={{ textAlign: 'center', color: 'text.secondary' }}
-        >
-          Nền tảng quản lý nội bộ dành cho hệ thống cửa hàng Cici Accessories.
-          Quản lý ca làm việc, chấm công, kiểm tiền ca, lương và phê duyệt yêu cầu
-          một cách tập trung, minh bạch và hiệu quả.
-        </Typography>
-      </m.div>
-
-      <m.div variants={varFade().in}>
-        <Stack
-          spacing={1.5}
-          direction={{ xs: 'column', sm: 'row' }}
-          sx={{ my: 5 }}
-        >
-          <Button
-            component={RouterLink}
-            href={paths.dashboard.root}
-            color="primary"
-            size="large"
-            variant="contained"
-            startIcon={<Iconify icon="eva:log-in-outline" width={24} />}
-          >
-            Vào hệ thống
-          </Button>
-
-          <Button
-            component={RouterLink}
-            href={paths.dashboard.shift.root}
-            color="inherit"
-            size="large"
-            variant="outlined"
-            startIcon={<Iconify icon="eva:calendar-outline" width={24} />}
-          >
-            Quản lý ca & lương
-          </Button>
-        </Stack>
-      </m.div>
-    </Stack>
+          CiCi Accessories
+        </Box>
+      </Box>
+    </m.div>
   );
 
-  // ----------------------------------------------------------------------
+  const renderText = () => (
+    <m.div {...motionProps}>
+      <Typography
+        variant="body1"
+        sx={{
+          mx: 'auto',
+          maxWidth: 560,
+          textAlign: 'center',
+          color: 'text.secondary',
+          [theme.breakpoints.up(lgKey)]: { fontSize: 18, lineHeight: '32px' },
+        }}
+      >
+        Phụ kiện thời trang nữ — trang sức, kẹp tóc, túi mini và hơn thế nữa.
+        {' '}Phong cách, cá tính, giá cả hợp lý.
+      </Typography>
+    </m.div>
+  );
 
-  const renderProductCards = (
+  const renderBadges = () => (
+    <m.div {...motionProps}>
+      <Stack
+        direction="row"
+        spacing={1.5}
+        flexWrap="wrap"
+        justifyContent="center"
+        sx={{ gap: 1 }}
+      >
+        {[
+          { icon: 'solar:star-bold-duotone', label: '2,000+ khách hàng' },
+          { icon: 'solar:delivery-bold-duotone', label: 'Ship toàn quốc' },
+          { icon: 'solar:shield-check-bold-duotone', label: 'Đổi trả 7 ngày' },
+        ].map((b) => (
+          <Chip
+            key={b.label}
+            icon={<Iconify icon={b.icon} width={16} />}
+            label={b.label}
+            size="small"
+            sx={{
+              bgcolor: alpha(theme.palette.primary.main, 0.08),
+              color: 'text.primary',
+              fontWeight: 600,
+              '& .MuiChip-icon': { color: 'primary.main' },
+            }}
+          />
+        ))}
+      </Stack>
+    </m.div>
+  );
+
+  const renderButtons = () => (
+    <Box
+      sx={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: { xs: 1.5, sm: 2 },
+      }}
+    >
+      <m.div {...motionProps}>
+        <Button
+          component={RouterLink}
+          href="#san-pham"
+          color="primary"
+          size="large"
+          variant="contained"
+          startIcon={<Iconify width={20} icon="solar:bag-smile-bold-duotone" />}
+        >
+          Xem bộ sưu tập
+        </Button>
+      </m.div>
+
+      <m.div {...motionProps}>
+        <Button
+          size="large"
+          color="inherit"
+          variant="outlined"
+          href="https://m.me/ciciaccessories"
+          target="_blank"
+          rel="noopener"
+          startIcon={<Iconify width={20} icon="logos:messenger" />}
+        >
+          Nhắn tin đặt hàng
+        </Button>
+      </m.div>
+    </Box>
+  );
+
+  const renderStaffLink = () => (
+    <m.div {...motionProps}>
+      <Link
+        component={RouterLink}
+        href={paths.auth.jwt.login}
+        variant="caption"
+        underline="hover"
+        sx={{
+          color: 'text.disabled',
+          opacity: 0.6,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.5,
+          '&:hover': { opacity: 1 },
+        }}
+      >
+        <Iconify icon="solar:lock-keyhole-minimalistic-outline" width={14} />
+        Dành cho nhân viên
+      </Link>
+    </m.div>
+  );
+
+  // Right column: product cards
+  const renderProductGrid = () => (
     <Stack
       alignItems="center"
       justifyContent="center"
       sx={{
         height: 1,
-        opacity: opacity > 0 ? opacity : 0,
-        transform: `skew(${-8 - percent / 32}deg, ${2 - percent / 24}deg)`,
-        ...(theme.direction === 'rtl' && {
-          transform: `skew(${8 + percent / 32}deg, ${2 + percent / 24}deg)`,
-        }),
+        opacity: Number((1 - scrollProgress.percent / 100).toFixed(2)),
+        transform: `skew(${-6 - scrollProgress.percent / 40}deg, ${1.5 - scrollProgress.percent / 28}deg)`,
       }}
     >
-      <m.div variants={varFade().inDown}>
+      <m.div variants={varFade('inDown', { distance: 16 })}>
         <Typography
           variant="overline"
-          sx={{
-            display: 'block',
-            textAlign: 'center',
-            color: 'text.disabled',
-            mb: 2,
-            letterSpacing: 2,
-          }}
+          sx={{ display: 'block', textAlign: 'center', color: 'text.disabled', mb: 2, letterSpacing: 2 }}
         >
           Sản phẩm nổi bật
         </Typography>
       </m.div>
 
-      <Grid
-        container
-        spacing={1.5}
-        sx={{ maxWidth: 340 }}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: 1.5,
+          width: '100%',
+          maxWidth: 340,
+        }}
       >
-        {cardItems.map((product, index) => (
-          <Grid key={product?.id ?? `placeholder-${index}`} size={{ xs: 6 }}>
-            <ProductMiniCard
-              product={product ?? undefined}
-              index={index}
-              loading={productsLoading}
-            />
-          </Grid>
+        {cardSlots.map((product, idx) => (
+          <ProductCard
+            key={product?.id ?? `slot-${idx}`}
+            product={product ?? undefined}
+            index={idx}
+            loading={productsLoading}
+          />
         ))}
-      </Grid>
+      </Box>
 
       {!productsLoading && products.length === 0 && (
-        <m.div variants={varFade().in}>
-          <Typography
-            variant="caption"
-            sx={{ display: 'block', textAlign: 'center', color: 'text.disabled', mt: 1.5 }}
-          >
-            Đăng nhập để xem sản phẩm
+        <m.div variants={varFade('in')}>
+          <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1.5, display: 'block', textAlign: 'center' }}>
+            Đang cập nhật sản phẩm...
           </Typography>
         </m.div>
       )}
@@ -437,52 +463,124 @@ export default function HomeHero({ products = [], productsLoading = true }: Prop
 
   // ----------------------------------------------------------------------
 
-  const renderPolygons = (
-    <>
-      <StyledPolygon />
-      <StyledPolygon anchor="right" opacity={0.48} />
-      <StyledPolygon anchor="right" opacity={0.48} sx={{ height: 48, zIndex: 10 }} />
-      <StyledPolygon anchor="right" sx={{ zIndex: 11, height: 24 }} />
-    </>
-  );
-
-  const renderEllipses = (
-    <>
-      {mdUp && <StyledEllipseTop />}
-      <StyledEllipseBottom />
-    </>
-  );
-
   return (
-    <>
-      <StyledRoot
-        ref={heroRef}
+    <Box
+      ref={scrollProgress.elementRef}
+      component="section"
+      sx={[
+        {
+          overflow: 'hidden',
+          position: 'relative',
+          [theme.breakpoints.up(mdKey)]: {
+            minHeight: 760,
+            height: '100vh',
+            maxHeight: 1440,
+            display: 'block',
+            willChange: 'opacity',
+          },
+        },
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
+      {...other}
+    >
+      <Box
+        component={m.div}
+        style={{ opacity }}
         sx={{
-          ...(hide && { opacity: 0 }),
+          width: 1,
+          display: 'flex',
+          position: 'relative',
+          flexDirection: 'column',
+          [theme.breakpoints.up(mdKey)]: {
+            height: 1,
+            position: 'fixed',
+            maxHeight: 'inherit',
+          },
         }}
       >
-        <StyledWrapper>
-          <Container component={MotionContainer} sx={{ height: 1 }}>
-            <Grid container columnSpacing={{ md: 6 }} sx={{ height: 1 }}>
-              <Grid size={{ xs: 12, md: 6 }}>
-                {renderDescription}
-              </Grid>
+        {/* Background */}
+        <HeroBg />
 
-              {mdUp && (
-                <Grid size={{ md: 6 }}>
-                  {renderProductCards}
-                </Grid>
-              )}
-            </Grid>
-          </Container>
+        <Container
+          component={MotionContainer}
+          sx={{
+            py: 3,
+            zIndex: 9,
+            position: 'relative',
+            display: 'flex',
+            [theme.breakpoints.up(mdKey)]: {
+              flex: '1 1 auto',
+              alignItems: 'center',
+              py: 'var(--layout-header-desktop-height, 80px)',
+            },
+          }}
+        >
+          <Box
+            sx={{
+              width: 1,
+              display: 'flex',
+              gap: 5,
+              flexDirection: { xs: 'column', md: 'row' },
+              alignItems: 'center',
+            }}
+          >
+            {/* Left: text content */}
+            <Stack
+              spacing={4}
+              alignItems="center"
+              sx={{ flex: 1, minWidth: 0 }}
+            >
+              <Stack spacing={3} alignItems="center" sx={{ textAlign: 'center' }}>
+                <m.div style={{ y: y1 }}>{renderHeading()}</m.div>
+                <m.div style={{ y: y2 }}>{renderText()}</m.div>
+              </Stack>
 
-          {renderEllipses}
-        </StyledWrapper>
-      </StyledRoot>
+              <m.div style={{ y: y3 }}>{renderBadges()}</m.div>
+              <m.div style={{ y: y4 }}>{renderButtons()}</m.div>
+              <m.div style={{ y: y5 }}>{renderStaffLink()}</m.div>
+            </Stack>
 
-      {mdUp && renderPolygons}
+            {/* Right: product cards (desktop only) */}
+            {mdUp && (
+              <Box sx={{ flexShrink: 0, width: 360, height: '100%' }}>
+                {renderProductGrid()}
+              </Box>
+            )}
+          </Box>
+        </Container>
+      </Box>
 
-      <Box sx={{ height: { md: '100vh' } }} />
-    </>
+      {/* Spacer to push content below fixed hero */}
+      <Box sx={{ display: { xs: 'none', md: 'block' }, height: '100vh' }} />
+    </Box>
   );
+}
+
+// ----------------------------------------------------------------------
+
+function useTransformY(value: MotionValue<number>, distance: number) {
+  const physics: SpringOptions = {
+    mass: 0.1,
+    damping: 20,
+    stiffness: 300,
+    restDelta: 0.001,
+  };
+  return useSpring(useTransform(value, [0, 1], [0, distance]), physics);
+}
+
+function useScrollPercent() {
+  const elementRef = useRef<HTMLDivElement>(null);
+  const { scrollY } = useScroll();
+  const [percent, setPercent] = useState(0);
+
+  useMotionValueEvent(scrollY, 'change', (scrollHeight) => {
+    let heroHeight = 0;
+    if (elementRef.current) {
+      heroHeight = elementRef.current.offsetHeight;
+    }
+    const scrollPercent = Math.floor((scrollHeight / heroHeight) * 100);
+    setPercent(scrollPercent >= 100 ? 100 : scrollPercent);
+  });
+
+  return { elementRef, percent, scrollY };
 }
