@@ -20,8 +20,6 @@ import { customShadows } from './custom-shadows';
 import { componentsOverrides } from './overrides';
 import { createPresets } from './options/presets';
 import { createContrast } from './options/contrast';
-import NextAppDirEmotionCacheProvider from './next-emotion-cache';
-
 // ----------------------------------------------------------------------
 
 type Props = {
@@ -72,13 +70,11 @@ export default function ThemeProvider({ children }: Props) {
   );
 
   return (
-    <NextAppDirEmotionCacheProvider options={{ key: 'css' }}>
-      <MuiThemeProvider theme={themeWithLocale}>
-        <RTL themeDirection={settings.themeDirection}>
-          <CssBaseline />
-          {children}
-        </RTL>
-      </MuiThemeProvider>
-    </NextAppDirEmotionCacheProvider>
+    <MuiThemeProvider theme={themeWithLocale}>
+      <RTL themeDirection={settings.themeDirection}>
+        <CssBaseline />
+        {children}
+      </RTL>
+    </MuiThemeProvider>
   );
 }

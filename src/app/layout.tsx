@@ -8,7 +8,6 @@ import 'src/locales/i18n';
 
 import type { Metadata, Viewport } from 'next';
 
-import InitColorSchemeScript from '@mui/material/InitColorSchemeScript';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter';
 
 import ThemeProvider from 'src/theme';
@@ -31,18 +30,34 @@ import { AuthProvider } from 'src/auth/context/jwt';
 // ----------------------------------------------------------------------
 
 export const viewport: Viewport = {
-  themeColor: '#000000',
+  themeColor: '#00A76F', // CiCi primary brand color
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
 };
 
 export const metadata: Metadata = {
-  title: 'CiCi Accessories - Hệ thống quản lý nội bộ',
+  title: {
+    template: '%s | CiCi Accessories',
+    default: 'CiCi Accessories — Phụ kiện thời trang nữ',
+  },
   description:
-    'Nền tảng quản lý nội bộ dành cho hệ thống cửa hàng CiCi Accessories. Quản lý ca làm việc, chấm công, kiểm tiền ca, lương và phê duyệt yêu cầu.',
-  keywords: 'cici,accessories,quản lý,nội bộ,ca làm việc,lương,chấm công',
+    'CiCi Accessories chuyên cung cấp phụ kiện thời trang nữ: trang sức, kẹp tóc, túi mini, ví da. Hàng trăm mẫu mới, giao hàng toàn quốc, đổi trả miễn phí 7 ngày.',
+  keywords: 'cici accessories,phụ kiện thời trang,trang sức nữ,kẹp tóc,túi mini,ví da,đồ trang sức,vòng tay,nhẫn bạc',
   manifest: '/manifest.json',
+  openGraph: {
+    type: 'website',
+    locale: 'vi_VN',
+    siteName: 'CiCi Accessories',
+    title: 'CiCi Accessories — Phụ kiện thời trang nữ',
+    description:
+      'Hàng trăm mẫu trang sức, kẹp tóc, túi mini. Giao hàng toàn quốc — đổi trả miễn phí 7 ngày.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'CiCi Accessories — Phụ kiện thời trang nữ',
+    description: 'Hàng trăm mẫu trang sức, kẹp tóc, túi mini. Giao hàng toàn quốc.',
+  },
   icons: [
     { rel: 'icon', url: '/favicon/favicon.ico' },
     { rel: 'icon', type: 'image/png', sizes: '16x16', url: '/favicon/favicon-16x16.png' },
@@ -59,8 +74,6 @@ export default function RootLayout({ children }: Props) {
   return (
     <html lang="vi" className={primaryFont.className} suppressHydrationWarning>
       <body>
-        <InitColorSchemeScript defaultMode="light" />
-
         <AuthProvider>
           <LocalizationProvider>
             <SettingsProvider
