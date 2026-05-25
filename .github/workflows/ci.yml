@@ -6,8 +6,6 @@ on:
 
 env:
   IMAGE_NAME: satthuno99/core-fe
-  DEPLOYMENT: core-fe
-  NAMESPACE: app
 
 jobs:
   build-and-push:
@@ -28,24 +26,29 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.IMAGE_NAME }}:latest
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
           build-args: |
             NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
             NEXT_PUBLIC_FACEBOOK_APP_ID=${{ secrets.NEXT_PUBLIC_FACEBOOK_APP_ID }}
 
-  deploy:
-    runs-on: self-hosted
+  update-gitops:
+    runs-on: ubuntu-latest
     needs: build-and-push
-    if: ${{ needs.build-and-push.result == 'success' }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Update image tag in GitOps repo
+        env:
+          GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+        run: |
+          git clone https://x-access-token:${GITOPS_TOKEN}@github.com/S-P-A-R-K-D-E-V/spark-infra.git
+          cd spark-infra
 
-      - name: Apply K8s manifest
-        run: kubectl apply -f k8s/deployment.yaml
+          sed -i "s|satthuno99/core-fe:.*|satthuno99/core-fe:${{ github.sha }}|" \
+            k8s/apps/core-fe/deployment.yaml
 
-      - name: Restart để pull image latest mới nhất
-        run: kubectl rollout restart deployment/${{ env.DEPLOYMENT }} -n ${{ env.NAMESPACE }}
-
-      - name: Chờ rollout hoàn tất
-        timeout-minutes: 5
-        run: kubectl rollout status deployment/${{ env.DEPLOYMENT }} -n ${{ env.NAMESPACE }}
+          git config user.email "ci@spark.dev"
+          git config user.name "GitHub Actions"
+          git add k8s/apps/core-fe/deployment.yaml
+          git diff --staged --quiet || git commit -m "deploy: core-fe → ${GITHUB_SHA::8}"
+          git push
