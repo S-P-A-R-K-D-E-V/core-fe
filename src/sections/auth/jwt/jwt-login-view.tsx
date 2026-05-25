@@ -156,7 +156,15 @@ export default function JwtLoginView() {
       <GoogleLogin
         onSuccess={async (resp) => {
           try {
-            await loginWithOAuth?.('google', resp.credential!);
+            // Decode Google ID token (JWT) to extract avatar without verifying signature
+            let googleAvatar: string | undefined;
+            try {
+              const payload = JSON.parse(atob(resp.credential!.split('.')[1]));
+              googleAvatar = payload.picture;
+            } catch (_) {
+              // ignore decode failure — avatar stays default
+            }
+            await loginWithOAuth?.('google', resp.credential!, googleAvatar);
             router.push(returnTo || PATH_AFTER_LOGIN);
           } catch (err: any) {
             const msg = err?.response?.data?.title || err?.response?.data?.detail || err?.message || 'Đăng nhập Google thất bại';
@@ -177,7 +185,8 @@ export default function JwtLoginView() {
         callback={async (resp: any) => {
           if (!resp?.accessToken) return;
           try {
-            await loginWithOAuth?.('facebook', resp.accessToken);
+            const fbAvatar: string | undefined = resp.picture?.data?.url;
+            await loginWithOAuth?.('facebook', resp.accessToken, fbAvatar);
             router.push(returnTo || PATH_AFTER_LOGIN);
           } catch (err: any) {
             const msg = err?.response?.data?.title || err?.response?.data?.detail || err?.message || 'Đăng nhập Facebook thất bại';

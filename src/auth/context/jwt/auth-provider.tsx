@@ -139,7 +139,7 @@ function buildUserFromToken(accessToken: string) {
   };
 }
 
-function buildUserFromResponse(res: IAuthResponse) {
+function buildUserFromResponse(res: IAuthResponse, avatarUrl?: string) {
   const { token, refreshToken, firstName, lastName, id, email, roles, permissions, role, sessionToken } = res;
   return {
     id,
@@ -150,7 +150,7 @@ function buildUserFromResponse(res: IAuthResponse) {
     role: role || (roles && roles[0]) || 'User',
     roles: roles || [],
     permissions: permissions || [],
-    photoURL: '/assets/images/avatar/avatar_default.jpg',
+    photoURL: avatarUrl || '/assets/images/avatar/avatar_default.jpg',
     accessToken: token,
     refreshToken,
     sessionToken,
@@ -300,7 +300,7 @@ export function AuthProvider({ children }: Props) {
   }, []);
 
   // OAUTH LOGIN (Google / Facebook)
-  const loginWithOAuth = useCallback(async (provider: 'google' | 'facebook', token: string) => {
+  const loginWithOAuth = useCallback(async (provider: 'google' | 'facebook', token: string, avatarUrl?: string) => {
     const data: IOAuthLoginRequest = { provider, token };
     const res = await axios.post<IAuthResponse>(endpoints.auth.oauthLogin, data);
     const { token: accessToken, refreshToken, sessionToken } = res.data;
@@ -311,7 +311,7 @@ export function AuthProvider({ children }: Props) {
       localStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
     }
 
-    const user = buildUserFromResponse(res.data);
+    const user = buildUserFromResponse(res.data, avatarUrl);
     dispatch({ type: Types.LOGIN, payload: { user } });
   }, []);
 
