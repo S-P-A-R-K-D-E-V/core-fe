@@ -119,7 +119,7 @@ function ScrollableContent({ containerRoot }: ScrollContentProps) {
   const [startScroll, setStartScroll] = useState(false);
 
   const physics = { damping: 16, mass: 0.12, stiffness: 80 };
-  const scrollRange = (-scrollRect.scrollWidth + containeRect.width / 2) * (isRtl ? -1 : 1);
+  const scrollRange = (-scrollRect.scrollWidth + containeRect.width) * (isRtl ? -1 : 1);
   const x = useSpring(useTransform(scrollYProgress, [0, 1], [0, scrollRange]), physics);
 
   const background = useTransform(
@@ -182,8 +182,9 @@ const ScrollContent = styled(m.div)(({ theme }) => ({
   display: 'flex',
   gap: theme.spacing(5),
   paddingLeft: theme.spacing(3),
+  paddingRight: theme.spacing(3),
   transition: theme.transitions.create(['margin-left']),
-  [theme.breakpoints.up('md')]: { gap: theme.spacing(8), paddingLeft: 0 },
+  [theme.breakpoints.up('md')]: { gap: theme.spacing(8), paddingLeft: 0, paddingRight: theme.spacing(8) },
 }));
 
 // ----------------------------------------------------------------------
@@ -192,9 +193,20 @@ type CategoryItemProps = BoxProps & { item: (typeof CATEGORIES)[number] };
 
 function CategoryItem({ item, sx, ...other }: CategoryItemProps) {
   return (
-    <Box sx={[{ flexShrink: 0, maxWidth: 440 }, ...(Array.isArray(sx) ? sx : [sx])]} {...other}>
+    <Box
+      component={m.div}
+      whileHover={{ y: -4 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      sx={[{ flexShrink: 0, maxWidth: 440 }, ...(Array.isArray(sx) ? sx : [sx])]}
+      {...other}
+    >
       <Box sx={{ mb: 5, gap: 2.5, display: 'flex', alignItems: 'flex-start' }}>
-        <Iconify width={36} icon={item.icon} sx={{ mt: '8px', color: 'rgba(255,255,255,0.9)', flexShrink: 0 }} />
+        <m.div
+          animate={{ rotate: [0, 8, -8, 0] }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <Iconify width={36} icon={item.icon} sx={{ mt: '8px', color: 'rgba(255,255,255,0.9)', flexShrink: 0 }} />
+        </m.div>
         <Stack spacing={2}>
           <Typography variant="h3" sx={{ color: 'rgba(255,255,255,0.95)' }}>{item.title}</Typography>
           <Typography sx={{ color: 'rgba(255,255,255,0.72)', maxWidth: 360 }}>{item.subtitle}</Typography>
@@ -214,9 +226,19 @@ function CategoryItem({ item, sx, ...other }: CategoryItemProps) {
           alignItems: 'center',
           justifyContent: 'center',
           gap: 2,
+          transition: 'background-color 0.3s ease, border-color 0.3s ease',
+          '&:hover': {
+            bgcolor: 'rgba(255,255,255,0.22)',
+            borderColor: 'rgba(255,255,255,0.4)',
+          },
         }}
       >
-        <Iconify width={72} icon={item.icon} sx={{ color: 'rgba(255,255,255,0.3)' }} />
+        <m.div
+          animate={{ scale: [1, 1.1, 1] }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <Iconify width={72} icon={item.icon} sx={{ color: 'rgba(255,255,255,0.3)' }} />
+        </m.div>
         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 2 }}>
           XEM TẤT CẢ
         </Typography>
