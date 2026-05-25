@@ -4,13 +4,12 @@ import type { BoxProps } from '@mui/material/Box';
 import type { Breakpoint } from '@mui/material/styles';
 import type { MotionProps, MotionValue, SpringOptions } from 'framer-motion';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { m, useScroll, useSpring, useTransform, useMotionValueEvent } from 'framer-motion';
 
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Card from '@mui/material/Card';
-import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Skeleton from '@mui/material/Skeleton';
@@ -87,8 +86,11 @@ function HeroBg() {
         <rect width="100%" height="100%" fill="url(#shopGrid)" />
       </Box>
 
-      {/* Blur glow top-right */}
+      {/* Blur glow top-right — animates slowly */}
       <Box
+        component={m.div}
+        animate={{ scale: [1, 1.15, 1], opacity: [0.35, 0.5, 0.35] }}
+        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
         sx={{
           top: -100,
           right: -100,
@@ -100,8 +102,11 @@ function HeroBg() {
           backgroundColor: 'rgba(248, 200, 220, 0.35)',
         }}
       />
-      {/* Blur glow bottom-left */}
+      {/* Blur glow bottom-left — animates offset */}
       <Box
+        component={m.div}
+        animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.35, 0.2] }}
+        transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
         sx={{
           bottom: -150,
           left: '5%',
@@ -126,6 +131,9 @@ type ProductCardProps = {
 };
 
 function ProductCard({ product, index, loading }: ProductCardProps) {
+  const [imgError, setImgError] = useState(false);
+  const handleImgError = useCallback(() => setImgError(true), []);
+
   if (loading) {
     return (
       <Skeleton
@@ -138,6 +146,7 @@ function ProductCard({ product, index, loading }: ProductCardProps) {
 
   const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
   const price = product?.sellingPrice ?? product?.basePrice ?? 0;
+  const showImage = !!product?.imageUrl && !imgError;
 
   return (
     <m.div variants={varFade('inUp', { distance: 16 })} style={{ width: '100%' }}>
@@ -146,10 +155,10 @@ function ProductCard({ product, index, loading }: ProductCardProps) {
           borderRadius: 2.5,
           overflow: 'hidden',
           cursor: 'pointer',
-          transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+          transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease',
           '&:hover': {
-            transform: 'translateY(-6px)',
-            boxShadow: (theme) => `0 20px 40px ${alpha(theme.palette.primary.main, 0.2)}`,
+            transform: 'translateY(-8px) scale(1.02)',
+            boxShadow: (theme) => `0 24px 48px ${alpha(theme.palette.primary.main, 0.25)}`,
           },
         }}
       >
@@ -165,19 +174,25 @@ function ProductCard({ product, index, loading }: ProductCardProps) {
             overflow: 'hidden',
           }}
         >
-          {product?.imageUrl ? (
+          {showImage ? (
             <Box
               component="img"
-              src={product.imageUrl}
-              alt={product.name}
+              src={product!.imageUrl}
+              alt={product!.name}
+              onError={handleImgError}
               sx={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }}
             />
           ) : (
-            <Iconify
-              icon="solar:bag-heart-bold-duotone"
-              width={48}
-              sx={{ color: 'rgba(255,255,255,0.6)' }}
-            />
+            <m.div
+              animate={{ scale: [1, 1.08, 1] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <Iconify
+                icon="solar:bag-heart-bold-duotone"
+                width={48}
+                sx={{ color: 'rgba(255,255,255,0.6)' }}
+              />
+            </m.div>
           )}
 
           {product?.categoryName && (
@@ -390,25 +405,33 @@ export default function HomeHero({ sx, products = [], productsLoading = true, ..
     </Box>
   );
 
-  const renderStaffLink = () => (
+  const renderLoginButton = () => (
     <m.div {...motionProps}>
-      <Link
+      <Button
         component={RouterLink}
         href={paths.auth.jwt.login}
-        variant="caption"
-        underline="hover"
+        size="medium"
+        variant="soft"
+        color="inherit"
+        startIcon={<Iconify icon="solar:lock-keyhole-minimalistic-bold-duotone" width={18} />}
         sx={{
-          color: 'text.disabled',
-          opacity: 0.6,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 0.5,
-          '&:hover': { opacity: 1 },
+          color: 'text.secondary',
+          border: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'rgba(255,255,255,0.7)',
+          backdropFilter: 'blur(8px)',
+          transition: 'all 0.25s ease',
+          '&:hover': {
+            bgcolor: 'background.paper',
+            borderColor: 'primary.main',
+            color: 'primary.main',
+            transform: 'translateY(-2px)',
+            boxShadow: (theme) => `0 8px 24px ${alpha(theme.palette.primary.main, 0.18)}`,
+          },
         }}
       >
-        <Iconify icon="solar:lock-keyhole-minimalistic-outline" width={14} />
-        Dành cho nhân viên
-      </Link>
+        Đăng nhập nhân viên
+      </Button>
     </m.div>
   );
 
@@ -537,7 +560,7 @@ export default function HomeHero({ sx, products = [], productsLoading = true, ..
 
               <m.div style={{ y: y3 }}>{renderBadges()}</m.div>
               <m.div style={{ y: y4 }}>{renderButtons()}</m.div>
-              <m.div style={{ y: y5 }}>{renderStaffLink()}</m.div>
+              <m.div style={{ y: y5 }}>{renderLoginButton()}</m.div>
             </Stack>
 
             {/* Right: product cards (desktop only) */}
