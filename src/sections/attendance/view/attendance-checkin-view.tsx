@@ -11,6 +11,7 @@ import Collapse from '@mui/material/Collapse';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
+import LinearProgress from '@mui/material/LinearProgress';
 import Chip from '@mui/material/Chip';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -84,6 +85,8 @@ export default function AttendanceCheckinView() {
   const [geoAccuracy, setGeoAccuracy] = useState<number | null>(null);
   const [geoAddress, setGeoAddress] = useState<string | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [gpsErrorCountdown, setGpsErrorCountdown] = useState<number | null>(null);
+  const [gpsErrorFallbackEnabled, setGpsErrorFallbackEnabled] = useState(false);
 
   const [branches, setBranches] = useState<IBranchLocation[]>([]);
   const [nearestBranch, setNearestBranch] = useState<{ name: string; distance: number; radius: number } | null>(null);
@@ -185,6 +188,29 @@ export default function AttendanceCheckinView() {
     const timer = setTimeout(() => forceUpdate((n) => n + 1), remaining + 50);
     return () => clearTimeout(timer);
   }, [gpsStableAt]);
+
+  // GPS error fallback: start 5-second countdown, then enable photo-only check-in
+  useEffect(() => {
+    if (geoError) {
+      setGpsErrorCountdown(5);
+      setGpsErrorFallbackEnabled(false);
+    } else {
+      setGpsErrorCountdown(null);
+      setGpsErrorFallbackEnabled(false);
+    }
+  }, [geoError]);
+
+  useEffect(() => {
+    if (gpsErrorCountdown === null || gpsErrorCountdown <= 0) {
+      if (gpsErrorCountdown === 0) setGpsErrorFallbackEnabled(true);
+      return undefined;
+    }
+    const timer = setTimeout(
+      () => setGpsErrorCountdown((n) => (n !== null ? n - 1 : null)),
+      1000
+    );
+    return () => clearTimeout(timer);
+  }, [gpsErrorCountdown]);
 
   useEffect(() => {
     if (!geoLocation) return;
@@ -720,7 +746,32 @@ export default function AttendanceCheckinView() {
       {/* GPS error banner */}
       {geoError && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          {geoError}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" spacing={1}>
+            <Typography variant="body2">{geoError}</Typography>
+            {gpsErrorFallbackEnabled ? (
+              <Chip
+                size="small"
+                label="Chụp ảnh check-in đã được bật"
+                color="success"
+                icon={<Iconify icon="mdi:camera-check" width={14} />}
+              />
+            ) : (
+              <Chip
+                size="small"
+                label={`Cho phép chụp ảnh sau ${gpsErrorCountdown ?? 0}s...`}
+                color="warning"
+                icon={<Iconify icon="mdi:timer-outline" width={14} />}
+              />
+            )}
+          </Stack>
+          {!gpsErrorFallbackEnabled && (
+            <LinearProgress
+              variant="determinate"
+              value={gpsErrorCountdown !== null ? ((5 - gpsErrorCountdown) / 5) * 100 : 100}
+              color="warning"
+              sx={{ mt: 1, borderRadius: 1, height: 4 }}
+            />
+          )}
         </Alert>
       )}
 
@@ -733,10 +784,7 @@ export default function AttendanceCheckinView() {
         sx={{ mb: 3 }}
       >
         <Box id="tour-current-time">
-          <Typography variant="h5" fontWeight="bold" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-            <CurrentTime />
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="subtitle1" fontWeight={600}>
             {new Date().toLocaleDateString('vi-VN', {
               weekday: 'long',
               year: 'numeric',
@@ -807,9 +855,17 @@ export default function AttendanceCheckinView() {
                     '--:--:--'
                   )}
                 </Typography>
-                <Typography variant="caption" sx={{ opacity: 0.7, display: 'block', mb: 2 }}>
+                <Typography variant="caption" sx={{ opacity: 0.7, display: 'block', mb: 1 }}>
                   thời gian đã làm
                 </Typography>
+
+                {openNonOvertimeLog?.checkInTime && currentShiftDisplay && (
+                  <ShiftProgressBar
+                    checkInTime={openNonOvertimeLog.checkInTime}
+                    shiftStart={currentShiftDisplay.overallStart}
+                    shiftEnd={currentShiftDisplay.overallEnd}
+                  />
+                )}
 
                 <Typography variant="body1" sx={{ opacity: 0.9, mb: 0.5 }}>
                   Ca:{' '}
@@ -915,7 +971,7 @@ export default function AttendanceCheckinView() {
 
                 <Tooltip
                   title={
-                    branches.length > 0 && !gpsReadyForCheckin
+                    branches.length > 0 && !gpsReadyForCheckin && !gpsErrorFallbackEnabled
                       ? 'Bạn chưa ở trong phạm vi cửa hàng hoặc GPS chưa ổn định'
                       : ''
                   }
@@ -932,7 +988,7 @@ export default function AttendanceCheckinView() {
                           openFaceDialog('smart');
                         }
                       }}
-                      disabled={!!actionLoading || (branches.length > 0 && !gpsReadyForCheckin)}
+                      disabled={!!actionLoading || (branches.length > 0 && !gpsReadyForCheckin && !gpsErrorFallbackEnabled)}
                       startIcon={
                         actionLoading === 'smart' ? (
                           <CircularProgress size={20} color="inherit" />
@@ -1136,7 +1192,7 @@ export default function AttendanceCheckinView() {
                   )
                 }
                 onClick={() => openFaceDialog('overtime', 'Ngoài giờ')}
-                disabled={!!actionLoading || (branches.length > 0 && !gpsReadyForCheckin)}
+                disabled={!!actionLoading || (branches.length > 0 && !gpsReadyForCheckin && !gpsErrorFallbackEnabled)}
                 sx={{ borderRadius: 2, fontWeight: 600 }}
               >
                 Chụp & Check In
@@ -1490,6 +1546,77 @@ function CurrentTime({ showDate }: { showDate?: boolean }) {
   }, []);
   if (showDate) return <>{time.toLocaleString('vi-VN')}</>;
   return <>{time.toLocaleTimeString('vi-VN')}</>;
+}
+
+// ── Helper: shift progress bar ──
+function ShiftProgressBar({
+  checkInTime,
+  shiftStart,
+  shiftEnd,
+}: {
+  checkInTime: string;
+  shiftStart: string; // HH:mm
+  shiftEnd: string;   // HH:mm
+}) {
+  const [progress, setProgress] = useState(0);
+  const [label, setLabel] = useState('');
+
+  useEffect(() => {
+    const update = () => {
+      const now = new Date();
+      const elapsed = Math.max(0, now.getTime() - new Date(checkInTime).getTime());
+
+      const [startH, startM] = shiftStart.split(':').map(Number);
+      const [endH, endM] = shiftEnd.split(':').map(Number);
+      const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startMs = base.getTime() + (startH * 60 + startM) * 60000;
+      let endMs = base.getTime() + (endH * 60 + endM) * 60000;
+      if (endMs <= startMs) endMs += 86400000; // overnight shift
+
+      const totalMs = endMs - startMs;
+      const pct = Math.min(100, Math.round((elapsed / totalMs) * 100));
+
+      const wH = Math.floor(elapsed / 3600000);
+      const wM = Math.floor((elapsed % 3600000) / 60000);
+      const tH = Math.floor(totalMs / 3600000);
+      const tM = Math.floor((totalMs % 3600000) / 60000);
+
+      setProgress(pct);
+      setLabel(
+        `${wH}g${String(wM).padStart(2, '0')} / ${tH}g${String(tM).padStart(2, '0')} · ${pct}%`
+      );
+    };
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [checkInTime, shiftStart, shiftEnd]);
+
+  return (
+    <Box sx={{ width: '100%', mb: 2 }}>
+      <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.75 }}>
+        <Typography variant="caption" sx={{ opacity: 0.75 }}>
+          Tiến độ ca làm
+        </Typography>
+        <Typography variant="caption" sx={{ opacity: 0.75, fontVariantNumeric: 'tabular-nums' }}>
+          {label}
+        </Typography>
+      </Stack>
+      <LinearProgress
+        variant="determinate"
+        value={progress}
+        sx={{
+          height: 8,
+          borderRadius: 4,
+          bgcolor: 'rgba(255,255,255,0.2)',
+          '& .MuiLinearProgress-bar': {
+            bgcolor: progress >= 100 ? '#66BB6A' : 'rgba(255,255,255,0.9)',
+            borderRadius: 4,
+            transition: 'transform 0.8s linear',
+          },
+        }}
+      />
+    </Box>
+  );
 }
 
 // ── Helper: elapsed timer ──
