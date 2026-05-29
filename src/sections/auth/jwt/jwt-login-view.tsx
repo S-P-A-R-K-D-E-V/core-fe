@@ -41,6 +41,16 @@ export default function JwtLoginView() {
   const searchParams = useSearchParams();
 
   const returnTo = searchParams.get('returnTo');
+  const isMobile = searchParams.get('mobile') === 'true';
+  const mobileRedirectUri = searchParams.get('redirect_uri');
+
+  function handleMobileRedirect(): boolean {
+    if (!isMobile || !mobileRedirectUri) return false;
+    const sessionToken = localStorage.getItem('sessionToken');
+    if (!sessionToken) return false;
+    window.location.href = `${mobileRedirectUri}?sessionToken=${encodeURIComponent(sessionToken)}`;
+    return true;
+  }
 
   const password = useBoolean();
 
@@ -69,14 +79,19 @@ export default function JwtLoginView() {
     try {
       await login?.(data.email, data.password);
 
-      router.push(returnTo || PATH_AFTER_LOGIN);
+      if (!handleMobileRedirect()) router.push(returnTo || PATH_AFTER_LOGIN);
     } catch (error) {
       console.error(error);
       const responseErrors = error?.errors;
 
+      // Build OTP redirect URL, preserving mobile params if present
+      const otpParams = new URLSearchParams({ email: data.email });
+      if (isMobile) otpParams.set('mobile', 'true');
+      if (mobileRedirectUri) otpParams.set('redirect_uri', mobileRedirectUri);
+
       // If OTP required, redirect to verify-otp page
       if (responseErrors?.['OTP_REQUIRED'] || error?.message?.includes('OTP_REQUIRED')) {
-        router.push(`${paths.auth.jwt.verifyOtp}?email=${encodeURIComponent(data.email)}`);
+        router.push(`${paths.auth.jwt.verifyOtp}?${otpParams.toString()}`);
         return;
       }
 
@@ -89,7 +104,7 @@ export default function JwtLoginView() {
         } catch (_) {
           // ignore resend errors
         }
-        router.push(`${paths.auth.jwt.verifyOtp}?email=${encodeURIComponent(data.email)}`);
+        router.push(`${paths.auth.jwt.verifyOtp}?${otpParams.toString()}`);
         return;
       }
 
@@ -165,7 +180,7 @@ export default function JwtLoginView() {
               // ignore decode failure — avatar stays default
             }
             await loginWithOAuth?.('google', resp.credential!, googleAvatar);
-            router.push(returnTo || PATH_AFTER_LOGIN);
+            if (!handleMobileRedirect()) router.push(returnTo || PATH_AFTER_LOGIN);
           } catch (err: any) {
             const msg = err?.response?.data?.title || err?.response?.data?.detail || err?.message || 'Đăng nhập Google thất bại';
             setErrorMsg(msg);
@@ -187,7 +202,7 @@ export default function JwtLoginView() {
           try {
             const fbAvatar: string | undefined = resp.picture?.data?.url;
             await loginWithOAuth?.('facebook', resp.accessToken, fbAvatar);
-            router.push(returnTo || PATH_AFTER_LOGIN);
+            if (!handleMobileRedirect()) router.push(returnTo || PATH_AFTER_LOGIN);
           } catch (err: any) {
             const msg = err?.response?.data?.title || err?.response?.data?.detail || err?.message || 'Đăng nhập Facebook thất bại';
             setErrorMsg(msg);

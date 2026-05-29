@@ -36,6 +36,8 @@ export default function JwtVerifyOtpView() {
   const searchParams = useSearchParams();
   const emailParam = searchParams.get('email');
   const returnTo = searchParams.get('returnTo');
+  const isMobile = searchParams.get('mobile') === 'true';
+  const mobileRedirectUri = searchParams.get('redirect_uri');
 
   const email = pendingVerification?.email || emailParam || '';
 
@@ -78,6 +80,13 @@ export default function JwtVerifyOtpView() {
     try {
       setErrorMsg('');
       await verifyOtp?.(email, data.otpCode);
+      if (isMobile && mobileRedirectUri) {
+        const sessionToken = localStorage.getItem('sessionToken');
+        if (sessionToken) {
+          window.location.href = `${mobileRedirectUri}?sessionToken=${encodeURIComponent(sessionToken)}`;
+          return;
+        }
+      }
       router.push(returnTo || PATH_AFTER_LOGIN);
     } catch (error) {
       console.error(error);
