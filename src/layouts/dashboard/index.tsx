@@ -20,6 +20,7 @@ import Iconify from 'src/components/iconify';
 import { useSettingsContext } from 'src/components/settings';
 import { ChatbotWidget } from 'src/components/chatbot';
 import MessengerProvider from 'src/components/messenger/messenger-provider';
+import ProfileCompletionDialog from 'src/components/profile-completion';
 
 import Main from './main';
 import Header from './header';
@@ -112,6 +113,7 @@ export default function DashboardLayout({ children }: Props) {
           {isMobileView && <NavBottom onOpenMenu={nav.onTrue} />}
           <ChatbotWidget />
           {renderMobilePrompt}
+          <ProfileCompletionDialog />
         </MessengerProvider>
       </SyncNotificationProvider>
     );
@@ -135,6 +137,7 @@ export default function DashboardLayout({ children }: Props) {
           {isMobileView && <NavBottom onOpenMenu={nav.onTrue} />}
           <ChatbotWidget />
           {renderMobilePrompt}
+          <ProfileCompletionDialog />
         </MessengerProvider>
       </SyncNotificationProvider>
     );
@@ -157,6 +160,7 @@ export default function DashboardLayout({ children }: Props) {
         {isMobileView && <NavBottom onOpenMenu={nav.onTrue} />}
         <ChatbotWidget />
         {renderMobilePrompt}
+        <ProfileCompletionDialog />
       </MessengerProvider>
     </SyncNotificationProvider>
   );
