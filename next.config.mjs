@@ -28,6 +28,16 @@ const nextConfig = {
   env: {
     BUILD_STATIC_EXPORT: isStaticExport,
   },
+  experimental: {
+    serverActions: {
+      // Stable key across all pods/deployments — prevents "Failed to find
+      // Server Action" when browser cache has JS from a previous build.
+      // Provided at runtime via K8s Secret (see k8s/deployment.yaml).
+      ...(process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY && {
+        encryptionKey: process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY,
+      }),
+    },
+  },
 
   // Proxy API requests to the backend service (baked at build time into routes-manifest.json).
   // BACKEND_URL defaults to the K8s internal service URL — override via env var if needed.
