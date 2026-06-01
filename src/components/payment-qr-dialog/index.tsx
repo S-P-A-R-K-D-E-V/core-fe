@@ -59,7 +59,7 @@ function buildVietQRUrl(
   content: string,
   accountName: string
 ): string {
-  const safeAmount = Math.round(Math.abs(amount));
+  const safeAmount = Math.ceil(Math.abs(amount));
   const amountStr = String(safeAmount).slice(0, 13);
   const safeContent = sanitizeAddInfo(content);
   const params = new URLSearchParams({
@@ -77,6 +77,11 @@ function formatCurrency(n: number) {
 function parseCurrencyInput(raw: string): number {
   const digits = raw.replace(/\D/g, '');
   return digits ? parseInt(digits, 10) : 0;
+}
+
+/** Round up to whole VND — mirrors backend SalaryMath.CeilVnd. */
+function ceilVnd(amount: number): number {
+  return Math.ceil(amount);
 }
 
 function formatNumberInput(n: number): string {
@@ -114,7 +119,7 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
   const [qrError, setQrError] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const parsedAmount = parseCurrencyInput(amountInput);
+  const parsedAmount = ceilVnd(parseCurrencyInput(amountInput));
 
   // Reset & fetch when dialog opens
   const fetch = useCallback(async () => {
@@ -166,8 +171,14 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    const digits = raw.replace(/\D/g, '').slice(0, 13);
-    setAmountInput(digits ? formatNumberInput(parseInt(digits, 10)) : '');
+    // Strip non-digits; if user somehow pastes a decimal like "1000.5", floor the fraction part
+    const digits = raw.replace(/[^\d.]/g, '');
+    if (!digits) { setAmountInput(''); return; }
+    const parsed = parseFloat(digits);
+    if (Number.isNaN(parsed)) { setAmountInput(''); return; }
+    const ceiled = ceilVnd(parsed);
+    const clamped = Math.min(ceiled, 9_999_999_999_999); // max 13 digits
+    setAmountInput(formatNumberInput(clamped));
   };
 
   const handleContentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
