@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -44,10 +44,10 @@ function sanitizeAddInfo(text: string): string {
   const noAccents = text
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '') // strip combining marks
-    .replace(/đ/gi, 'd');             // đ / Đ → d
+    .replace(/đ/gi, 'd'); // đ / Đ → d
   const ascii = noAccents
     .replace(/[^a-zA-Z0-9 \-]/g, ' ') // keep alphanumeric, space, hyphen
-    .replace(/ {2,}/g, ' ')            // collapse spaces
+    .replace(/ {2,}/g, ' ') // collapse spaces
     .trim();
   return ascii.length > 50 ? ascii.slice(0, 50).trimEnd() : ascii;
 }
@@ -60,7 +60,6 @@ function buildVietQRUrl(
   accountName: string
 ): string {
   const safeAmount = Math.round(Math.abs(amount));
-  // Guard: amount must be ≤ 13 digits per VietQR spec
   const amountStr = String(safeAmount).slice(0, 13);
   const safeContent = sanitizeAddInfo(content);
   const params = new URLSearchParams({
@@ -71,13 +70,27 @@ function buildVietQRUrl(
   return `https://img.vietqr.io/image/${bankCode}-${bankAccount}-compact2.jpg?${params.toString()}`;
 }
 
+function formatCurrency(n: number) {
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
+}
+
+function parseCurrencyInput(raw: string): number {
+  const digits = raw.replace(/\D/g, '');
+  return digits ? parseInt(digits, 10) : 0;
+}
+
+function formatNumberInput(n: number): string {
+  if (!n) return '';
+  return new Intl.NumberFormat('vi-VN').format(n);
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 
 type Props = {
   open: boolean;
   record: IPayrollRecord | null;
   onClose: VoidFunction;
-  onPaid: (detail: IPayrollPaymentDetail) => void; // called after mark-paid succeeds
+  onPaid: (detail: IPayrollPaymentDetail) => void;
 };
 
 export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props) {
@@ -88,12 +101,22 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
   const [loading, setLoading] = useState(false);
   const [marking, setMarking] = useState(false);
 
-  // Editable fields for mark-paid
+  // Editable fields
+  const [amountInput, setAmountInput] = useState('');
+  const [content, setContent] = useState('');
   const [transactionRef, setTransactionRef] = useState('');
   const [note, setNote] = useState('');
+
+  // Debounced QR state
+  const [qrAmount, setQrAmount] = useState(0);
+  const [qrContent, setQrContent] = useState('');
   const [qrLoading, setQrLoading] = useState(true);
   const [qrError, setQrError] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const parsedAmount = parseCurrencyInput(amountInput);
+
+  // Reset & fetch when dialog opens
   const fetch = useCallback(async () => {
     if (!record) return;
     setLoading(true);
@@ -101,6 +124,10 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
     try {
       const data = await preparePayrollPayment(record.id);
       setPrepare(data);
+      setAmountInput(formatNumberInput(data.computedAmount));
+      setContent(data.suggestedContent);
+      setQrAmount(data.computedAmount);
+      setQrContent(data.suggestedContent);
     } catch {
       enqueueSnackbar('Không tải được thông tin thanh toán', { variant: 'error' });
     } finally {
@@ -111,6 +138,8 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
   useEffect(() => {
     if (open && record) {
       setPrepare(null);
+      setAmountInput('');
+      setContent('');
       setTransactionRef('');
       setNote('');
       setQrLoading(true);
@@ -119,13 +148,56 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
     }
   }, [open, record, fetch]);
 
+  // Debounce QR update when amount or content changes
+  useEffect(() => {
+    if (!prepare) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setQrAmount(parsedAmount > 0 ? parsedAmount : prepare.computedAmount);
+      setQrContent(content || prepare.suggestedContent);
+      setQrLoading(true);
+      setQrError(false);
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [amountInput, content]);
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const digits = raw.replace(/\D/g, '').slice(0, 13);
+    setAmountInput(digits ? formatNumberInput(parseInt(digits, 10)) : '');
+  };
+
+  const handleContentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = sanitizeAddInfo(e.target.value);
+    setContent(sanitized);
+  };
+
+  const handleResetContent = () => {
+    if (prepare) {
+      setContent(prepare.suggestedContent);
+    }
+  };
+
+  const computedAmount = prepare?.computedAmount ?? 0;
+  const amountChanged = parsedAmount > 0 && parsedAmount !== computedAmount;
+  const amountDiff = parsedAmount - computedAmount;
+  const noteRequired = amountChanged;
+  const noteValid = !noteRequired || (note.trim().length >= 5 && note.trim().length <= 500);
+  const amountValid = parsedAmount > 0 && String(parsedAmount).length <= 13;
+  const contentValid = content.length > 0 && content.length <= 50;
+  const canSubmit = amountValid && contentValid && noteValid;
+
   const handleMarkPaid = async () => {
     if (!record || !prepare) return;
     try {
       setMarking(true);
       const detail = await markPayrollPaid(record.id, {
-        amount: prepare.amount,
-        content: prepare.suggestedContent,
+        amount: parsedAmount || computedAmount,
+        computedAmount,
+        content: content || prepare.suggestedContent,
         transactionRef: transactionRef.trim() || undefined,
         note: note.trim() || undefined,
       });
@@ -144,10 +216,12 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
     enqueueSnackbar(`Đã sao chép ${label}!`);
   };
 
-  const formatCurrency = (n: number) =>
-    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
-
   const isPaid = record?.payment?.status === 'Paid';
+
+  const qrUrl =
+    prepare?.canPay && qrAmount > 0
+      ? buildVietQRUrl(prepare.bankCode!, prepare.bankAccount!, qrAmount, qrContent, prepare.accountName!)
+      : null;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -196,29 +270,68 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
                 <strong>{formatCurrency(record.payment.amount)}</strong> vào{' '}
                 {new Date(record.payment.paidAt).toLocaleString('vi-VN')}
                 {record.payment.transactionRef && (
-                  <span> · Mã GD: <strong>{record.payment.transactionRef}</strong></span>
+                  <span>
+                    {' '}
+                    · Mã GD: <strong>{record.payment.transactionRef}</strong>
+                  </span>
                 )}
               </Alert>
             )}
 
-            {/* Amount */}
-            <Stack
-              direction="row"
-              justifyContent="space-between"
-              alignItems="center"
-              sx={{
-                p: 2,
-                borderRadius: 1.5,
-                bgcolor: alpha(theme.palette.primary.main, 0.08),
-              }}
-            >
-              <Typography variant="subtitle2" color="text.secondary">
-                Số tiền cần trả
-              </Typography>
-              <Typography variant="h5" color="primary.main" fontWeight={700}>
-                {formatCurrency(prepare.amount)}
-              </Typography>
-            </Stack>
+            {/* Editable amount input (hide if already paid) */}
+            {!isPaid && (
+              <Stack spacing={0.5}>
+                <TextField
+                  label="Lương thực trả"
+                  size="small"
+                  fullWidth
+                  value={amountInput}
+                  onChange={handleAmountChange}
+                  error={amountInput !== '' && !amountValid}
+                  helperText={amountInput !== '' && !amountValid ? 'Số tiền không hợp lệ' : undefined}
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">₫</InputAdornment>,
+                  }}
+                  inputProps={{ inputMode: 'numeric' }}
+                />
+                {/* Diff badge */}
+                {amountChanged && (
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Chip
+                      size="small"
+                      label={`${amountDiff > 0 ? '↑ +' : '↓ '}${formatCurrency(amountDiff)}`}
+                      color={amountDiff > 0 ? 'success' : 'error'}
+                      variant="outlined"
+                      sx={{ fontWeight: 600 }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      so với lương tính ({formatCurrency(computedAmount)})
+                    </Typography>
+                  </Stack>
+                )}
+              </Stack>
+            )}
+
+            {/* Amount display when already paid */}
+            {isPaid && (
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                sx={{
+                  p: 2,
+                  borderRadius: 1.5,
+                  bgcolor: alpha(theme.palette.primary.main, 0.08),
+                }}
+              >
+                <Typography variant="subtitle2" color="text.secondary">
+                  Số tiền đã trả
+                </Typography>
+                <Typography variant="h5" color="primary.main" fontWeight={700}>
+                  {formatCurrency(record?.payment?.amount ?? prepare.amount)}
+                </Typography>
+              </Stack>
+            )}
 
             {/* QR code */}
             <Box textAlign="center">
@@ -238,14 +351,21 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
                   }}
                 >
                   <Stack alignItems="center" spacing={1}>
-                    <Iconify icon="solar:qr-code-bold-duotone" width={44} sx={{ color: 'text.disabled' }} />
+                    <Iconify
+                      icon="solar:qr-code-bold-duotone"
+                      width={44}
+                      sx={{ color: 'text.disabled' }}
+                    />
                     <Typography variant="caption" color="text.disabled">
                       Không tạo được QR, vui lòng thử lại
                     </Typography>
                     <Button
                       size="small"
                       variant="text"
-                      onClick={() => { setQrError(false); setQrLoading(true); }}
+                      onClick={() => {
+                        setQrError(false);
+                        setQrLoading(true);
+                      }}
                     >
                       Thử lại
                     </Button>
@@ -253,7 +373,6 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
                 </Box>
               ) : (
                 <Box sx={{ position: 'relative', width: 240, height: 240, mx: 'auto' }}>
-                  {/* Skeleton shown while image is loading */}
                   {qrLoading && (
                     <Skeleton
                       variant="rectangular"
@@ -262,26 +381,25 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
                       sx={{ borderRadius: 2, position: 'absolute', top: 0, left: 0 }}
                     />
                   )}
-                  <Box
-                    component="img"
-                    src={buildVietQRUrl(
-                      prepare.bankCode!,
-                      prepare.bankAccount!,
-                      prepare.amount,
-                      prepare.suggestedContent,
-                      prepare.accountName!
-                    )}
-                    alt="VietQR payment"
-                    onLoad={() => setQrLoading(false)}
-                    onError={() => { setQrLoading(false); setQrError(true); }}
-                    sx={{
-                      width: 240,
-                      height: 240,
-                      borderRadius: 2,
-                      objectFit: 'cover',
-                      display: qrLoading ? 'none' : 'block',
-                    }}
-                  />
+                  {qrUrl && (
+                    <Box
+                      component="img"
+                      src={qrUrl}
+                      alt="VietQR payment"
+                      onLoad={() => setQrLoading(false)}
+                      onError={() => {
+                        setQrLoading(false);
+                        setQrError(true);
+                      }}
+                      sx={{
+                        width: 240,
+                        height: 240,
+                        borderRadius: 2,
+                        objectFit: 'cover',
+                        display: qrLoading ? 'none' : 'block',
+                      }}
+                    />
+                  )}
                 </Box>
               )}
               <Typography variant="caption" color="text.disabled" display="block" mt={0.75}>
@@ -294,50 +412,106 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
             {/* Bank info */}
             <Stack spacing={1.5}>
               <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="body2" color="text.secondary">Ngân hàng</Typography>
-                <Typography variant="body2" fontWeight={600}>{prepare.bankCode}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Ngân hàng
+                </Typography>
+                <Typography variant="body2" fontWeight={600}>
+                  {prepare.bankCode}
+                </Typography>
               </Stack>
 
               <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="body2" color="text.secondary">Số tài khoản</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Số tài khoản
+                </Typography>
                 <Stack direction="row" spacing={0.5} alignItems="center">
-                  <Typography variant="body2" fontWeight={600}>{prepare.bankAccount}</Typography>
-                  <Tooltip title="Sao chép STK">
-                    <IconButton size="small" onClick={() => copyToClipboard(prepare.bankAccount!, 'số tài khoản')}>
-                      <Iconify icon="solar:copy-bold" width={16} />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
-              </Stack>
-
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="body2" color="text.secondary">Tên tài khoản</Typography>
-                <Typography variant="body2" fontWeight={600}>{prepare.accountName}</Typography>
-              </Stack>
-
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="body2" color="text.secondary">Nội dung CK</Typography>
-                <Stack direction="row" spacing={0.5} alignItems="center">
-                  <Typography variant="body2" fontWeight={600} sx={{ maxWidth: 220, textAlign: 'right' }}>
-                    {prepare.suggestedContent}
+                  <Typography variant="body2" fontWeight={600}>
+                    {prepare.bankAccount}
                   </Typography>
-                  <Tooltip title="Sao chép nội dung">
-                    <IconButton size="small" onClick={() => copyToClipboard(prepare.suggestedContent, 'nội dung')}>
+                  <Tooltip title="Sao chép STK">
+                    <IconButton
+                      size="small"
+                      onClick={() => copyToClipboard(prepare.bankAccount!, 'số tài khoản')}
+                    >
                       <Iconify icon="solar:copy-bold" width={16} />
                     </IconButton>
                   </Tooltip>
                 </Stack>
               </Stack>
+
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Typography variant="body2" color="text.secondary">
+                  Tên tài khoản
+                </Typography>
+                <Typography variant="body2" fontWeight={600}>
+                  {prepare.accountName}
+                </Typography>
+              </Stack>
+
+              {/* Editable content field */}
+              {!isPaid ? (
+                <Stack spacing={0.5}>
+                  <TextField
+                    label="Nội dung thanh toán"
+                    size="small"
+                    fullWidth
+                    value={content}
+                    onChange={handleContentChange}
+                    error={content.length > 50}
+                    helperText={
+                      content.length > 50
+                        ? 'Tối đa 50 ký tự'
+                        : `${content.length}/50 · Chỉ chứa chữ cái và số không dấu`
+                    }
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <Tooltip title="Reset về mặc định">
+                            <IconButton
+                              size="small"
+                              onClick={handleResetContent}
+                              disabled={content === prepare.suggestedContent}
+                            >
+                              <Iconify icon="solar:refresh-bold" width={14} />
+                            </IconButton>
+                          </Tooltip>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Stack>
+              ) : (
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="body2" color="text.secondary">
+                    Nội dung CK
+                  </Typography>
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <Typography
+                      variant="body2"
+                      fontWeight={600}
+                      sx={{ maxWidth: 220, textAlign: 'right' }}
+                    >
+                      {prepare.suggestedContent}
+                    </Typography>
+                    <Tooltip title="Sao chép nội dung">
+                      <IconButton
+                        size="small"
+                        onClick={() => copyToClipboard(prepare.suggestedContent, 'nội dung')}
+                      >
+                        <Iconify icon="solar:copy-bold" width={16} />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                </Stack>
+              )}
             </Stack>
 
-            {/* Mark paid fields — only show if not already paid */}
+            {/* Confirmation fields — only show if not already paid */}
             {!isPaid && (
               <>
                 <Divider />
                 <Stack spacing={1.5}>
-                  <Typography variant="subtitle2">
-                    Xác nhận thanh toán
-                  </Typography>
+                  <Typography variant="subtitle2">Xác nhận thanh toán</Typography>
                   <TextField
                     label="Mã giao dịch (tùy chọn)"
                     size="small"
@@ -353,12 +527,24 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
                     }}
                   />
                   <TextField
-                    label="Ghi chú (tùy chọn)"
+                    label={noteRequired ? 'Ghi chú (bắt buộc)' : 'Ghi chú (tùy chọn)'}
                     size="small"
+                    required={noteRequired}
+                    error={noteRequired && note.trim().length > 0 && !noteValid}
+                    helperText={
+                      noteRequired
+                        ? note.trim().length === 0
+                          ? 'Vui lòng giải thích lý do thay đổi (vd: trừ ứng, thưởng thêm, làm tròn...)'
+                          : !noteValid
+                            ? 'Ghi chú cần từ 5 đến 500 ký tự'
+                            : undefined
+                        : undefined
+                    }
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     multiline
                     rows={2}
+                    inputProps={{ maxLength: 500 }}
                   />
                 </Stack>
               </>
@@ -376,10 +562,11 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
             variant="contained"
             color="success"
             loading={marking}
+            disabled={!canSubmit}
             onClick={handleMarkPaid}
             startIcon={<Iconify icon="solar:check-circle-bold" width={18} />}
           >
-            Đánh dấu đã thanh toán
+            Xác nhận thanh toán
           </LoadingButton>
         )}
       </DialogActions>
