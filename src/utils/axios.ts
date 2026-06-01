@@ -156,6 +156,9 @@ export const endpoints = {
     removeWaiver: (waiverId: string) => `/payroll/waive-penalty/${waiverId}`,
     salaryConfigPreview: '/payroll/salary-config-preview',
     bulkFinalize: '/payroll/bulk-finalize',
+    payment: (id: string) => `/payroll/${id}/payment`,
+    paymentPrepare: (id: string) => `/payroll/${id}/payment/prepare`,
+    markPaid: (id: string) => `/payroll/${id}/mark-paid`,
   },
   shiftSwap: {
     list: '/shift-swap/pending',
