@@ -142,6 +142,7 @@ export const endpoints = {
     update: (id: string) => `/salary-configurations/${id}`,
     delete: (id: string) => `/salary-configurations/${id}`,
     mySalary: '/salary/my-salary',
+    versionedUpsert: '/salary-configurations/versioned-upsert',
   },
   payroll: {
     calculate: '/payroll/calculate',
@@ -153,6 +154,8 @@ export const endpoints = {
     shiftDetails: (id: string) => `/payroll/${id}/shift-details`,
     waivePenalty: '/payroll/waive-penalty',
     removeWaiver: (waiverId: string) => `/payroll/waive-penalty/${waiverId}`,
+    salaryConfigPreview: '/payroll/salary-config-preview',
+    bulkFinalize: '/payroll/bulk-finalize',
   },
   shiftSwap: {
     list: '/shift-swap/pending',

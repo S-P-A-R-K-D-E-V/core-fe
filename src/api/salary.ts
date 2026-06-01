@@ -5,6 +5,7 @@ import type {
   ISalaryConfiguration,
   ISalaryConfigurationPagedResponse,
   IUpdateSalaryConfigurationRequest,
+  IVersionedUpsertSalaryConfigRequest,
 } from 'src/types/corecms-api';
 
 // ----------------------------------------------------------------------
@@ -52,5 +53,12 @@ export async function deleteSalaryConfiguration(id: string): Promise<void> {
 
 export async function getMySalaryConfiguration(): Promise<ISalaryConfiguration[]> {
   const response = await axios.get<ISalaryConfiguration[]>(endpoints.salary.mySalary);
+  return response.data;
+}
+
+export async function versionedUpsertSalaryConfig(
+  data: IVersionedUpsertSalaryConfigRequest
+): Promise<ISalaryConfiguration> {
+  const response = await axios.post<ISalaryConfiguration>(endpoints.salary.versionedUpsert, data);
   return response.data;
 }
