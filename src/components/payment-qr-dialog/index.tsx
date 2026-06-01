@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Skeleton from '@mui/material/Skeleton';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -32,11 +33,39 @@ import type {
 import { markPayrollPaid, preparePayrollPayment } from 'src/api/payroll';
 
 // ──────────────────────────────────────────────────────────────────────────
+// VietQR spec: https://www.vietqr.io/danh-sach-api/link-tao-ma-nhanh/
+//   BANK_ID-ACCOUNT_NO-TEMPLATE.png?amount=N&addInfo=DESC&accountName=NAME
+//   • addInfo: ASCII only, no diacritics, no special chars, max 50 chars
+//   • amount: positive integer, max 13 digits
+//   • template: compact2 (540×640) recommended for popups
 
-function buildVietQRUrl(bankCode: string, bankAccount: string, amount: number, content: string, accountName: string) {
+/** Strip Vietnamese diacritics and reduce to [a-zA-Z0-9 -], max 50 chars. */
+function sanitizeAddInfo(text: string): string {
+  const noAccents = text
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // strip combining marks
+    .replace(/đ/gi, 'd');             // đ / Đ → d
+  const ascii = noAccents
+    .replace(/[^a-zA-Z0-9 \-]/g, ' ') // keep alphanumeric, space, hyphen
+    .replace(/ {2,}/g, ' ')            // collapse spaces
+    .trim();
+  return ascii.length > 50 ? ascii.slice(0, 50).trimEnd() : ascii;
+}
+
+function buildVietQRUrl(
+  bankCode: string,
+  bankAccount: string,
+  amount: number,
+  content: string,
+  accountName: string
+): string {
+  const safeAmount = Math.round(Math.abs(amount));
+  // Guard: amount must be ≤ 13 digits per VietQR spec
+  const amountStr = String(safeAmount).slice(0, 13);
+  const safeContent = sanitizeAddInfo(content);
   const params = new URLSearchParams({
-    amount: String(Math.round(amount)),
-    addInfo: content,
+    amount: amountStr,
+    addInfo: safeContent,
     accountName,
   });
   return `https://img.vietqr.io/image/${bankCode}-${bankAccount}-compact2.jpg?${params.toString()}`;
@@ -62,6 +91,7 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
   // Editable fields for mark-paid
   const [transactionRef, setTransactionRef] = useState('');
   const [note, setNote] = useState('');
+  const [qrLoading, setQrLoading] = useState(true);
   const [qrError, setQrError] = useState(false);
 
   const fetch = useCallback(async () => {
@@ -83,6 +113,8 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
       setPrepare(null);
       setTransactionRef('');
       setNote('');
+      setQrLoading(true);
+      setQrError(false);
       fetch();
     }
   }, [open, record, fetch]);
@@ -193,8 +225,8 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
               {qrError ? (
                 <Box
                   sx={{
-                    width: 220,
-                    height: 220,
+                    width: 240,
+                    height: 240,
                     mx: 'auto',
                     display: 'flex',
                     alignItems: 'center',
@@ -205,30 +237,55 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
                     borderColor: 'divider',
                   }}
                 >
-                  <Stack alignItems="center" spacing={0.5}>
-                    <Iconify icon="solar:qr-code-bold-duotone" width={40} sx={{ color: 'text.disabled' }} />
+                  <Stack alignItems="center" spacing={1}>
+                    <Iconify icon="solar:qr-code-bold-duotone" width={44} sx={{ color: 'text.disabled' }} />
                     <Typography variant="caption" color="text.disabled">
-                      Không tải được QR
+                      Không tạo được QR, vui lòng thử lại
                     </Typography>
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={() => { setQrError(false); setQrLoading(true); }}
+                    >
+                      Thử lại
+                    </Button>
                   </Stack>
                 </Box>
               ) : (
-                <Box
-                  component="img"
-                  src={buildVietQRUrl(
-                    prepare.bankCode!,
-                    prepare.bankAccount!,
-                    prepare.amount,
-                    prepare.suggestedContent,
-                    prepare.accountName!
+                <Box sx={{ position: 'relative', width: 240, height: 240, mx: 'auto' }}>
+                  {/* Skeleton shown while image is loading */}
+                  {qrLoading && (
+                    <Skeleton
+                      variant="rectangular"
+                      width={240}
+                      height={240}
+                      sx={{ borderRadius: 2, position: 'absolute', top: 0, left: 0 }}
+                    />
                   )}
-                  alt="VietQR"
-                  onError={() => setQrError(true)}
-                  sx={{ width: 220, height: 220, borderRadius: 2, objectFit: 'cover' }}
-                />
+                  <Box
+                    component="img"
+                    src={buildVietQRUrl(
+                      prepare.bankCode!,
+                      prepare.bankAccount!,
+                      prepare.amount,
+                      prepare.suggestedContent,
+                      prepare.accountName!
+                    )}
+                    alt="VietQR payment"
+                    onLoad={() => setQrLoading(false)}
+                    onError={() => { setQrLoading(false); setQrError(true); }}
+                    sx={{
+                      width: 240,
+                      height: 240,
+                      borderRadius: 2,
+                      objectFit: 'cover',
+                      display: qrLoading ? 'none' : 'block',
+                    }}
+                  />
+                </Box>
               )}
-              <Typography variant="caption" color="text.disabled" display="block" mt={0.5}>
-                Quét mã QR để chuyển khoản
+              <Typography variant="caption" color="text.disabled" display="block" mt={0.75}>
+                Quét mã QR để chuyển khoản (compact2 · 540×640)
               </Typography>
             </Box>
 
