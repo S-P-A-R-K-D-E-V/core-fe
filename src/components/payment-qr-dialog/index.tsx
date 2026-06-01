@@ -129,9 +129,10 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
     try {
       const data = await preparePayrollPayment(record.id);
       setPrepare(data);
-      setAmountInput(formatNumberInput(data.computedAmount));
+      const ceiled = ceilVnd(data.computedAmount);
+      setAmountInput(formatNumberInput(ceiled));
       setContent(data.suggestedContent);
-      setQrAmount(data.computedAmount);
+      setQrAmount(ceiled);
       setQrContent(data.suggestedContent);
     } catch {
       enqueueSnackbar('Không tải được thông tin thanh toán', { variant: 'error' });
@@ -169,16 +170,25 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [amountInput, content]);
 
+  const handleAmountKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Block decimal separators — lương phải là số nguyên đồng
+    if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+  };
+
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    // Strip non-digits; if user somehow pastes a decimal like "1000.5", floor the fraction part
-    const digits = raw.replace(/[^\d.]/g, '');
-    if (!digits) { setAmountInput(''); return; }
-    const parsed = parseFloat(digits);
-    if (Number.isNaN(parsed)) { setAmountInput(''); return; }
-    const ceiled = ceilVnd(parsed);
-    const clamped = Math.min(ceiled, 9_999_999_999_999); // max 13 digits
-    setAmountInput(formatNumberInput(clamped));
+    // Handle paste containing decimal (e.g. "10000000.3" → ceil → 10000001)
+    const withDot = raw.replace(/[^\d.]/g, '');
+    if (withDot.includes('.')) {
+      const n = ceilVnd(parseFloat(withDot));
+      if (!Number.isNaN(n) && n > 0) {
+        setAmountInput(formatNumberInput(Math.min(n, 9_999_999_999_999)));
+      }
+      return;
+    }
+    // Normal integer-only input
+    const digits = raw.replace(/\D/g, '').slice(0, 13);
+    setAmountInput(digits ? formatNumberInput(parseInt(digits, 10)) : '');
   };
 
   const handleContentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,7 +202,7 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
     }
   };
 
-  const computedAmount = prepare?.computedAmount ?? 0;
+  const computedAmount = ceilVnd(prepare?.computedAmount ?? 0);
   const amountChanged = parsedAmount > 0 && parsedAmount !== computedAmount;
   const amountDiff = parsedAmount - computedAmount;
   const noteRequired = amountChanged;
@@ -298,6 +308,7 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
                   fullWidth
                   value={amountInput}
                   onChange={handleAmountChange}
+                  onKeyDown={handleAmountKeyDown}
                   error={amountInput !== '' && !amountValid}
                   helperText={amountInput !== '' && !amountValid ? 'Số tiền không hợp lệ' : undefined}
                   InputProps={{
