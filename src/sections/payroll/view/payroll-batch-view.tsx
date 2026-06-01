@@ -482,7 +482,13 @@ export default function PayrollBatchView() {
 
   const selectedCycle = cycles.find((c) => c.id === selectedCycleId) ?? null;
 
-  const records = cycleDetail?.records ?? [];
+  // Defensive client-side filter: exclude employees with 0 working hours.
+  // The server already filters these out, but we guard here too in case of
+  // stale data or a deployment window where the server-side fix is not yet live.
+  const records = useMemo(
+    () => (cycleDetail?.records ?? []).filter((r) => r.totalHoursWorked > 0),
+    [cycleDetail]
+  );
   const paginatedRecords = records.slice(
     table.page * table.rowsPerPage,
     table.page * table.rowsPerPage + table.rowsPerPage
