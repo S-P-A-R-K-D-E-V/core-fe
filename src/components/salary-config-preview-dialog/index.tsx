@@ -83,7 +83,9 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onP
     setLoading(true);
     try {
       const data = await getSalaryConfigPreview(fromDate);
-      setItems(data);
+      // Defensive client-side filter: isStaff is always true on current BE,
+      // but guard against stale data or old deployments that return non-staff.
+      setItems(data.filter((item) => item.isStaff !== false));
     } catch {
       enqueueSnackbar('Không tải được cấu hình lương', { variant: 'error' });
     } finally {
@@ -168,6 +170,28 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onP
         {loading ? (
           <Box display="flex" justifyContent="center" py={6}>
             <CircularProgress />
+          </Box>
+        ) : items.length === 0 ? (
+          <Box
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            py={8}
+            gap={1.5}
+          >
+            <Iconify
+              icon="solar:users-group-two-rounded-bold-duotone"
+              width={56}
+              sx={{ color: 'text.disabled' }}
+            />
+            <Typography variant="subtitle1" color="text.secondary">
+              Không có nhân viên nào cần cấu hình lương
+            </Typography>
+            <Typography variant="body2" color="text.disabled" textAlign="center" maxWidth={320}>
+              Tất cả nhân viên (Staff) đã có cấu hình lương hoặc chưa có tài khoản nào với role
+              Staff.
+            </Typography>
           </Box>
         ) : (
           <>

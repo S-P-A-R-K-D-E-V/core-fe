@@ -586,6 +586,8 @@ export interface ISalaryConfigPreviewItem {
   userName: string;
   hasActiveConfig: boolean;
   activeConfig?: ISalaryConfigSummary;
+  /** Always true — endpoint only returns Staff users. Used for defensive client-side guard. */
+  isStaff?: boolean;
 }
 
 // POST /salary-configurations/versioned-upsert
