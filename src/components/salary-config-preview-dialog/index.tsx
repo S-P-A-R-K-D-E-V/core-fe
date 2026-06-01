@@ -83,8 +83,12 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onP
     setLoading(true);
     try {
       const data = await getSalaryConfigPreview(fromDate);
-      // Defensive client-side filter: isStaff is always true on current BE,
-      // but guard against stale data or old deployments that return non-staff.
+      // Defensive client-side filter using INCLUSIVE logic: show the item if
+      // isStaff is true OR undefined (older BE that doesn't send the field).
+      // isStaff === false only when a future BE explicitly marks a non-staff
+      // user — in that case we hide them.
+      // This mirrors the BE's .Any(ur => ur.Role.Name == "Staff") behavior:
+      // a user with Admin+Staff roles still passes (inclusive, not exclusive).
       setItems(data.filter((item) => item.isStaff !== false));
     } catch {
       enqueueSnackbar('Không tải được cấu hình lương', { variant: 'error' });
