@@ -70,6 +70,7 @@ import { adjustAttendanceTime } from 'src/api/attendance';
 import { getAllPayrollCycles } from 'src/api/payrollCycle';
 
 import SalaryConfigPreviewDialog from 'src/components/salary-config-preview-dialog';
+import PaymentQRDialog from 'src/components/payment-qr-dialog';
 
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
@@ -91,6 +92,7 @@ const TABLE_HEAD = [
   { id: 'penaltyAmount', label: 'Tiền phạt', width: 120 },
   { id: 'totalSalary', label: 'Tổng lương', width: 150 },
   { id: 'status', label: 'Trạng thái', width: 100 },
+  { id: 'payment', label: 'Trả lương', width: 140, align: 'center' as const },
 ];
 
 // ----------------------------------------------------------------------
@@ -115,6 +117,9 @@ export default function PayrollBatchView() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkApproving, setBulkApproving] = useState(false);
   const [confirmBulkOpen, setConfirmBulkOpen] = useState(false);
+
+  // Payment QR dialog state
+  const [paymentDialogRecord, setPaymentDialogRecord] = useState<IPayrollRecord | null>(null);
 
   // Salary config preview state — shown before generate/recalculate
   const [salaryConfigOpen, setSalaryConfigOpen] = useState(false);
@@ -813,6 +818,48 @@ export default function PayrollBatchView() {
                             {row.isFinalized ? 'Đã duyệt' : 'Chưa duyệt'}
                           </Label>
                         </TableCell>
+
+                        {/* Payment action column */}
+                        <TableCell
+                          align="center"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {row.payment?.status === 'Paid' ? (
+                            <Tooltip title={`Đã trả ${new Date(row.payment.paidAt).toLocaleDateString('vi-VN')}`}>
+                              <Chip
+                                size="small"
+                                label="Đã trả"
+                                color="success"
+                                variant="soft"
+                                icon={<Iconify icon="solar:check-circle-bold" width={14} />}
+                                onClick={() => setPaymentDialogRecord(row)}
+                                sx={{ cursor: 'pointer' }}
+                              />
+                            </Tooltip>
+                          ) : (
+                            <Tooltip
+                              title={
+                                !row.isFinalized
+                                  ? 'Cần duyệt bảng lương trước khi trả lương'
+                                  : 'Trả lương cho nhân viên'
+                              }
+                            >
+                              <span>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  color="primary"
+                                  disabled={!row.isFinalized}
+                                  startIcon={<Iconify icon="solar:wallet-money-bold" width={16} />}
+                                  onClick={() => setPaymentDialogRecord(row)}
+                                  sx={{ minWidth: 100 }}
+                                >
+                                  Trả lương
+                                </Button>
+                              </span>
+                            </Tooltip>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
 
@@ -1419,6 +1466,17 @@ export default function PayrollBatchView() {
           </LoadingButton>
         </DialogActions>
       </Dialog>
+
+      {/* ── Payment QR Dialog ─────────────────────────────────────────────── */}
+      <PaymentQRDialog
+        open={!!paymentDialogRecord}
+        record={paymentDialogRecord}
+        onClose={() => setPaymentDialogRecord(null)}
+        onPaid={(detail) => {
+          // Optimistically update the row payment summary
+          if (selectedCycleId) fetchCycleDetail(selectedCycleId);
+        }}
+      />
 
       {/* ── Salary Config Preview Dialog ───────────────────────────────────── */}
       <SalaryConfigPreviewDialog

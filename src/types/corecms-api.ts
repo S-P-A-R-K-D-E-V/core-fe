@@ -531,6 +531,16 @@ export interface IUpdateSalaryConfigurationRequest {
 }
 
 // --- Payroll Record ---
+// ── Payroll payment summary (embedded in IPayrollRecord) ─────────────────
+export interface IPayrollPaymentSummary {
+  paymentId: string;
+  status: 'Paid' | 'Unpaid' | 'Failed';
+  amount: number;
+  paidAt: string;
+  transactionRef?: string;
+}
+// ──────────────────────────────────────────────────────────────────────────
+
 export interface IPayrollRecord {
   id: string;
   payrollCycleId?: string;
@@ -557,6 +567,7 @@ export interface IPayrollRecord {
   finalizedBy?: string;
   finalizedAt?: string;
   createdAt: string;
+  payment?: IPayrollPaymentSummary;
 }
 
 export interface IPayrollCalculationRequest {
@@ -564,6 +575,46 @@ export interface IPayrollCalculationRequest {
   fromDate: string; // "yyyy-MM-dd"
   toDate: string;   // "yyyy-MM-dd"
 }
+
+// ── Payroll payment ──────────────────────────────────────────────────────
+
+export interface IPayrollPaymentDetail {
+  id: string;
+  payrollRecordId: string;
+  status: 'Paid' | 'Unpaid' | 'Failed';
+  amount: number;
+  bankAccount: string;
+  bankCode: string;
+  accountName: string;
+  content: string;
+  transactionRef?: string;
+  note?: string;
+  paidBy: string;
+  paidByName: string;
+  paidAt: string;
+  createdAt: string;
+}
+
+export interface IPreparePayrollPaymentResponse {
+  payrollId: string;
+  userFullName: string;
+  amount: number;
+  bankAccount?: string;
+  bankCode?: string;
+  accountName?: string;
+  suggestedContent: string;
+  canPay: boolean;
+  missingInfoReason?: string;
+}
+
+export interface IMarkPayrollPaidRequest {
+  amount: number;
+  content: string;
+  transactionRef?: string;
+  note?: string;
+}
+
+// ── end payroll payment ──────────────────────────────────────────────────
 
 export interface IFinalizePayrollRequest {
   isFinalized: boolean;

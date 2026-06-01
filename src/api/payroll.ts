@@ -6,10 +6,13 @@ import type {
   IBulkFinalizePayrollRequest,
   IBulkFinalizePayrollResponse,
   IFinalizePayrollRequest,
+  IMarkPayrollPaidRequest,
   IPayrollCalculationRequest,
   IPayrollCycleDetailResponse,
+  IPayrollPaymentDetail,
   IPayrollRecord,
   IPayrollShiftDetailResponse,
+  IPreparePayrollPaymentResponse,
   ISalaryConfigPreviewItem,
   IWaivePenaltyRequest,
   IWaivePenaltyResponse,
@@ -83,6 +86,30 @@ export async function removeWaiver(waiverId: string): Promise<void> {
 }
 
 // ── New endpoints ────────────────────────────────────────────────────────
+
+// ── Payment endpoints ────────────────────────────────────────────────────
+
+export async function getPayrollPayment(id: string): Promise<IPayrollPaymentDetail | null> {
+  const response = await axios.get<IPayrollPaymentDetail | null>(endpoints.payroll.payment(id));
+  return response.data;
+}
+
+export async function preparePayrollPayment(id: string): Promise<IPreparePayrollPaymentResponse> {
+  const response = await axios.post<IPreparePayrollPaymentResponse>(
+    endpoints.payroll.paymentPrepare(id)
+  );
+  return response.data;
+}
+
+export async function markPayrollPaid(
+  id: string,
+  data: IMarkPayrollPaidRequest
+): Promise<IPayrollPaymentDetail> {
+  const response = await axios.post<IPayrollPaymentDetail>(endpoints.payroll.markPaid(id), data);
+  return response.data;
+}
+
+// ── Salary config preview + bulk finalize ────────────────────────────────
 
 export async function getSalaryConfigPreview(
   fromDate: string
