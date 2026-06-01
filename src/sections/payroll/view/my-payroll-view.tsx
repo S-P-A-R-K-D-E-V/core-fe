@@ -73,8 +73,14 @@ export default function MyPayrollView() {
   const [payrolls, setPayrolls] = useState<IPayrollRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Only finalized records are visible to staff
-  const finalizedPayrolls = useMemo(() => payrolls.filter((p) => p.isFinalized), [payrolls]);
+  // Only finalized records with actual working hours are visible to staff.
+  // Defensive client-side guard: even if the API returns a 0-hour record
+  // (e.g. stale data from before the server-side filter was deployed), we
+  // never render it — a period with 0 working hours has no payable work.
+  const finalizedPayrolls = useMemo(
+    () => payrolls.filter((p) => p.isFinalized && p.totalHoursWorked > 0),
+    [payrolls]
+  );
   const paginatedPayrolls = finalizedPayrolls.slice(
     table.page * table.rowsPerPage,
     table.page * table.rowsPerPage + table.rowsPerPage
