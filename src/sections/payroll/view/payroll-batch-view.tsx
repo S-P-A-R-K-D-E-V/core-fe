@@ -6,6 +6,7 @@ import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
+import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
@@ -56,6 +57,7 @@ import type {
 import type { IPayrollCycle } from 'src/types/corecms-api';
 
 import {
+  bulkFinalizePayroll,
   finalizePayroll,
   generateBatchPayroll,
   getPayrollByCycle,
@@ -66,6 +68,8 @@ import {
 } from 'src/api/payroll';
 import { adjustAttendanceTime } from 'src/api/attendance';
 import { getAllPayrollCycles } from 'src/api/payrollCycle';
+
+import SalaryConfigPreviewDialog from 'src/components/salary-config-preview-dialog';
 
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
@@ -106,6 +110,16 @@ export default function PayrollBatchView() {
 
   // Track unfinalized record counts per cycle (populated after loading each cycle)
   const [cycleUnfinalizedCounts, setCycleUnfinalizedCounts] = useState<Record<string, number>>({});
+
+  // Checkbox selection state (Set<id> for O(1) lookup)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkApproving, setBulkApproving] = useState(false);
+  const [confirmBulkOpen, setConfirmBulkOpen] = useState(false);
+
+  // Salary config preview state — shown before generate/recalculate
+  const [salaryConfigOpen, setSalaryConfigOpen] = useState(false);
+  // pendingAction stores what to execute after the user clicks "Tiếp tục"
+  const [pendingAction, setPendingAction] = useState<'generate' | 'recalculate' | null>(null);
 
   // Dialog state
   const [openDialog, setOpenDialog] = useState(false);
@@ -168,7 +182,9 @@ export default function PayrollBatchView() {
     }
   }, [selectedCycleId, fetchCycleDetail]);
 
-  const handleRecalculate = async () => {
+  // ── Actual API calls (invoked after salary config review) ────────────────
+
+  const executeRecalculate = async () => {
     if (!selectedCycleId) return;
     try {
       setRecalculating(true);
@@ -177,6 +193,7 @@ export default function PayrollBatchView() {
         `Tính lại thành công! ${result.successCount} nhân viên`,
         { variant: 'success' }
       );
+      setSelectedIds(new Set()); // clear selection on data refresh
       await fetchCycleDetail(selectedCycleId);
     } catch (error: any) {
       console.error('Failed to recalculate payroll:', error);
@@ -186,12 +203,8 @@ export default function PayrollBatchView() {
     }
   };
 
-  const handleGenerateBatch = async () => {
-    if (!periodName || !fromDate || !toDate) {
-      enqueueSnackbar('Vui lòng nhập đầy đủ thông tin', { variant: 'warning' });
-      return;
-    }
-
+  const executeGenerateBatch = async () => {
+    if (!periodName || !fromDate || !toDate) return;
     try {
       setGenerating(true);
       const result: IBatchPayrollResponse = await generateBatchPayroll({
@@ -220,6 +233,85 @@ export default function PayrollBatchView() {
       setGenerating(false);
     }
   };
+
+  // ── Interceptors that show salary config preview first ───────────────────
+
+  const handleRecalculate = () => {
+    if (!selectedCycleId) return;
+    setPendingAction('recalculate');
+    setSalaryConfigOpen(true);
+  };
+
+  const handleGenerateBatch = () => {
+    if (!periodName || !fromDate || !toDate) {
+      enqueueSnackbar('Vui lòng nhập đầy đủ thông tin', { variant: 'warning' });
+      return;
+    }
+    setOpenDialog(false); // close date-picker dialog first
+    setPendingAction('generate');
+    setSalaryConfigOpen(true);
+  };
+
+  const handleSalaryConfigProceed = async () => {
+    setSalaryConfigOpen(false);
+    if (pendingAction === 'generate') await executeGenerateBatch();
+    if (pendingAction === 'recalculate') await executeRecalculate();
+    setPendingAction(null);
+  };
+
+  // ── Checkbox / bulk approve helpers ──────────────────────────────────────
+
+  const unfinalizedIds = useMemo(
+    () =>
+      (cycleDetail?.records ?? [])
+        .filter((r) => r.totalHoursWorked > 0 && !r.isFinalized)
+        .map((r) => r.id),
+    [cycleDetail]
+  );
+
+  const allUnfinalizedSelected =
+    unfinalizedIds.length > 0 && unfinalizedIds.every((id) => selectedIds.has(id));
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedIds(checked ? new Set(unfinalizedIds) : new Set());
+  };
+
+  const handleSelectRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedIds.size === 0) return;
+    try {
+      setBulkApproving(true);
+      const result = await bulkFinalizePayroll({
+        payrollIds: Array.from(selectedIds),
+        isFinalized: true,
+      });
+      if (result.failedCount > 0) {
+        enqueueSnackbar(
+          `Duyệt ${result.successCount} thành công, ${result.failedCount} thất bại`,
+          { variant: 'warning' }
+        );
+      } else {
+        enqueueSnackbar(`Đã duyệt ${result.successCount} bảng lương!`, { variant: 'success' });
+      }
+      setSelectedIds(new Set());
+      setConfirmBulkOpen(false);
+      if (selectedCycleId) await fetchCycleDetail(selectedCycleId);
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || 'Duyệt hàng loạt thất bại', { variant: 'error' });
+    } finally {
+      setBulkApproving(false);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
@@ -595,41 +687,97 @@ export default function PayrollBatchView() {
               </Stack>
             )}
 
+            {/* Bulk approve toolbar — shown when ≥1 row selected */}
+            {selectedIds.size > 0 && (
+              <Stack
+                direction="row"
+                spacing={1.5}
+                alignItems="center"
+                sx={{
+                  px: 2,
+                  py: 1,
+                  bgcolor: 'primary.lighter',
+                  borderRadius: 1,
+                  mb: 1,
+                }}
+              >
+                <Iconify icon="solar:check-circle-bold" width={20} sx={{ color: 'primary.main' }} />
+                <Typography variant="body2" fontWeight={600}>
+                  Đã chọn {selectedIds.size} nhân viên
+                </Typography>
+                <Box sx={{ flexGrow: 1 }} />
+                <Button
+                  variant="contained"
+                  size="small"
+                  color="success"
+                  startIcon={<Iconify icon="solar:check-circle-bold" width={16} />}
+                  onClick={() => setConfirmBulkOpen(true)}
+                >
+                  Duyệt hàng loạt
+                </Button>
+                <Button
+                  variant="text"
+                  size="small"
+                  color="inherit"
+                  onClick={() => setSelectedIds(new Set())}
+                >
+                  Bỏ chọn
+                </Button>
+              </Stack>
+            )}
+
             <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
               <Scrollbar>
                 <Table size={table.dense ? 'small' : 'medium'}>
-                  <TableHeadCustom headLabel={TABLE_HEAD} />
+                  <TableHeadCustom
+                    headLabel={TABLE_HEAD}
+                    rowCount={unfinalizedIds.length}
+                    numSelected={selectedIds.size}
+                    onSelectAllRows={handleSelectAll}
+                  />
 
                   <TableBody>
                     {paginatedRecords.map((row: IPayrollRecord) => (
                       <TableRow
                         key={row.id}
                         hover
+                        selected={selectedIds.has(row.id)}
                         sx={{ cursor: 'pointer' }}
-                        onClick={() => handleOpenShiftDetail(row)}
                       >
-                        <TableCell>
+                        {/* Checkbox cell — stop click from opening shift detail */}
+                        <TableCell
+                          padding="checkbox"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {!row.isFinalized && (
+                            <Checkbox
+                              checked={selectedIds.has(row.id)}
+                              onChange={() => handleSelectRow(row.id)}
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
                           <strong>{row.userName}</strong>
                         </TableCell>
-                        <TableCell>{row.totalShifts}</TableCell>
-                        <TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>{row.totalShifts}</TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
                           <Chip label={row.presentShifts} color="success" size="small" />
                         </TableCell>
-                        <TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
                           {row.absentShifts > 0 ? (
                             <Chip label={row.absentShifts} color="error" size="small" />
                           ) : (
                             '0'
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
                           {row.wrongShifts > 0 ? (
                             <Chip label={row.wrongShifts} color="warning" size="small" />
                           ) : (
                             '0'
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
                           {row.totalLateMinutes > 0 ? (
                             <Chip
                               label={`${row.totalLateMinutes} phút`}
@@ -641,12 +789,12 @@ export default function PayrollBatchView() {
                             '0'
                           )}
                         </TableCell>
-                        <TableCell>{row.totalHoursWorked.toFixed(1)}h</TableCell>
-                        <TableCell>{formatCurrency(row.baseSalary)}</TableCell>
-                        <TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>{row.totalHoursWorked.toFixed(1)}h</TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>{formatCurrency(row.baseSalary)}</TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
                           {row.bonus > 0 ? formatCurrency(row.bonus) : '-'}
                         </TableCell>
-                        <TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
                           {row.penaltyAmount > 0 ? (
                             <Typography color="error.main" variant="body2">
                               -{formatCurrency(row.penaltyAmount)}
@@ -655,12 +803,12 @@ export default function PayrollBatchView() {
                             '-'
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
                           <strong style={{ color: '#00AB55' }}>
                             {formatCurrency(row.totalSalary)}
                           </strong>
                         </TableCell>
-                        <TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
                           <Label color={row.isFinalized ? 'success' : 'warning'}>
                             {row.isFinalized ? 'Đã duyệt' : 'Chưa duyệt'}
                           </Label>
@@ -1268,6 +1416,61 @@ export default function PayrollBatchView() {
             disabled={!checkInValue && !checkOutValue}
           >
             Lưu
+          </LoadingButton>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Salary Config Preview Dialog ───────────────────────────────────── */}
+      <SalaryConfigPreviewDialog
+        open={salaryConfigOpen}
+        fromDate={fromDate || (pendingAction === 'recalculate' && cycleDetail ? cycleDetail.fromDate : '')}
+        onClose={() => {
+          setSalaryConfigOpen(false);
+          setPendingAction(null);
+        }}
+        onProceed={handleSalaryConfigProceed}
+      />
+
+      {/* ── Bulk Approve Confirm Dialog ─────────────────────────────────────── */}
+      <Dialog open={confirmBulkOpen} onClose={() => setConfirmBulkOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Iconify icon="solar:check-circle-bold-duotone" width={26} sx={{ color: 'success.main' }} />
+            <span>Xác nhận duyệt hàng loạt</span>
+          </Stack>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5} sx={{ mt: 0.5 }}>
+            <Typography variant="body2">
+              Bạn sắp duyệt <strong>{selectedIds.size}</strong> bảng lương.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Tổng lương:{' '}
+              <strong>
+                {formatCurrency(
+                  records
+                    .filter((r) => selectedIds.has(r.id))
+                    .reduce((s, r) => s + r.totalSalary, 0)
+                )}
+              </strong>
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Nhân viên sẽ nhận thông báo sau khi duyệt.
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="outlined" onClick={() => setConfirmBulkOpen(false)}>
+            Huỷ
+          </Button>
+          <LoadingButton
+            variant="contained"
+            color="success"
+            loading={bulkApproving}
+            onClick={handleBulkApprove}
+            startIcon={<Iconify icon="solar:check-circle-bold" width={18} />}
+          >
+            Duyệt {selectedIds.size} bảng lương
           </LoadingButton>
         </DialogActions>
       </Dialog>

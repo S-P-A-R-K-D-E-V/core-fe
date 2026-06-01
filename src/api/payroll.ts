@@ -3,11 +3,14 @@ import axios, { endpoints } from 'src/utils/axios';
 import type {
   IBatchPayrollCalculationRequest,
   IBatchPayrollResponse,
+  IBulkFinalizePayrollRequest,
+  IBulkFinalizePayrollResponse,
   IFinalizePayrollRequest,
   IPayrollCalculationRequest,
   IPayrollCycleDetailResponse,
   IPayrollRecord,
   IPayrollShiftDetailResponse,
+  ISalaryConfigPreviewItem,
   IWaivePenaltyRequest,
   IWaivePenaltyResponse,
 } from 'src/types/corecms-api';
@@ -77,4 +80,26 @@ export async function waivePenalty(
 
 export async function removeWaiver(waiverId: string): Promise<void> {
   await axios.delete(endpoints.payroll.removeWaiver(waiverId));
+}
+
+// ── New endpoints ────────────────────────────────────────────────────────
+
+export async function getSalaryConfigPreview(
+  fromDate: string
+): Promise<ISalaryConfigPreviewItem[]> {
+  const response = await axios.get<ISalaryConfigPreviewItem[]>(
+    endpoints.payroll.salaryConfigPreview,
+    { params: { fromDate } }
+  );
+  return response.data;
+}
+
+export async function bulkFinalizePayroll(
+  data: IBulkFinalizePayrollRequest
+): Promise<IBulkFinalizePayrollResponse> {
+  const response = await axios.post<IBulkFinalizePayrollResponse>(
+    endpoints.payroll.bulkFinalize,
+    data
+  );
+  return response.data;
 }

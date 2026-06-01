@@ -569,6 +569,52 @@ export interface IFinalizePayrollRequest {
   isFinalized: boolean;
 }
 
+// Salary config summary embedded in preview
+export interface ISalaryConfigSummary {
+  id: string;
+  salaryType: string;
+  amount: number;
+  probationRate?: number;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  note?: string;
+}
+
+// GET /payroll/salary-config-preview
+export interface ISalaryConfigPreviewItem {
+  userId: string;
+  userName: string;
+  hasActiveConfig: boolean;
+  activeConfig?: ISalaryConfigSummary;
+}
+
+// POST /salary-configurations/versioned-upsert
+export interface IVersionedUpsertSalaryConfigRequest {
+  userId: string;
+  salaryType: 'PerShift' | 'Hourly' | 'Monthly';
+  amount: number;
+  probationRate?: number;
+  effectiveFrom: string; // yyyy-MM-dd
+  note?: string;
+}
+
+// POST /payroll/bulk-finalize
+export interface IBulkFinalizePayrollRequest {
+  payrollIds: string[];
+  isFinalized: boolean;
+}
+
+export interface IBulkFinalizeError {
+  payrollId: string;
+  reason: string;
+}
+
+export interface IBulkFinalizePayrollResponse {
+  successCount: number;
+  failedCount: number;
+  errors: IBulkFinalizeError[];
+}
+
 export interface IBatchPayrollCalculationRequest {
   periodName: string;
   fromDate: string; // "yyyy-MM-dd"
