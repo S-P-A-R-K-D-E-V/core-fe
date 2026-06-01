@@ -599,6 +599,7 @@ export interface IPreparePayrollPaymentResponse {
   payrollId: string;
   userFullName: string;
   amount: number;
+  computedAmount: number;
   bankAccount?: string;
   bankCode?: string;
   accountName?: string;
@@ -609,6 +610,7 @@ export interface IPreparePayrollPaymentResponse {
 
 export interface IMarkPayrollPaidRequest {
   amount: number;
+  computedAmount: number;
   content: string;
   transactionRef?: string;
   note?: string;
