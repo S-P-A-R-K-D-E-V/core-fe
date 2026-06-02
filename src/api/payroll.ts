@@ -121,6 +121,11 @@ export async function getSalaryConfigPreview(
   return response.data;
 }
 
+export async function recalculatePayrollRecord(id: string): Promise<IPayrollRecord> {
+  const response = await axios.post<IPayrollRecord>(endpoints.payroll.recalculateRecord(id));
+  return response.data;
+}
+
 export async function bulkFinalizePayroll(
   data: IBulkFinalizePayrollRequest
 ): Promise<IBulkFinalizePayrollResponse> {
