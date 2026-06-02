@@ -63,6 +63,7 @@ import {
   getPayrollByCycle,
   getPayrollShiftDetails,
   recalculatePayrollByCycle,
+  recalculatePayrollRecord,
   removeWaiver,
   waivePenalty,
 } from 'src/api/payroll';
@@ -93,6 +94,7 @@ const TABLE_HEAD = [
   { id: 'totalSalary', label: 'Tổng lương', width: 150 },
   { id: 'status', label: 'Trạng thái', width: 100 },
   { id: 'payment', label: 'Trả lương', width: 140, align: 'center' as const },
+  { id: 'recalculate', label: '', width: 100, align: 'center' as const },
 ];
 
 // ----------------------------------------------------------------------
@@ -109,6 +111,7 @@ export default function PayrollBatchView() {
   const [generating, setGenerating] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
+  const [recalculatingRecordId, setRecalculatingRecordId] = useState<string | null>(null);
 
   // Track unfinalized record counts per cycle (populated after loading each cycle)
   const [cycleUnfinalizedCounts, setCycleUnfinalizedCounts] = useState<Record<string, number>>({});
@@ -362,6 +365,19 @@ export default function PayrollBatchView() {
       enqueueSnackbar(error?.message || 'Thao tác thất bại', { variant: 'error' });
     } finally {
       setFinalizing(false);
+    }
+  };
+
+  const handleRecalculateRecord = async (row: IPayrollRecord) => {
+    try {
+      setRecalculatingRecordId(row.id);
+      await recalculatePayrollRecord(row.id);
+      enqueueSnackbar(`Đã tính lại lương cho ${row.userName}`, { variant: 'success' });
+      if (selectedCycleId) await fetchCycleDetail(selectedCycleId);
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || 'Tính lại lương thất bại', { variant: 'error' });
+    } finally {
+      setRecalculatingRecordId(null);
     }
   };
 
@@ -859,6 +875,34 @@ export default function PayrollBatchView() {
                               </span>
                             </Tooltip>
                           )}
+                        </TableCell>
+
+                        {/* Recalculate action column */}
+                        <TableCell
+                          align="center"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Tooltip title={cycleDetail?.isLocked ? 'Chu kỳ đã khóa' : 'Tính lại lương — chuyển về chờ duyệt'}>
+                            <span>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="warning"
+                                disabled={!!cycleDetail?.isLocked || recalculatingRecordId === row.id}
+                                startIcon={
+                                  recalculatingRecordId === row.id ? (
+                                    <CircularProgress size={14} />
+                                  ) : (
+                                    <Iconify icon="mingcute:refresh-2-line" width={14} />
+                                  )
+                                }
+                                onClick={() => handleRecalculateRecord(row)}
+                                sx={{ minWidth: 90 }}
+                              >
+                                Tính lại
+                              </Button>
+                            </span>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))}
