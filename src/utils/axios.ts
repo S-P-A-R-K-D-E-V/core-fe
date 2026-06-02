@@ -160,6 +160,8 @@ export const endpoints = {
     paymentPrepare: (id: string) => `/payroll/${id}/payment/prepare`,
     markPaid: (id: string) => `/payroll/${id}/mark-paid`,
     recalculateRecord: (id: string) => `/payroll/${id}/recalculate`,
+    calendar: (cycleId: string) => `/payroll/calendar?cycleId=${cycleId}`,
+    summary: (cycleId: string) => `/payroll/summary?cycleId=${cycleId}`,
   },
   shiftSwap: {
     list: '/shift-swap/pending',

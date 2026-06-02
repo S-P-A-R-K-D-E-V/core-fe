@@ -696,6 +696,52 @@ export interface IPayrollCycleDetailResponse {
   records: IPayrollRecord[];
 }
 
+// --- Payroll Calendar ---
+
+export interface IPayrollCalendarEmployee {
+  userId: string;
+  userName: string;
+  estimatedDailyAmount: number;
+}
+
+export interface IPayrollCalendarShift {
+  shiftName: string;
+  startTime: string;
+  endTime: string;
+  employeeCount: number;
+  isOverThreshold: boolean;
+  employees: IPayrollCalendarEmployee[];
+}
+
+export interface IPayrollCalendarDay {
+  date: string;
+  totalEmployees: number;
+  totalAmount: number;
+  hasWarning: boolean;
+  shifts: IPayrollCalendarShift[];
+}
+
+export interface IPayrollCalendar {
+  fromDate: string;
+  toDate: string;
+  warningThreshold: number;
+  days: IPayrollCalendarDay[];
+}
+
+// --- Payroll Summary ---
+
+export interface IPayrollSummary {
+  totalEmployees: number;
+  finalizedCount: number;
+  pendingCount: number;
+  totalSalary: number;
+  averageSalary: number;
+  totalBaseSalary: number;
+  totalBonus: number;
+  totalPenalty: number;
+  totalHoursWorked: number;
+}
+
 // --- Shift Swap Request ---
 export type ShiftSwapStatus = 'Pending' | 'Approved' | 'Rejected' | 'Cancelled';
 
