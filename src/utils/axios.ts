@@ -159,6 +159,7 @@ export const endpoints = {
     payment: (id: string) => `/payroll/${id}/payment`,
     paymentPrepare: (id: string) => `/payroll/${id}/payment/prepare`,
     markPaid: (id: string) => `/payroll/${id}/mark-paid`,
+    recalculateRecord: (id: string) => `/payroll/${id}/recalculate`,
   },
   shiftSwap: {
     list: '/shift-swap/pending',
