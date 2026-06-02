@@ -49,10 +49,13 @@ import {
 
 import type {
   IBatchPayrollResponse,
+  IPayrollCalendar,
+  IPayrollCalendarDay,
   IPayrollCycleDetailResponse,
   IPayrollRecord,
   IPayrollShiftDetailResponse,
   IPayrollShiftItem,
+  IPayrollSummary,
 } from 'src/types/corecms-api';
 import type { IPayrollCycle } from 'src/types/corecms-api';
 
@@ -61,7 +64,9 @@ import {
   finalizePayroll,
   generateBatchPayroll,
   getPayrollByCycle,
+  getPayrollCalendar,
   getPayrollShiftDetails,
+  getPayrollSummary,
   recalculatePayrollByCycle,
   recalculatePayrollRecord,
   removeWaiver,
@@ -145,6 +150,13 @@ export default function PayrollBatchView() {
   const [shiftDetailTab, setShiftDetailTab] = useState<'calendar' | 'table'>('calendar');
   const [calendarWeekOffset, setCalendarWeekOffset] = useState(0);
 
+  // Summary & calendar state
+  const [summary, setSummary] = useState<IPayrollSummary | null>(null);
+  const [calendar, setCalendar] = useState<IPayrollCalendar | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
+
   // Edit checkin/checkout state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<IPayrollShiftItem | null>(null);
@@ -184,11 +196,34 @@ export default function PayrollBatchView() {
     fetchCycles();
   }, [fetchCycles]);
 
+  const fetchSummaryAndCalendar = useCallback(async (cycleId: string) => {
+    setSummaryLoading(true);
+    setCalendarLoading(true);
+    try {
+      const [summaryData, calendarData] = await Promise.all([
+        getPayrollSummary(cycleId),
+        getPayrollCalendar(cycleId),
+      ]);
+      setSummary(summaryData);
+      setCalendar(calendarData);
+      setCalendarMonthOffset(0);
+    } catch (error) {
+      console.error('Failed to fetch summary/calendar:', error);
+    } finally {
+      setSummaryLoading(false);
+      setCalendarLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (selectedCycleId) {
       fetchCycleDetail(selectedCycleId);
+      fetchSummaryAndCalendar(selectedCycleId);
+    } else {
+      setSummary(null);
+      setCalendar(null);
     }
-  }, [selectedCycleId, fetchCycleDetail]);
+  }, [selectedCycleId, fetchCycleDetail, fetchSummaryAndCalendar]);
 
   // ── Actual API calls (invoked after salary config review) ────────────────
 
@@ -203,6 +238,7 @@ export default function PayrollBatchView() {
       );
       setSelectedIds(new Set()); // clear selection on data refresh
       await fetchCycleDetail(selectedCycleId);
+      await fetchSummaryAndCalendar(selectedCycleId);
     } catch (error: any) {
       console.error('Failed to recalculate payroll:', error);
       enqueueSnackbar(error?.message || 'Tính lại bảng lương thất bại', { variant: 'error' });
@@ -927,6 +963,214 @@ export default function PayrollBatchView() {
           </>
         )}
       </Card>
+
+      {/* Quick Summary */}
+      {summary && !summaryLoading && (
+        <Card sx={{ mt: 3, p: 3 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Báo cáo nhanh
+          </Typography>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(5, 1fr)' },
+              gap: 2,
+            }}
+          >
+            {[
+              { label: 'Tổng nhân viên', value: summary.totalEmployees, color: 'text.primary', isCurrency: false },
+              { label: 'Đã duyệt', value: summary.finalizedCount, color: 'success.main', isCurrency: false },
+              { label: 'Chờ duyệt', value: summary.pendingCount, color: 'warning.main', isCurrency: false },
+              { label: 'Tổng lương', value: summary.totalSalary, color: 'primary.main', isCurrency: true },
+              { label: 'Lương trung bình', value: summary.averageSalary, color: 'info.main', isCurrency: true },
+              { label: 'Lương cơ bản', value: summary.totalBaseSalary, color: 'text.primary', isCurrency: true },
+              { label: 'Tổng thưởng', value: summary.totalBonus, color: 'success.dark', isCurrency: true },
+              { label: 'Tổng phạt', value: summary.totalPenalty, color: 'error.main', isCurrency: true },
+              { label: 'Tổng giờ làm', value: summary.totalHoursWorked, color: 'text.primary', isCurrency: false, suffix: 'h' },
+            ].map((item) => (
+              <Paper
+                key={item.label}
+                variant="outlined"
+                sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}
+              >
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                  {item.label}
+                </Typography>
+                <Typography variant="subtitle1" fontWeight={700} color={item.color}>
+                  {item.isCurrency
+                    ? formatCurrency(item.value as number)
+                    : `${item.value}${item.suffix ?? ''}`}
+                </Typography>
+              </Paper>
+            ))}
+          </Box>
+        </Card>
+      )}
+
+      {/* Payroll Calendar */}
+      {selectedCycleId && (
+        <Card sx={{ mt: 3, p: 3 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+            <Typography variant="h6">Lịch lương theo ngày</Typography>
+            {calendar && calendar.warningThreshold > 0 && (
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Iconify icon="solar:danger-triangle-bold" width={18} sx={{ color: 'error.main' }} />
+                <Typography variant="caption" color="error.main">
+                  Cảnh báo khi &ge; {calendar.warningThreshold} nhân viên / ca
+                </Typography>
+              </Stack>
+            )}
+          </Stack>
+
+          {calendarLoading ? (
+            <Stack alignItems="center" justifyContent="center" sx={{ py: 6 }}>
+              <CircularProgress />
+            </Stack>
+          ) : !calendar || calendar.days.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+              Không có dữ liệu lịch lương cho chu kỳ này
+            </Typography>
+          ) : (
+            (() => {
+              // Group days into weeks (7 days per row)
+              const allDays = calendar.days;
+              const weeks: typeof allDays[] = [];
+              for (let i = 0; i < allDays.length; i += 7) {
+                weeks.push(allDays.slice(i, i + 7));
+              }
+              const currentWeek = weeks[calendarMonthOffset] ?? weeks[0] ?? [];
+              return (
+                <>
+                  {/* Navigation */}
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+                    <IconButton
+                      onClick={() => setCalendarMonthOffset((o) => Math.max(0, o - 1))}
+                      disabled={calendarMonthOffset === 0}
+                    >
+                      <Iconify icon="mingcute:left-line" />
+                    </IconButton>
+                    <Typography variant="subtitle2">
+                      Tuần {calendarMonthOffset + 1} / {weeks.length}
+                      {currentWeek.length > 0 && (
+                        <Typography component="span" variant="body2" color="text.secondary">
+                          {' '}({currentWeek[0].date} → {currentWeek[currentWeek.length - 1].date})
+                        </Typography>
+                      )}
+                    </Typography>
+                    <IconButton
+                      onClick={() => setCalendarMonthOffset((o) => Math.min(weeks.length - 1, o + 1))}
+                      disabled={calendarMonthOffset >= weeks.length - 1}
+                    >
+                      <Iconify icon="mingcute:right-line" />
+                    </IconButton>
+                  </Stack>
+
+                  {/* Calendar grid */}
+                  <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${currentWeek.length}, 1fr)`, gap: 1 }}>
+                    {currentWeek.map((day) => {
+                      const date = new Date(day.date);
+                      const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+                      const dayLabel = `${dayNames[date.getDay()]} ${date.getDate()}/${date.getMonth() + 1}`;
+                      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+
+                      return (
+                        <Paper
+                          key={day.date}
+                          variant="outlined"
+                          sx={{
+                            minHeight: 130,
+                            p: 1,
+                            bgcolor: day.hasWarning
+                              ? alpha(theme.palette.error.main, 0.06)
+                              : isWeekend
+                              ? alpha(theme.palette.grey[500], 0.06)
+                              : 'background.paper',
+                            borderColor: day.hasWarning ? theme.palette.error.main : theme.palette.divider,
+                            borderWidth: day.hasWarning ? 2 : 1,
+                          }}
+                        >
+                          {/* Day header */}
+                          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                            <Typography
+                              variant="caption"
+                              fontWeight={700}
+                              color={day.hasWarning ? 'error.main' : isWeekend ? 'text.secondary' : 'text.primary'}
+                            >
+                              {dayLabel}
+                            </Typography>
+                            {day.hasWarning && (
+                              <Tooltip title="Có ca vượt ngưỡng nhân viên">
+                                <Iconify icon="solar:danger-triangle-bold" width={14} sx={{ color: 'error.main' }} />
+                              </Tooltip>
+                            )}
+                          </Stack>
+                          <Divider sx={{ mb: 0.5 }} />
+
+                          {/* Total */}
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                            {day.totalEmployees} NV · {formatCurrency(day.totalAmount)}
+                          </Typography>
+
+                          {/* Shifts */}
+                          <Stack spacing={0.5}>
+                            {day.shifts.map((shift) => (
+                              <Tooltip
+                                key={`${shift.shiftName}-${shift.startTime}`}
+                                title={
+                                  <Box>
+                                    <Typography variant="caption" fontWeight={700}>{shift.shiftName} ({shift.startTime}–{shift.endTime})</Typography>
+                                    {shift.employees.map((e) => (
+                                      <Typography key={e.userId} variant="caption" sx={{ display: 'block' }}>
+                                        {e.userName} — {formatCurrency(e.estimatedDailyAmount)}
+                                      </Typography>
+                                    ))}
+                                  </Box>
+                                }
+                                arrow
+                              >
+                                <Box
+                                  sx={{
+                                    px: 0.75,
+                                    py: 0.25,
+                                    borderRadius: 0.75,
+                                    bgcolor: shift.isOverThreshold
+                                      ? alpha(theme.palette.error.main, 0.12)
+                                      : alpha(theme.palette.primary.main, 0.08),
+                                    border: `1px solid ${shift.isOverThreshold ? theme.palette.error.light : theme.palette.primary.light}`,
+                                    cursor: 'default',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    fontWeight={600}
+                                    color={shift.isOverThreshold ? 'error.dark' : 'primary.dark'}
+                                    sx={{ display: 'block', fontSize: '0.68rem' }}
+                                  >
+                                    {shift.shiftName}
+                                    {shift.isOverThreshold && (
+                                      <Box component="span" sx={{ ml: 0.5 }}>⚠</Box>
+                                    )}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                    {shift.startTime}–{shift.endTime} · {shift.employeeCount} NV
+                                  </Typography>
+                                </Box>
+                              </Tooltip>
+                            ))}
+                            {day.shifts.length === 0 && (
+                              <Typography variant="caption" color="text.disabled">—</Typography>
+                            )}
+                          </Stack>
+                        </Paper>
+                      );
+                    })}
+                  </Box>
+                </>
+              );
+            })()
+          )}
+        </Card>
+      )}
 
       {/* Generate batch payroll dialog */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>

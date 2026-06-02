@@ -8,10 +8,12 @@ import type {
   IFinalizePayrollRequest,
   IMarkPayrollPaidRequest,
   IPayrollCalculationRequest,
+  IPayrollCalendar,
   IPayrollCycleDetailResponse,
   IPayrollPaymentDetail,
   IPayrollRecord,
   IPayrollShiftDetailResponse,
+  IPayrollSummary,
   IPreparePayrollPaymentResponse,
   ISalaryConfigPreviewItem,
   IWaivePenaltyRequest,
@@ -133,5 +135,15 @@ export async function bulkFinalizePayroll(
     endpoints.payroll.bulkFinalize,
     data
   );
+  return response.data;
+}
+
+export async function getPayrollCalendar(cycleId: string): Promise<IPayrollCalendar> {
+  const response = await axios.get<IPayrollCalendar>(endpoints.payroll.calendar(cycleId));
+  return response.data;
+}
+
+export async function getPayrollSummary(cycleId: string): Promise<IPayrollSummary> {
+  const response = await axios.get<IPayrollSummary>(endpoints.payroll.summary(cycleId));
   return response.data;
 }
