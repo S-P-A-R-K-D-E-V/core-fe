@@ -52,6 +52,11 @@ function sanitizeAddInfo(text: string): string {
   return ascii.length > 50 ? ascii.slice(0, 50).trimEnd() : ascii;
 }
 
+/** Round up to whole VND — mirrors backend SalaryMath.CeilVnd. */
+function ceilVnd(amount: number): number {
+  return Math.ceil(amount);
+}
+
 function buildVietQRUrl(
   bankCode: string,
   bankAccount: string,
@@ -59,7 +64,7 @@ function buildVietQRUrl(
   content: string,
   accountName: string
 ): string {
-  const safeAmount = Math.round(Math.abs(amount));
+  const safeAmount = ceilVnd(Math.abs(amount));
   const amountStr = String(safeAmount).slice(0, 13);
   const safeContent = sanitizeAddInfo(content);
   const params = new URLSearchParams({
@@ -124,9 +129,10 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
     try {
       const data = await preparePayrollPayment(record.id);
       setPrepare(data);
-      setAmountInput(formatNumberInput(data.computedAmount));
+      const ceiled = ceilVnd(data.computedAmount);
+      setAmountInput(formatNumberInput(ceiled));
       setContent(data.suggestedContent);
-      setQrAmount(data.computedAmount);
+      setQrAmount(ceiled);
       setQrContent(data.suggestedContent);
     } catch {
       enqueueSnackbar('Không tải được thông tin thanh toán', { variant: 'error' });
@@ -164,8 +170,22 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [amountInput, content]);
 
+  const handleAmountKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Block decimal separators — lương phải là số nguyên đồng
+    if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+  };
+
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
+    // Handle paste containing decimal (e.g. "10000000.3" → ceil → 10000001)
+    const withDot = raw.replace(/[^\d.]/g, '');
+    if (withDot.includes('.')) {
+      const n = ceilVnd(parseFloat(withDot));
+      if (!Number.isNaN(n) && n > 0)
+        setAmountInput(formatNumberInput(Math.min(n, 9_999_999_999_999)));
+      return;
+    }
+    // Normal integer-only input
     const digits = raw.replace(/\D/g, '').slice(0, 13);
     setAmountInput(digits ? formatNumberInput(parseInt(digits, 10)) : '');
   };
@@ -181,7 +201,7 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
     }
   };
 
-  const computedAmount = prepare?.computedAmount ?? 0;
+  const computedAmount = ceilVnd(prepare?.computedAmount ?? 0);
   const amountChanged = parsedAmount > 0 && parsedAmount !== computedAmount;
   const amountDiff = parsedAmount - computedAmount;
   const noteRequired = amountChanged;
@@ -287,6 +307,7 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
                   fullWidth
                   value={amountInput}
                   onChange={handleAmountChange}
+                  onKeyDown={handleAmountKeyDown}
                   error={amountInput !== '' && !amountValid}
                   helperText={amountInput !== '' && !amountValid ? 'Số tiền không hợp lệ' : undefined}
                   InputProps={{
