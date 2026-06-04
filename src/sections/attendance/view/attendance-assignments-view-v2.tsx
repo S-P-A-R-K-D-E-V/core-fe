@@ -78,9 +78,6 @@ import {
 import { getShiftRegistrations } from 'src/api/shiftRegistration';
 import { getAllUsers } from 'src/api/users';
 
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-
-import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 import { StyledCalendar } from '../../calendar/styles';
 import CalendarToolbar from '../../calendar/calendar-toolbar';
@@ -770,19 +767,21 @@ export default function AttendanceAssignmentsView() {
         {/* Filters */}
         <Card sx={{ mb: 3, p: 2.5 }}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
-            <DatePicker
+            <TextField
               label="Từ ngày"
-              value={parseDateStr(fromDate)}
-              onChange={(val) => setFromDate(toDateStr(val))}
-              format="dd/MM/yyyy"
-              slotProps={{ textField: { sx: { width: { xs: 1, md: 180 } } } }}
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: { xs: 1, md: 180 } }}
             />
-            <DatePicker
+            <TextField
               label="Đến ngày"
-              value={parseDateStr(toDate)}
-              onChange={(val) => setToDate(toDateStr(val))}
-              format="dd/MM/yyyy"
-              slotProps={{ textField: { sx: { width: { xs: 1, md: 180 } } } }}
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: { xs: 1, md: 180 } }}
             />
 
             <TextField
@@ -1033,12 +1032,13 @@ export default function AttendanceAssignmentsView() {
               ))}
             </TextField>
 
-            <DatePicker
+            <TextField
               label="Ngày"
-              value={parseDateStr(newDate)}
-              onChange={(val) => setNewDate(toDateStr(val))}
-              format="dd/MM/yyyy"
-              slotProps={{ textField: { fullWidth: true } }}
+              type="date"
+              value={newDate.split('T')[0]}
+              onChange={(e) => setNewDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
             />
 
             <TextField
@@ -2201,12 +2201,13 @@ export default function AttendanceAssignmentsView() {
               </TextField>
 
               {/* Target date */}
-              <DatePicker
+              <TextField
                 label="Ngày đổi đến"
-                value={parseDateStr(swapTargetDate)}
-                onChange={(val) => setSwapTargetDate(toDateStr(val))}
-                format="dd/MM/yyyy"
-                slotProps={{ textField: { fullWidth: true } }}
+                type="date"
+                value={swapTargetDate}
+                onChange={(e) => setSwapTargetDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
               />
 
               {/* Target staff */}

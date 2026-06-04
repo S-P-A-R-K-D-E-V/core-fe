@@ -78,10 +78,6 @@ import { getAllPayrollCycles } from 'src/api/payrollCycle';
 import SalaryConfigPreviewDialog from 'src/components/salary-config-preview-dialog';
 import PaymentQRDialog from 'src/components/payment-qr-dialog';
 
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
-
-import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 // ----------------------------------------------------------------------
 
@@ -556,21 +552,6 @@ export default function PayrollBatchView() {
     return vnDate.toISOString();
   };
 
-  const parseDatetimeLocalStr = (val: string) => (val ? new Date(val) : null);
-  const toDatetimeLocalStr = (date: any) => {
-    if (!date) return '';
-    const d = new Date(date);
-    const vnOffset = 7 * 60;
-    const localOffset = d.getTimezoneOffset();
-    const vnDate = new Date(d.getTime() + (vnOffset + localOffset) * 60000);
-    const yyyy = vnDate.getFullYear();
-    const mm = String(vnDate.getMonth() + 1).padStart(2, '0');
-    const dd = String(vnDate.getDate()).padStart(2, '0');
-    const hh = String(vnDate.getHours()).padStart(2, '0');
-    const min = String(vnDate.getMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
-  };
-
   // Handler functions for edit dialog
   const handleOpenEditShift = (shift: IPayrollShiftItem) => {
     if (selectedPayrollRecord?.isFinalized) return;
@@ -605,8 +586,8 @@ export default function PayrollBatchView() {
       setEditingSubmitting(true);
       await adjustAttendanceTime({
         shiftAssignmentId: editingShift.shiftAssignmentId,
-        checkInTime: checkInValue ? datetimeLocalToUtcIso(checkInValue) : undefined,
-        checkOutTime: checkOutValue ? datetimeLocalToUtcIso(checkOutValue) : undefined,
+        checkInTime: checkInValue ? datetimeLocalToUtcIso(checkInValue) : null,
+        checkOutTime: checkOutValue ? datetimeLocalToUtcIso(checkOutValue) : null,
         note: 'Điều chỉnh từ bảng lương',
       });
       enqueueSnackbar('Điều chỉnh thời gian checkin/checkout thành công', { variant: 'success' });
@@ -1184,19 +1165,21 @@ export default function PayrollBatchView() {
               value={periodName}
               onChange={(e) => setPeriodName(e.target.value)}
             />
-            <DatePicker
+            <TextField
               label="Từ ngày"
-              value={parseDateStr(fromDate)}
-              onChange={(val) => setFromDate(toDateStr(val))}
-              format="dd/MM/yyyy"
-              slotProps={{ textField: { fullWidth: true } }}
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
             />
-            <DatePicker
+            <TextField
               label="Đến ngày"
-              value={parseDateStr(toDate)}
-              onChange={(val) => setToDate(toDateStr(val))}
-              format="dd/MM/yyyy"
-              slotProps={{ textField: { fullWidth: true } }}
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
             />
 
             <Box sx={{ p: 2, bgcolor: 'background.neutral', borderRadius: 1 }}>
@@ -1706,12 +1689,14 @@ export default function PayrollBatchView() {
 
               <Box>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <DateTimePicker
+                  <TextField
                     label="Giờ vào"
-                    value={parseDatetimeLocalStr(checkInValue)}
-                    onChange={(val) => setCheckInValue(toDatetimeLocalStr(val))}
-                    format="dd/MM/yyyy HH:mm"
-                    slotProps={{ textField: { fullWidth: true, size: 'small' } }}
+                    type="datetime-local"
+                    value={checkInValue}
+                    onChange={(e) => setCheckInValue(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                    size="small"
                   />
                   <Tooltip title={`Đặt thời gian bắt đầu ca (${editingShift?.shiftStartTime})`}>
                     <IconButton color="primary" onClick={handleSetCheckInToShiftStart} size="small">
@@ -1723,12 +1708,14 @@ export default function PayrollBatchView() {
 
               <Box>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <DateTimePicker
+                  <TextField
                     label="Giờ ra"
-                    value={parseDatetimeLocalStr(checkOutValue)}
-                    onChange={(val) => setCheckOutValue(toDatetimeLocalStr(val))}
-                    format="dd/MM/yyyy HH:mm"
-                    slotProps={{ textField: { fullWidth: true, size: 'small' } }}
+                    type="datetime-local"
+                    value={checkOutValue}
+                    onChange={(e) => setCheckOutValue(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                    size="small"
                   />
                   <Tooltip title={`Đặt thời gian kết thúc ca (${editingShift?.shiftEndTime})`}>
                     <IconButton color="primary" onClick={handleSetCheckOutToShiftEnd} size="small">

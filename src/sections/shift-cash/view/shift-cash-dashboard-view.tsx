@@ -45,8 +45,6 @@ import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Label from 'src/components/label';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { usePageTours } from 'src/hooks/use-tour';
@@ -668,12 +666,13 @@ export default function ShiftCashDashboardView() {
         {/* Date picker */}
         <Card id="tour-date-picker" sx={{ mb: 3, p: 2.5 }}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <DatePicker
+            <TextField
               label="Ngày"
-              value={parseDateStr(currentDate)}
-              onChange={(val) => setCurrentDate(toDateStr(val))}
-              format="dd/MM/yyyy"
-              slotProps={{ textField: { sx: { width: 200 } } }}
+              type="date"
+              value={currentDate}
+              onChange={(e) => setCurrentDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: 200 }}
             />
             {isToday ? (
               <Button
