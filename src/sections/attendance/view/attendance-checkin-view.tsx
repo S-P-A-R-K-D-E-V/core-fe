@@ -57,6 +57,59 @@ import { checkinFace } from 'src/api/checkinFace';
 const GPS_ACCURACY_THRESHOLD = 50;
 const GEOFENCE_ENABLE_DELAY_MS = 3000;
 
+// ── Check-in window helpers ──────────────────────────────────────────────────
+
+type WindowStatus = 'too-early' | 'allowed' | 'too-late' | 'checked-in';
+
+interface CheckInWindowInfo {
+  status: WindowStatus;
+  allowedFrom: Date;
+  shiftEnd: Date;
+  minutesUntil: number; // minutes until allowedFrom (positive = not yet open)
+}
+
+function getCheckInWindowInfo(assignment: IShiftAssignment, now: Date): CheckInWindowInfo {
+  const [startH, startM] = assignment.startTime.split(':').map(Number);
+  const [endH, endM] = assignment.endTime.split(':').map(Number);
+  const minutesBefore = assignment.checkInAllowedMinutesBefore ?? 15;
+  const [y, mo, d] = (assignment.date ?? new Date().toISOString().slice(0, 10)).split('-').map(Number);
+
+  const allowedFrom = new Date(y, mo - 1, d, startH, startM - minutesBefore, 0, 0);
+  const shiftEnd = new Date(y, mo - 1, d, endH, endM, 0, 0);
+  const minutesUntil = Math.ceil((allowedFrom.getTime() - now.getTime()) / 60_000);
+
+  if (assignment.hasCheckedIn) return { status: 'checked-in', allowedFrom, shiftEnd, minutesUntil };
+  if (now < allowedFrom) return { status: 'too-early', allowedFrom, shiftEnd, minutesUntil };
+  if (now > shiftEnd) return { status: 'too-late', allowedFrom, shiftEnd, minutesUntil };
+  return { status: 'allowed', allowedFrom, shiftEnd, minutesUntil };
+}
+
+function fmtHHmm(date: Date): string {
+  return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function fmtCountdown(minutes: number): string {
+  if (minutes <= 0) return '';
+  if (minutes < 60) return `${minutes} phút`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h} giờ ${m} phút` : `${h} giờ`;
+}
+
+function extractApiError(error: any): string {
+  if (!error) return 'Thất bại. Vui lòng thử lại.';
+  if (error?.errors && typeof error.errors === 'object' && !Array.isArray(error.errors)) {
+    const key = Object.keys(error.errors)[0];
+    if (key) {
+      const msgs = error.errors[key];
+      return Array.isArray(msgs) ? msgs[0] : String(msgs);
+    }
+  }
+  return error?.detail || error?.description || error?.message
+    || (error?.title !== 'One or more validation errors occurred.' ? error?.title : null)
+    || 'Thất bại. Vui lòng thử lại.';
+}
+
 function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -116,6 +169,13 @@ export default function AttendanceCheckinView() {
   const tourDialogRef = useRef(false);
 
   const [today] = useState(() => new Date().toISOString());
+
+  // Clock for check-in window computation — 30-second precision is enough for countdown display
+  const [nowTick, setNowTick] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   // ── GPS ──
   useEffect(() => {
@@ -266,6 +326,28 @@ export default function AttendanceCheckinView() {
     [todayAssignments]
   );
   const isCurrentlyWorking = !!openNonOvertimeLog || hasOpenCheckinFromSchedule;
+
+  // First assignment in time order that is currently inside its check-in window
+  const activeSmartShift = useMemo(() => {
+    const sorted = [...todayAssignments].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    return sorted.find((a) => getCheckInWindowInfo(a, nowTick).status === 'allowed') ?? null;
+  }, [todayAssignments, nowTick]);
+
+  // Human-readable reason shown in tooltip / subtitle when smart check-in is blocked by time window
+  const smartCheckinWindowReason = useMemo((): string | null => {
+    if (todayAssignments.length === 0) return null; // overtime path, no reason needed
+    if (activeSmartShift) return null;              // window is open
+    const sorted = [...todayAssignments].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    for (const a of sorted) {
+      const info = getCheckInWindowInfo(a, nowTick);
+      if (info.status === 'too-early') {
+        return `Check-in mở lúc ${fmtHHmm(info.allowedFrom)} (còn ${fmtCountdown(info.minutesUntil)})`;
+      }
+    }
+    return todayAssignments.every((a) => a.hasCheckedIn)
+      ? 'Đã check-in tất cả ca hôm nay'
+      : 'Ngoài khung giờ check-in';
+  }, [todayAssignments, activeSmartShift, nowTick]);
 
   const shiftTimeline = useMemo(() => {
     if (todayAssignments.length === 0) return [];
@@ -451,22 +533,11 @@ export default function AttendanceCheckinView() {
     try {
       const staffName = user?.displayName || user?.name || user?.email || 'N/A';
       const shiftLabel =
-        pendingCheckin.mode === 'smart' && currentShiftDisplay
-          ? `${currentShiftDisplay.currentShift.shiftName || currentShiftDisplay.currentShift.scheduleName} (${currentShiftDisplay.currentShift.startTime}–${currentShiftDisplay.currentShift.endTime})`
+        pendingCheckin.mode === 'smart' && activeSmartShift
+          ? `${activeSmartShift.shiftName || activeSmartShift.scheduleName} (${activeSmartShift.startTime}–${activeSmartShift.endTime})`
           : pendingCheckin.shiftName;
 
-      await checkinFace({
-        candidateName: staffName,
-        imageBase64: capturedImage,
-        lat: geoLocation?.lat,
-        lng: geoLocation?.lng,
-        deviceName: navigator.userAgent.slice(0, 80),
-        time: new Date().toISOString(),
-        branchName: isWithinGeofence ? nearestBranch?.name : undefined,
-        shiftName: shiftLabel,
-        checkInType: pendingCheckin.mode,
-      });
-
+      // 1. Create attendance log first — if rejected (no shift window, geofence, etc.), abort before sending Telegram
       if (pendingCheckin.mode === 'overtime') {
         await checkIn({
           isOvertime: true,
@@ -484,6 +555,19 @@ export default function AttendanceCheckinView() {
         });
       }
 
+      // 2. Attendance log created — now fire Telegram notification
+      await checkinFace({
+        candidateName: staffName,
+        imageBase64: capturedImage,
+        lat: geoLocation?.lat,
+        lng: geoLocation?.lng,
+        deviceName: navigator.userAgent.slice(0, 80),
+        time: new Date().toISOString(),
+        branchName: isWithinGeofence ? nearestBranch?.name : undefined,
+        shiftName: shiftLabel,
+        checkInType: pendingCheckin.mode,
+      });
+
       enqueueSnackbar(
         pendingCheckin.mode === 'overtime' ? 'Check-in ngoài giờ thành công!' : 'Check-in thành công!',
         { variant: 'success' }
@@ -492,13 +576,12 @@ export default function AttendanceCheckinView() {
       fetchData();
     } catch (error: any) {
       console.error(error);
-      const msg = error?.title || error?.message || 'Check-in thất bại!';
-      enqueueSnackbar(msg, { variant: 'error' });
+      enqueueSnackbar(extractApiError(error), { variant: 'error' });
     } finally {
       setSubmitting(false);
       setActionLoading(null);
     }
-  }, [capturedImage, pendingCheckin, user, geoLocation, geoAccuracy, isWithinGeofence, nearestBranch, enqueueSnackbar, closeFaceDialog, fetchData]);
+  }, [capturedImage, pendingCheckin, activeSmartShift, user, geoLocation, geoAccuracy, isWithinGeofence, nearestBranch, enqueueSnackbar, closeFaceDialog, fetchData]);
 
   const handleSmartCheckOut = async () => {
     try {
@@ -941,7 +1024,7 @@ export default function AttendanceCheckinView() {
                   <CurrentTime />
                 </Typography>
 
-                {/* Subtle notice when no shifts */}
+                {/* Contextual subtitle based on shift window status */}
                 {todayAssignments.length === 0 ? (
                   <Stack
                     direction="row"
@@ -963,16 +1046,29 @@ export default function AttendanceCheckinView() {
                       Không có ca hôm nay — sẽ check-in ngoài giờ
                     </Typography>
                   </Stack>
+                ) : activeSmartShift ? (
+                  <Stack alignItems="center" spacing={0.5} sx={{ mb: 3 }}>
+                    <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 600 }}>
+                      {activeSmartShift.shiftName || activeSmartShift.scheduleName} · {activeSmartShift.startTime} – {activeSmartShift.endTime}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#69F0AE', fontWeight: 600 }}>
+                      ✓ Đang trong khung giờ check-in
+                    </Typography>
+                  </Stack>
                 ) : (
-                  <Typography variant="body2" sx={{ opacity: 0.8, mb: 3 }}>
-                    Hệ thống sẽ tự nhận diện ca phù hợp dựa vào thời gian hiện tại
-                  </Typography>
+                  <Stack alignItems="center" spacing={0.5} sx={{ mb: 3 }}>
+                    <Typography variant="body2" sx={{ opacity: 0.65 }}>
+                      {smartCheckinWindowReason ?? 'Hệ thống tự nhận diện ca phù hợp'}
+                    </Typography>
+                  </Stack>
                 )}
 
                 <Tooltip
                   title={
                     branches.length > 0 && !gpsReadyForCheckin && !gpsErrorFallbackEnabled
                       ? 'Bạn chưa ở trong phạm vi cửa hàng hoặc GPS chưa ổn định'
+                      : todayAssignments.length > 0 && !activeSmartShift && smartCheckinWindowReason
+                      ? smartCheckinWindowReason
                       : ''
                   }
                 >
@@ -988,10 +1084,16 @@ export default function AttendanceCheckinView() {
                           openFaceDialog('smart');
                         }
                       }}
-                      disabled={!!actionLoading || (branches.length > 0 && !gpsReadyForCheckin && !gpsErrorFallbackEnabled)}
+                      disabled={
+                        !!actionLoading ||
+                        (branches.length > 0 && !gpsReadyForCheckin && !gpsErrorFallbackEnabled) ||
+                        (todayAssignments.length > 0 && !activeSmartShift)
+                      }
                       startIcon={
                         actionLoading === 'smart' ? (
                           <CircularProgress size={20} color="inherit" />
+                        ) : todayAssignments.length > 0 && !activeSmartShift ? (
+                          <Iconify icon="mdi:clock-outline" />
                         ) : (
                           <Iconify icon="mdi:camera" />
                         )
@@ -1009,7 +1111,11 @@ export default function AttendanceCheckinView() {
                         color: '#fff',
                       }}
                     >
-                      {todayAssignments.length === 0 ? 'Chụp ảnh & Check-in ngoài giờ' : 'Chụp ảnh & Bắt đầu làm việc'}
+                      {todayAssignments.length === 0
+                        ? 'Chụp ảnh & Check-in ngoài giờ'
+                        : activeSmartShift
+                        ? 'Chụp ảnh & Bắt đầu làm việc'
+                        : 'Chưa đến giờ check-in'}
                     </Button>
                   </span>
                 </Tooltip>
@@ -1096,6 +1202,37 @@ export default function AttendanceCheckinView() {
                             <Typography variant="body2" color="text.secondary">
                               {assignment.startTime} - {assignment.endTime}
                             </Typography>
+                            {/* Check-in window hint */}
+                            {(() => {
+                              const info = getCheckInWindowInfo(assignment, nowTick);
+                              if (info.status === 'checked-in') {
+                                return (
+                                  <Typography variant="caption" color="success.main">
+                                    ✓ Check-in lúc {assignment.checkInTime ? fmtHHmm(new Date(assignment.checkInTime)) : '--'}
+                                  </Typography>
+                                );
+                              }
+                              if (info.status === 'allowed') {
+                                return (
+                                  <Typography variant="caption" color="success.main" fontWeight={600}>
+                                    ✓ Đang mở check-in đến {fmtHHmm(info.shiftEnd)}
+                                  </Typography>
+                                );
+                              }
+                              if (info.status === 'too-early') {
+                                return (
+                                  <Typography variant="caption" color="warning.main">
+                                    ⏳ Mở lúc {fmtHHmm(info.allowedFrom)} · còn {fmtCountdown(info.minutesUntil)}
+                                  </Typography>
+                                );
+                              }
+                              // too-late
+                              return (
+                                <Typography variant="caption" color="text.disabled">
+                                  Khung check-in: {fmtHHmm(info.allowedFrom)} – {fmtHHmm(info.shiftEnd)}
+                                </Typography>
+                              );
+                            })()}
                           </Box>
                           <Label variant="soft" color={statusConfig.color}>
                             {statusConfig.label}
