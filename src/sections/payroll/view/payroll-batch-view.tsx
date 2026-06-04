@@ -29,6 +29,7 @@ import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { alpha, useTheme } from '@mui/material/styles';
 import LoadingButton from '@mui/lab/LoadingButton';
 
@@ -513,6 +514,7 @@ export default function PayrollBatchView() {
   };
 
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const getShiftCardColor = (shift: IPayrollShiftItem) => {
     if (shift.isWaived) return { bg: alpha(theme.palette.info.main, 0.08), border: theme.palette.info.main };
@@ -1046,8 +1048,8 @@ export default function PayrollBatchView() {
                     </IconButton>
                   </Stack>
 
-                  {/* Calendar grid */}
-                  <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${currentWeek.length}, 1fr)`, gap: 1 }}>
+                  {/* Calendar grid — stacks to 1 column on mobile */}
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: `repeat(${currentWeek.length}, 1fr)` }, gap: 1 }}>
                     {currentWeek.map((day) => {
                       const date = new Date(day.date);
                       const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -1214,6 +1216,7 @@ export default function PayrollBatchView() {
         onClose={handleCloseShiftDetail}
         maxWidth="xl"
         fullWidth
+        fullScreen={isMobile}
       >
         <DialogTitle sx={{ pb: 0 }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between">
@@ -1320,11 +1323,11 @@ export default function PayrollBatchView() {
                         </IconButton>
                       </Stack>
 
-                      {/* 7-column grid */}
+                      {/* 7-column grid — stacks to 1 column on mobile */}
                       <Box
                         sx={{
                           display: 'grid',
-                          gridTemplateColumns: 'repeat(7, 1fr)',
+                          gridTemplateColumns: { xs: '1fr', sm: 'repeat(7, 1fr)' },
                           gap: 1,
                         }}
                       >
