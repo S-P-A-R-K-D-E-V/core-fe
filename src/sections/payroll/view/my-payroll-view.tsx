@@ -25,6 +25,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { alpha, useTheme } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
@@ -175,6 +176,7 @@ export default function MyPayrollView() {
   }, [shiftDetail]);
 
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const getShiftCardColor = (shift: IPayrollShiftItem) => {
     if (shift.isWaived) return { bg: alpha(theme.palette.info.main, 0.08), border: theme.palette.info.main };
@@ -319,6 +321,7 @@ export default function MyPayrollView() {
         onClose={handleCloseShiftDetail}
         maxWidth="xl"
         fullWidth
+        fullScreen={isMobile}
       >
         <DialogTitle sx={{ pb: 0 }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between">
@@ -382,7 +385,7 @@ export default function MyPayrollView() {
                       <Box
                         sx={{
                           display: 'grid',
-                          gridTemplateColumns: 'repeat(7, 1fr)',
+                          gridTemplateColumns: { xs: '1fr', sm: 'repeat(7, 1fr)' },
                           gap: 1,
                         }}
                       >
