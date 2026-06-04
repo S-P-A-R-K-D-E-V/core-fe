@@ -60,9 +60,8 @@ import {
 import { getAllUsers } from 'src/api/users';
 
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 
-import { parseDateStr, toDateStr, parseDatetimeLocalStr, toDatetimeLocalStr } from 'src/utils/format-time';
+import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 import { StyledCalendar } from '../../calendar/styles';
 import CalendarToolbar from '../../calendar/calendar-toolbar';
@@ -429,10 +428,11 @@ export default function AttendanceAdjustView() {
         if (!editingAssignment) return;
         setSubmitting(true);
         try {
+            // Send null (not undefined) when empty so the backend can explicitly clear the field
             await adjustAttendanceTime({
                 shiftAssignmentId: editingAssignment.id,
-                checkInTime: checkInValue ? datetimeLocalToUtcIso(checkInValue) : undefined,
-                checkOutTime: checkOutValue ? datetimeLocalToUtcIso(checkOutValue) : undefined,
+                checkInTime: checkInValue ? datetimeLocalToUtcIso(checkInValue) : null,
+                checkOutTime: checkOutValue ? datetimeLocalToUtcIso(checkOutValue) : null,
                 note: note || undefined,
             });
             enqueueSnackbar('Điều chỉnh chấm công thành công', { variant: 'success' });
@@ -812,35 +812,53 @@ export default function AttendanceAdjustView() {
 
                             <Box>
                                 <Stack direction="row" spacing={1} alignItems="center">
-                                    <DateTimePicker
+                                    <TextField
                                         label="Giờ vào"
-                                        value={parseDatetimeLocalStr(checkInValue)}
-                                        onChange={(val) => setCheckInValue(toDatetimeLocalStr(val))}
-                                        format="dd/MM/yyyy HH:mm"
-                                        slotProps={{ textField: { fullWidth: true } }}
+                                        type="datetime-local"
+                                        value={checkInValue}
+                                        onChange={(e) => setCheckInValue(e.target.value)}
+                                        InputLabelProps={{ shrink: true }}
+                                        fullWidth
+                                        helperText={checkInValue ? '' : 'Để trống = xóa giờ vào'}
                                     />
-                                    <Tooltip title="Đặt giờ bắt đầu ca">
+                                    <Tooltip title="Đặt bằng giờ bắt đầu ca">
                                         <IconButton color="primary" onClick={handleSetCheckInToShiftStart}>
                                             <Iconify icon="solar:check-circle-bold" />
                                         </IconButton>
                                     </Tooltip>
+                                    {checkInValue && (
+                                        <Tooltip title="Xóa giờ vào">
+                                            <IconButton color="error" onClick={() => setCheckInValue('')}>
+                                                <Iconify icon="solar:close-circle-bold" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    )}
                                 </Stack>
                             </Box>
 
                             <Box>
                                 <Stack direction="row" spacing={1} alignItems="center">
-                                    <DateTimePicker
+                                    <TextField
                                         label="Giờ ra"
-                                        value={parseDatetimeLocalStr(checkOutValue)}
-                                        onChange={(val) => setCheckOutValue(toDatetimeLocalStr(val))}
-                                        format="dd/MM/yyyy HH:mm"
-                                        slotProps={{ textField: { fullWidth: true } }}
+                                        type="datetime-local"
+                                        value={checkOutValue}
+                                        onChange={(e) => setCheckOutValue(e.target.value)}
+                                        InputLabelProps={{ shrink: true }}
+                                        fullWidth
+                                        helperText={checkOutValue ? '' : 'Để trống = xóa giờ ra'}
                                     />
-                                    <Tooltip title="Đặt giờ kết thúc ca">
+                                    <Tooltip title="Đặt bằng giờ kết thúc ca">
                                         <IconButton color="primary" onClick={handleSetCheckOutToShiftEnd}>
                                             <Iconify icon="solar:check-circle-bold" />
                                         </IconButton>
                                     </Tooltip>
+                                    {checkOutValue && (
+                                        <Tooltip title="Xóa giờ ra">
+                                            <IconButton color="error" onClick={() => setCheckOutValue('')}>
+                                                <Iconify icon="solar:close-circle-bold" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    )}
                                 </Stack>
                             </Box>
 
@@ -863,7 +881,6 @@ export default function AttendanceAdjustView() {
                         variant="contained"
                         loading={submitting}
                         onClick={handleSubmit}
-                        disabled={!checkInValue && !checkOutValue}
                     >
                         Lưu
                     </LoadingButton>
