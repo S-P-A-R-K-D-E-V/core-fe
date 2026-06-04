@@ -53,10 +53,10 @@ export async function changeMyPassword(data: IChangePasswordRequest): Promise<vo
   await axios.post(endpoints.users.changePassword, data);
 }
 
-export async function uploadMyAvatar(file: File): Promise<{ avatarUrl: string }> {
+export async function uploadMyAvatar(file: File): Promise<{ objectKey: string }> {
   const formData = new FormData();
   formData.append('avatar', file);
-  const response = await axios.post<{ avatarUrl: string }>(endpoints.users.uploadAvatar, formData, {
+  const response = await axios.post<{ objectKey: string }>(endpoints.users.uploadAvatar, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return response.data;

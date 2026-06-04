@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect, useReducer, useCallback } from 'react';
 
 import axios, { endpoints } from 'src/utils/axios';
+import { getStorageUrl } from 'src/utils/storage';
 import {
   IAuthResponse,
   ILoginRequest,
@@ -193,7 +194,7 @@ export function AuthProvider({ children }: Props) {
       const res = await axios.get(endpoints.users.me);
       const profileImageUrl: string | undefined = res.data?.profileImageUrl;
       if (profileImageUrl) {
-        dispatch({ type: Types.LOGIN, payload: { user: { ...baseUser, photoURL: profileImageUrl } } });
+        dispatch({ type: Types.LOGIN, payload: { user: { ...baseUser, photoURL: getStorageUrl(profileImageUrl) } } });
       }
     } catch {
       // non-blocking — keep existing photoURL

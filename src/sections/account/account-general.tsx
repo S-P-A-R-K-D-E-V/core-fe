@@ -18,6 +18,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { fData } from 'src/utils/format-number';
+import { getStorageUrl } from 'src/utils/storage';
 import axiosInstance, { endpoints } from 'src/utils/axios';
 
 import { useSnackbar } from 'src/components/snackbar';
@@ -25,6 +26,8 @@ import FormProvider, {
   RHFTextField,
   RHFUploadAvatar,
 } from 'src/components/hook-form';
+
+import { useAuthContext } from 'src/auth/hooks';
 
 import { IUser } from 'src/types/corecms-api';
 import { getCurrentUser, updateMyProfile, uploadMyAvatar } from 'src/api/users';
@@ -43,6 +46,7 @@ type AvatarSource = 'upload' | 'google';
 
 export default function AccountGeneral() {
   const { enqueueSnackbar } = useSnackbar();
+  const { updateUser } = useAuthContext();
 
   const [user, setUser] = useState<IUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,7 +108,7 @@ export default function AccountGeneral() {
           address: profile.address || '',
           bankCode: profile.bankCode || '',
           bankNo: profile.bankNo || '',
-          profileImageUrl: profile.profileImageUrl || null,
+          profileImageUrl: getStorageUrl(profile.profileImageUrl) || null,
         });
 
         const google = connections.find((c) => c.provider.toLowerCase() === 'google') ?? null;
@@ -129,8 +133,8 @@ export default function AccountGeneral() {
       }
       // If user dropped a new file, upload it to R2 first
       else if (avatarSource === 'upload' && data.profileImageUrl instanceof File) {
-        const { avatarUrl } = await uploadMyAvatar(data.profileImageUrl);
-        finalImageUrl = avatarUrl;
+        const { objectKey } = await uploadMyAvatar(data.profileImageUrl);
+        finalImageUrl = getStorageUrl(objectKey);
       }
 
       await updateMyProfile({
@@ -142,6 +146,11 @@ export default function AccountGeneral() {
         bankNo: data.bankNo || undefined,
         profileImageUrl: finalImageUrl,
       });
+
+      // Sync header/nav avatar immediately
+      if (finalImageUrl) {
+        updateUser({ photoURL: finalImageUrl });
+      }
 
       enqueueSnackbar('Cập nhật thành công!');
     } catch (error) {

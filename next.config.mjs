@@ -8,7 +8,7 @@ const isStaticExport = 'false';
 // When BACKEND_URL is set (production/K8s), requests to these paths are
 // forwarded server-side to the backend — no CORS, no backend URL exposed to browser.
 const BACKEND_API_PREFIXES = [
-  'auth', 'users', 'roles', 'permissions',
+  'auth', 'users', 'roles', 'permissions', 'media',
   'shifts', 'shift-templates', 'shift-schedules', 'shift-assignments', 'shift-swap', 'shift-registrations', 'shift-cash',
   'attendance', 'branches', 'checkin',
   'salary', 'salary-configurations', 'salary-history',
