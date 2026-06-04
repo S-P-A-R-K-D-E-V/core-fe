@@ -33,9 +33,6 @@ import { IAttendanceLog, IUser } from 'src/types/corecms-api';
 import { getAttendanceLogs } from 'src/api/attendance';
 import { getAllUsers } from 'src/api/users';
 
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-
-import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 // ----------------------------------------------------------------------
 
@@ -112,19 +109,21 @@ export default function AttendanceLogsView() {
 
       <Card sx={{ mb: 3, p: 2.5 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-          <DatePicker
+          <TextField
             label="From Date"
-            value={parseDateStr(fromDate)}
-            onChange={(val) => setFromDate(toDateStr(val))}
-            format="dd/MM/yyyy"
-            slotProps={{ textField: { sx: { width: { xs: 1, md: 180 } } } }}
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={{ width: { xs: 1, md: 180 } }}
           />
-          <DatePicker
+          <TextField
             label="To Date"
-            value={parseDateStr(toDate)}
-            onChange={(val) => setToDate(toDateStr(val))}
-            format="dd/MM/yyyy"
-            slotProps={{ textField: { sx: { width: { xs: 1, md: 180 } } } }}
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={{ width: { xs: 1, md: 180 } }}
           />
           <TextField
             select

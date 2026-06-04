@@ -44,9 +44,6 @@ import {
   updatePayrollCycle,
 } from 'src/api/payrollCycle';
 
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-
-import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 // ----------------------------------------------------------------------
 
@@ -285,19 +282,21 @@ export default function PayrollCycleListView() {
             </TextField>
 
             <Stack direction="row" spacing={2}>
-              <DatePicker
+              <TextField
                 label="Từ ngày"
-                value={parseDateStr(formData.fromDate)}
-                onChange={(val) => setFormData({ ...formData, fromDate: toDateStr(val) })}
-                format="dd/MM/yyyy"
-                slotProps={{ textField: { fullWidth: true } }}
+                type="date"
+                value={formData.fromDate}
+                onChange={(e) => setFormData({ ...formData, fromDate: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
               />
-              <DatePicker
+              <TextField
                 label="Đến ngày"
-                value={parseDateStr(formData.toDate)}
-                onChange={(val) => setFormData({ ...formData, toDate: toDateStr(val) })}
-                format="dd/MM/yyyy"
-                slotProps={{ textField: { fullWidth: true } }}
+                type="date"
+                value={formData.toDate}
+                onChange={(e) => setFormData({ ...formData, toDate: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
               />
             </Stack>
 

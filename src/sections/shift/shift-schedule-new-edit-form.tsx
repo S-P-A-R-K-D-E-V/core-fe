@@ -10,6 +10,7 @@ import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid2';
 import Stack from '@mui/material/Stack';
 import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
 import LoadingButton from '@mui/lab/LoadingButton';
 import FormGroup from '@mui/material/FormGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -21,8 +22,6 @@ import { useRouter } from 'src/routes/hooks';
 
 import { useSnackbar } from 'src/components/snackbar';
 import FormProvider, { RHFTextField, RHFSelect } from 'src/components/hook-form';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 import { IShiftSchedule, IShiftTemplate } from 'src/types/corecms-api';
 import {
@@ -184,18 +183,15 @@ export default function ShiftScheduleNewEditForm({ currentSchedule }: Props) {
                 name="fromDate"
                 control={methods.control}
                 render={({ field, fieldState: { error } }) => (
-                  <DatePicker
+                  <TextField
                     label="From Date"
-                    value={parseDateStr(field.value)}
-                    onChange={(val) => field.onChange(toDateStr(val))}
-                    format="dd/MM/yyyy"
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        error: !!error,
-                        helperText: error?.message,
-                      },
-                    }}
+                    type="date"
+                    value={field.value ? field.value.split('T')[0] : ''}
+                    onChange={(e) => field.onChange(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                    error={!!error}
+                    helperText={error?.message}
                   />
                 )}
               />
@@ -204,18 +200,15 @@ export default function ShiftScheduleNewEditForm({ currentSchedule }: Props) {
                 name="toDate"
                 control={methods.control}
                 render={({ field, fieldState: { error } }) => (
-                  <DatePicker
+                  <TextField
                     label="To Date (Optional)"
-                    value={parseDateStr(field.value)}
-                    onChange={(val) => field.onChange(toDateStr(val))}
-                    format="dd/MM/yyyy"
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        error: !!error,
-                        helperText: error?.message,
-                      },
-                    }}
+                    type="date"
+                    value={field.value ? field.value.split('T')[0] : ''}
+                    onChange={(e) => field.onChange(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                    error={!!error}
+                    helperText={error?.message}
                   />
                 )}
               />

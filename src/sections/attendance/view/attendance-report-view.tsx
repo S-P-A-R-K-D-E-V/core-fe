@@ -32,9 +32,6 @@ import { IAttendanceReport, IUser } from 'src/types/corecms-api';
 import { getAttendanceReport, autoCloseShifts } from 'src/api/attendance';
 import { getAllUsers } from 'src/api/users';
 
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-
-import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 // ----------------------------------------------------------------------
 
@@ -171,19 +168,23 @@ export default function AttendanceReportView() {
               </Button>
             ))}
           </Stack>
-          <DatePicker
+          <TextField
             label="From"
-            value={parseDateStr(fromDate)}
-            onChange={(val) => setFromDate(toDateStr(val))}
-            format="dd/MM/yyyy"
-            slotProps={{ textField: { size: 'small', sx: { width: 160 } } }}
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            size="small"
+            sx={{ width: 160 }}
           />
-          <DatePicker
+          <TextField
             label="To"
-            value={parseDateStr(toDate)}
-            onChange={(val) => setToDate(toDateStr(val))}
-            format="dd/MM/yyyy"
-            slotProps={{ textField: { size: 'small', sx: { width: 160 } } }}
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            size="small"
+            sx={{ width: 160 }}
           />
           <TextField
             select

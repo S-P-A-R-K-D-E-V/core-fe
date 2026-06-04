@@ -55,9 +55,6 @@ import { useAuthContext } from 'src/auth/hooks';
 import { usePageTours } from 'src/hooks/use-tour';
 import type { TourDefinition } from 'src/hooks/use-tour';
 
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-
-import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 import { StyledCalendar } from '../../calendar/styles';
 import CalendarToolbar from '../../calendar/calendar-toolbar';
@@ -692,19 +689,23 @@ export default function ShiftRegistrationView() {
         <Card id="tour-date-filter" sx={{ mb: 3, p: { xs: 1.5, md: 2.5 } }}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
             <Stack direction="row" spacing={1} sx={{ width: { xs: 1, md: 'auto' } }}>
-              <DatePicker
+              <TextField
                 label="Từ ngày"
-                value={parseDateStr(fromDate)}
-                onChange={(val) => setFromDate(toDateStr(val))}
-                format="dd/MM/yyyy"
-                slotProps={{ textField: { size: smUp ? 'medium' : 'small', sx: { flex: 1, minWidth: 0 } } }}
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                size={smUp ? 'medium' : 'small'}
+                sx={{ flex: 1, minWidth: 0 }}
               />
-              <DatePicker
+              <TextField
                 label="Đến ngày"
-                value={parseDateStr(toDate)}
-                onChange={(val) => setToDate(toDateStr(val))}
-                format="dd/MM/yyyy"
-                slotProps={{ textField: { size: smUp ? 'medium' : 'small', sx: { flex: 1, minWidth: 0 } } }}
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                size={smUp ? 'medium' : 'small'}
+                sx={{ flex: 1, minWidth: 0 }}
               />
             </Stack>
             <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'block' } }} />
