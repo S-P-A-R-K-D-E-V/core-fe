@@ -188,6 +188,18 @@ export function AuthProvider({ children }: Props) {
     }
   }, []);
 
+  const fetchAndPatchAvatar = useCallback(async (baseUser: any) => {
+    try {
+      const res = await axios.get(endpoints.users.me);
+      const profileImageUrl: string | undefined = res.data?.profileImageUrl;
+      if (profileImageUrl) {
+        dispatch({ type: Types.LOGIN, payload: { user: { ...baseUser, photoURL: profileImageUrl } } });
+      }
+    } catch {
+      // non-blocking — keep existing photoURL
+    }
+  }, []);
+
   const initialize = useCallback(async () => {
     try {
       const accessToken = sessionStorage.getItem(STORAGE_KEY);
@@ -196,6 +208,7 @@ export function AuthProvider({ children }: Props) {
         setSession(accessToken);
         const user = buildUserFromToken(accessToken);
         dispatch({ type: Types.INITIAL, payload: { user: { ...user, accessToken } } });
+        fetchAndPatchAvatar({ ...user, accessToken });
         return;
       }
 
@@ -208,7 +221,7 @@ export function AuthProvider({ children }: Props) {
       console.error(error);
       dispatch({ type: Types.INITIAL, payload: { user: null } });
     }
-  }, [tryRestoreSession]);
+  }, [tryRestoreSession, fetchAndPatchAvatar]);
 
   useEffect(() => {
     initialize();
@@ -245,7 +258,8 @@ export function AuthProvider({ children }: Props) {
 
     const user = buildUserFromResponse(res.data);
     dispatch({ type: Types.LOGIN, payload: { user } });
-  }, []);
+    fetchAndPatchAvatar(user);
+  }, [fetchAndPatchAvatar]);
 
   // REGISTER (now requires OTP verification before activation)
   const register = useCallback(
@@ -315,6 +329,12 @@ export function AuthProvider({ children }: Props) {
     dispatch({ type: Types.LOGIN, payload: { user } });
   }, []);
 
+  // UPDATE USER (e.g. after avatar/profile change)
+  const updateUser = useCallback((updates: Partial<NonNullable<typeof state.user>>) => {
+    if (!state.user) return;
+    dispatch({ type: Types.LOGIN, payload: { user: { ...state.user, ...updates } } });
+  }, [state.user]);
+
   // LOGOUT
   const logout = useCallback(async () => {
     try {
@@ -357,8 +377,9 @@ export function AuthProvider({ children }: Props) {
       restoreSession,
       loginWithOAuth,
       pendingVerification,
+      updateUser,
     }),
-    [login, logout, register, verifyOtp, resendOtp, restoreSession, loginWithOAuth, state.user, status, pendingVerification]
+    [login, logout, register, verifyOtp, resendOtp, restoreSession, loginWithOAuth, updateUser, state.user, status, pendingVerification]
   );
 
   return <AuthContext.Provider value={memoizedValue}>{children}</AuthContext.Provider>;
