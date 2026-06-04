@@ -60,6 +60,7 @@ export type JWTContextType = CanRemove & {
   restoreSession: (sessionToken: string) => Promise<void>;
   loginWithOAuth: (provider: 'google' | 'facebook', token: string, avatarUrl?: string) => Promise<void>;
   pendingVerification: { email: string } | null;
+  updateUser: (updates: Partial<NonNullable<AuthUserType>>) => void;
 };
 
 export type FirebaseContextType = CanRemove & {
