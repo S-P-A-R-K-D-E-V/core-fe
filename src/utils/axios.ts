@@ -52,6 +52,7 @@ export const endpoints = {
     resetPassword: (id: string) => `/users/${id}/reset-password`,
     me: '/users/me',
     updateProfile: '/users/me/profile',
+    uploadAvatar: '/users/me/avatar',
     changePassword: '/users/me/change-password',
   },
   roles: {
