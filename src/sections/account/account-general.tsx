@@ -1,3 +1,5 @@
+'use client';
+
 import * as Yup from 'yup';
 import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -7,11 +9,16 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Grid from '@mui/material/Grid2';
+import Switch from '@mui/material/Switch';
+import Avatar from '@mui/material/Avatar';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { fData } from 'src/utils/format-number';
+import axiosInstance, { endpoints } from 'src/utils/axios';
 
 import { useSnackbar } from 'src/components/snackbar';
 import FormProvider, {
@@ -20,7 +27,17 @@ import FormProvider, {
 } from 'src/components/hook-form';
 
 import { IUser } from 'src/types/corecms-api';
-import { getCurrentUser, updateMyProfile } from 'src/api/users';
+import { getCurrentUser, updateMyProfile, uploadMyAvatar } from 'src/api/users';
+
+// ----------------------------------------------------------------------
+
+interface OAuthConnection {
+  provider: string;
+  connectedAt: string;
+  pictureUrl?: string;
+}
+
+type AvatarSource = 'upload' | 'google';
 
 // ----------------------------------------------------------------------
 
@@ -29,6 +46,9 @@ export default function AccountGeneral() {
 
   const [user, setUser] = useState<IUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [googleConnection, setGoogleConnection] = useState<OAuthConnection | null>(null);
+  const [avatarSource, setAvatarSource] = useState<AvatarSource>('upload');
 
   const UpdateUserSchema = Yup.object().shape({
     firstName: Yup.string().required('First name is required'),
@@ -65,9 +85,16 @@ export default function AccountGeneral() {
   } = methods;
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchData = async () => {
       try {
-        const profile = await getCurrentUser();
+        const [profile, connections] = await Promise.all([
+          getCurrentUser(),
+          axiosInstance
+            .get<OAuthConnection[]>(endpoints.auth.oauthConnections)
+            .then((r) => r.data)
+            .catch(() => [] as OAuthConnection[]),
+        ]);
+
         setUser(profile);
         reset({
           firstName: profile.firstName || '',
@@ -79,17 +106,33 @@ export default function AccountGeneral() {
           bankNo: profile.bankNo || '',
           profileImageUrl: profile.profileImageUrl || null,
         });
+
+        const google = connections.find((c) => c.provider.toLowerCase() === 'google') ?? null;
+        setGoogleConnection(google);
       } catch (error) {
         console.error('Failed to load profile:', error);
       } finally {
         setLoading(false);
       }
     };
-    fetchProfile();
+    fetchData();
   }, [reset]);
 
   const onSubmit = handleSubmit(async (data) => {
     try {
+      let finalImageUrl: string | undefined =
+        typeof data.profileImageUrl === 'string' ? data.profileImageUrl : undefined;
+
+      // If user selected Google photo, use it directly
+      if (avatarSource === 'google' && googleConnection?.pictureUrl) {
+        finalImageUrl = googleConnection.pictureUrl;
+      }
+      // If user dropped a new file, upload it to R2 first
+      else if (avatarSource === 'upload' && data.profileImageUrl instanceof File) {
+        const { avatarUrl } = await uploadMyAvatar(data.profileImageUrl);
+        finalImageUrl = avatarUrl;
+      }
+
       await updateMyProfile({
         firstName: data.firstName,
         lastName: data.lastName,
@@ -97,29 +140,34 @@ export default function AccountGeneral() {
         address: data.address || undefined,
         bankCode: data.bankCode || undefined,
         bankNo: data.bankNo || undefined,
-        profileImageUrl: typeof data.profileImageUrl === 'string' ? data.profileImageUrl : undefined,
+        profileImageUrl: finalImageUrl,
       });
-      enqueueSnackbar('Update success!');
+
+      enqueueSnackbar('Cập nhật thành công!');
     } catch (error) {
       console.error(error);
-      enqueueSnackbar('Update failed!', { variant: 'error' });
+      enqueueSnackbar('Cập nhật thất bại!', { variant: 'error' });
     }
   });
 
   const handleDrop = useCallback(
     (acceptedFiles: File[]) => {
       const file = acceptedFiles[0];
+      if (!file) return;
 
       const newFile = Object.assign(file, {
         preview: URL.createObjectURL(file),
       });
 
-      if (file) {
-        setValue('profileImageUrl', newFile, { shouldValidate: true });
-      }
+      setValue('profileImageUrl', newFile, { shouldValidate: true });
+      setAvatarSource('upload');
     },
     [setValue]
   );
+
+  const handleAvatarSourceToggle = (_: React.ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    setAvatarSource(checked ? 'google' : 'upload');
+  };
 
   if (loading) {
     return (
@@ -129,31 +177,80 @@ export default function AccountGeneral() {
     );
   }
 
+  const isGoogleConnected = !!googleConnection;
+  const googleHasPicture = !!googleConnection?.pictureUrl;
+
   return (
     <FormProvider methods={methods} onSubmit={onSubmit}>
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 4 }}>
           <Card sx={{ pt: 10, pb: 5, px: 3, textAlign: 'center' }}>
-            <RHFUploadAvatar
-              name="profileImageUrl"
-              maxSize={3145728}
-              onDrop={handleDrop}
-              helperText={
-                <Typography
-                  variant="caption"
-                  sx={{
-                    mt: 3,
-                    mx: 'auto',
-                    display: 'block',
-                    textAlign: 'center',
-                    color: 'text.disabled',
-                  }}
+            {/* Avatar source toggle — only shown when Google is connected */}
+            {isGoogleConnected && (
+              <Box sx={{ mb: 2 }}>
+                <Tooltip
+                  title={
+                    !googleHasPicture
+                      ? 'Ngắt kết nối và kết nối lại Google để lấy ảnh'
+                      : ''
+                  }
                 >
-                  Allowed *.jpeg, *.jpg, *.png, *.gif
-                  <br /> max size of {fData(3145728)}
+                  <span>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={avatarSource === 'google'}
+                          onChange={handleAvatarSourceToggle}
+                          disabled={!googleHasPicture}
+                          size="small"
+                        />
+                      }
+                      label={
+                        <Typography variant="caption" color="text.secondary">
+                          {avatarSource === 'google' ? 'Đang dùng ảnh Google' : 'Dùng ảnh Google'}
+                        </Typography>
+                      }
+                      labelPlacement="end"
+                    />
+                  </span>
+                </Tooltip>
+              </Box>
+            )}
+
+            {/* Avatar preview */}
+            {avatarSource === 'google' && googleConnection?.pictureUrl ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                <Avatar
+                  src={googleConnection.pictureUrl}
+                  alt="Google profile"
+                  sx={{ width: 144, height: 144, mx: 'auto', border: '2px solid', borderColor: 'primary.main' }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Ảnh từ tài khoản Google
                 </Typography>
-              }
-            />
+              </Box>
+            ) : (
+              <RHFUploadAvatar
+                name="profileImageUrl"
+                maxSize={5242880}
+                onDrop={handleDrop}
+                helperText={
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      mt: 3,
+                      mx: 'auto',
+                      display: 'block',
+                      textAlign: 'center',
+                      color: 'text.disabled',
+                    }}
+                  >
+                    Allowed *.jpeg, *.jpg, *.png, *.gif, *.webp
+                    <br /> max size of {fData(5242880)}
+                  </Typography>
+                }
+              />
+            )}
 
             {user && (
               <Stack spacing={1} sx={{ mt: 3, textAlign: 'left' }}>
@@ -190,7 +287,7 @@ export default function AccountGeneral() {
 
             <Stack alignItems="flex-end" sx={{ mt: 3 }}>
               <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
-                Save Changes
+                Lưu thay đổi
               </LoadingButton>
             </Stack>
           </Card>
