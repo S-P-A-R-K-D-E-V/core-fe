@@ -294,6 +294,7 @@ export interface IShiftAssignment {
   note?: string;
   createdAt: string;
   // Schedule-embedded attendance info (from MyScheduleResponse)
+  checkInAllowedMinutesBefore?: number; // minutes before shift start when check-in opens
   hasCheckedIn?: boolean;
   hasCheckedOut?: boolean;
   checkInTime?: string;
