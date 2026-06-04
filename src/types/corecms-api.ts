@@ -421,8 +421,8 @@ export interface IManualAttendanceAdjustmentRequest {
 
 export interface IAdjustAttendanceTimeRequest {
   shiftAssignmentId: string;
-  checkInTime?: string;
-  checkOutTime?: string;
+  checkInTime?: string | null; // null = explicitly clear the value in DB
+  checkOutTime?: string | null;
   note?: string;
 }
 
