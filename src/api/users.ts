@@ -52,3 +52,12 @@ export async function updateMyProfile(data: IUpdateProfileRequest): Promise<void
 export async function changeMyPassword(data: IChangePasswordRequest): Promise<void> {
   await axios.post(endpoints.users.changePassword, data);
 }
+
+export async function uploadMyAvatar(file: File): Promise<{ avatarUrl: string }> {
+  const formData = new FormData();
+  formData.append('avatar', file);
+  const response = await axios.post<{ avatarUrl: string }>(endpoints.users.uploadAvatar, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}
