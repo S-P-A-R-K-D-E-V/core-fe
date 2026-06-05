@@ -17,6 +17,8 @@ import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableContainer from '@mui/material/TableContainer';
 import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/paths';
@@ -24,6 +26,7 @@ import { paths } from 'src/routes/paths';
 import { useAuthContext } from 'src/auth/hooks';
 
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
+import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
@@ -35,7 +38,9 @@ import type { IShiftAssignment, IShiftPoolPost } from 'src/types/corecms-api';
 import { getShiftAssignments } from 'src/api/attendance';
 import { claimShiftPoolPost, getOpenShiftPoolPosts } from 'src/api/shiftPool';
 
-import { fmtDate, needTypeLabel, poolStatusColor } from './pool-helpers';
+import PoolCalendar from './pool-calendar';
+import LegendDot from './pool-legend';
+import { fmtDate, needTypeHex, needTypeLabel, poolStatusColor } from './pool-helpers';
 
 // ----------------------------------------------------------------------
 
@@ -62,6 +67,7 @@ export default function BrowsePoolView() {
 
   const [posts, setPosts] = useState<IShiftPoolPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
 
   // claim dialog
   const [target, setTarget] = useState<IShiftPoolPost | null>(null);
@@ -138,15 +144,49 @@ export default function BrowsePoolView() {
           { name: 'Đổi ca & Làm hộ' },
           { name: 'Chợ ca' },
         ]}
+        action={
+          <ToggleButtonGroup
+            size="small"
+            value={viewMode}
+            exclusive
+            onChange={(_, v) => v && setViewMode(v)}
+          >
+            <ToggleButton value="calendar">
+              <Iconify icon="eva:calendar-fill" />
+            </ToggleButton>
+            <ToggleButton value="table">
+              <Iconify icon="eva:list-fill" />
+            </ToggleButton>
+          </ToggleButtonGroup>
+        }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
-      <Card>
-        {loading ? (
+      {loading ? (
+        <Card>
           <Stack alignItems="center" justifyContent="center" sx={{ py: 10 }}>
             <CircularProgress />
           </Stack>
-        ) : (
+        </Card>
+      ) : viewMode === 'calendar' ? (
+        <>
+          <PoolCalendar
+            posts={posts}
+            getColor={(p) => needTypeHex(p.needType)}
+            getTitle={(p) => `${needTypeLabel(p.needType)} · ${p.posterName}`}
+            onClickPost={handleOpenClaim}
+          />
+          <Stack direction="row" spacing={2} sx={{ mt: 1.5, px: 1 }} flexWrap="wrap">
+            <LegendDot color={needTypeHex('Swap')} label="Đổi ca" />
+            <LegendDot color={needTypeHex('FullCover')} label="Làm hộ cả ca" />
+            <LegendDot color={needTypeHex('PartialCover')} label="Làm hộ 1 phần" />
+            <Typography variant="caption" color="text.secondary">
+              · Click vào ca để nhận
+            </Typography>
+          </Stack>
+        </>
+      ) : (
+        <Card>
           <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
             <Scrollbar>
               <Table>
@@ -178,8 +218,8 @@ export default function BrowsePoolView() {
               </Table>
             </Scrollbar>
           </TableContainer>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {/* Claim dialog */}
       <Dialog open={!!target} onClose={handleCloseClaim} maxWidth="xs" fullWidth>

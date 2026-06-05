@@ -2,18 +2,27 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableContainer from '@mui/material/TableContainer';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/paths';
 
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
+import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
@@ -24,7 +33,9 @@ import type { IShiftPoolPost } from 'src/types/corecms-api';
 
 import { cancelShiftPoolPost, getMyShiftPoolPosts } from 'src/api/shiftPool';
 
-import { fmtDate, needTypeLabel, poolStatusColor, poolStatusLabel } from './pool-helpers';
+import PoolCalendar from './pool-calendar';
+import LegendDot from './pool-legend';
+import { fmtDate, needTypeLabel, poolStatusColor, poolStatusLabel, statusHex } from './pool-helpers';
 
 // ----------------------------------------------------------------------
 
@@ -38,6 +49,10 @@ const TABLE_HEAD = [
   { id: 'action', label: '', width: 90 },
 ];
 
+function isCancellable(s: string) {
+  return s === 'Open' || s === 'WaitingApproval';
+}
+
 // ----------------------------------------------------------------------
 
 export default function MyPoolPostsView() {
@@ -46,6 +61,8 @@ export default function MyPoolPostsView() {
 
   const [posts, setPosts] = useState<IShiftPoolPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
+  const [selected, setSelected] = useState<IShiftPoolPost | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -66,6 +83,7 @@ export default function MyPoolPostsView() {
     try {
       await cancelShiftPoolPost(id);
       enqueueSnackbar('Đã huỷ bài đăng.', { variant: 'success' });
+      setSelected(null);
       fetchData();
     } catch (error: any) {
       enqueueSnackbar(error?.title || error?.message || 'Huỷ thất bại!', { variant: 'error' });
@@ -81,49 +99,114 @@ export default function MyPoolPostsView() {
           { name: 'Đổi ca & Làm hộ' },
           { name: 'Bài đăng của tôi' },
         ]}
+        action={
+          <ToggleButtonGroup
+            size="small"
+            value={viewMode}
+            exclusive
+            onChange={(_, v) => v && setViewMode(v)}
+          >
+            <ToggleButton value="calendar">
+              <Iconify icon="eva:calendar-fill" />
+            </ToggleButton>
+            <ToggleButton value="table">
+              <Iconify icon="eva:list-fill" />
+            </ToggleButton>
+          </ToggleButtonGroup>
+        }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
-      <Card>
-        {loading ? (
+      {loading ? (
+        <Card>
           <Stack alignItems="center" justifyContent="center" sx={{ py: 10 }}>
             <CircularProgress />
           </Stack>
-        ) : (
+        </Card>
+      ) : viewMode === 'calendar' ? (
+        <>
+          <PoolCalendar
+            posts={posts}
+            getColor={(p) => statusHex(p.status)}
+            getTitle={(p) => `${needTypeLabel(p.needType)} · ${poolStatusLabel(p.status)}`}
+            onClickPost={setSelected}
+          />
+          <Stack direction="row" spacing={2} sx={{ mt: 1.5, px: 1 }} flexWrap="wrap">
+            <LegendDot color={statusHex('Open')} label="Đang mở" />
+            <LegendDot color={statusHex('WaitingApproval')} label="Chờ duyệt" />
+            <LegendDot color={statusHex('Approved')} label="Đã duyệt" />
+            <LegendDot color={statusHex('Rejected')} label="Từ chối" />
+            <LegendDot color={statusHex('Cancelled')} label="Đã huỷ" />
+          </Stack>
+        </>
+      ) : (
+        <Card>
           <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
             <Scrollbar>
               <Table>
                 <TableHeadCustom headLabel={TABLE_HEAD} />
                 <TableBody>
-                  {posts.map((row) => {
-                    const canCancel = row.status === 'Open' || row.status === 'WaitingApproval';
-                    return (
-                      <tr key={row.id}>
-                        <td style={{ padding: '16px' }}>{row.shiftName}</td>
-                        <td style={{ padding: '16px' }}>{fmtDate(row.shiftDate)}</td>
-                        <td style={{ padding: '16px' }}>{needTypeLabel(row.needType)}</td>
-                        <td style={{ padding: '16px' }}>{row.claimerName || '-'}</td>
-                        <td style={{ padding: '16px' }}>
-                          <Label color={poolStatusColor(row.status)}>{poolStatusLabel(row.status)}</Label>
-                        </td>
-                        <td style={{ padding: '16px' }}>{row.reviewNote || '-'}</td>
-                        <td style={{ padding: '16px' }}>
-                          {canCancel && (
-                            <Button size="small" color="error" onClick={() => handleCancel(row.id)}>
-                              Huỷ
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {posts.map((row) => (
+                    <tr key={row.id}>
+                      <td style={{ padding: '16px' }}>{row.shiftName}</td>
+                      <td style={{ padding: '16px' }}>{fmtDate(row.shiftDate)}</td>
+                      <td style={{ padding: '16px' }}>{needTypeLabel(row.needType)}</td>
+                      <td style={{ padding: '16px' }}>{row.claimerName || '-'}</td>
+                      <td style={{ padding: '16px' }}>
+                        <Label color={poolStatusColor(row.status)}>{poolStatusLabel(row.status)}</Label>
+                      </td>
+                      <td style={{ padding: '16px' }}>{row.reviewNote || '-'}</td>
+                      <td style={{ padding: '16px' }}>
+                        {isCancellable(row.status) && (
+                          <Button size="small" color="error" onClick={() => handleCancel(row.id)}>
+                            Huỷ
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                   {posts.length === 0 && <TableNoData notFound />}
                 </TableBody>
               </Table>
             </Scrollbar>
           </TableContainer>
-        )}
-      </Card>
+        </Card>
+      )}
+
+      {/* Detail / cancel dialog (calendar click) */}
+      <Dialog open={!!selected} onClose={() => setSelected(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Bài đăng của tôi</DialogTitle>
+        <DialogContent>
+          {selected && (
+            <Stack spacing={1.5} sx={{ pt: 1 }}>
+              <Typography variant="subtitle2">
+                {needTypeLabel(selected.needType)} · {selected.shiftName} · {fmtDate(selected.shiftDate)}
+              </Typography>
+              <Box>
+                <Label color={poolStatusColor(selected.status)}>{poolStatusLabel(selected.status)}</Label>
+              </Box>
+              {selected.claimerName && (
+                <Typography variant="body2">Người nhận: {selected.claimerName}</Typography>
+              )}
+              {selected.reviewNote && (
+                <Typography variant="body2" color="text.secondary">
+                  Phản hồi: {selected.reviewNote}
+                </Typography>
+              )}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" onClick={() => setSelected(null)}>
+            Đóng
+          </Button>
+          {selected && isCancellable(selected.status) && (
+            <Button color="error" variant="contained" onClick={() => handleCancel(selected.id)}>
+              Huỷ bài đăng
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
