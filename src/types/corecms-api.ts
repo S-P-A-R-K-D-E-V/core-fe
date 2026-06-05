@@ -20,6 +20,8 @@ export interface IUser {
   updatedAt?: string;
   lastLogin?: string;
   profileImageUrl?: string;
+  idCardFrontUrl?: string;
+  idCardBackUrl?: string;
   roles: string[];
 }
 

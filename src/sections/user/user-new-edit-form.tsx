@@ -1,11 +1,12 @@
 import * as Yup from 'yup';
-import { useMemo, useCallback } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useMemo, useCallback, useRef, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
+import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import Grid from '@mui/material/Grid2';
 import Typography from '@mui/material/Typography';
@@ -15,6 +16,7 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { fData } from 'src/utils/format-number';
+import { getStorageUrl } from 'src/utils/storage';
 
 import Label from 'src/components/label';
 import { useSnackbar } from 'src/components/snackbar';
@@ -25,7 +27,7 @@ import FormProvider, {
 } from 'src/components/hook-form';
 
 import { IUser, UserStatus } from 'src/types/corecms-api';
-import { updateUser, changeUserStatus } from 'src/api/users';
+import { updateUser, changeUserStatus, uploadUserIdCard } from 'src/api/users';
 
 // ----------------------------------------------------------------------
 
@@ -44,6 +46,15 @@ export default function UserNewEditForm({ currentUser }: Props) {
   const router = useRouter();
 
   const { enqueueSnackbar } = useSnackbar();
+
+  // CCCD state
+  const [idCardFrontFile, setIdCardFrontFile] = useState<File | null>(null);
+  const [idCardBackFile,  setIdCardBackFile]  = useState<File | null>(null);
+  const [idCardFrontPreview, setIdCardFrontPreview] = useState<string | null>(null);
+  const [idCardBackPreview,  setIdCardBackPreview]  = useState<string | null>(null);
+  const [uploadingIdCard, setUploadingIdCard] = useState(false);
+  const frontInputRef = useRef<HTMLInputElement>(null);
+  const backInputRef  = useRef<HTMLInputElement>(null);
 
   const EditUserSchema = Yup.object().shape({
     firstName: Yup.string().required('First name is required'),
@@ -129,6 +140,34 @@ export default function UserNewEditForm({ currentUser }: Props) {
     },
     [setValue]
   );
+
+  const handleIdCardFileChange = (side: 'front' | 'back') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const preview = URL.createObjectURL(file);
+    if (side === 'front') { setIdCardFrontFile(file); setIdCardFrontPreview(preview); }
+    else                  { setIdCardBackFile(file);  setIdCardBackPreview(preview);  }
+  };
+
+  const handleIdCardUpload = async () => {
+    if (!currentUser || (!idCardFrontFile && !idCardBackFile)) return;
+    try {
+      setUploadingIdCard(true);
+      await uploadUserIdCard(
+        currentUser.id,
+        idCardFrontFile ?? undefined,
+        idCardBackFile  ?? undefined
+      );
+      setIdCardFrontFile(null);
+      setIdCardBackFile(null);
+      enqueueSnackbar('Đã cập nhật CCCD và gửi thông báo Telegram!');
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar('Tải lên CCCD thất bại!', { variant: 'error' });
+    } finally {
+      setUploadingIdCard(false);
+    }
+  };
 
   return (
     <FormProvider methods={methods} onSubmit={onSubmit}>
@@ -223,6 +262,126 @@ export default function UserNewEditForm({ currentUser }: Props) {
             </Stack>
           </Card>
         </Grid>
+
+        {/* CCCD Section */}
+        {currentUser && (
+          <Grid size={{ xs: 12 }}>
+            <Card sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                Căn cước công dân (CCCD)
+              </Typography>
+              <Divider sx={{ mb: 3 }} />
+
+              <Box display="grid" gridTemplateColumns={{ xs: '1fr', sm: '1fr 1fr' }} gap={3}>
+                {/* Mặt trước */}
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Mặt trước
+                  </Typography>
+                  <Box
+                    sx={{
+                      border: '1px dashed',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      overflow: 'hidden',
+                      aspectRatio: '16/10',
+                      bgcolor: 'background.neutral',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      position: 'relative',
+                    }}
+                    onClick={() => frontInputRef.current?.click()}
+                  >
+                    {(idCardFrontPreview || currentUser.idCardFrontUrl) ? (
+                      <Box
+                        component="img"
+                        src={idCardFrontPreview ?? getStorageUrl(currentUser.idCardFrontUrl)}
+                        alt="CCCD mặt trước"
+                        sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                    ) : (
+                      <Typography variant="caption" color="text.disabled">
+                        Nhấn để chọn ảnh
+                      </Typography>
+                    )}
+                  </Box>
+                  <input
+                    ref={frontInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    style={{ display: 'none' }}
+                    onChange={handleIdCardFileChange('front')}
+                  />
+                  {idCardFrontFile && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                      {idCardFrontFile.name}
+                    </Typography>
+                  )}
+                </Box>
+
+                {/* Mặt sau */}
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Mặt sau
+                  </Typography>
+                  <Box
+                    sx={{
+                      border: '1px dashed',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      overflow: 'hidden',
+                      aspectRatio: '16/10',
+                      bgcolor: 'background.neutral',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => backInputRef.current?.click()}
+                  >
+                    {(idCardBackPreview || currentUser.idCardBackUrl) ? (
+                      <Box
+                        component="img"
+                        src={idCardBackPreview ?? getStorageUrl(currentUser.idCardBackUrl)}
+                        alt="CCCD mặt sau"
+                        sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                    ) : (
+                      <Typography variant="caption" color="text.disabled">
+                        Nhấn để chọn ảnh
+                      </Typography>
+                    )}
+                  </Box>
+                  <input
+                    ref={backInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    style={{ display: 'none' }}
+                    onChange={handleIdCardFileChange('back')}
+                  />
+                  {idCardBackFile && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                      {idCardBackFile.name}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+
+              <Stack alignItems="flex-end" sx={{ mt: 3 }}>
+                <LoadingButton
+                  variant="contained"
+                  loading={uploadingIdCard}
+                  disabled={!idCardFrontFile && !idCardBackFile}
+                  onClick={handleIdCardUpload}
+                >
+                  Tải lên CCCD
+                </LoadingButton>
+              </Stack>
+            </Card>
+          </Grid>
+        )}
       </Grid>
     </FormProvider>
   );
