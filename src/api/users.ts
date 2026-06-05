@@ -53,10 +53,41 @@ export async function changeMyPassword(data: IChangePasswordRequest): Promise<vo
   await axios.post(endpoints.users.changePassword, data);
 }
 
-export async function uploadMyAvatar(file: File): Promise<{ avatarUrl: string }> {
+export async function uploadUserIdCard(
+  id: string,
+  idCardFront?: File,
+  idCardBack?: File
+): Promise<{ frontObjectKey?: string; backObjectKey?: string }> {
+  const formData = new FormData();
+  if (idCardFront) formData.append('idCardFront', idCardFront);
+  if (idCardBack)  formData.append('idCardBack',  idCardBack);
+  const res = await axios.post<{ frontObjectKey?: string; backObjectKey?: string }>(
+    endpoints.users.uploadIdCard(id),
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return res.data;
+}
+
+export async function uploadMyIdCard(
+  idCardFront?: File,
+  idCardBack?: File
+): Promise<{ frontObjectKey?: string; backObjectKey?: string }> {
+  const formData = new FormData();
+  if (idCardFront) formData.append('idCardFront', idCardFront);
+  if (idCardBack)  formData.append('idCardBack',  idCardBack);
+  const res = await axios.post<{ frontObjectKey?: string; backObjectKey?: string }>(
+    endpoints.users.uploadMyIdCard,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return res.data;
+}
+
+export async function uploadMyAvatar(file: File): Promise<{ objectKey: string }> {
   const formData = new FormData();
   formData.append('avatar', file);
-  const response = await axios.post<{ avatarUrl: string }>(endpoints.users.uploadAvatar, formData, {
+  const response = await axios.post<{ objectKey: string }>(endpoints.users.uploadAvatar, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return response.data;

@@ -53,6 +53,8 @@ export const endpoints = {
     me: '/users/me',
     updateProfile: '/users/me/profile',
     uploadAvatar: '/users/me/avatar',
+    uploadIdCard: (id: string) => `/users/${id}/id-card`,
+    uploadMyIdCard: '/users/me/id-card',
     changePassword: '/users/me/change-password',
   },
   roles: {
