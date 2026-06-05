@@ -176,6 +176,13 @@ export const paths = {
       myRequests: `${ROOTS.DASHBOARD}/late-cover/my-requests`,
       pending: `${ROOTS.DASHBOARD}/late-cover/pending`,
     },
+    shiftPool: {
+      root: `${ROOTS.DASHBOARD}/shift-pool`,
+      browse: `${ROOTS.DASHBOARD}/shift-pool/browse`,
+      myPosts: `${ROOTS.DASHBOARD}/shift-pool/my-posts`,
+      myClaims: `${ROOTS.DASHBOARD}/shift-pool/my-claims`,
+      pending: `${ROOTS.DASHBOARD}/shift-pool/pending`,
+    },
     shiftCash: {
       root: `${ROOTS.DASHBOARD}/shift-cash`,
       dashboard: `${ROOTS.DASHBOARD}/shift-cash`,

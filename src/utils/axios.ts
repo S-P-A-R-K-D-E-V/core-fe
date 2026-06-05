@@ -180,6 +180,16 @@ export const endpoints = {
     pending: '/late-cover/pending',
     review: (id: string) => `/late-cover/${id}/review`,
   },
+  shiftPool: {
+    create: '/shift-pool',
+    open: '/shift-pool/open',
+    myPosts: '/shift-pool/my-posts',
+    myClaims: '/shift-pool/my-claims',
+    pending: '/shift-pool/pending',
+    claim: (id: string) => `/shift-pool/${id}/claim`,
+    cancel: (id: string) => `/shift-pool/${id}/cancel`,
+    review: (id: string) => `/shift-pool/${id}/review`,
+  },
   holidayPolicy: {
     list: '/holiday-policies',
     details: (id: string) => `/holiday-policies/${id}`,

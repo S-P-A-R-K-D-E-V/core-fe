@@ -197,28 +197,17 @@ export function useNavData() {
           },
           
 
-          // SHIFT SWAP REQUESTS
+          // ĐỔI CA & LÀM HỘ (pool hợp nhất)
           {
-            title: 'Đổi ca',
-            path: paths.dashboard.shiftSwap.root,
+            title: 'Đổi ca & Làm hộ',
+            path: paths.dashboard.shiftPool.root,
             icon: ICONS.job,
             roles: ['Admin', 'Manager', 'Staff'],
             children: [
-              { title: 'Yêu cầu của tôi', path: paths.dashboard.shiftSwap.myRequests },
-              { title: 'Chờ xác nhận', path: paths.dashboard.shiftSwap.myConfirmationRequests },
-              { title: 'Duyệt đổi ca', path: paths.dashboard.shiftSwap.pending, roles: ['Admin', 'Manager'] },
-            ],
-          },
-
-          // LATE COVER REQUESTS
-          {
-            title: 'Làm hộ',
-            path: paths.dashboard.lateCover.root,
-            icon: ICONS.booking,
-            roles: ['Admin', 'Manager', 'Staff'],
-            children: [
-              { title: 'Yêu cầu của tôi', path: paths.dashboard.lateCover.myRequests },
-              { title: 'Duyệt làm hộ', path: paths.dashboard.lateCover.pending, roles: ['Admin', 'Manager'] },
+              { title: 'Chợ ca', path: paths.dashboard.shiftPool.browse },
+              { title: 'Bài đăng của tôi', path: paths.dashboard.shiftPool.myPosts },
+              { title: 'Ca tôi nhận', path: paths.dashboard.shiftPool.myClaims },
+              { title: 'Duyệt', path: paths.dashboard.shiftPool.pending, roles: ['Admin', 'Manager'] },
             ],
           },
 

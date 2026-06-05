@@ -11,12 +11,15 @@ import { EventClickArg } from '@fullcalendar/core';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Menu from '@mui/material/Menu';
@@ -31,12 +34,14 @@ import { paths } from 'src/routes/paths';
 import { useResponsive } from 'src/hooks/use-responsive';
 
 import { useSettingsContext } from 'src/components/settings';
+import { useSnackbar } from 'src/components/snackbar';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Label from 'src/components/label';
 
-import { IShiftSchedule, IShiftAssignment, IAttendanceLog } from 'src/types/corecms-api';
+import { IShiftSchedule, IShiftAssignment, IAttendanceLog, PoolNeedType } from 'src/types/corecms-api';
 import { ICalendarEvent, ICalendarView } from 'src/types/calendar';
 import { getMySchedule, getMyAttendanceLogs, getShiftSchedulesByDateRange } from 'src/api/attendance';
+import { createShiftPoolPost } from 'src/api/shiftPool';
 
 import { usePageTours } from 'src/hooks/use-tour';
 import type { TourDefinition } from 'src/hooks/use-tour';
@@ -126,6 +131,7 @@ function transformAssignmentToEvent(assignment: IAssignmentWithDetails): ICalend
 export default function MyScheduleView() {
   const theme = useTheme();
   const settings = useSettingsContext();
+  const { enqueueSnackbar } = useSnackbar();
   const smUp = useResponsive('up', 'sm');
   const calendarRef = useRef<any>(null);
 
@@ -136,6 +142,14 @@ export default function MyScheduleView() {
   const [date, setDate] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<IAssignmentWithDetails | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
+
+  // Publish-to-pool dialog state
+  const [openPublish, setOpenPublish] = useState(false);
+  const [needType, setNeedType] = useState<PoolNeedType>('Swap');
+  const [partialStart, setPartialStart] = useState('');
+  const [partialEnd, setPartialEnd] = useState('');
+  const [poolNote, setPoolNote] = useState('');
+  const [publishing, setPublishing] = useState(false);
 
   // Tour state
   const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
@@ -233,6 +247,40 @@ export default function MyScheduleView() {
     setOpenDialog(false);
     setSelectedEvent(null);
   }, []);
+
+  const handleOpenPublish = useCallback(() => {
+    if (!selectedEvent) return;
+    setNeedType('Swap');
+    setPartialStart(selectedEvent.startTime || '');
+    setPartialEnd(selectedEvent.endTime || '');
+    setPoolNote('');
+    setOpenPublish(true);
+  }, [selectedEvent]);
+
+  const handlePublishSubmit = useCallback(async () => {
+    if (!selectedEvent) return;
+    setPublishing(true);
+    try {
+      await createShiftPoolPost({
+        shiftAssignmentId: selectedEvent.assignmentId || selectedEvent.id,
+        needType,
+        partialStartTime: needType === 'PartialCover' ? partialStart : undefined,
+        partialEndTime: needType === 'PartialCover' ? partialEnd : undefined,
+        note: poolNote || undefined,
+      });
+      enqueueSnackbar('Đã đăng ca lên pool!', { variant: 'success' });
+      setOpenPublish(false);
+      setOpenDialog(false);
+      setSelectedEvent(null);
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Đăng ca thất bại!', { variant: 'error' });
+    } finally {
+      setPublishing(false);
+    }
+  }, [selectedEvent, needType, partialStart, partialEnd, poolNote, enqueueSnackbar]);
+
+  // Chỉ cho đăng ca lên pool khi chưa check-in (ca chưa diễn ra)
+  const canPublishSelected = !!selectedEvent && !selectedEvent.attendanceLog?.checkInTime;
 
   // ── Tour definitions ──
 
@@ -630,6 +678,95 @@ export default function MyScheduleView() {
             </Stack>
           )}
         </DialogContent>
+        <DialogActions>
+          {canPublishSelected && (
+            <Button
+              variant="contained"
+              startIcon={<Iconify icon="solar:share-bold" />}
+              onClick={handleOpenPublish}
+            >
+              Đăng lên pool (đổi ca / làm hộ)
+            </Button>
+          )}
+          <Button color="inherit" onClick={handleCloseDialog}>
+            Đóng
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Publish to pool dialog */}
+      <Dialog fullWidth maxWidth="xs" open={openPublish} onClose={() => setOpenPublish(false)}>
+        <DialogTitle>Đăng ca lên pool</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2.5} sx={{ pt: 1 }}>
+            {selectedEvent && (
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Ca
+                </Typography>
+                <Typography variant="subtitle2">
+                  {selectedEvent.shiftName} ·{' '}
+                  {new Date(selectedEvent.date).toLocaleDateString('vi-VN')} ·{' '}
+                  {selectedEvent.startTime}-{selectedEvent.endTime}
+                </Typography>
+              </Box>
+            )}
+
+            <TextField
+              select
+              fullWidth
+              label="Nhu cầu"
+              value={needType}
+              onChange={(e) => setNeedType(e.target.value as PoolNeedType)}
+            >
+              <MenuItem value="Swap">Đổi ca (tìm người đổi ca khác)</MenuItem>
+              <MenuItem value="FullCover">Làm hộ cả ca</MenuItem>
+              <MenuItem value="PartialCover">Làm hộ 1 khoảng thời gian</MenuItem>
+            </TextField>
+
+            {needType === 'PartialCover' && (
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  fullWidth
+                  type="time"
+                  label="Từ giờ"
+                  value={partialStart}
+                  onChange={(e) => setPartialStart(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+                <TextField
+                  fullWidth
+                  type="time"
+                  label="Đến giờ"
+                  value={partialEnd}
+                  onChange={(e) => setPartialEnd(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Stack>
+            )}
+
+            <TextField
+              fullWidth
+              multiline
+              rows={2}
+              label="Ghi chú (tuỳ chọn)"
+              value={poolNote}
+              onChange={(e) => setPoolNote(e.target.value)}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" onClick={() => setOpenPublish(false)}>
+            Huỷ
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handlePublishSubmit}
+            disabled={publishing || (needType === 'PartialCover' && (!partialStart || !partialEnd))}
+          >
+            Đăng
+          </Button>
+        </DialogActions>
       </Dialog>
     </Container>
   );

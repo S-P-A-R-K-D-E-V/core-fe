@@ -837,6 +837,57 @@ export interface IReviewLateCoverRequestDto {
   reviewNote?: string;
 }
 
+// --- Shift Pool (đổi ca & làm hộ hợp nhất) ---
+export type PoolNeedType = 'Swap' | 'FullCover' | 'PartialCover';
+export type PoolPostStatus = 'Open' | 'WaitingApproval' | 'Approved' | 'Rejected' | 'Cancelled';
+
+export interface IShiftPoolPost {
+  id: string;
+  posterId: string;
+  posterName: string;
+  shiftAssignmentId: string;
+  shiftName: string;
+  shiftDate: string;
+  shiftStartTime: string;
+  shiftEndTime: string;
+  needType: PoolNeedType;
+  partialStartTime?: string;
+  partialEndTime?: string;
+  note?: string;
+  status: PoolPostStatus;
+  claimerId?: string;
+  claimerName?: string;
+  claimerOfferedAssignmentId?: string;
+  claimerOfferedShiftName?: string;
+  claimerOfferedShiftDate?: string;
+  claimedAt?: string;
+  coveringHours?: number;
+  hourlyRate?: number;
+  extraPayAmount?: number;
+  reviewedBy?: string;
+  reviewerName?: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+  createdAt: string;
+}
+
+export interface ICreateShiftPoolPostDto {
+  shiftAssignmentId: string;
+  needType: PoolNeedType;
+  partialStartTime?: string; // "HH:mm" — bắt buộc khi PartialCover
+  partialEndTime?: string;   // "HH:mm" — bắt buộc khi PartialCover
+  note?: string;
+}
+
+export interface IClaimShiftPoolPostDto {
+  offeredAssignmentId?: string; // bắt buộc khi post là Swap
+}
+
+export interface IReviewShiftPoolPostDto {
+  status: string; // "Approved" | "Rejected"
+  reviewNote?: string;
+}
+
 // --- Holiday Policy ---
 export type HolidayBonusType = 'Percentage' | 'Multiplier' | 'FixedAmount' | 'Combined';
 
