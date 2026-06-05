@@ -229,15 +229,11 @@ export default function MyScheduleView() {
 
   const handleClickEvent = useCallback(
     (arg: EventClickArg) => {
-      const { extendedProps } = arg.event;
-
-      // Find assignment for this event
-      if (extendedProps.myAssignment) {
-        const assignment = assignments.find((a) => a.assignmentId === extendedProps.myAssignment.assignmentId);
-        if (assignment) {
-          setSelectedEvent(assignment);
-          setOpenDialog(true);
-        }
+      // Event id === assignment.assignmentId (xem transformAssignmentToEvent)
+      const assignment = assignments.find((a) => a.assignmentId === arg.event.id);
+      if (assignment) {
+        setSelectedEvent(assignment);
+        setOpenDialog(true);
       }
     },
     [assignments]
@@ -251,8 +247,8 @@ export default function MyScheduleView() {
   const handleOpenPublish = useCallback(() => {
     if (!selectedEvent) return;
     setNeedType('Swap');
-    setPartialStart(selectedEvent.startTime || '');
-    setPartialEnd(selectedEvent.endTime || '');
+    setPartialStart((selectedEvent.startTime || selectedEvent.shiftStartTime || '').slice(0, 5));
+    setPartialEnd((selectedEvent.endTime || selectedEvent.shiftEndTime || '').slice(0, 5));
     setPoolNote('');
     setOpenPublish(true);
   }, [selectedEvent]);
@@ -707,7 +703,8 @@ export default function MyScheduleView() {
                 <Typography variant="subtitle2">
                   {selectedEvent.shiftName} ·{' '}
                   {new Date(selectedEvent.date).toLocaleDateString('vi-VN')} ·{' '}
-                  {selectedEvent.startTime}-{selectedEvent.endTime}
+                  {(selectedEvent.startTime || selectedEvent.shiftStartTime || '').slice(0, 5)}-
+                  {(selectedEvent.endTime || selectedEvent.shiftEndTime || '').slice(0, 5)}
                 </Typography>
               </Box>
             )}
