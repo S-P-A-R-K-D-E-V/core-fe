@@ -31,7 +31,7 @@ import { TableHeadCustom, TableNoData } from 'src/components/table';
 
 import type { IShiftPoolPost } from 'src/types/corecms-api';
 
-import { cancelShiftPoolPost, getMyShiftPoolPosts } from 'src/api/shiftPool';
+import { cancelShiftPoolPost, getMyShiftPoolPosts, reviewShiftPoolPost } from 'src/api/shiftPool';
 
 import PoolCalendar from './pool-calendar';
 import LegendDot from './pool-legend';
@@ -63,6 +63,7 @@ export default function MyPoolPostsView() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
   const [selected, setSelected] = useState<IShiftPoolPost | null>(null);
+  const [acting, setActing] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -87,6 +88,23 @@ export default function MyPoolPostsView() {
       fetchData();
     } catch (error: any) {
       enqueueSnackbar(error?.title || error?.message || 'Huỷ thất bại!', { variant: 'error' });
+    }
+  };
+
+  // Người đăng (staff 1) xác nhận người nhận → thực hiện đổi ca / làm hộ
+  const handleConfirm = async (id: string, accept: boolean) => {
+    setActing(true);
+    try {
+      await reviewShiftPoolPost(id, { status: accept ? 'Approved' : 'Rejected' });
+      enqueueSnackbar(accept ? 'Đã xác nhận đổi ca / làm hộ!' : 'Đã từ chối người nhận.', {
+        variant: 'success',
+      });
+      setSelected(null);
+      fetchData();
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Thao tác thất bại!', { variant: 'error' });
+    } finally {
+      setActing(false);
     }
   };
 
@@ -157,11 +175,18 @@ export default function MyPoolPostsView() {
                       </td>
                       <td style={{ padding: '16px' }}>{row.reviewNote || '-'}</td>
                       <td style={{ padding: '16px' }}>
-                        {isCancellable(row.status) && (
-                          <Button size="small" color="error" onClick={() => handleCancel(row.id)}>
-                            Huỷ
-                          </Button>
-                        )}
+                        <Stack direction="row" spacing={1}>
+                          {row.status === 'WaitingApproval' && (
+                            <Button size="small" variant="contained" onClick={() => setSelected(row)}>
+                              Xác nhận
+                            </Button>
+                          )}
+                          {isCancellable(row.status) && (
+                            <Button size="small" color="error" onClick={() => handleCancel(row.id)}>
+                              Huỷ
+                            </Button>
+                          )}
+                        </Stack>
                       </td>
                     </tr>
                   ))}
@@ -188,9 +213,25 @@ export default function MyPoolPostsView() {
               {selected.claimerName && (
                 <Typography variant="body2">Người nhận: {selected.claimerName}</Typography>
               )}
+              {selected.needType === 'Swap' && selected.claimerOfferedShiftName && (
+                <Typography variant="body2">
+                  Ca đổi lại: {selected.claimerOfferedShiftName} (
+                  {fmtDate(selected.claimerOfferedShiftDate)})
+                </Typography>
+              )}
+              {selected.needType === 'PartialCover' && selected.partialStartTime && (
+                <Typography variant="body2">
+                  Khoảng làm hộ: {selected.partialStartTime} - {selected.partialEndTime}
+                </Typography>
+              )}
               {selected.reviewNote && (
                 <Typography variant="body2" color="text.secondary">
                   Phản hồi: {selected.reviewNote}
+                </Typography>
+              )}
+              {selected.status === 'WaitingApproval' && (
+                <Typography variant="caption" color="text.secondary">
+                  Xác nhận để hoàn tất đổi ca / làm hộ với người nhận.
                 </Typography>
               )}
             </Stack>
@@ -200,7 +241,26 @@ export default function MyPoolPostsView() {
           <Button color="inherit" onClick={() => setSelected(null)}>
             Đóng
           </Button>
-          {selected && isCancellable(selected.status) && (
+          {selected && selected.status === 'WaitingApproval' && (
+            <>
+              <Button
+                color="error"
+                onClick={() => handleConfirm(selected.id, false)}
+                disabled={acting}
+              >
+                Từ chối
+              </Button>
+              <Button
+                variant="contained"
+                color="success"
+                onClick={() => handleConfirm(selected.id, true)}
+                disabled={acting}
+              >
+                Xác nhận
+              </Button>
+            </>
+          )}
+          {selected && selected.status === 'Open' && (
             <Button color="error" variant="contained" onClick={() => handleCancel(selected.id)}>
               Huỷ bài đăng
             </Button>
