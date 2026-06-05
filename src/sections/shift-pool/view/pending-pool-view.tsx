@@ -17,11 +17,14 @@ import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableContainer from '@mui/material/TableContainer';
 import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/paths';
 
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
+import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
@@ -32,7 +35,9 @@ import type { IShiftPoolPost } from 'src/types/corecms-api';
 
 import { getPendingShiftPoolPosts, reviewShiftPoolPost } from 'src/api/shiftPool';
 
-import { fmtDate, needTypeLabel } from './pool-helpers';
+import PoolCalendar from './pool-calendar';
+import LegendDot from './pool-legend';
+import { fmtDate, needTypeHex, needTypeLabel } from './pool-helpers';
 
 // ----------------------------------------------------------------------
 
@@ -54,9 +59,9 @@ export default function PendingPoolView() {
 
   const [posts, setPosts] = useState<IShiftPoolPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
 
   const [target, setTarget] = useState<IShiftPoolPost | null>(null);
-  const [approve, setApprove] = useState(true);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -75,13 +80,12 @@ export default function PendingPoolView() {
     fetchData();
   }, [fetchData]);
 
-  const openReview = (post: IShiftPoolPost, isApprove: boolean) => {
+  const openReview = (post: IShiftPoolPost) => {
     setTarget(post);
-    setApprove(isApprove);
     setNote('');
   };
 
-  const handleSubmit = async () => {
+  const handleReview = async (approve: boolean) => {
     if (!target) return;
     setSubmitting(true);
     try {
@@ -108,15 +112,49 @@ export default function PendingPoolView() {
           { name: 'Đổi ca & Làm hộ' },
           { name: 'Duyệt' },
         ]}
+        action={
+          <ToggleButtonGroup
+            size="small"
+            value={viewMode}
+            exclusive
+            onChange={(_, v) => v && setViewMode(v)}
+          >
+            <ToggleButton value="calendar">
+              <Iconify icon="eva:calendar-fill" />
+            </ToggleButton>
+            <ToggleButton value="table">
+              <Iconify icon="eva:list-fill" />
+            </ToggleButton>
+          </ToggleButtonGroup>
+        }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
-      <Card>
-        {loading ? (
+      {loading ? (
+        <Card>
           <Stack alignItems="center" justifyContent="center" sx={{ py: 10 }}>
             <CircularProgress />
           </Stack>
-        ) : (
+        </Card>
+      ) : viewMode === 'calendar' ? (
+        <>
+          <PoolCalendar
+            posts={posts}
+            getColor={(p) => needTypeHex(p.needType)}
+            getTitle={(p) => `${needTypeLabel(p.needType)} · ${p.posterName}→${p.claimerName ?? ''}`}
+            onClickPost={openReview}
+          />
+          <Stack direction="row" spacing={2} sx={{ mt: 1.5, px: 1 }} flexWrap="wrap">
+            <LegendDot color={needTypeHex('Swap')} label="Đổi ca" />
+            <LegendDot color={needTypeHex('FullCover')} label="Làm hộ cả ca" />
+            <LegendDot color={needTypeHex('PartialCover')} label="Làm hộ 1 phần" />
+            <Typography variant="caption" color="text.secondary">
+              · Click vào ca để duyệt
+            </Typography>
+          </Stack>
+        </>
+      ) : (
+        <Card>
           <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
             <Scrollbar>
               <Table>
@@ -145,24 +183,9 @@ export default function PendingPoolView() {
                           : '-'}
                       </td>
                       <td style={{ padding: '16px' }}>
-                        <Stack direction="row" spacing={1}>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="success"
-                            onClick={() => openReview(row, true)}
-                          >
-                            Duyệt
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="error"
-                            onClick={() => openReview(row, false)}
-                          >
-                            Từ chối
-                          </Button>
-                        </Stack>
+                        <Button size="small" variant="contained" onClick={() => openReview(row)}>
+                          Xem & duyệt
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -171,12 +194,12 @@ export default function PendingPoolView() {
               </Table>
             </Scrollbar>
           </TableContainer>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {/* Review dialog */}
       <Dialog open={!!target} onClose={() => setTarget(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>{approve ? 'Duyệt yêu cầu' : 'Từ chối yêu cầu'}</DialogTitle>
+        <DialogTitle>Duyệt yêu cầu</DialogTitle>
         <DialogContent>
           {target && (
             <Stack spacing={2} sx={{ pt: 1 }}>
@@ -189,17 +212,26 @@ export default function PendingPoolView() {
                 </Typography>
               </Box>
 
-              {approve && (
-                <Stack direction="row" spacing={1} flexWrap="wrap">
-                  {target.needType === 'Swap' && <Chip size="small" label="Hoán đổi 2 ca" color="info" />}
-                  {target.needType === 'FullCover' && (
-                    <Chip size="small" label="Chuyển cả ca sang người nhận" color="info" />
-                  )}
-                  {target.needType === 'PartialCover' && (
-                    <Chip size="small" label="Tính phụ cấp làm hộ theo giờ" color="warning" />
-                  )}
-                </Stack>
+              {target.needType === 'Swap' && target.claimerOfferedShiftName && (
+                <Typography variant="body2">
+                  Ca đổi lại: {target.claimerOfferedShiftName} ({fmtDate(target.claimerOfferedShiftDate)})
+                </Typography>
               )}
+              {target.needType === 'PartialCover' && target.partialStartTime && (
+                <Typography variant="body2">
+                  Khoảng làm hộ: {target.partialStartTime} - {target.partialEndTime}
+                </Typography>
+              )}
+
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                {target.needType === 'Swap' && <Chip size="small" label="Hoán đổi 2 ca" color="info" />}
+                {target.needType === 'FullCover' && (
+                  <Chip size="small" label="Chuyển cả ca sang người nhận" color="info" />
+                )}
+                {target.needType === 'PartialCover' && (
+                  <Chip size="small" label="Tính phụ cấp làm hộ theo giờ" color="warning" />
+                )}
+              </Stack>
 
               <TextField
                 fullWidth
@@ -216,13 +248,11 @@ export default function PendingPoolView() {
           <Button color="inherit" onClick={() => setTarget(null)}>
             Đóng
           </Button>
-          <Button
-            variant="contained"
-            color={approve ? 'success' : 'error'}
-            onClick={handleSubmit}
-            disabled={submitting}
-          >
-            {approve ? 'Duyệt' : 'Từ chối'}
+          <Button color="error" onClick={() => handleReview(false)} disabled={submitting}>
+            Từ chối
+          </Button>
+          <Button variant="contained" color="success" onClick={() => handleReview(true)} disabled={submitting}>
+            Duyệt
           </Button>
         </DialogActions>
       </Dialog>
