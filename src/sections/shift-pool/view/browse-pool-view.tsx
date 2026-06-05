@@ -23,8 +23,6 @@ import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/paths';
 
-import { useAuthContext } from 'src/auth/hooks';
-
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
@@ -35,7 +33,7 @@ import { TableHeadCustom, TableNoData } from 'src/components/table';
 
 import type { IShiftAssignment, IShiftPoolPost } from 'src/types/corecms-api';
 
-import { getShiftAssignments } from 'src/api/attendance';
+import { getMySchedule } from 'src/api/attendance';
 import { claimShiftPoolPost, getOpenShiftPoolPosts } from 'src/api/shiftPool';
 
 import PoolCalendar from './pool-calendar';
@@ -63,7 +61,6 @@ function toDateStr(d: Date): string {
 export default function BrowsePoolView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
-  const { user: authUser } = useAuthContext();
 
   const [posts, setPosts] = useState<IShiftPoolPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,7 +68,6 @@ export default function BrowsePoolView() {
 
   // claim dialog
   const [target, setTarget] = useState<IShiftPoolPost | null>(null);
-  const [offerDate, setOfferDate] = useState(toDateStr(new Date()));
   const [myAssignments, setMyAssignments] = useState<IShiftAssignment[]>([]);
   const [offeredId, setOfferedId] = useState('');
   const [loadingMine, setLoadingMine] = useState(false);
@@ -92,20 +88,33 @@ export default function BrowsePoolView() {
     fetchData();
   }, [fetchData]);
 
-  // load my shifts for swap-offer when date changes
+  // Khi mở dialog nhận ca dạng Swap: tải các ca SẮP TỚI của chính mình (dùng my-schedule
+  // vì endpoint /range chỉ cho Admin/Manager). Lọc bỏ ca đã bắt đầu và ca trùng đúng ca đang đăng.
   useEffect(() => {
-    if (!target || target.needType !== 'Swap' || !authUser?.id || !offerDate) return;
+    if (!target || target.needType !== 'Swap') return;
     setLoadingMine(true);
     setOfferedId('');
-    getShiftAssignments(offerDate, offerDate, authUser.id)
-      .then(setMyAssignments)
+    const from = toDateStr(new Date());
+    const to = toDateStr(new Date(Date.now() + 60 * 24 * 3600 * 1000));
+    getMySchedule(from, to)
+      .then((all) => {
+        const now = Date.now();
+        const upcoming = all.filter((a) => {
+          const dateStr = (a.date ?? '').split('T')[0];
+          const start = a.startTime || (a as any).shiftStartTime || '00:00';
+          const startMs = new Date(`${dateStr}T${start}`).getTime();
+          const aid = a.id || (a as any).assignmentId;
+          // chỉ ca chưa bắt đầu, và không phải đúng ca đang được đăng
+          return startMs > now && aid !== target.shiftAssignmentId;
+        });
+        setMyAssignments(upcoming);
+      })
       .catch(() => setMyAssignments([]))
       .finally(() => setLoadingMine(false));
-  }, [target, offerDate, authUser?.id]);
+  }, [target]);
 
   const handleOpenClaim = (post: IShiftPoolPost) => {
     setTarget(post);
-    setOfferDate(post.shiftDate || toDateStr(new Date()));
     setMyAssignments([]);
     setOfferedId('');
   };
@@ -120,7 +129,7 @@ export default function BrowsePoolView() {
       await claimShiftPoolPost(target.id, {
         offeredAssignmentId: target.needType === 'Swap' ? offeredId : undefined,
       });
-      enqueueSnackbar('Đã nhận ca! Chờ quản lý duyệt.', { variant: 'success' });
+      enqueueSnackbar('Đã nhận ca! Chờ người đăng xác nhận.', { variant: 'success' });
       setTarget(null);
       fetchData();
     } catch (error: any) {
@@ -132,7 +141,9 @@ export default function BrowsePoolView() {
 
   const fmtAssignment = (a: IShiftAssignment) => {
     const name = (a as any).scheduleName || (a as any).shiftName || 'Ca làm việc';
-    return `${name} (${a.startTime?.slice(0, 5)} - ${a.endTime?.slice(0, 5)})`;
+    const dateStr = (a.date ?? '').split('T')[0];
+    const d = dateStr ? new Date(dateStr).toLocaleDateString('vi-VN') : '';
+    return `${d} · ${name} (${a.startTime?.slice(0, 5)} - ${a.endTime?.slice(0, 5)})`;
   };
 
   return (
@@ -242,16 +253,8 @@ export default function BrowsePoolView() {
               {target.needType === 'Swap' ? (
                 <>
                   <Typography variant="body2" color="text.secondary">
-                    Đổi ca 2 chiều — chọn 1 ca của bạn để đưa đổi lại:
+                    Đổi ca 2 chiều — chọn 1 ca sắp tới của bạn để đưa đổi lại:
                   </Typography>
-                  <TextField
-                    fullWidth
-                    type="date"
-                    label="Ngày ca của bạn"
-                    value={offerDate}
-                    onChange={(e) => setOfferDate(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                  />
                   <TextField
                     select
                     fullWidth
@@ -263,7 +266,7 @@ export default function BrowsePoolView() {
                       loadingMine
                         ? 'Đang tải...'
                         : myAssignments.length === 0
-                        ? 'Bạn không có ca nào trong ngày này'
+                        ? 'Bạn không có ca sắp tới nào để đổi'
                         : 'Bắt buộc chọn ca để đổi'
                     }
                   >
@@ -274,10 +277,14 @@ export default function BrowsePoolView() {
                     ))}
                   </TextField>
                 </>
+              ) : target.needType === 'PartialCover' ? (
+                <Typography variant="body2" color="text.secondary">
+                  Bạn sẽ làm hộ khoảng thời gian này. Lưu ý: chỉ nhân sự ca liền trước (ở lại làm
+                  thêm) mới được nhận. Người đăng sẽ xác nhận sau khi bạn nhận.
+                </Typography>
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  Bạn sẽ làm hộ {target.needType === 'FullCover' ? 'cả ca' : 'khoảng thời gian'} này.
-                  Yêu cầu sẽ được gửi cho quản lý duyệt.
+                  Bạn sẽ làm hộ cả ca này. Người đăng sẽ xác nhận sau khi bạn nhận.
                 </Typography>
               )}
             </Stack>
