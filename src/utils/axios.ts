@@ -170,7 +170,15 @@ export const endpoints = {
     list: '/shift-swap/pending',
     create: '/shift-swap',
     myRequests: '/shift-swap/my-requests',
+    myConfirmationRequests: '/shift-swap/my-confirmation-requests',
     review: (id: string) => `/shift-swap/${id}/review`,
+    targetConfirm: (id: string) => `/shift-swap/${id}/target-confirm`,
+  },
+  lateCover: {
+    create: '/late-cover',
+    myRequests: '/late-cover/my-requests',
+    pending: '/late-cover/pending',
+    review: (id: string) => `/late-cover/${id}/review`,
   },
   holidayPolicy: {
     list: '/holiday-policies',

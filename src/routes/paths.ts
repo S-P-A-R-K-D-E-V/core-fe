@@ -168,7 +168,13 @@ export const paths = {
     shiftSwap: {
       root: `${ROOTS.DASHBOARD}/shift-swap`,
       myRequests: `${ROOTS.DASHBOARD}/shift-swap/my-requests`,
+      myConfirmationRequests: `${ROOTS.DASHBOARD}/shift-swap/my-confirmation-requests`,
       pending: `${ROOTS.DASHBOARD}/shift-swap/pending`,
+    },
+    lateCover: {
+      root: `${ROOTS.DASHBOARD}/late-cover`,
+      myRequests: `${ROOTS.DASHBOARD}/late-cover/my-requests`,
+      pending: `${ROOTS.DASHBOARD}/late-cover/pending`,
     },
     shiftCash: {
       root: `${ROOTS.DASHBOARD}/shift-cash`,

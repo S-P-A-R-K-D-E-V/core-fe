@@ -142,6 +142,8 @@ export default function MyShiftSwapRequestsView() {
         return 'error';
       case 'Cancelled':
         return 'default';
+      case 'WaitingTargetConfirmation':
+        return 'info';
       default:
         return 'warning';
     }
@@ -150,7 +152,9 @@ export default function MyShiftSwapRequestsView() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'Pending':
-        return 'Chờ duyệt';
+        return 'Chờ admin duyệt';
+      case 'WaitingTargetConfirmation':
+        return 'Chờ xác nhận';
       case 'Approved':
         return 'Đã duyệt';
       case 'Rejected':

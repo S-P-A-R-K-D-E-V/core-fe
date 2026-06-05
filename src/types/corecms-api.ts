@@ -746,7 +746,12 @@ export interface IPayrollSummary {
 }
 
 // --- Shift Swap Request ---
-export type ShiftSwapStatus = 'Pending' | 'Approved' | 'Rejected' | 'Cancelled';
+export type ShiftSwapStatus =
+  | 'Pending'
+  | 'Approved'
+  | 'Rejected'
+  | 'Cancelled'
+  | 'WaitingTargetConfirmation';
 
 export interface IShiftSwapRequest {
   id: string;
@@ -755,7 +760,7 @@ export interface IShiftSwapRequest {
   currentShiftAssignmentId: string;
   currentShiftName: string;
   currentShiftDate: string;
-  targetUserId: string;
+  targetUserId?: string;
   targetUserName?: string;
   targetShiftAssignmentId?: string;
   targetShiftName?: string;
@@ -766,6 +771,8 @@ export interface IShiftSwapRequest {
   reviewerName?: string;
   reviewedAt?: string;
   reviewNote?: string;
+  targetConfirmedAt?: string;
+  targetDeclineReason?: string;
   createdAt: string;
 }
 
@@ -777,6 +784,55 @@ export interface ICreateShiftSwapRequestRequest {
 }
 
 export interface IReviewShiftSwapRequestRequest {
+  status: string; // "Approved" | "Rejected"
+  reviewNote?: string;
+}
+
+export interface IConfirmShiftSwapTargetRequest {
+  isAccepted: boolean;
+  declineReason?: string;
+}
+
+// --- Late Cover Request ---
+export type LateCoverStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface ILateCoverRequest {
+  id: string;
+  requesterId: string;
+  requesterName: string;
+  lateStaffId: string;
+  lateStaffName: string;
+  coveringStaffId: string;
+  coveringStaffName: string;
+  lateStaffAssignmentId: string;
+  lateShiftName: string;
+  lateShiftDate: string;
+  coveringStaffAssignmentId: string;
+  coveringShiftName: string;
+  coveringShiftDate: string;
+  coveringStartTime: string;
+  coveringEndTime: string;
+  coveringHours: number;
+  lateStaffHourlyRate: number;
+  extraPayAmount: number;
+  reason?: string;
+  status: string;
+  reviewedBy?: string;
+  reviewerName?: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+  createdAt: string;
+}
+
+export interface ICreateLateCoverRequestDto {
+  lateStaffId: string;
+  coveringStaffId: string;
+  lateStaffAssignmentId: string;
+  coveringStaffAssignmentId: string;
+  reason?: string;
+}
+
+export interface IReviewLateCoverRequestDto {
   status: string; // "Approved" | "Rejected"
   reviewNote?: string;
 }
