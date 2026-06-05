@@ -198,16 +198,29 @@ export function useNavData() {
           
 
           // SHIFT SWAP REQUESTS
-          // {
-          //   title: t('shiftSwap'),
-          //   path: paths.dashboard.shiftSwap.root,
-          //   icon: ICONS.job,
-          //   roles: ['Admin', 'Manager', 'Staff'],
-          //   children: [
-          //     { title: t('myRequests'), path: paths.dashboard.shiftSwap.myRequests },
-          //     { title: t('pendingApproval'), path: paths.dashboard.shiftSwap.pending },
-          //   ],
-          // },
+          {
+            title: 'Đổi ca',
+            path: paths.dashboard.shiftSwap.root,
+            icon: ICONS.job,
+            roles: ['Admin', 'Manager', 'Staff'],
+            children: [
+              { title: 'Yêu cầu của tôi', path: paths.dashboard.shiftSwap.myRequests },
+              { title: 'Chờ xác nhận', path: paths.dashboard.shiftSwap.myConfirmationRequests },
+              { title: 'Duyệt đổi ca', path: paths.dashboard.shiftSwap.pending, roles: ['Admin', 'Manager'] },
+            ],
+          },
+
+          // LATE COVER REQUESTS
+          {
+            title: 'Làm hộ',
+            path: paths.dashboard.lateCover.root,
+            icon: ICONS.booking,
+            roles: ['Admin', 'Manager', 'Staff'],
+            children: [
+              { title: 'Yêu cầu của tôi', path: paths.dashboard.lateCover.myRequests },
+              { title: 'Duyệt làm hộ', path: paths.dashboard.lateCover.pending, roles: ['Admin', 'Manager'] },
+            ],
+          },
 
           // NOTIFICATION CONFIG (Admin only)
           {

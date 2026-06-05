@@ -1,6 +1,7 @@
 import axios, { endpoints } from 'src/utils/axios';
 
 import type {
+  IConfirmShiftSwapTargetRequest,
   ICreateShiftSwapRequestRequest,
   IReviewShiftSwapRequestRequest,
   IShiftSwapRequest,
@@ -19,6 +20,19 @@ export async function createShiftSwapRequest(
 
 export async function getMyShiftSwapRequests(): Promise<IShiftSwapRequest[]> {
   const response = await axios.get<IShiftSwapRequest[]>(endpoints.shiftSwap.myRequests);
+  return response.data;
+}
+
+export async function getMyConfirmationRequests(): Promise<IShiftSwapRequest[]> {
+  const response = await axios.get<IShiftSwapRequest[]>(endpoints.shiftSwap.myConfirmationRequests);
+  return response.data;
+}
+
+export async function confirmShiftSwapTarget(
+  id: string,
+  data: IConfirmShiftSwapTargetRequest
+): Promise<IShiftSwapRequest> {
+  const response = await axios.put<IShiftSwapRequest>(endpoints.shiftSwap.targetConfirm(id), data);
   return response.data;
 }
 
