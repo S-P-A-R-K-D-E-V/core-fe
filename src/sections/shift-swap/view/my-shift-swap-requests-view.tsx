@@ -208,7 +208,7 @@ export default function MyShiftSwapRequestsView() {
       await createShiftSwapRequest({
         currentShiftAssignmentId: myAssignmentId,
         targetUserId,
-        targetShiftAssignmentId: targetAssignmentId || undefined,
+        targetShiftAssignmentId: targetAssignmentId,
         reason: reason || undefined,
       } as any);
       enqueueSnackbar('Tạo yêu cầu đổi ca thành công!', { variant: 'success' });
@@ -268,7 +268,7 @@ export default function MyShiftSwapRequestsView() {
     return `${name} (${a.startTime?.slice(0, 5)} - ${a.endTime?.slice(0, 5)})`;
   };
 
-  const isFormValid = !!myAssignmentId && !!targetUserId;
+  const isFormValid = !!myAssignmentId && !!targetUserId && !!targetAssignmentId;
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
@@ -458,17 +458,24 @@ export default function MyShiftSwapRequestsView() {
                     setTargetAssignmentId('');
                   }}
                 >
-                  {users.filter((u) => u.id !== authUser?.id).map((u) => (
-                    <MenuItem key={u.id} value={u.id}>
-                      {u.fullName}
-                    </MenuItem>
-                  ))}
+                  {users
+                    .filter(
+                      (u) =>
+                        u.id !== authUser?.id &&
+                        u.status === 'Active' &&
+                        (u.roles?.includes('Staff') || u.role === 'Staff')
+                    )
+                    .map((u) => (
+                      <MenuItem key={u.id} value={u.id}>
+                        {u.fullName}
+                      </MenuItem>
+                    ))}
                 </TextField>
                 {targetUserId && (
                   <TextField
                     select
                     fullWidth
-                    label="Ca của nhân viên đó"
+                    label="Chọn ca muốn đổi *"
                     value={targetAssignmentId}
                     onChange={(e) => setTargetAssignmentId(e.target.value)}
                     disabled={loadingTargetAssignments}
@@ -476,11 +483,11 @@ export default function MyShiftSwapRequestsView() {
                       loadingTargetAssignments
                         ? 'Đang tải...'
                         : targetAssignments.length === 0
-                        ? 'Nhân viên không có ca ngày này'
-                        : 'Tuỳ chọn — để trống nếu đổi bất kỳ ca nào'
+                        ? 'Nhân viên không có ca trong ngày này'
+                        : 'Bắt buộc chọn ca cụ thể'
                     }
+                    error={!loadingTargetAssignments && targetAssignments.length === 0 && !!targetUserId}
                   >
-                    <MenuItem value="">— Bất kỳ ca nào —</MenuItem>
                     {targetAssignments.map((a) => (
                       <MenuItem key={a.id || (a as any).assignmentId} value={a.id || (a as any).assignmentId}>
                         {fmtAssignment(a)}
