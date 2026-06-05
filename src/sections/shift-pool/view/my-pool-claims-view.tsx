@@ -2,17 +2,27 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableContainer from '@mui/material/TableContainer';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/paths';
 
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
+import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
@@ -23,7 +33,9 @@ import type { IShiftPoolPost } from 'src/types/corecms-api';
 
 import { getMyShiftPoolClaims } from 'src/api/shiftPool';
 
-import { fmtDate, needTypeLabel, poolStatusColor, poolStatusLabel } from './pool-helpers';
+import PoolCalendar from './pool-calendar';
+import LegendDot from './pool-legend';
+import { fmtDate, needTypeLabel, poolStatusColor, poolStatusLabel, statusHex } from './pool-helpers';
 
 // ----------------------------------------------------------------------
 
@@ -45,6 +57,8 @@ export default function MyPoolClaimsView() {
 
   const [posts, setPosts] = useState<IShiftPoolPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
+  const [selected, setSelected] = useState<IShiftPoolPost | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -61,6 +75,8 @@ export default function MyPoolClaimsView() {
     fetchData();
   }, [fetchData]);
 
+  const fmtPay = (v?: number) => (v ? `${v.toLocaleString('vi-VN')}đ` : '-');
+
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
       <CustomBreadcrumbs
@@ -70,15 +86,47 @@ export default function MyPoolClaimsView() {
           { name: 'Đổi ca & Làm hộ' },
           { name: 'Ca tôi nhận' },
         ]}
+        action={
+          <ToggleButtonGroup
+            size="small"
+            value={viewMode}
+            exclusive
+            onChange={(_, v) => v && setViewMode(v)}
+          >
+            <ToggleButton value="calendar">
+              <Iconify icon="eva:calendar-fill" />
+            </ToggleButton>
+            <ToggleButton value="table">
+              <Iconify icon="eva:list-fill" />
+            </ToggleButton>
+          </ToggleButtonGroup>
+        }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
-      <Card>
-        {loading ? (
+      {loading ? (
+        <Card>
           <Stack alignItems="center" justifyContent="center" sx={{ py: 10 }}>
             <CircularProgress />
           </Stack>
-        ) : (
+        </Card>
+      ) : viewMode === 'calendar' ? (
+        <>
+          <PoolCalendar
+            posts={posts}
+            getColor={(p) => statusHex(p.status)}
+            getTitle={(p) => `${needTypeLabel(p.needType)} · ${p.posterName}`}
+            onClickPost={setSelected}
+          />
+          <Stack direction="row" spacing={2} sx={{ mt: 1.5, px: 1 }} flexWrap="wrap">
+            <LegendDot color={statusHex('WaitingApproval')} label="Chờ duyệt" />
+            <LegendDot color={statusHex('Approved')} label="Đã duyệt" />
+            <LegendDot color={statusHex('Rejected')} label="Từ chối" />
+            <LegendDot color={statusHex('Cancelled')} label="Đã huỷ" />
+          </Stack>
+        </>
+      ) : (
+        <Card>
           <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
             <Scrollbar>
               <Table>
@@ -90,9 +138,7 @@ export default function MyPoolClaimsView() {
                       <td style={{ padding: '16px' }}>{row.shiftName}</td>
                       <td style={{ padding: '16px' }}>{fmtDate(row.shiftDate)}</td>
                       <td style={{ padding: '16px' }}>{needTypeLabel(row.needType)}</td>
-                      <td style={{ padding: '16px' }}>
-                        {row.extraPayAmount ? `${row.extraPayAmount.toLocaleString('vi-VN')}đ` : '-'}
-                      </td>
+                      <td style={{ padding: '16px' }}>{fmtPay(row.extraPayAmount)}</td>
                       <td style={{ padding: '16px' }}>
                         <Label color={poolStatusColor(row.status)}>{poolStatusLabel(row.status)}</Label>
                       </td>
@@ -104,8 +150,44 @@ export default function MyPoolClaimsView() {
               </Table>
             </Scrollbar>
           </TableContainer>
-        )}
-      </Card>
+        </Card>
+      )}
+
+      {/* Detail dialog (calendar click) */}
+      <Dialog open={!!selected} onClose={() => setSelected(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Ca tôi nhận</DialogTitle>
+        <DialogContent>
+          {selected && (
+            <Stack spacing={1.5} sx={{ pt: 1 }}>
+              <Typography variant="subtitle2">
+                {needTypeLabel(selected.needType)} · {selected.shiftName} · {fmtDate(selected.shiftDate)}
+              </Typography>
+              <Typography variant="body2">Người đăng: {selected.posterName}</Typography>
+              {selected.needType === 'PartialCover' && selected.partialStartTime && (
+                <Typography variant="body2">
+                  Khoảng làm hộ: {selected.partialStartTime} - {selected.partialEndTime}
+                </Typography>
+              )}
+              {!!selected.extraPayAmount && (
+                <Typography variant="body2">Phụ cấp: {fmtPay(selected.extraPayAmount)}</Typography>
+              )}
+              <Box>
+                <Label color={poolStatusColor(selected.status)}>{poolStatusLabel(selected.status)}</Label>
+              </Box>
+              {selected.reviewNote && (
+                <Typography variant="body2" color="text.secondary">
+                  Phản hồi: {selected.reviewNote}
+                </Typography>
+              )}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" onClick={() => setSelected(null)}>
+            Đóng
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
