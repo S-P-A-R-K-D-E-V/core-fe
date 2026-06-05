@@ -9,7 +9,7 @@ const isStaticExport = 'false';
 // forwarded server-side to the backend — no CORS, no backend URL exposed to browser.
 const BACKEND_API_PREFIXES = [
   'auth', 'users', 'roles', 'permissions', 'media',
-  'shifts', 'shift-templates', 'shift-schedules', 'shift-assignments', 'shift-swap', 'shift-registrations', 'shift-cash', 'late-cover',
+  'shifts', 'shift-templates', 'shift-schedules', 'shift-assignments', 'shift-swap', 'shift-registrations', 'shift-cash', 'late-cover', 'shift-pool',
   'attendance', 'branches', 'checkin',
   'salary', 'salary-configurations', 'salary-history',
   'payroll', 'payroll-cycles',
