@@ -39,6 +39,7 @@ export interface IAuthResponse {
   requiresOtpVerification: boolean;
   emailConfirmed: boolean;
   sessionToken?: string;
+  hasShiftPreference?: boolean;
 }
 
 export interface ILoginRequest {
@@ -839,7 +840,7 @@ export interface IReviewLateCoverRequestDto {
 
 // --- Shift Pool (đổi ca & làm hộ hợp nhất) ---
 export type PoolNeedType = 'Swap' | 'FullCover' | 'PartialCover';
-export type PoolPostStatus = 'Open' | 'WaitingApproval' | 'Approved' | 'Rejected' | 'Cancelled';
+export type PoolPostStatus = 'Open' | 'WaitingApproval' | 'Approved' | 'Cancelled';
 
 export interface IShiftPoolPost {
   id: string;
@@ -868,24 +869,42 @@ export interface IShiftPoolPost {
   reviewerName?: string;
   reviewedAt?: string;
   reviewNote?: string;
+  lastClaimRejectedNote?: string;
+  lastClaimRejectedAt?: string;
   createdAt: string;
 }
 
 export interface ICreateShiftPoolPostDto {
   shiftAssignmentId: string;
   needType: PoolNeedType;
-  partialStartTime?: string; // "HH:mm" — bắt buộc khi PartialCover
-  partialEndTime?: string;   // "HH:mm" — bắt buộc khi PartialCover
+  partialStartTime?: string;
+  partialEndTime?: string;
   note?: string;
 }
 
 export interface IClaimShiftPoolPostDto {
-  offeredAssignmentId?: string; // bắt buộc khi post là Swap
+  offeredAssignmentId?: string;
 }
 
 export interface IReviewShiftPoolPostDto {
-  status: string; // "Approved" | "Rejected"
+  action: string; // "Approve" | "RejectClaim"
   reviewNote?: string;
+}
+
+export interface IDirectedResolveShiftPoolPostDto {
+  claimerId: string;
+  offeredAssignmentId?: string;
+}
+
+export interface IUserShiftPreferenceResponse {
+  shiftTemplateId: string;
+  shiftTemplateName: string;
+  shiftType: string;
+  color?: string;
+}
+
+export interface ISetShiftPreferencesDto {
+  shiftTemplateIds: string[];
 }
 
 // --- Holiday Policy ---

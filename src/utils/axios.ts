@@ -189,6 +189,14 @@ export const endpoints = {
     claim: (id: string) => `/shift-pool/${id}/claim`,
     cancel: (id: string) => `/shift-pool/${id}/cancel`,
     review: (id: string) => `/shift-pool/${id}/review`,
+    directedResolve: (id: string) => `/shift-pool/${id}/directed-resolve`,
+  },
+  shiftAudit: {
+    list: '/shift-audit',
+  },
+  userPreference: {
+    myShiftPreferences: '/users/me/shift-preferences',
+    staffShiftPreferences: (userId: string) => `/users/${userId}/shift-preferences`,
   },
   holidayPolicy: {
     list: '/holiday-policies',
