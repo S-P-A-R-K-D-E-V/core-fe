@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -11,6 +11,11 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
@@ -19,7 +24,10 @@ import TableContainer from '@mui/material/TableContainer';
 import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+
+import { usePageTours, type TourDefinition } from 'src/hooks/use-tour';
 
 import { paths } from 'src/routes/paths';
 
@@ -65,6 +73,7 @@ export default function BrowsePoolView() {
   const [posts, setPosts] = useState<IShiftPoolPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
+  const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
 
   // claim dialog
   const [target, setTarget] = useState<IShiftPoolPost | null>(null);
@@ -139,6 +148,90 @@ export default function BrowsePoolView() {
     }
   };
 
+  // ── Tour definitions ──
+  const BROWSE_TOURS: TourDefinition[] = useMemo(
+    () => [
+      {
+        tourKey: 'shift-pool-browse-overview',
+        label: 'Tổng quan Chợ ca',
+        steps: [
+          {
+            element: '#tour-browse-view-toggle',
+            popover: {
+              title: '📋 Chế độ xem',
+              description:
+                'Chuyển giữa dạng Lịch và dạng Bảng tuỳ ý. Dạng Lịch cho cái nhìn trực quan theo ngày; dạng Bảng phù hợp khi bạn muốn lọc và so sánh nhiều bài đăng.',
+              side: 'bottom' as const,
+              align: 'end' as const,
+            },
+          },
+          {
+            element: '#tour-browse-content',
+            popover: {
+              title: '🏪 Chợ ca — Tất cả ca đang mở',
+              description:
+                'Hiển thị các bài đăng đang mở của đồng nghiệp (không bao gồm bài đăng của bạn).\n\n🔵 Xanh dương = Đổi ca (Swap)\n🟣 Tím = Làm hộ cả ca (FullCover)\n🟠 Cam = Làm hộ 1 phần (PartialCover)\n\nNhấn vào ca bất kỳ để xem chi tiết và nhận.',
+              side: 'top' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            element: '#tour-browse-legend',
+            popover: {
+              title: '🎨 Chú thích màu',
+              description:
+                'Ba loại nhu cầu trong Chợ ca:\n\n🔵 Đổi ca — Hoán đổi ca 2 chiều với người khác\n🟣 Làm hộ cả ca — Nhường toàn bộ ca cho người nhận\n🟠 Làm hộ 1 phần — Làm hộ 1 khoảng giờ trong ca (đến muộn / về sớm)',
+              side: 'top' as const,
+              align: 'start' as const,
+            },
+          },
+          {
+            popover: {
+              title: 'Hoàn thành! 🎉',
+              description:
+                'Bạn đã nắm được cách đọc Chợ ca. Tiếp theo hãy xem hướng dẫn "Cách nhận ca" để biết từng bước thực hiện.',
+            },
+          },
+        ],
+      },
+      {
+        tourKey: 'shift-pool-browse-claim',
+        label: 'Cách nhận ca',
+        steps: [
+          {
+            element: '#tour-browse-content',
+            popover: {
+              title: '👆 Bước 1 — Chọn ca muốn nhận',
+              description:
+                'Nhấn vào bất kỳ ca nào trên lịch (hoặc nút "Nhận" trong bảng) để mở hộp thoại xác nhận.',
+              side: 'top' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            popover: {
+              title: '🔄 Bước 2 — Xác nhận loại yêu cầu',
+              description:
+                '• Đổi ca: bạn cần chọn 1 ca của mình để đưa đổi lại\n• Làm hộ cả ca / 1 phần: chỉ cần xác nhận — không cần đưa ca lại\n\nSau khi nhận, bài đăng chuyển sang trạng thái "Chờ duyệt".',
+            },
+          },
+          {
+            popover: {
+              title: '✅ Bước 3 — Chờ phê duyệt',
+              description:
+                'Người đăng (hoặc Admin/Manager) sẽ xem xét và duyệt. Bạn sẽ nhận thông báo khi được duyệt hoặc từ chối.\n\nKiểm tra trạng thái tại menu "Ca tôi nhận".',
+            },
+          },
+        ],
+      },
+    ],
+    []
+  );
+
+  const { startTour, resetAndRestartAll, completedMap, tours: tourList } = usePageTours({
+    tours: BROWSE_TOURS,
+  });
+
   const fmtAssignment = (a: IShiftAssignment) => {
     const name = (a as any).scheduleName || (a as any).shiftName || 'Ca làm việc';
     const dateStr = (a.date ?? '').split('T')[0];
@@ -156,22 +249,70 @@ export default function BrowsePoolView() {
           { name: 'Chợ ca' },
         ]}
         action={
-          <ToggleButtonGroup
-            size="small"
-            value={viewMode}
-            exclusive
-            onChange={(_, v) => v && setViewMode(v)}
-          >
-            <ToggleButton value="calendar">
-              <Iconify icon="eva:calendar-fill" />
-            </ToggleButton>
-            <ToggleButton value="table">
-              <Iconify icon="eva:list-fill" />
-            </ToggleButton>
-          </ToggleButtonGroup>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <div id="tour-browse-view-toggle">
+              <ToggleButtonGroup
+                size="small"
+                value={viewMode}
+                exclusive
+                onChange={(_, v) => v && setViewMode(v)}
+              >
+                <ToggleButton value="calendar">
+                  <Iconify icon="eva:calendar-fill" />
+                </ToggleButton>
+                <ToggleButton value="table">
+                  <Iconify icon="eva:list-fill" />
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </div>
+            <Tooltip title="Hướng dẫn sử dụng">
+              <IconButton size="small" onClick={(e) => setTourMenuAnchor(e.currentTarget)}>
+                <Iconify icon="solar:question-circle-bold" width={22} />
+              </IconButton>
+            </Tooltip>
+          </Stack>
         }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
+
+      {/* Tour help menu */}
+      <Menu
+        anchorEl={tourMenuAnchor}
+        open={Boolean(tourMenuAnchor)}
+        onClose={() => setTourMenuAnchor(null)}
+        slotProps={{ paper: { sx: { minWidth: 220 } } }}
+      >
+        {tourList.map((t) => (
+          <MenuItem
+            key={t.tourKey}
+            onClick={() => {
+              setTourMenuAnchor(null);
+              startTour(t.tourKey);
+            }}
+          >
+            <ListItemIcon>
+              <Iconify
+                icon={completedMap[t.tourKey] ? 'solar:check-circle-bold' : 'solar:play-circle-bold'}
+                width={20}
+                sx={{ color: completedMap[t.tourKey] ? 'success.main' : 'text.secondary' }}
+              />
+            </ListItemIcon>
+            <ListItemText primary={t.label} />
+          </MenuItem>
+        ))}
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            setTourMenuAnchor(null);
+            resetAndRestartAll();
+          }}
+        >
+          <ListItemIcon>
+            <Iconify icon="solar:restart-bold" width={20} />
+          </ListItemIcon>
+          <ListItemText primary="Xem lại tất cả" />
+        </MenuItem>
+      </Menu>
 
       {loading ? (
         <Card>
@@ -180,14 +321,14 @@ export default function BrowsePoolView() {
           </Stack>
         </Card>
       ) : viewMode === 'calendar' ? (
-        <>
+        <div id="tour-browse-content">
           <PoolCalendar
             posts={posts}
             getColor={(p) => needTypeHex(p.needType)}
             getTitle={(p) => `${needTypeLabel(p.needType)} · ${p.posterName}`}
             onClickPost={handleOpenClaim}
           />
-          <Stack direction="row" spacing={2} sx={{ mt: 1.5, px: 1 }} flexWrap="wrap">
+          <Stack id="tour-browse-legend" direction="row" spacing={2} sx={{ mt: 1.5, px: 1 }} flexWrap="wrap">
             <LegendDot color={needTypeHex('Swap')} label="Đổi ca" />
             <LegendDot color={needTypeHex('FullCover')} label="Làm hộ cả ca" />
             <LegendDot color={needTypeHex('PartialCover')} label="Làm hộ 1 phần" />
@@ -195,9 +336,9 @@ export default function BrowsePoolView() {
               · Click vào ca để nhận
             </Typography>
           </Stack>
-        </>
+        </div>
       ) : (
-        <Card>
+        <Card id="tour-browse-content">
           <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
             <Scrollbar>
               <Table>
