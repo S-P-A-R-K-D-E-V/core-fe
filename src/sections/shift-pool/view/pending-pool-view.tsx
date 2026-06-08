@@ -90,7 +90,7 @@ export default function PendingPoolView() {
     setSubmitting(true);
     try {
       await reviewShiftPoolPost(target.id, {
-        status: approve ? 'Approved' : 'Rejected',
+        action: approve ? 'Approve' : 'RejectClaim',
         reviewNote: note || undefined,
       });
       enqueueSnackbar(approve ? 'Đã duyệt!' : 'Đã từ chối.', { variant: 'success' });
