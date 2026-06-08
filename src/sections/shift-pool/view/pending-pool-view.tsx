@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -12,6 +12,12 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -19,7 +25,10 @@ import TableContainer from '@mui/material/TableContainer';
 import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+
+import { usePageTours, type TourDefinition } from 'src/hooks/use-tour';
 
 import { paths } from 'src/routes/paths';
 
@@ -64,6 +73,95 @@ export default function PendingPoolView() {
   const [target, setTarget] = useState<IShiftPoolPost | null>(null);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
+
+  // ── Tour definitions ──
+  const PENDING_TOURS: TourDefinition[] = useMemo(
+    () => [
+      {
+        tourKey: 'shift-pool-pending-overview',
+        label: 'Tổng quan hàng chờ duyệt',
+        steps: [
+          {
+            element: '#tour-pending-content',
+            popover: {
+              title: '⏳ Danh sách chờ duyệt',
+              description:
+                'Hiển thị tất cả yêu cầu đổi ca / làm hộ đang ở trạng thái "Chờ duyệt" — tức là đã có người nhận và đang chờ Admin/Manager phê duyệt.\n\n🔵 Xanh = Đổi ca\n🟣 Tím = Làm hộ cả ca\n🟠 Cam = Làm hộ 1 phần',
+              side: 'top' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            element: '#tour-pending-legend',
+            popover: {
+              title: '🎨 Màu sắc theo loại yêu cầu',
+              description:
+                'Màu thể hiện loại nhu cầu của bài đăng, giúp bạn nhận biết nhanh mà không cần đọc từng chi tiết.',
+              side: 'top' as const,
+              align: 'start' as const,
+            },
+          },
+          {
+            popover: {
+              title: 'Hoàn thành! 🎉',
+              description:
+                'Tiếp theo, hãy xem hướng dẫn "Quy trình duyệt" để biết các bước phê duyệt và hệ quả với từng loại.',
+            },
+          },
+        ],
+      },
+      {
+        tourKey: 'shift-pool-pending-review',
+        label: 'Quy trình duyệt',
+        steps: [
+          {
+            element: '#tour-pending-review-btn',
+            popover: {
+              title: '👆 Mở hộp thoại duyệt',
+              description:
+                'Nhấn vào ca trên lịch (hoặc nút "Xem & duyệt" trong bảng) để mở dialog chi tiết yêu cầu.',
+              side: 'left' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            popover: {
+              title: '✅ Duyệt — Hệ quả theo loại',
+              description:
+                '• Đổi ca (Swap): hoán đổi StaffId giữa 2 ca — mỗi người sẽ làm ca của người kia\n• Làm hộ cả ca (FullCover): ca chuyển hoàn toàn sang người nhận\n• Làm hộ 1 phần (PartialCover): người nhận được cộng phụ cấp giờ vào bảng lương\n\nCả 2 bên đều nhận thông báo khi được duyệt.',
+            },
+          },
+          {
+            popover: {
+              title: '❌ Từ chối — Bài đăng mở lại',
+              description:
+                'Khi từ chối, bài đăng sẽ tự động chuyển về trạng thái Mở (Open) và người khác có thể nhận lại.\n\nBạn có thể điền ghi chú để thông báo lý do từ chối cho cả người đăng và người nhận.',
+            },
+          },
+          {
+            popover: {
+              title: '🔒 Ca bị khoá (IsDirected)',
+              description:
+                'Nếu bạn dùng chức năng "Chỉ định trực tiếp" (Directed Resolve), các ca liên quan sẽ bị khoá — staff không thể tái đăng lên pool.\n\nChỉ nên dùng khi cần can thiệp khẩn cấp mà không thể chờ quy trình pool thông thường.',
+            },
+          },
+          {
+            popover: {
+              title: 'Hoàn thành! 🎉',
+              description:
+                'Bạn đã nắm đầy đủ quy trình duyệt đổi ca & làm hộ. Nhấn ❓ bất kỳ lúc nào để xem lại.',
+            },
+          },
+        ],
+      },
+    ],
+    []
+  );
+
+  const { startTour, resetAndRestartAll, completedMap, tours: tourList } = usePageTours({
+    tours: PENDING_TOURS,
+  });
 
   const fetchData = useCallback(async () => {
     try {
@@ -113,22 +211,68 @@ export default function PendingPoolView() {
           { name: 'Duyệt' },
         ]}
         action={
-          <ToggleButtonGroup
-            size="small"
-            value={viewMode}
-            exclusive
-            onChange={(_, v) => v && setViewMode(v)}
-          >
-            <ToggleButton value="calendar">
-              <Iconify icon="eva:calendar-fill" />
-            </ToggleButton>
-            <ToggleButton value="table">
-              <Iconify icon="eva:list-fill" />
-            </ToggleButton>
-          </ToggleButtonGroup>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <ToggleButtonGroup
+              size="small"
+              value={viewMode}
+              exclusive
+              onChange={(_, v) => v && setViewMode(v)}
+            >
+              <ToggleButton value="calendar">
+                <Iconify icon="eva:calendar-fill" />
+              </ToggleButton>
+              <ToggleButton value="table">
+                <Iconify icon="eva:list-fill" />
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <Tooltip title="Hướng dẫn sử dụng">
+              <IconButton size="small" onClick={(e) => setTourMenuAnchor(e.currentTarget)}>
+                <Iconify icon="solar:question-circle-bold" width={22} />
+              </IconButton>
+            </Tooltip>
+          </Stack>
         }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
+
+      {/* Tour help menu */}
+      <Menu
+        anchorEl={tourMenuAnchor}
+        open={Boolean(tourMenuAnchor)}
+        onClose={() => setTourMenuAnchor(null)}
+        slotProps={{ paper: { sx: { minWidth: 240 } } }}
+      >
+        {tourList.map((t) => (
+          <MenuItem
+            key={t.tourKey}
+            onClick={() => {
+              setTourMenuAnchor(null);
+              startTour(t.tourKey);
+            }}
+          >
+            <ListItemIcon>
+              <Iconify
+                icon={completedMap[t.tourKey] ? 'solar:check-circle-bold' : 'solar:play-circle-bold'}
+                width={20}
+                sx={{ color: completedMap[t.tourKey] ? 'success.main' : 'text.secondary' }}
+              />
+            </ListItemIcon>
+            <ListItemText primary={t.label} />
+          </MenuItem>
+        ))}
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            setTourMenuAnchor(null);
+            resetAndRestartAll();
+          }}
+        >
+          <ListItemIcon>
+            <Iconify icon="solar:restart-bold" width={20} />
+          </ListItemIcon>
+          <ListItemText primary="Xem lại tất cả" />
+        </MenuItem>
+      </Menu>
 
       {loading ? (
         <Card>
@@ -137,14 +281,14 @@ export default function PendingPoolView() {
           </Stack>
         </Card>
       ) : viewMode === 'calendar' ? (
-        <>
+        <div id="tour-pending-content">
           <PoolCalendar
             posts={posts}
             getColor={(p) => needTypeHex(p.needType)}
             getTitle={(p) => `${needTypeLabel(p.needType)} · ${p.posterName}→${p.claimerName ?? ''}`}
             onClickPost={openReview}
           />
-          <Stack direction="row" spacing={2} sx={{ mt: 1.5, px: 1 }} flexWrap="wrap">
+          <Stack id="tour-pending-legend" direction="row" spacing={2} sx={{ mt: 1.5, px: 1 }} flexWrap="wrap">
             <LegendDot color={needTypeHex('Swap')} label="Đổi ca" />
             <LegendDot color={needTypeHex('FullCover')} label="Làm hộ cả ca" />
             <LegendDot color={needTypeHex('PartialCover')} label="Làm hộ 1 phần" />
@@ -152,9 +296,9 @@ export default function PendingPoolView() {
               · Click vào ca để duyệt
             </Typography>
           </Stack>
-        </>
+        </div>
       ) : (
-        <Card>
+        <Card id="tour-pending-content">
           <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
             <Scrollbar>
               <Table>
@@ -183,7 +327,7 @@ export default function PendingPoolView() {
                           : '-'}
                       </td>
                       <td style={{ padding: '16px' }}>
-                        <Button size="small" variant="contained" onClick={() => openReview(row)}>
+                        <Button id="tour-pending-review-btn" size="small" variant="contained" onClick={() => openReview(row)}>
                           Xem & duyệt
                         </Button>
                       </td>

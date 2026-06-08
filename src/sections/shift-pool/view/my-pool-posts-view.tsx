@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -11,13 +11,22 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableContainer from '@mui/material/TableContainer';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+
+import { usePageTours, type TourDefinition } from 'src/hooks/use-tour';
 
 import { paths } from 'src/routes/paths';
 
@@ -64,6 +73,58 @@ export default function MyPoolPostsView() {
   const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
   const [selected, setSelected] = useState<IShiftPoolPost | null>(null);
   const [acting, setActing] = useState(false);
+  const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
+
+  // ── Tour definitions ──
+  const MY_POSTS_TOURS: TourDefinition[] = useMemo(
+    () => [
+      {
+        tourKey: 'shift-pool-my-posts-overview',
+        label: 'Bài đăng & trạng thái',
+        steps: [
+          {
+            element: '#tour-my-posts-content',
+            popover: {
+              title: '📌 Bài đăng của bạn',
+              description:
+                'Liệt kê tất cả bài đăng bạn đã tạo, kèm trạng thái hiện tại.\n\n🔵 Đang mở (Open) — Chưa có ai nhận\n🟠 Chờ duyệt — Đã có người nhận, đang chờ bạn hoặc Admin xác nhận\n🟢 Đã duyệt — Hoàn tất\n⚫ Đã huỷ — Bạn đã huỷ bài đăng',
+              side: 'top' as const,
+              align: 'center' as const,
+            },
+          },
+          {
+            element: '#tour-my-posts-legend',
+            popover: {
+              title: '🎨 Ý nghĩa màu trên lịch',
+              description:
+                'Màu sắc trên lịch thể hiện trạng thái bài đăng, giúp bạn theo dõi nhanh mà không cần đọc từng dòng.',
+              side: 'top' as const,
+              align: 'start' as const,
+            },
+          },
+          {
+            popover: {
+              title: '⚙️ Thao tác với bài đăng',
+              description:
+                '• Nhấn vào ca trên lịch để xem chi tiết\n• Khi có người nhận (Chờ duyệt): bạn có thể Xác nhận hoặc Từ chối người nhận đó\n• Khi đang Mở: bạn có thể Huỷ bài đăng\n\nLưu ý: Khi từ chối, bài đăng sẽ tự động mở lại để người khác nhận.',
+            },
+          },
+          {
+            popover: {
+              title: 'Hoàn thành! 🎉',
+              description:
+                'Bạn đã hiểu cách theo dõi và quản lý bài đăng của mình. Nhấn ❓ bất kỳ lúc nào để xem lại hướng dẫn.',
+            },
+          },
+        ],
+      },
+    ],
+    []
+  );
+
+  const { startTour, resetAndRestartAll, completedMap, tours: tourList } = usePageTours({
+    tours: MY_POSTS_TOURS,
+  });
 
   const fetchData = useCallback(async () => {
     try {
@@ -118,22 +179,68 @@ export default function MyPoolPostsView() {
           { name: 'Bài đăng của tôi' },
         ]}
         action={
-          <ToggleButtonGroup
-            size="small"
-            value={viewMode}
-            exclusive
-            onChange={(_, v) => v && setViewMode(v)}
-          >
-            <ToggleButton value="calendar">
-              <Iconify icon="eva:calendar-fill" />
-            </ToggleButton>
-            <ToggleButton value="table">
-              <Iconify icon="eva:list-fill" />
-            </ToggleButton>
-          </ToggleButtonGroup>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <ToggleButtonGroup
+              size="small"
+              value={viewMode}
+              exclusive
+              onChange={(_, v) => v && setViewMode(v)}
+            >
+              <ToggleButton value="calendar">
+                <Iconify icon="eva:calendar-fill" />
+              </ToggleButton>
+              <ToggleButton value="table">
+                <Iconify icon="eva:list-fill" />
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <Tooltip title="Hướng dẫn sử dụng">
+              <IconButton size="small" onClick={(e) => setTourMenuAnchor(e.currentTarget)}>
+                <Iconify icon="solar:question-circle-bold" width={22} />
+              </IconButton>
+            </Tooltip>
+          </Stack>
         }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
+
+      {/* Tour help menu */}
+      <Menu
+        anchorEl={tourMenuAnchor}
+        open={Boolean(tourMenuAnchor)}
+        onClose={() => setTourMenuAnchor(null)}
+        slotProps={{ paper: { sx: { minWidth: 220 } } }}
+      >
+        {tourList.map((t) => (
+          <MenuItem
+            key={t.tourKey}
+            onClick={() => {
+              setTourMenuAnchor(null);
+              startTour(t.tourKey);
+            }}
+          >
+            <ListItemIcon>
+              <Iconify
+                icon={completedMap[t.tourKey] ? 'solar:check-circle-bold' : 'solar:play-circle-bold'}
+                width={20}
+                sx={{ color: completedMap[t.tourKey] ? 'success.main' : 'text.secondary' }}
+              />
+            </ListItemIcon>
+            <ListItemText primary={t.label} />
+          </MenuItem>
+        ))}
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            setTourMenuAnchor(null);
+            resetAndRestartAll();
+          }}
+        >
+          <ListItemIcon>
+            <Iconify icon="solar:restart-bold" width={20} />
+          </ListItemIcon>
+          <ListItemText primary="Xem lại tất cả" />
+        </MenuItem>
+      </Menu>
 
       {loading ? (
         <Card>
@@ -142,23 +249,22 @@ export default function MyPoolPostsView() {
           </Stack>
         </Card>
       ) : viewMode === 'calendar' ? (
-        <>
+        <div id="tour-my-posts-content">
           <PoolCalendar
             posts={posts}
             getColor={(p) => statusHex(p.status)}
             getTitle={(p) => `${needTypeLabel(p.needType)} · ${poolStatusLabel(p.status)}`}
             onClickPost={setSelected}
           />
-          <Stack direction="row" spacing={2} sx={{ mt: 1.5, px: 1 }} flexWrap="wrap">
+          <Stack id="tour-my-posts-legend" direction="row" spacing={2} sx={{ mt: 1.5, px: 1 }} flexWrap="wrap">
             <LegendDot color={statusHex('Open')} label="Đang mở" />
             <LegendDot color={statusHex('WaitingApproval')} label="Chờ duyệt" />
             <LegendDot color={statusHex('Approved')} label="Đã duyệt" />
             <LegendDot color={statusHex('Cancelled')} label="Đã huỷ" />
-            <LegendDot color={statusHex('Cancelled')} label="Đã huỷ" />
           </Stack>
-        </>
+        </div>
       ) : (
-        <Card>
+        <Card id="tour-my-posts-content">
           <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
             <Scrollbar>
               <Table>
