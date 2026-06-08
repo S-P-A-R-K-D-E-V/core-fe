@@ -21,6 +21,9 @@ import { useSettingsContext } from 'src/components/settings';
 import { ChatbotWidget } from 'src/components/chatbot';
 import MessengerProvider from 'src/components/messenger/messenger-provider';
 import ProfileCompletionDialog from 'src/components/profile-completion';
+import ShiftPreferencePromptDialog from 'src/components/shift-preference-prompt/ShiftPreferencePromptDialog';
+
+import { useAuthContext } from 'src/auth/hooks';
 
 import Main from './main';
 import Header from './header';
@@ -38,6 +41,7 @@ type Props = {
 
 export default function DashboardLayout({ children }: Props) {
   const settings = useSettingsContext();
+  const { user, updateUser } = useAuthContext();
 
   const lgUp = useResponsive('up', 'lg');
 
@@ -51,6 +55,9 @@ export default function DashboardLayout({ children }: Props) {
 
   // Show prompt when on small screen and preference not yet saved
   const showMobilePrompt = loaded && !lgUp && pref === null;
+
+  const showShiftPreferencePrompt =
+    !!user && user.hasShiftPreference === false && user.roles?.includes('Staff');
   const isMobileView = !lgUp && pref === 'mobile';
 
   const renderNavMini = <NavMini />;
@@ -114,6 +121,10 @@ export default function DashboardLayout({ children }: Props) {
           <ChatbotWidget />
           {renderMobilePrompt}
           <ProfileCompletionDialog />
+          <ShiftPreferencePromptDialog
+            open={showShiftPreferencePrompt}
+            onCompleted={() => updateUser?.({ hasShiftPreference: true })}
+          />
         </MessengerProvider>
       </SyncNotificationProvider>
     );
@@ -138,6 +149,10 @@ export default function DashboardLayout({ children }: Props) {
           <ChatbotWidget />
           {renderMobilePrompt}
           <ProfileCompletionDialog />
+          <ShiftPreferencePromptDialog
+            open={showShiftPreferencePrompt}
+            onCompleted={() => updateUser?.({ hasShiftPreference: true })}
+          />
         </MessengerProvider>
       </SyncNotificationProvider>
     );

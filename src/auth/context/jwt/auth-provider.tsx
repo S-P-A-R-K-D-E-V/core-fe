@@ -141,7 +141,7 @@ function buildUserFromToken(accessToken: string) {
 }
 
 function buildUserFromResponse(res: IAuthResponse, avatarUrl?: string) {
-  const { token, refreshToken, firstName, lastName, id, email, roles, permissions, role, sessionToken } = res;
+  const { token, refreshToken, firstName, lastName, id, email, roles, permissions, role, sessionToken, hasShiftPreference } = res;
   return {
     id,
     email,
@@ -155,6 +155,7 @@ function buildUserFromResponse(res: IAuthResponse, avatarUrl?: string) {
     accessToken: token,
     refreshToken,
     sessionToken,
+    hasShiftPreference: hasShiftPreference ?? true,
   };
 }
 

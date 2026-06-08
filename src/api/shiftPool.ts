@@ -3,6 +3,7 @@ import axios, { endpoints } from 'src/utils/axios';
 import type {
   IClaimShiftPoolPostDto,
   ICreateShiftPoolPostDto,
+  IDirectedResolveShiftPoolPostDto,
   IReviewShiftPoolPostDto,
   IShiftPoolPost,
 } from 'src/types/corecms-api';
@@ -52,5 +53,13 @@ export async function reviewShiftPoolPost(
   data: IReviewShiftPoolPostDto
 ): Promise<IShiftPoolPost> {
   const response = await axios.put<IShiftPoolPost>(endpoints.shiftPool.review(id), data);
+  return response.data;
+}
+
+export async function directedResolveShiftPoolPost(
+  id: string,
+  data: IDirectedResolveShiftPoolPostDto
+): Promise<IShiftPoolPost> {
+  const response = await axios.post<IShiftPoolPost>(endpoints.shiftPool.directedResolve(id), data);
   return response.data;
 }
