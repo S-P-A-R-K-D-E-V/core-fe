@@ -95,7 +95,7 @@ export default function MyPoolPostsView() {
   const handleConfirm = async (id: string, accept: boolean) => {
     setActing(true);
     try {
-      await reviewShiftPoolPost(id, { status: accept ? 'Approved' : 'Rejected' });
+      await reviewShiftPoolPost(id, { action: accept ? 'Approve' : 'RejectClaim' });
       enqueueSnackbar(accept ? 'Đã xác nhận đổi ca / làm hộ!' : 'Đã từ chối người nhận.', {
         variant: 'success',
       });
@@ -153,7 +153,7 @@ export default function MyPoolPostsView() {
             <LegendDot color={statusHex('Open')} label="Đang mở" />
             <LegendDot color={statusHex('WaitingApproval')} label="Chờ duyệt" />
             <LegendDot color={statusHex('Approved')} label="Đã duyệt" />
-            <LegendDot color={statusHex('Rejected')} label="Từ chối" />
+            <LegendDot color={statusHex('Cancelled')} label="Đã huỷ" />
             <LegendDot color={statusHex('Cancelled')} label="Đã huỷ" />
           </Stack>
         </>

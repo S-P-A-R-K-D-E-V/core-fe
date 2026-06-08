@@ -121,7 +121,6 @@ export default function MyPoolClaimsView() {
           <Stack direction="row" spacing={2} sx={{ mt: 1.5, px: 1 }} flexWrap="wrap">
             <LegendDot color={statusHex('WaitingApproval')} label="Chờ duyệt" />
             <LegendDot color={statusHex('Approved')} label="Đã duyệt" />
-            <LegendDot color={statusHex('Rejected')} label="Từ chối" />
             <LegendDot color={statusHex('Cancelled')} label="Đã huỷ" />
           </Stack>
         </>
