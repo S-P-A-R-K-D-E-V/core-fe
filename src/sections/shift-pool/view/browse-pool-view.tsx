@@ -38,7 +38,7 @@ import { claimShiftPoolPost, getOpenShiftPoolPosts } from 'src/api/shiftPool';
 
 import PoolCalendar from './pool-calendar';
 import LegendDot from './pool-legend';
-import { fmtDate, needTypeHex, needTypeLabel, poolStatusColor } from './pool-helpers';
+import { fmtDate, needTypeHex, needTypeLabel, partialCoverSubTypeLabel, poolStatusColor } from './pool-helpers';
 
 // ----------------------------------------------------------------------
 
@@ -278,10 +278,24 @@ export default function BrowsePoolView() {
                   </TextField>
                 </>
               ) : target.needType === 'PartialCover' ? (
-                <Typography variant="body2" color="text.secondary">
-                  Bạn sẽ làm hộ khoảng thời gian này. Lưu ý: chỉ nhân sự ca liền trước (ở lại làm
-                  thêm) mới được nhận. Người đăng sẽ xác nhận sau khi bạn nhận.
-                </Typography>
+                (() => {
+                  const sub = partialCoverSubTypeLabel(
+                    target.partialStartTime,
+                    target.partialEndTime,
+                    target.shiftStartTime,
+                    target.shiftEndTime
+                  );
+                  return (
+                    <Stack spacing={1}>
+                      <Typography variant="body2" fontWeight={600}>
+                        {sub.label}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {sub.hint} Người đăng sẽ xác nhận sau khi bạn nhận.
+                      </Typography>
+                    </Stack>
+                  );
+                })()
               ) : (
                 <Typography variant="body2" color="text.secondary">
                   Bạn sẽ làm hộ cả ca này. Người đăng sẽ xác nhận sau khi bạn nhận.
