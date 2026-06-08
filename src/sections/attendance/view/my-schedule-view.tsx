@@ -27,6 +27,8 @@ import MenuItem from '@mui/material/MenuItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { useTheme } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
@@ -146,6 +148,7 @@ export default function MyScheduleView() {
   // Publish-to-pool dialog state
   const [openPublish, setOpenPublish] = useState(false);
   const [needType, setNeedType] = useState<PoolNeedType>('Swap');
+  const [partialSubType, setPartialSubType] = useState<'LateArrive' | 'EarlyLeave'>('LateArrive');
   const [partialStart, setPartialStart] = useState('');
   const [partialEnd, setPartialEnd] = useState('');
   const [poolNote, setPoolNote] = useState('');
@@ -246,12 +249,32 @@ export default function MyScheduleView() {
 
   const handleOpenPublish = useCallback(() => {
     if (!selectedEvent) return;
+    const shiftStart = (selectedEvent.startTime || selectedEvent.shiftStartTime || '').slice(0, 5);
     setNeedType('Swap');
-    setPartialStart((selectedEvent.startTime || selectedEvent.shiftStartTime || '').slice(0, 5));
-    setPartialEnd((selectedEvent.endTime || selectedEvent.shiftEndTime || '').slice(0, 5));
+    setPartialSubType('LateArrive');
+    setPartialStart(shiftStart); // "đến muộn": start = đầu ca (cố định)
+    setPartialEnd('');            // user chọn giờ đến
     setPoolNote('');
     setOpenPublish(true);
   }, [selectedEvent]);
+
+  /** Khi đổi sub-type PartialCover, auto-fill đầu hoặc cuối ca */
+  const handleSubTypeChange = useCallback(
+    (sub: 'LateArrive' | 'EarlyLeave') => {
+      if (!selectedEvent) return;
+      const shiftStart = (selectedEvent.startTime || selectedEvent.shiftStartTime || '').slice(0, 5);
+      const shiftEnd = (selectedEvent.endTime || selectedEvent.shiftEndTime || '').slice(0, 5);
+      setPartialSubType(sub);
+      if (sub === 'LateArrive') {
+        setPartialStart(shiftStart); // cố định đầu ca
+        setPartialEnd('');           // user chọn giờ đến
+      } else {
+        setPartialStart('');         // user chọn giờ về
+        setPartialEnd(shiftEnd);     // cố định cuối ca
+      }
+    },
+    [selectedEvent]
+  );
 
   const handlePublishSubmit = useCallback(async () => {
     if (!selectedEvent) return;
@@ -722,23 +745,72 @@ export default function MyScheduleView() {
             </TextField>
 
             {needType === 'PartialCover' && (
-              <Stack direction="row" spacing={2}>
-                <TextField
+              <Stack spacing={2}>
+                {/* Sub-type selector */}
+                <ToggleButtonGroup
+                  value={partialSubType}
+                  exclusive
+                  onChange={(_, v) => v && handleSubTypeChange(v)}
+                  size="small"
                   fullWidth
-                  type="time"
-                  label="Từ giờ"
-                  value={partialStart}
-                  onChange={(e) => setPartialStart(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
-                <TextField
-                  fullWidth
-                  type="time"
-                  label="Đến giờ"
-                  value={partialEnd}
-                  onChange={(e) => setPartialEnd(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
+                >
+                  <ToggleButton value="LateArrive" sx={{ flex: 1 }}>
+                    ⏰ Tôi đến muộn
+                  </ToggleButton>
+                  <ToggleButton value="EarlyLeave" sx={{ flex: 1 }}>
+                    🚪 Tôi về sớm
+                  </ToggleButton>
+                </ToggleButtonGroup>
+
+                {/* Description hint */}
+                <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
+                  {partialSubType === 'LateArrive'
+                    ? 'Ca của bạn đã bắt đầu nhưng bạn chưa đến — nhờ nhân sự ca liền TRƯỚC ở lại làm hộ phần đầu ca.'
+                    : 'Bạn cần rời ca sớm — nhờ nhân sự ca liền SAU đến sớm hơn để làm hộ phần cuối ca.'}
+                </Typography>
+
+                {/* Time pickers */}
+                {partialSubType === 'LateArrive' ? (
+                  <Stack direction="row" spacing={2}>
+                    <TextField
+                      fullWidth
+                      type="time"
+                      label="Từ (đầu ca — cố định)"
+                      value={partialStart}
+                      disabled
+                      InputLabelProps={{ shrink: true }}
+                    />
+                    <TextField
+                      fullWidth
+                      type="time"
+                      label="Đến khi bạn đến *"
+                      value={partialEnd}
+                      onChange={(e) => setPartialEnd(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                      helperText="Chọn giờ bạn dự kiến đến ca"
+                    />
+                  </Stack>
+                ) : (
+                  <Stack direction="row" spacing={2}>
+                    <TextField
+                      fullWidth
+                      type="time"
+                      label="Từ khi bạn về *"
+                      value={partialStart}
+                      onChange={(e) => setPartialStart(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                      helperText="Chọn giờ bạn dự kiến rời ca"
+                    />
+                    <TextField
+                      fullWidth
+                      type="time"
+                      label="Đến (cuối ca — cố định)"
+                      value={partialEnd}
+                      disabled
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Stack>
+                )}
               </Stack>
             )}
 

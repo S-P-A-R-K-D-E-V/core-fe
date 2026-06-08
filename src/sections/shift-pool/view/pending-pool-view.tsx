@@ -37,7 +37,7 @@ import { getPendingShiftPoolPosts, reviewShiftPoolPost } from 'src/api/shiftPool
 
 import PoolCalendar from './pool-calendar';
 import LegendDot from './pool-legend';
-import { fmtDate, needTypeHex, needTypeLabel } from './pool-helpers';
+import { fmtDate, needTypeHex, needTypeLabel, partialCoverSubTypeLabel } from './pool-helpers';
 
 // ----------------------------------------------------------------------
 
@@ -218,9 +218,26 @@ export default function PendingPoolView() {
                 </Typography>
               )}
               {target.needType === 'PartialCover' && target.partialStartTime && (
-                <Typography variant="body2">
-                  Khoảng làm hộ: {target.partialStartTime} - {target.partialEndTime}
-                </Typography>
+                <>
+                  <Typography variant="body2">
+                    Khoảng làm hộ: <strong>{target.partialStartTime} – {target.partialEndTime}</strong>
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {partialCoverSubTypeLabel(
+                      target.partialStartTime,
+                      target.partialEndTime,
+                      target.shiftStartTime,
+                      target.shiftEndTime
+                    ).label}
+                    {' — '}
+                    {partialCoverSubTypeLabel(
+                      target.partialStartTime,
+                      target.partialEndTime,
+                      target.shiftStartTime,
+                      target.shiftEndTime
+                    ).hint}
+                  </Typography>
+                </>
               )}
 
               <Stack direction="row" spacing={1} flexWrap="wrap">

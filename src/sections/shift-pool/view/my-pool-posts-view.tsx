@@ -35,7 +35,7 @@ import { cancelShiftPoolPost, getMyShiftPoolPosts, reviewShiftPoolPost } from 's
 
 import PoolCalendar from './pool-calendar';
 import LegendDot from './pool-legend';
-import { fmtDate, needTypeLabel, poolStatusColor, poolStatusLabel, statusHex } from './pool-helpers';
+import { fmtDate, needTypeLabel, partialCoverSubTypeLabel, poolStatusColor, poolStatusLabel, statusHex } from './pool-helpers';
 
 // ----------------------------------------------------------------------
 
@@ -220,9 +220,25 @@ export default function MyPoolPostsView() {
                 </Typography>
               )}
               {selected.needType === 'PartialCover' && selected.partialStartTime && (
-                <Typography variant="body2">
-                  Khoảng làm hộ: {selected.partialStartTime} - {selected.partialEndTime}
-                </Typography>
+                <>
+                  <Typography variant="body2">
+                    Khoảng làm hộ: <strong>{selected.partialStartTime} – {selected.partialEndTime}</strong>
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {partialCoverSubTypeLabel(
+                      selected.partialStartTime,
+                      selected.partialEndTime,
+                      selected.shiftStartTime,
+                      selected.shiftEndTime
+                    ).label}{' — '}
+                    {partialCoverSubTypeLabel(
+                      selected.partialStartTime,
+                      selected.partialEndTime,
+                      selected.shiftStartTime,
+                      selected.shiftEndTime
+                    ).hint}
+                  </Typography>
+                </>
               )}
               {selected.reviewNote && (
                 <Typography variant="body2" color="text.secondary">
