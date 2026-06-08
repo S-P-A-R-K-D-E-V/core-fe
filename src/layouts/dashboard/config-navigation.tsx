@@ -211,6 +211,14 @@ export function useNavData() {
             ],
           },
 
+          // SHIFT AUDIT LOG (Admin, Manager)
+          {
+            title: 'Audit Log ca làm',
+            path: paths.dashboard.shiftAudit.root,
+            icon: ICONS.file,
+            roles: ['Admin', 'Manager'],
+          },
+
           // NOTIFICATION CONFIG (Admin only)
           {
             title: 'Cấu hình thông báo',

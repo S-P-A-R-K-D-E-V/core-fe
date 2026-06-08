@@ -183,6 +183,9 @@ export const paths = {
       myClaims: `${ROOTS.DASHBOARD}/shift-pool/my-claims`,
       pending: `${ROOTS.DASHBOARD}/shift-pool/pending`,
     },
+    shiftAudit: {
+      root: `${ROOTS.DASHBOARD}/shift-audit`,
+    },
     shiftCash: {
       root: `${ROOTS.DASHBOARD}/shift-cash`,
       dashboard: `${ROOTS.DASHBOARD}/shift-cash`,
