@@ -145,15 +145,41 @@ function buildUserFromToken(accessToken: string) {
 
 function buildUserFromResponse(res: IAuthResponse, avatarUrl?: string) {
   const { token, refreshToken, firstName, lastName, id, email, roles, permissions, role, sessionToken, hasShiftPreference } = res;
+
+  // Fallback: extract role from JWT token when backend response body doesn't include role/roles
+  // (e.g. some OAuth login endpoints may omit them but the token itself carries the claims)
+  let effectiveRole = role || (roles && roles[0]);
+  let effectiveRoles = roles || [];
+  let effectivePermissions = permissions || [];
+  if ((!effectiveRole || effectiveRoles.length === 0) && token) {
+    try {
+      const tokenData = jwtDecode(token);
+      const rolesClaim =
+        tokenData['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ||
+        tokenData.role;
+      if (rolesClaim) {
+        const parsedRoles = Array.isArray(rolesClaim) ? rolesClaim : [rolesClaim];
+        if (!effectiveRole) effectiveRole = parsedRoles[0];
+        if (effectiveRoles.length === 0) effectiveRoles = parsedRoles;
+      }
+      if (effectivePermissions.length === 0) {
+        const permClaim = tokenData.permission || [];
+        effectivePermissions = Array.isArray(permClaim) ? permClaim : [permClaim];
+      }
+    } catch {
+      // non-blocking — fall through to defaults
+    }
+  }
+
   return {
     id,
     email,
-    displayName: `${firstName} ${lastName}`,
+    displayName: `${firstName} ${lastName}`.trim() || email || 'User',
     firstName,
     lastName,
-    role: role || (roles && roles[0]) || 'User',
-    roles: roles || [],
-    permissions: permissions || [],
+    role: effectiveRole || 'User',
+    roles: effectiveRoles,
+    permissions: effectivePermissions,
     photoURL: avatarUrl || '/assets/images/avatar/avatar_default.jpg',
     accessToken: token,
     refreshToken,
@@ -352,7 +378,9 @@ export function AuthProvider({ children }: Props) {
 
     const user = buildUserFromResponse(res.data, avatarUrl);
     dispatch({ type: Types.LOGIN, payload: { user } });
-  }, []);
+    // Fetch up-to-date profile (avatar, etc.) — same as regular login()
+    fetchAndPatchAvatar(user);
+  }, [fetchAndPatchAvatar]);
 
   // UPDATE USER (e.g. after avatar/profile change)
   const updateUser = useCallback((updates: Partial<NonNullable<typeof state.user>>) => {
