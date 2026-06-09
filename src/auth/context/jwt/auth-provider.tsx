@@ -60,7 +60,10 @@ const reducer = (state: AuthStateType, action: ActionsType) => {
   if (action.type === Types.INITIAL) {
     return {
       loading: false,
-      user: action.payload.user,
+      // Race-condition guard: nếu initialize() kết thúc với user=null (vd: tryRestoreSession
+      // fail sau khi user đã login xong), không override user đang có → giữ trạng thái login.
+      // LOGOUT dùng riêng Types.LOGOUT nên trường hợp đó không bị ảnh hưởng.
+      user: action.payload.user !== null ? action.payload.user : state.user,
     };
   }
   if (action.type === Types.LOGIN) {
@@ -215,12 +218,32 @@ export function AuthProvider({ children }: Props) {
       }
 
       // No valid access token — try to restore from login session (7-day cookie)
+      // NOTE: này là async — user có thể login trong lúc chờ API
       const restored = await tryRestoreSession();
       if (restored) return;
+
+      // Double-check sau khi await: nếu user đã login trong lúc tryRestoreSession chạy
+      // (race condition), token đã được lưu vào sessionStorage → dùng nó thay vì dispatch null.
+      const newToken = sessionStorage.getItem(STORAGE_KEY);
+      if (newToken && isValidToken(newToken)) {
+        setSession(newToken);
+        const user = buildUserFromToken(newToken);
+        dispatch({ type: Types.INITIAL, payload: { user: { ...user, accessToken: newToken } } });
+        fetchAndPatchAvatar({ ...user, accessToken: newToken });
+        return;
+      }
 
       dispatch({ type: Types.INITIAL, payload: { user: null } });
     } catch (error) {
       console.error(error);
+      // Tương tự: nếu lỗi xảy ra nhưng user đã login, không xoá state
+      const savedToken = sessionStorage.getItem(STORAGE_KEY);
+      if (savedToken && isValidToken(savedToken)) {
+        setSession(savedToken);
+        const user = buildUserFromToken(savedToken);
+        dispatch({ type: Types.INITIAL, payload: { user: { ...user, accessToken: savedToken } } });
+        return;
+      }
       dispatch({ type: Types.INITIAL, payload: { user: null } });
     }
   }, [tryRestoreSession, fetchAndPatchAvatar]);
