@@ -47,11 +47,25 @@ const ICONS = {
 
 // ----------------------------------------------------------------------
 
-export function useNavData() {
+/** Lọc nav item theo role của user hiện tại (đệ quy vào children) */
+function filterByRole<T extends { roles?: string[]; children?: T[] }>(
+  items: T[],
+  userRole: string
+): T[] {
+  return items
+    .filter((item) => !item.roles || item.roles.includes(userRole))
+    .map((item) => ({
+      ...item,
+      children: item.children ? filterByRole(item.children, userRole) : undefined,
+    }));
+}
+
+export function useNavData(userRole?: string) {
   const { t } = useTranslate();
 
   const data = useMemo(
-    () => [
+    () => {
+      const fullNav = [
       {
         subheader: t('overview'),
         items: [
@@ -353,8 +367,22 @@ export function useNavData() {
           },
         ],
       },
-    ],
-    [t]
+      // end fullNav
+      ];
+
+      // Nếu user chưa load hoặc chưa có role → trả nguyên (SplashScreen đang hiện)
+      if (!userRole) return fullNav;
+
+      // Lọc từng group theo role, bỏ group rỗng
+      return fullNav
+        .map((group) => ({
+          ...group,
+          items: filterByRole(group.items as any[], userRole),
+        }))
+        .filter((group) => group.items.length > 0);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, userRole]
   );
 
   return data;

@@ -32,7 +32,7 @@ export default function NavVertical({ openNav, onCloseNav }: Props) {
 
   const lgUp = useResponsive('up', 'lg');
 
-  const navData = useNavData();
+  const navData = useNavData(user?.role);
 
   useEffect(() => {
     if (openNav) {
