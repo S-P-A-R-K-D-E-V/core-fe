@@ -388,6 +388,43 @@ export function AuthProvider({ children }: Props) {
     dispatch({ type: Types.LOGIN, payload: { user: { ...state.user, ...updates } } });
   }, [state.user]);
 
+  // REFRESH USER — re-sync role/permissions from JWT + latest profile from server.
+  // Call after any login redirect to guarantee nav menu reflects the correct role.
+  const refreshUser = useCallback(async () => {
+    const accessToken = sessionStorage.getItem(STORAGE_KEY);
+    if (!accessToken || !isValidToken(accessToken)) return;
+
+    // Step 1: Rebuild from JWT — role & permissions are always authoritative here
+    const tokenUser = buildUserFromToken(accessToken);
+
+    // Step 2: Merge with current user state to preserve server-side fields
+    //         (sessionToken, hasShiftPreference, refreshToken, etc.)
+    const merged = {
+      ...(state.user || {}),
+      ...tokenUser,
+      accessToken,
+      // Keep refreshToken from sessionStorage in case it was updated
+      refreshToken: getRefreshToken() || (state.user as any)?.refreshToken,
+    };
+
+    // Step 3: Fetch latest profile image from server (non-blocking)
+    try {
+      const res = await axios.get(endpoints.users.me);
+      const profileImageUrl: string | undefined = res.data?.profileImageUrl;
+      dispatch({
+        type: Types.LOGIN,
+        payload: {
+          user: profileImageUrl
+            ? { ...merged, photoURL: getStorageUrl(profileImageUrl) }
+            : merged,
+        },
+      });
+    } catch {
+      // Even if /users/me fails, at least update role/permissions from JWT
+      dispatch({ type: Types.LOGIN, payload: { user: merged } });
+    }
+  }, [state.user]);
+
   // LOGOUT
   const logout = useCallback(async () => {
     try {
@@ -431,8 +468,9 @@ export function AuthProvider({ children }: Props) {
       loginWithOAuth,
       pendingVerification,
       updateUser,
+      refreshUser,
     }),
-    [login, logout, register, verifyOtp, resendOtp, restoreSession, loginWithOAuth, updateUser, state.user, status, pendingVerification]
+    [login, logout, register, verifyOtp, resendOtp, restoreSession, loginWithOAuth, updateUser, refreshUser, state.user, status, pendingVerification]
   );
 
   return <AuthContext.Provider value={memoizedValue}>{children}</AuthContext.Provider>;

@@ -61,6 +61,9 @@ export type JWTContextType = CanRemove & {
   loginWithOAuth: (provider: 'google' | 'facebook', token: string, avatarUrl?: string) => Promise<void>;
   pendingVerification: { email: string } | null;
   updateUser: (updates: Partial<NonNullable<AuthUserType>>) => void;
+  /** Re-sync role/permissions from JWT + latest profile from server.
+   *  Call after any login redirect to guarantee nav menu reflects correct role. */
+  refreshUser: () => Promise<void>;
 };
 
 export type FirebaseContextType = CanRemove & {
