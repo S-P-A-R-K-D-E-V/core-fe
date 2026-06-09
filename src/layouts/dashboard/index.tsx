@@ -176,6 +176,10 @@ export default function DashboardLayout({ children }: Props) {
         <ChatbotWidget />
         {renderMobilePrompt}
         <ProfileCompletionDialog />
+        <ShiftPreferencePromptDialog
+          open={showShiftPreferencePrompt}
+          onCompleted={() => updateUser?.({ hasShiftPreference: true })}
+        />
       </MessengerProvider>
     </SyncNotificationProvider>
   );

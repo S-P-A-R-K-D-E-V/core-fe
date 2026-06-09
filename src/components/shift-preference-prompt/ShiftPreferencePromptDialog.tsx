@@ -34,7 +34,8 @@ export default function ShiftPreferencePromptDialog({ open, onCompleted }: Props
     setFetching(true);
     try {
       const all = await getAllShiftTemplates();
-      setTemplates(all.filter((t) => t.isActive));
+      // Chỉ hiển thị ca chính (Main) đang active để staff chọn ca ưa thích
+      setTemplates(all.filter((t) => t.isActive && t.shiftType === 'Main'));
     } catch {
       setError('Không thể tải danh sách ca. Vui lòng thử lại.');
     } finally {
