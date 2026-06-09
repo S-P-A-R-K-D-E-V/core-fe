@@ -11,14 +11,16 @@ export interface IShiftAuditLog {
   affectedStaffIds: string[];
   shiftDate: string;
   needType?: string;
-  oldData?: string;
-  newData?: string;
+  oldData?: string;   // JSON string
+  newData?: string;   // JSON string
   note?: string;
   timestamp: string;
 }
 
 export async function getShiftAuditLogs(params: {
-  date?: string;
+  from?: string;        // yyyy-MM-dd — lọc theo Timestamp (ưu tiên)
+  to?: string;          // yyyy-MM-dd
+  date?: string;        // legacy: single ShiftDate
   staffId?: string;
   actionType?: string;
   limit?: number;
