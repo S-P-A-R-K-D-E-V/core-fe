@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -41,7 +41,17 @@ type Props = {
 
 export default function DashboardLayout({ children }: Props) {
   const settings = useSettingsContext();
-  const { user, updateUser } = useAuthContext();
+  const { user, updateUser, refreshUser } = useAuthContext();
+
+  // Safety net: re-sync role/permissions from JWT + server on first dashboard mount.
+  // Catches cases where login (especially Google OAuth redirect) left stale auth state.
+  const hasRefreshed = useRef(false);
+  useEffect(() => {
+    if (user && !hasRefreshed.current) {
+      hasRefreshed.current = true;
+      refreshUser?.();
+    }
+  }, [user, refreshUser]);
 
   const lgUp = useResponsive('up', 'lg');
 
