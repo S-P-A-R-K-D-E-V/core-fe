@@ -144,13 +144,18 @@ export default function MyShiftSwapRequestsView() {
     if (viewMode === 'calendar') fetchCalendarAssignments();
   }, [viewMode, fetchCalendarAssignments]);
 
+  // Chỉ cho đổi ca chưa bắt đầu và chưa có chấm công
+  const isSwappable = (a: IShiftAssignment) =>
+    !a.attendanceLog?.checkInTime &&
+    new Date() < new Date(`${(a.date ?? '').split('T')[0]}T${(a.startTime || '00:00').slice(0, 5)}:00`);
+
   // --- Load my assignments when myDate changes ---
   useEffect(() => {
     if (!authUser?.id || !myDate || !openDialog) return;
     setLoadingMyAssignments(true);
     setMyAssignmentId('');
     getShiftAssignments(myDate, myDate, authUser.id)
-      .then(setMyAssignments)
+      .then((data) => setMyAssignments(data.filter(isSwappable)))
       .catch(() => setMyAssignments([]))
       .finally(() => setLoadingMyAssignments(false));
   }, [myDate, authUser?.id, openDialog]);
@@ -161,7 +166,7 @@ export default function MyShiftSwapRequestsView() {
     setLoadingTargetAssignments(true);
     setTargetAssignmentId('');
     getShiftAssignments(targetDate, targetDate, targetUserId)
-      .then(setTargetAssignments)
+      .then((data) => setTargetAssignments(data.filter(isSwappable)))
       .catch(() => setTargetAssignments([]))
       .finally(() => setLoadingTargetAssignments(false));
   }, [targetDate, targetUserId, openDialog]);

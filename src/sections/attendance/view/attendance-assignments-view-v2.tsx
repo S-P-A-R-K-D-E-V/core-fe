@@ -45,6 +45,7 @@ import Chart, { useChart } from 'src/components/chart';
 
 import { paths } from 'src/routes/paths';
 
+import { useAuthContext } from 'src/auth/hooks';
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useResponsive } from 'src/hooks/use-responsive';
 
@@ -113,8 +114,21 @@ const toLocalDateStr = (d: Date): string => {
   return `${y}-${m}-${day}`;
 };
 
+// Ca đã đến giờ bắt đầu chưa (so theo giờ máy client — giờ VN)
+const isShiftStarted = (date: string, startTime?: string): boolean => {
+  if (!date) return false;
+  const hhmm = (startTime || '00:00').slice(0, 5);
+  return new Date() >= new Date(`${date}T${hhmm}:00`);
+};
+
+const hasAttendance = (u?: { attendance?: any }): boolean => !!u?.attendance?.checkInTime;
+
 export default function AttendanceAssignmentsView() {
   const theme = useTheme();
+  const { user: authUser } = useAuthContext();
+  // Manager bị chặn thao tác với ca đã bắt đầu / đã có chấm công — chỉ Admin được
+  const isAdminUser =
+    authUser?.role === 'Admin' || (authUser?.roles || []).includes('Admin');
   const { enqueueSnackbar } = useSnackbar();
   const table = useTable();
   const settings = useSettingsContext();
@@ -380,16 +394,31 @@ export default function AttendanceAssignmentsView() {
 
   const handleDelete = useCallback(
     async (id: string) => {
+      const target = tableData.find((a) => a.id === id);
+      if (!isAdminUser && target) {
+        if (target.attendanceLog?.checkInTime) {
+          enqueueSnackbar('Ca đã có chấm công, không thể xóa. Chỉ Admin mới được phép.', {
+            variant: 'warning',
+          });
+          return;
+        }
+        if (isShiftStarted(target.date, target.startTime)) {
+          enqueueSnackbar('Ca đã bắt đầu hoặc đã qua, không thể xóa. Chỉ Admin mới được phép.', {
+            variant: 'warning',
+          });
+          return;
+        }
+      }
       try {
         await deleteShiftAssignment(id);
         enqueueSnackbar('Deleted!');
         fetchAssignments();
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
-        enqueueSnackbar('Delete failed!', { variant: 'error' });
+        enqueueSnackbar(error?.title || error?.message || 'Delete failed!', { variant: 'error' });
       }
     },
-    [enqueueSnackbar, fetchAssignments]
+    [enqueueSnackbar, fetchAssignments, tableData, isAdminUser]
   );
 
   const handleCreate = async () => {
@@ -612,6 +641,28 @@ export default function AttendanceAssignmentsView() {
 
   const handleSaveAssignments = async () => {
     if (!managingEvent) return;
+
+    if (!isAdminUser && isShiftStarted(managingEvent.date, managingEvent.startTime)) {
+      enqueueSnackbar('Ca đã bắt đầu hoặc đã qua, không thể thay đổi phân công. Chỉ Admin mới được phép.', {
+        variant: 'warning',
+      });
+      return;
+    }
+
+    // Không cho gỡ nhân viên đã có chấm công khỏi ca (trừ Admin)
+    if (!isAdminUser) {
+      const removedWithCheckin = managingEvent.users.filter(
+        (u) => !dndAssigned.includes(u.staffId) && hasAttendance(u)
+      );
+      if (removedWithCheckin.length > 0) {
+        enqueueSnackbar(
+          `Không thể gỡ nhân viên đã chấm công: ${removedWithCheckin.map((u) => u.staffName).join(', ')}`,
+          { variant: 'warning' }
+        );
+        return;
+      }
+    }
+
     setManageSaving(true);
     try {
       const result = await manageShiftAssignments({
@@ -640,6 +691,21 @@ export default function AttendanceAssignmentsView() {
   const handleOpenSwap = useCallback(
     (staffId: string) => {
       if (!managingEvent) return;
+
+      const sourceUser = managingEvent.users.find((u) => u.staffId === staffId);
+      if (!isAdminUser && hasAttendance(sourceUser)) {
+        enqueueSnackbar('Nhân viên này đã chấm công, không thể đổi ca. Chỉ Admin mới được phép.', {
+          variant: 'warning',
+        });
+        return;
+      }
+      if (!isAdminUser && isShiftStarted(managingEvent.date, managingEvent.startTime)) {
+        enqueueSnackbar('Ca đã bắt đầu hoặc đã qua, không thể đổi ca. Chỉ Admin mới được phép.', {
+          variant: 'warning',
+        });
+        return;
+      }
+
       const info = staffInfoMap.get(staffId);
       setSwapSource({
         staffId,
@@ -654,7 +720,7 @@ export default function AttendanceAssignmentsView() {
       setSwapTargetCandidates([]);
       swapDialog.onTrue();
     },
-    [managingEvent, staffInfoMap, swapDialog]
+    [managingEvent, staffInfoMap, swapDialog, isAdminUser, enqueueSnackbar]
   );
 
   // Load candidates when target schedule + date is selected
@@ -681,6 +747,27 @@ export default function AttendanceAssignmentsView() {
 
   const handleSwap = async () => {
     if (!swapSource || !swapTargetScheduleId || !swapTargetDate || !swapTargetStaffId) return;
+
+    if (!isAdminUser) {
+      const targetSchedule = schedules.find((s) => s.id === swapTargetScheduleId);
+      if (isShiftStarted(swapTargetDate, targetSchedule?.startTime)) {
+        enqueueSnackbar('Ca muốn đổi đã bắt đầu hoặc đã qua, không thể đổi. Chỉ Admin mới được phép.', {
+          variant: 'warning',
+        });
+        return;
+      }
+      const targetEvent = events.find((e) => e.id === `${swapTargetScheduleId}_${swapTargetDate}`);
+      const targetUser = (targetEvent?.extendedProps.users as any[] | undefined)?.find(
+        (u) => u.staffId === swapTargetStaffId
+      );
+      if (hasAttendance(targetUser)) {
+        enqueueSnackbar('Nhân viên muốn đổi đã chấm công ca này, không thể đổi. Chỉ Admin mới được phép.', {
+          variant: 'warning',
+        });
+        return;
+      }
+    }
+
     setSwapSaving(true);
     try {
       await swapShiftAssignments({
