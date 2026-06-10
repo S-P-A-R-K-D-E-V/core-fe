@@ -266,6 +266,8 @@ export default function ShiftRegistrationView() {
       const toRegister: { shiftScheduleId: string; date: string }[] = [];
       const toUnregister: { shiftScheduleId: string; date: string }[] = [];
 
+      let skippedStarted = 0;
+
       weekDays.forEach((d) => {
         const dateStr = toLocalDateStr(d);
         weekSchedules.forEach((s) => {
@@ -273,6 +275,13 @@ export default function ShiftRegistrationView() {
           const key = `${s.id}_${dateStr}`;
           const isSelected = !!weekSelections[key];
           const wasRegistered = myRegisteredKeys.has(key);
+          if (isSelected === wasRegistered) return;
+
+          // Ca đã bắt đầu thì không đăng ký / hủy được nữa
+          if (new Date() >= new Date(`${dateStr}T${(s.startTime || '00:00').slice(0, 5)}:00`)) {
+            skippedStarted += 1;
+            return;
+          }
 
           if (isSelected && !wasRegistered) {
             toRegister.push({ shiftScheduleId: s.id, date: dateStr });
@@ -281,6 +290,10 @@ export default function ShiftRegistrationView() {
           }
         });
       });
+
+      if (skippedStarted > 0) {
+        enqueueSnackbar(`Bỏ qua ${skippedStarted} ca đã bắt đầu hoặc đã qua.`, { variant: 'info' });
+      }
 
       const promises: Promise<any>[] = [];
       toRegister.forEach((r) =>
@@ -459,8 +472,16 @@ export default function ShiftRegistrationView() {
     [detailDialog]
   );
 
+  // Ca đã đến giờ bắt đầu chưa (giờ máy client = giờ VN)
+  const isShiftSlotStarted = (date: string, startTime?: string) =>
+    new Date() >= new Date(`${date}T${(startTime || '00:00').slice(0, 5)}:00`);
+
   const handleRegister = async () => {
     if (!selectedShift) return;
+    if (isShiftSlotStarted(selectedShift.date, selectedShift.startTime)) {
+      enqueueSnackbar('Ca đã bắt đầu hoặc đã qua, không thể đăng ký.', { variant: 'warning' });
+      return;
+    }
     setRegistering(true);
     try {
       await registerShift({
@@ -481,6 +502,10 @@ export default function ShiftRegistrationView() {
 
   const handleUnregister = async () => {
     if (!selectedShift) return;
+    if (isShiftSlotStarted(selectedShift.date, selectedShift.startTime)) {
+      enqueueSnackbar('Ca đã bắt đầu hoặc đã qua, không thể hủy đăng ký.', { variant: 'warning' });
+      return;
+    }
     setRegistering(true);
     try {
       await unregisterShift({

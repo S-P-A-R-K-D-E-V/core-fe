@@ -278,6 +278,18 @@ export default function MyScheduleView() {
 
   const handlePublishSubmit = useCallback(async () => {
     if (!selectedEvent) return;
+
+    // Đổi ca / làm hộ toàn ca: chỉ được trước khi ca bắt đầu
+    if (needType !== 'PartialCover') {
+      const startHHmm = (selectedEvent.startTime || selectedEvent.shiftStartTime || '00:00').slice(0, 5);
+      if (new Date() >= new Date(`${selectedEvent.date}T${startHHmm}:00`)) {
+        enqueueSnackbar('Ca đã bắt đầu, chỉ có thể đăng "Làm hộ 1 khoảng thời gian".', {
+          variant: 'warning',
+        });
+        return;
+      }
+    }
+
     setPublishing(true);
     try {
       await createShiftPoolPost({
