@@ -44,7 +44,7 @@ import Label from 'src/components/label';
 import { IShiftSchedule, IShiftAssignment, IAttendanceLog, IShiftPoolPost, PoolNeedType } from 'src/types/corecms-api';
 import { ICalendarEvent, ICalendarView } from 'src/types/calendar';
 import { getMySchedule, getMyAttendanceLogs, getShiftSchedulesByDateRange } from 'src/api/attendance';
-import { cancelShiftPoolPost, claimShiftPoolPost, createShiftPoolPost, getMyShiftPoolClaims, getMyShiftPoolPosts, getOpenShiftPoolPosts } from 'src/api/shiftPool';
+import { cancelShiftPoolPost, claimShiftPoolPost, createShiftPoolPost, getMyShiftPoolClaims, getMyShiftPoolPosts, getOpenShiftPoolPosts, reviewShiftPoolPost } from 'src/api/shiftPool';
 import { fmtDate, needTypeHex, needTypeLabel, partialCoverSubTypeLabel, poolStatusColor, poolStatusLabel, statusHex } from 'src/sections/shift-pool/view/pool-helpers';
 import LegendDot from 'src/sections/shift-pool/view/pool-legend';
 
@@ -175,6 +175,10 @@ export default function MyScheduleView() {
   // Manage-post dialog (khi click ca amber đang có post active)
   const [openManagePost, setOpenManagePost] = useState(false);
   const [cancellingPost, setCancellingPost] = useState(false);
+  // Poster review actions (Duyệt / Từ chối claim)
+  const [showRejectNote, setShowRejectNote] = useState(false);
+  const [rejectNote, setRejectNote] = useState('');
+  const [reviewingPost, setReviewingPost] = useState(false);
 
   // Tour state
   const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
@@ -216,6 +220,17 @@ export default function MyScheduleView() {
   useEffect(() => {
     fetchSchedule();
   }, [fetchSchedule]);
+
+  // Set of my assignment IDs currently locked as offered in a WaitingApproval claim
+  const lockedAsOfferedIds = useMemo(
+    () =>
+      new Set(
+        myClaims
+          .filter((c) => c.status === 'WaitingApproval' && c.claimerOfferedAssignmentId)
+          .map((c) => c.claimerOfferedAssignmentId!)
+      ),
+    [myClaims]
+  );
 
   // Map of active pool posts keyed by shiftAssignmentId (for amber colour)
   const postedMap = useMemo(
@@ -427,13 +442,16 @@ export default function MyScheduleView() {
     }
   }, [selectedEvent, needType, partialStart, partialEnd, poolNote, enqueueSnackbar]);
 
-  // Chỉ cho đăng ca lên pool khi chưa check-in và chưa có bài đăng active
+  // Chỉ cho đăng ca lên pool khi chưa check-in, chưa có post active, và không đang dùng làm offered
   const canPublishSelected =
     !!selectedEvent &&
     !selectedEvent.attendanceLog?.checkInTime &&
-    !postedMap.has(selectedEvent.assignmentId);
+    !postedMap.has(selectedEvent.assignmentId) &&
+    !lockedAsOfferedIds.has(selectedEvent.assignmentId);
 
-  // Load upcoming assignments for Swap claim
+  const isLockedAsOffered = !!selectedEvent && lockedAsOfferedIds.has(selectedEvent.assignmentId);
+
+  // Load upcoming assignments for Swap claim (filter out locked-as-offered + already started + target ca)
   useEffect(() => {
     if (!claimTarget || claimTarget.needType !== 'Swap') return;
     const from = new Date().toISOString().split('T')[0];
@@ -446,12 +464,16 @@ export default function MyScheduleView() {
           const start = a.startTime || (a as any).shiftStartTime || '00:00';
           const startMs = new Date(`${dateStr}T${start}`).getTime();
           const aid = a.id || (a as any).assignmentId;
-          return startMs > now && aid !== claimTarget.shiftAssignmentId;
+          return (
+            startMs > now &&
+            aid !== claimTarget.shiftAssignmentId &&
+            !lockedAsOfferedIds.has(aid)  // bỏ qua ca đang dùng làm offered trong pending claim khác
+          );
         });
         setClaimMyAssignments(upcoming);
       })
       .catch(() => setClaimMyAssignments([]));
-  }, [claimTarget]);
+  }, [claimTarget, lockedAsOfferedIds]);
 
   const handleSubmitClaim = useCallback(async () => {
     if (!claimTarget) return;
@@ -471,6 +493,47 @@ export default function MyScheduleView() {
     }
   }, [claimTarget, claimOfferedId, enqueueSnackbar, fetchSchedule]);
 
+  const closeManagePost = useCallback(() => {
+    setOpenManagePost(false);
+    setSelectedEvent(null);
+    setShowRejectNote(false);
+    setRejectNote('');
+  }, []);
+
+  const handleApprovePost = useCallback(async () => {
+    if (!selectedEvent) return;
+    const post = postedMap.get(selectedEvent.assignmentId);
+    if (!post) return;
+    setReviewingPost(true);
+    try {
+      await reviewShiftPoolPost(post.id, { action: 'Approve' });
+      enqueueSnackbar('Đã duyệt! Ca đã được hoán đổi/làm hộ.', { variant: 'success' });
+      closeManagePost();
+      fetchSchedule();
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Duyệt thất bại!', { variant: 'error' });
+    } finally {
+      setReviewingPost(false);
+    }
+  }, [selectedEvent, postedMap, enqueueSnackbar, closeManagePost, fetchSchedule]);
+
+  const handleRejectPost = useCallback(async () => {
+    if (!selectedEvent) return;
+    const post = postedMap.get(selectedEvent.assignmentId);
+    if (!post) return;
+    setReviewingPost(true);
+    try {
+      await reviewShiftPoolPost(post.id, { action: 'RejectClaim', reviewNote: rejectNote || undefined });
+      enqueueSnackbar('Đã từ chối claim. Bài đăng quay về trạng thái mở.', { variant: 'info' });
+      closeManagePost();
+      fetchSchedule();
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Từ chối thất bại!', { variant: 'error' });
+    } finally {
+      setReviewingPost(false);
+    }
+  }, [selectedEvent, postedMap, rejectNote, enqueueSnackbar, closeManagePost, fetchSchedule]);
+
   const handleCancelPost = useCallback(async () => {
     if (!selectedEvent) return;
     const post = postedMap.get(selectedEvent.assignmentId);
@@ -479,15 +542,14 @@ export default function MyScheduleView() {
     try {
       await cancelShiftPoolPost(post.id);
       enqueueSnackbar('Đã huỷ bài đăng.', { variant: 'success' });
-      setOpenManagePost(false);
-      setSelectedEvent(null);
+      closeManagePost();
       fetchSchedule();
     } catch (error: any) {
       enqueueSnackbar(error?.title || error?.message || 'Huỷ thất bại!', { variant: 'error' });
     } finally {
       setCancellingPost(false);
     }
-  }, [selectedEvent, postedMap, enqueueSnackbar, fetchSchedule]);
+  }, [selectedEvent, postedMap, enqueueSnackbar, closeManagePost, fetchSchedule]);
 
   // ── Tour definitions ──
 
@@ -944,7 +1006,7 @@ export default function MyScheduleView() {
             </Stack>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ flexWrap: 'wrap', gap: 0.5 }}>
           {canPublishSelected && (
             <Button
               variant="contained"
@@ -953,6 +1015,11 @@ export default function MyScheduleView() {
             >
               Đăng lên pool (đổi ca / làm hộ)
             </Button>
+          )}
+          {isLockedAsOffered && (
+            <Label variant="soft" color="warning">
+              Ca đang dùng để đổi — không thể đăng pool
+            </Label>
           )}
           <Button color="inherit" onClick={handleCloseDialog}>
             Đóng
@@ -968,7 +1035,7 @@ export default function MyScheduleView() {
             fullWidth
             maxWidth="xs"
             open={openManagePost}
-            onClose={() => { setOpenManagePost(false); setSelectedEvent(null); }}
+            onClose={closeManagePost}
           >
             <DialogTitle>Bài đăng của bạn</DialogTitle>
             <DialogContent>
@@ -1017,7 +1084,7 @@ export default function MyScheduleView() {
                     </Box>
                   </Box>
 
-                  {/* WaitingApproval: claimer info */}
+                  {/* WaitingApproval: claimer info + poster action */}
                   {activePost.status === 'WaitingApproval' && activePost.claimerName && (
                     <Box sx={{ p: 1.5, bgcolor: 'warning.lighter', borderRadius: 1, border: '1px solid', borderColor: 'warning.light' }}>
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
@@ -1025,15 +1092,28 @@ export default function MyScheduleView() {
                       </Typography>
                       <Typography variant="body2" fontWeight={600}>{activePost.claimerName}</Typography>
                       {activePost.needType === 'Swap' && activePost.claimerOfferedShiftName && (
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                           Đổi lại: {activePost.claimerOfferedShiftName}
                           {activePost.claimerOfferedShiftDate ? ` · ${fmtDate(activePost.claimerOfferedShiftDate)}` : ''}
                         </Typography>
                       )}
-                      <Typography variant="caption" color="warning.dark" sx={{ display: 'block', mt: 0.5 }}>
-                        Đang chờ Admin/Manager duyệt
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                        Bạn có thể duyệt ngay hoặc để Admin/Manager xử lý
                       </Typography>
                     </Box>
+                  )}
+
+                  {/* Reject note input (hiện khi bấm Từ chối) */}
+                  {activePost.status === 'WaitingApproval' && showRejectNote && (
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={2}
+                      label="Lý do từ chối (tuỳ chọn)"
+                      value={rejectNote}
+                      onChange={(e) => setRejectNote(e.target.value)}
+                      autoFocus
+                    />
                   )}
 
                   {/* Rejected note nếu có */}
@@ -1046,7 +1126,8 @@ export default function MyScheduleView() {
                 </Stack>
               )}
             </DialogContent>
-            <DialogActions>
+            <DialogActions sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+              {/* Open: chỉ có Huỷ bài đăng */}
               {activePost?.status === 'Open' && (
                 <Button
                   variant="outlined"
@@ -1057,7 +1138,51 @@ export default function MyScheduleView() {
                   {cancellingPost ? 'Đang huỷ...' : 'Huỷ bài đăng'}
                 </Button>
               )}
-              <Button color="inherit" onClick={() => { setOpenManagePost(false); setSelectedEvent(null); }}>
+
+              {/* WaitingApproval: Duyệt + Từ chối (poster có thể tự quyết) */}
+              {activePost?.status === 'WaitingApproval' && !showRejectNote && (
+                <>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={handleApprovePost}
+                    disabled={reviewingPost}
+                  >
+                    {reviewingPost ? 'Đang duyệt...' : 'Duyệt'}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={() => setShowRejectNote(true)}
+                    disabled={reviewingPost}
+                  >
+                    Từ chối
+                  </Button>
+                </>
+              )}
+
+              {/* Sau khi bấm Từ chối: hiện nút Xác nhận */}
+              {activePost?.status === 'WaitingApproval' && showRejectNote && (
+                <>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    onClick={handleRejectPost}
+                    disabled={reviewingPost}
+                  >
+                    {reviewingPost ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                  </Button>
+                  <Button
+                    color="inherit"
+                    onClick={() => { setShowRejectNote(false); setRejectNote(''); }}
+                    disabled={reviewingPost}
+                  >
+                    Quay lại
+                  </Button>
+                </>
+              )}
+
+              <Button color="inherit" onClick={closeManagePost}>
                 Đóng
               </Button>
             </DialogActions>
