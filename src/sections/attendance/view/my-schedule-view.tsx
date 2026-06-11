@@ -164,7 +164,7 @@ export default function MyScheduleView() {
   const [myPoolPosts, setMyPoolPosts] = useState<IShiftPoolPost[]>([]);
   const [myClaims, setMyClaims] = useState<IShiftPoolPost[]>([]);
   const [visibleLayers, setVisibleLayers] = useState<Set<'personal' | 'open-pool' | 'my-claim'>>(
-    new Set(['personal', 'open-pool', 'my-claim'])
+    new Set(['personal', 'my-claim'])  // open-pool mặc định ẩn
   );
   const [claimTarget, setClaimTarget] = useState<IShiftPoolPost | null>(null);
   const [claimOfferedId, setClaimOfferedId] = useState('');
@@ -252,17 +252,42 @@ export default function MyScheduleView() {
     [openPoolPosts, monthInfo.from, monthInfo.to]
   );
 
-  // My claims (WaitingApproval or Approved), filtered to current month
+  // Chỉ WaitingApproval claims hiện trên calendar dạng tentative.
+  // Approved đã được phản ánh vào Layer A (StaffId đã cập nhật sau khi duyệt).
   const filteredMyClaims = useMemo(
     () =>
       myClaims.filter(
         (p) =>
           p.shiftDate >= monthInfo.from &&
           p.shiftDate <= monthInfo.to &&
-          (p.status === 'WaitingApproval' || p.status === 'Approved')
+          p.status === 'WaitingApproval'
       ),
     [myClaims, monthInfo.from, monthInfo.to]
   );
+
+  // PartialCover Approved (tôi là poster): badge "đang được làm hộ X giờ" trên Layer A
+  const approvedPartialCoverMap = useMemo(
+    () =>
+      new Map(
+        myPoolPosts
+          .filter((p) => p.status === 'Approved' && p.needType === 'PartialCover')
+          .map((p) => [p.shiftAssignmentId, p])
+      ),
+    [myPoolPosts]
+  );
+
+  // Toàn bộ hoạt động pool tháng này (cả poster lẫn claimer) để hiện lịch sử
+  const historyItems = useMemo(() => {
+    const posterItems = myPoolPosts
+      .filter((p) => p.shiftDate >= monthInfo.from && p.shiftDate <= monthInfo.to)
+      .map((p) => ({ role: 'poster' as const, post: p }));
+    const claimerItems = myClaims
+      .filter((p) => p.shiftDate >= monthInfo.from && p.shiftDate <= monthInfo.to)
+      .map((p) => ({ role: 'claimer' as const, post: p }));
+    return [...posterItems, ...claimerItems].sort((a, b) =>
+      b.post.shiftDate.localeCompare(a.post.shiftDate)
+    );
+  }, [myPoolPosts, myClaims, monthInfo.from, monthInfo.to]);
 
   // 3-layer calendar events
   const allEvents = useMemo(() => {
@@ -275,6 +300,7 @@ export default function MyScheduleView() {
             layerType: 'personal' as const,
             assignmentId: a.assignmentId,
             hasActivePost: postedMap.has(a.assignmentId),
+            partialCoverPost: approvedPartialCoverMap.get(a.assignmentId) ?? null,
           },
         }))
       : [];
@@ -292,21 +318,25 @@ export default function MyScheduleView() {
         }))
       : [];
 
+    // Layer C: chỉ WaitingApproval, hiện dạng tentative (mờ + viền nét đứt)
+    const TENTATIVE_COLOR = '#7986cb'; // indigo nhạt cho ca chờ duyệt
     const layerC = visibleLayers.has('my-claim')
       ? filteredMyClaims.map((p) => ({
           id: `claim-${p.id}`,
-          title: `✓ ${needTypeLabel(p.needType)} · ${p.shiftName}`,
+          title: `⏳ ${needTypeLabel(p.needType)} · ${p.shiftName}`,
           start: new Date(`${p.shiftDate}T${p.shiftStartTime}`).getTime(),
           end: new Date(`${p.shiftDate}T${p.shiftEndTime}`).getTime(),
           allDay: false,
-          color: statusHex(p.status),
+          backgroundColor: `${TENTATIVE_COLOR}55`,
+          borderColor: TENTATIVE_COLOR,
+          textColor: TENTATIVE_COLOR,
           description: '',
-          extendedProps: { layerType: 'my-claim' as const, post: p },
+          extendedProps: { layerType: 'my-claim' as const, post: p, tentative: true },
         }))
       : [];
 
     return [...layerA, ...layerB, ...layerC];
-  }, [assignments, visibleLayers, postedMap, filteredOpenPosts, filteredMyClaims]);
+  }, [assignments, visibleLayers, postedMap, approvedPartialCoverMap, filteredOpenPosts, filteredMyClaims]);
 
   const handleChangeView = useCallback((newView: ICalendarView) => {
       const calendarApi = calendarRef.current.getApi();
@@ -693,7 +723,7 @@ export default function MyScheduleView() {
                   [
                     { key: 'personal', label: 'Lịch của tôi', color: '#42A5F5' },
                     { key: 'open-pool', label: 'Chợ ca', color: '#1976d2' },
-                    { key: 'my-claim', label: 'Ca tôi nhận', color: '#2e7d32' },
+                    { key: 'my-claim', label: 'Ca chờ nhận', color: '#7986cb' },
                   ] as const
                 ).map(({ key, label, color }) => {
                   const active = visibleLayers.has(key);
@@ -745,21 +775,24 @@ export default function MyScheduleView() {
                   plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
                   eventContent={(eventInfo) => {
                     const ep = (eventInfo.event.extendedProps ?? {}) as any;
+                    const isTentative = ep.tentative === true;
                     let color: string;
                     if (ep.layerType === 'personal') {
                       const assignment = assignments.find((a) => a.assignmentId === ep.assignmentId);
                       color = assignment ? getEventColor(assignment) : '#9E9E9E';
                       if (ep.hasActivePost) color = POOL_POSTED_COLOR;
                     } else {
-                      color = eventInfo.event.backgroundColor || '#1976d2';
+                      color = eventInfo.event.backgroundColor?.replace(/55$/, '') || '#7986cb';
                     }
                     return (
                       <Box
                         sx={{
-                          width: "100%",
+                          width: '100%',
                           borderRadius: 1,
-                          overflow: "hidden",
-                          fontSize: 12
+                          overflow: 'hidden',
+                          fontSize: 12,
+                          opacity: isTentative ? 0.75 : 1,
+                          border: isTentative ? `1.5px dashed ${color}` : 'none',
                         }}
                       >
                         <Box
@@ -767,13 +800,32 @@ export default function MyScheduleView() {
                             px: 1,
                             py: 0.5,
                             fontWeight: 600,
-                            borderBottom: "1px solid rgba(255,255,255,0.3)",
+                            borderBottom: '1px solid rgba(255,255,255,0.3)',
                             color,
                             backgroundColor: `${color}33`,
                           }}
                         >
                           {eventInfo.event.title}
                         </Box>
+                        {/* Badge: ca đang được làm hộ 1 phần (PartialCover Approved) */}
+                        {ep.layerType === 'personal' && ep.partialCoverPost && (
+                          <Box
+                            sx={{
+                              px: 1,
+                              py: 0.25,
+                              fontSize: 10,
+                              fontWeight: 500,
+                              bgcolor: '#ed6c0218',
+                              color: '#e65100',
+                              borderTop: '1px solid #ed6c0230',
+                            }}
+                          >
+                            🤝 {ep.partialCoverPost.claimerName}
+                            {ep.partialCoverPost.coveringHours
+                              ? ` · ${ep.partialCoverPost.coveringHours.toFixed(1)}h`
+                              : ''}
+                          </Box>
+                        )}
                       </Box>
                     );
                   }}
@@ -847,11 +899,81 @@ export default function MyScheduleView() {
                 <LegendDot color="#FFA726" label="Đi muộn" />
                 <LegendDot color="#66BB6A" label="Hoàn thành" />
                 <LegendDot color={POOL_POSTED_COLOR} label="Đang đăng pool" />
-                <LegendDot color="#1976d2" label="Chợ ca – Đổi ca" />
-                <LegendDot color="#7b1fa2" label="Chợ ca – Làm hộ cả ca" />
-                <LegendDot color="#ed6c02" label="Chợ ca – Làm hộ 1 phần" />
-                <LegendDot color="#ed6c02" label="Ca nhận – Chờ duyệt" />
-                <LegendDot color="#2e7d32" label="Ca nhận – Đã duyệt" />
+                <LegendDot color="#e65100" label="Có người làm hộ 1 phần" />
+                <LegendDot color="#1976d2" label="Chợ ca – Đổi ca (khi bật)" />
+                <LegendDot color="#7b1fa2" label="Chợ ca – Làm hộ cả ca (khi bật)" />
+                <LegendDot color="#ed6c02" label="Chợ ca – Làm hộ 1 phần (khi bật)" />
+                <LegendDot color="#7986cb" label="Ca đang chờ nhận (nét đứt)" />
+              </Stack>
+            </Card>
+          )}
+
+          {/* Lịch sử đổi ca & làm hộ tháng này */}
+          {historyItems.length > 0 && (
+            <Card sx={{ mt: 3, p: 3 }}>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                Lịch sử đổi ca & làm hộ
+              </Typography>
+              <Stack spacing={1.5}>
+                {historyItems.map(({ role, post }) => (
+                  <Box
+                    key={`${role}-${post.id}`}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <Label variant="soft" color={role === 'poster' ? 'warning' : 'info'} sx={{ flexShrink: 0 }}>
+                      {role === 'poster' ? 'Bạn đăng' : 'Bạn nhận'}
+                    </Label>
+
+                    <Label variant="soft" color="default" sx={{ flexShrink: 0 }}>
+                      {needTypeLabel(post.needType)}
+                    </Label>
+
+                    <Box sx={{ flexGrow: 1, minWidth: 140 }}>
+                      <Typography variant="body2" fontWeight={500}>
+                        {post.shiftName} · {fmtDate(post.shiftDate)}
+                      </Typography>
+                      {post.needType === 'PartialCover' && post.partialStartTime && (
+                        <Typography variant="caption" color="text.secondary">
+                          {post.partialStartTime.slice(0, 5)} – {post.partialEndTime?.slice(0, 5)}
+                        </Typography>
+                      )}
+                      {post.needType === 'Swap' && role === 'claimer' && post.claimerOfferedShiftName && (
+                        <Typography variant="caption" color="text.secondary">
+                          Đổi lại: {post.claimerOfferedShiftName}
+                          {post.claimerOfferedShiftDate ? ` · ${fmtDate(post.claimerOfferedShiftDate)}` : ''}
+                        </Typography>
+                      )}
+                    </Box>
+
+                    <Box sx={{ minWidth: 90 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        {role === 'poster' ? 'Người nhận' : 'Người đăng'}
+                      </Typography>
+                      <Typography variant="body2">
+                        {role === 'poster' ? (post.claimerName || '—') : post.posterName}
+                      </Typography>
+                    </Box>
+
+                    {post.extraPayAmount != null && post.extraPayAmount > 0 && (
+                      <Typography variant="body2" color="success.main" fontWeight={600} sx={{ flexShrink: 0 }}>
+                        +{post.extraPayAmount.toLocaleString('vi-VN')}đ
+                      </Typography>
+                    )}
+
+                    <Label variant="soft" color={poolStatusColor(post.status)} sx={{ flexShrink: 0 }}>
+                      {poolStatusLabel(post.status)}
+                    </Label>
+                  </Box>
+                ))}
               </Stack>
             </Card>
           )}
