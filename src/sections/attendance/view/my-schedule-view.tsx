@@ -11,6 +11,8 @@ import { EventClickArg } from '@fullcalendar/core';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
+import Paper from '@mui/material/Paper';
+import Portal from '@mui/material/Portal';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
@@ -187,6 +189,10 @@ export default function MyScheduleView() {
 
   // Tour state
   const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
+  // Sample popup shown by the "Đổi ca & Làm hộ" tour (illustrative only, no real data)
+  const [tourDemo, setTourDemo] = useState<null | 'publish' | 'claim' | 'manage'>(null);
+  const tourDemoRef = useRef(setTourDemo);
+  tourDemoRef.current = setTourDemo;
 
   const fetchSchedule = useCallback(async () => {
     setLoading(true);
@@ -632,6 +638,58 @@ export default function MyScheduleView() {
           },
         ],
       },
+      {
+        tourKey: 'my-schedule-pool-guide',
+        label: 'Đổi ca & Làm hộ',
+        steps: [
+          {
+            element: '#tour-layer-chips',
+            onHighlightStarted: () => tourDemoRef.current(null),
+            popover: {
+              title: '🔄 Đổi ca & Làm hộ ngay trên lịch',
+              description:
+                'Ngay tại lịch cá nhân, bạn có thể đăng ca cần đổi/nhờ làm hộ và nhận ca của người khác. 3 lớp hiển thị:\n\n🟦 Lịch của tôi — ca được phân của bạn\n🔵 Chợ ca — ca người khác đang cần đổi/làm hộ (mặc định ẩn, bật để xem)\n🟣 Ca chờ nhận — ca bạn đã nhận, đang chờ duyệt\n\nNhấn vào từng chip để bật/tắt lớp tương ứng.',
+              side: 'bottom' as const,
+              align: 'start' as const,
+            },
+          },
+          {
+            onHighlightStarted: () => tourDemoRef.current('publish'),
+            popover: {
+              title: '1️⃣ Đăng ca lên Chợ',
+              description:
+                'Nhấn vào một ca của bạn trên lịch → chọn "Đăng lên pool". Chọn 1 trong 3 loại nhu cầu (xem popup mẫu bên trên):\n\n• Đổi ca — đổi lấy ca của người nhận\n• Làm hộ cả ca — nhờ người khác làm trọn ca\n• Làm hộ 1 phần — chỉ nhờ một khoảng giờ (đến muộn / về sớm)\n\nSau khi đăng, ca xuất hiện ở Chợ ca cho người khác nhận.',
+            },
+          },
+          {
+            onHighlightStarted: () => tourDemoRef.current('claim'),
+            popover: {
+              title: '2️⃣ Nhận / Đổi ca từ Chợ',
+              description:
+                'Bật lớp "Chợ ca", nhấn vào ca của người khác để mở popup nhận (xem mẫu bên trên):\n\n• Làm hộ → xác nhận nhận ca, xem phụ cấp (nếu là làm hộ 1 phần)\n• Đổi ca → chọn một ca của bạn để đổi lại\n\nSau khi nhận, ca chuyển sang trạng thái "Chờ duyệt".',
+            },
+          },
+          {
+            onHighlightStarted: () => tourDemoRef.current('manage'),
+            popover: {
+              title: '3️⃣ Duyệt người nhận',
+              description:
+                'Ca bạn đã đăng và có người nhận sẽ hiển thị viền cam. Nhấn vào để mở popup quản lý (xem mẫu bên trên): bạn có thể Duyệt ngay hoặc Từ chối người nhận, hoặc để Admin/Manager xử lý.\n\nTrạng thái: Đang mở → Chờ duyệt → Đã duyệt.',
+            },
+          },
+          {
+            element: '#tour-month-summary',
+            onHighlightStarted: () => tourDemoRef.current(null),
+            popover: {
+              title: 'Hoàn thành! 🎉',
+              description:
+                'Bạn đã nắm được cách Đổi ca & Làm hộ ngay trên lịch. Lịch sử các lượt đăng/nhận hiển thị bên dưới phần tổng quan tháng. Nhấn ❓ bất kỳ lúc nào để xem lại.',
+              side: 'top' as const,
+              align: 'start' as const,
+            },
+          },
+        ],
+      },
     ],
     []
   );
@@ -641,7 +699,14 @@ export default function MyScheduleView() {
     resetAndRestartAll,
     completedMap,
     tours: tourList,
-  } = usePageTours({ tours: SCHEDULE_TOURS });
+  } = usePageTours({
+    tours: SCHEDULE_TOURS,
+    // Mờ nền vừa phải để vẫn đọc được popup mẫu phía trên; dọn popup mẫu khi đóng tour
+    driverConfig: {
+      overlayOpacity: 0.5,
+      onDestroyed: () => tourDemoRef.current(null),
+    },
+  });
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
@@ -722,7 +787,7 @@ export default function MyScheduleView() {
               />
 
               {/* Layer filter chips */}
-              <Stack direction="row" spacing={1} sx={{ px: 2, pb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+              <Stack id="tour-layer-chips" direction="row" spacing={1} sx={{ px: 2, pb: 1.5, flexWrap: 'wrap', gap: 1 }}>
                 {(
                   [
                     { key: 'personal', label: 'Lịch của tôi', color: '#42A5F5' },
@@ -1580,6 +1645,117 @@ export default function MyScheduleView() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* ── Popup MẪU cho tour "Đổi ca & Làm hộ" (chỉ minh hoạ, không thao tác thật) ── */}
+      {tourDemo && (
+        <Portal>
+          <Paper
+            elevation={12}
+            sx={{
+              position: 'fixed',
+              top: 76,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 'min(380px, 92vw)',
+              maxHeight: '42vh',
+              overflowY: 'auto',
+              p: 2,
+              borderRadius: 2,
+              // Trên overlay tối của driver (z-index 1e9) để popup mẫu hiển thị rõ.
+              // pointerEvents:none nên dù có chồng lên popover tour, nút "Tiếp" vẫn bấm được.
+              zIndex: 1_000_000_002,
+              pointerEvents: 'none',
+            }}
+          >
+            <Box sx={{ mb: 1.5 }}>
+              <Label variant="soft" color="info" sx={{ fontWeight: 700, fontSize: 10 }}>
+                MẪU HƯỚNG DẪN
+              </Label>
+            </Box>
+
+            {tourDemo === 'publish' && (
+              <Stack spacing={1.5}>
+                <Typography variant="subtitle1" fontWeight={700}>Đăng ca lên Chợ ca</Typography>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Ca</Typography>
+                  <Typography variant="body2" fontWeight={600}>Ca Sáng · 24/06/2026 · 08:30–12:30</Typography>
+                </Box>
+                <Typography variant="caption" color="text.secondary">Bạn cần gì?</Typography>
+                <Stack spacing={1}>
+                  {[
+                    { t: 'Đổi ca', d: 'Đổi lấy ca của người nhận', c: needTypeHex('Swap'), on: false },
+                    { t: 'Làm hộ cả ca', d: 'Nhờ làm trọn ca', c: needTypeHex('FullCover'), on: false },
+                    { t: 'Làm hộ 1 phần', d: 'Chỉ nhờ một khoảng giờ', c: needTypeHex('PartialCover'), on: true },
+                  ].map((o) => (
+                    <Box key={o.t} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, borderRadius: 1, border: '1.5px solid', borderColor: o.on ? o.c : 'divider', bgcolor: o.on ? `${o.c}14` : 'transparent' }}>
+                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: o.c }} />
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" fontWeight={o.on ? 700 : 500} sx={{ color: o.on ? o.c : 'text.primary' }}>{o.t}</Typography>
+                        <Typography variant="caption" color="text.secondary">{o.d}</Typography>
+                      </Box>
+                      {o.on && <Iconify icon="eva:checkmark-circle-2-fill" sx={{ color: o.c }} />}
+                    </Box>
+                  ))}
+                </Stack>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Khoảng giờ làm hộ</Typography>
+                  <Typography variant="body2">11:00 – 12:30 · Về sớm</Typography>
+                </Box>
+                <Button variant="contained" size="small" sx={{ alignSelf: 'flex-end' }}>Đăng</Button>
+              </Stack>
+            )}
+
+            {tourDemo === 'claim' && (
+              <Stack spacing={1.5}>
+                <Typography variant="subtitle1" fontWeight={700}>Nhận ca từ Chợ</Typography>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Ca cần đổi</Typography>
+                  <Typography variant="body2" fontWeight={600}>Ca Chiều · 24/06/2026 · 12:30–18:00</Typography>
+                  <Typography variant="caption" color="text.secondary">Người đăng: Nguyễn Văn A · Loại: Đổi ca</Typography>
+                </Box>
+                <Typography variant="caption" color="text.secondary">Chọn ca của bạn để đổi lại</Typography>
+                <Stack spacing={1}>
+                  {[
+                    { n: 'Ca Sáng · 25/06 · 08:30–12:30', on: true },
+                    { n: 'Ca Tối · 26/06 · 18:00–22:00', on: false },
+                  ].map((s) => (
+                    <Box key={s.n} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, borderRadius: 1, border: '1.5px solid', borderColor: s.on ? 'primary.main' : 'divider', bgcolor: s.on ? 'primary.lighter' : 'transparent' }}>
+                      <Typography variant="body2" sx={{ flex: 1 }} fontWeight={s.on ? 700 : 500}>{s.n}</Typography>
+                      {s.on && <Iconify icon="eva:checkmark-circle-2-fill" sx={{ color: 'primary.main' }} />}
+                    </Box>
+                  ))}
+                </Stack>
+                <Button variant="contained" size="small" sx={{ alignSelf: 'flex-end' }}>Xác nhận nhận ca</Button>
+              </Stack>
+            )}
+
+            {tourDemo === 'manage' && (
+              <Stack spacing={1.5}>
+                <Typography variant="subtitle1" fontWeight={700}>Bài đăng của bạn</Typography>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Ca</Typography>
+                  <Typography variant="body2" fontWeight={600}>Ca Sáng · 24/06/2026 · 08:30–12:30 · Đổi ca</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Trạng thái</Typography>
+                  <Box sx={{ mt: 0.5 }}>
+                    <Label variant="soft" color="warning">Chờ duyệt</Label>
+                  </Box>
+                </Box>
+                <Box sx={{ p: 1.5, bgcolor: 'warning.lighter', borderRadius: 1, border: '1px solid', borderColor: 'warning.light' }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Người muốn nhận ca</Typography>
+                  <Typography variant="body2" fontWeight={600}>Trần Thị B</Typography>
+                  <Typography variant="caption" color="text.secondary">Đổi lại: Ca Chiều · 25/06</Typography>
+                </Box>
+                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                  <Button variant="outlined" color="error" size="small">Từ chối</Button>
+                  <Button variant="contained" color="success" size="small">Duyệt</Button>
+                </Stack>
+              </Stack>
+            )}
+          </Paper>
+        </Portal>
+      )}
     </Container>
   );
 }
