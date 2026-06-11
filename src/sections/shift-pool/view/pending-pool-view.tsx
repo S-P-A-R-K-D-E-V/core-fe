@@ -43,6 +43,7 @@ import { TableHeadCustom, TableNoData } from 'src/components/table';
 import type { IShiftPoolPost } from 'src/types/corecms-api';
 
 import { getPendingShiftPoolPosts, reviewShiftPoolPost } from 'src/api/shiftPool';
+import { useShiftNotificationRefresh } from 'src/hooks/use-shift-notification-refresh';
 
 import PoolCalendar from './pool-calendar';
 import LegendDot from './pool-legend';
@@ -177,6 +178,8 @@ export default function PendingPoolView() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useShiftNotificationRefresh(fetchData);
 
   const openReview = (post: IShiftPoolPost) => {
     setTarget(post);

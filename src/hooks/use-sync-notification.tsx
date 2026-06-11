@@ -168,6 +168,8 @@ export function SyncNotificationProvider({ children }: Props) {
       setDbNotifications((prev) => [notification, ...prev]);
       setDbUnreadCount((prev) => prev + 1);
       setDbTotalCount((prev) => prev + 1);
+      // Phát custom event để các component hiện toast + âm thanh
+      window.dispatchEvent(new CustomEvent('shift-notification', { detail: notification }));
     });
 
     connection.on('ForceLogout', (payload: { Reason: string }) => {

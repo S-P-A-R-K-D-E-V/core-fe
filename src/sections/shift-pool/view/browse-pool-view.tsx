@@ -43,6 +43,7 @@ import type { IShiftAssignment, IShiftPoolPost } from 'src/types/corecms-api';
 
 import { getMySchedule } from 'src/api/attendance';
 import { claimShiftPoolPost, getOpenShiftPoolPosts } from 'src/api/shiftPool';
+import { useShiftNotificationRefresh } from 'src/hooks/use-shift-notification-refresh';
 
 import PoolCalendar from './pool-calendar';
 import LegendDot from './pool-legend';
@@ -96,6 +97,8 @@ export default function BrowsePoolView() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useShiftNotificationRefresh(fetchData);
 
   // Khi mở dialog nhận ca dạng Swap: tải các ca SẮP TỚI của chính mình (dùng my-schedule
   // vì endpoint /range chỉ cho Admin/Manager). Lọc bỏ ca đã bắt đầu và ca trùng đúng ca đang đăng.

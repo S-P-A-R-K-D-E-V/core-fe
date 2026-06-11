@@ -41,6 +41,7 @@ import { TableHeadCustom, TableNoData } from 'src/components/table';
 import type { IShiftPoolPost } from 'src/types/corecms-api';
 
 import { cancelShiftPoolPost, getMyShiftPoolPosts, reviewShiftPoolPost } from 'src/api/shiftPool';
+import { useShiftNotificationRefresh } from 'src/hooks/use-shift-notification-refresh';
 
 import PoolCalendar from './pool-calendar';
 import LegendDot from './pool-legend';
@@ -140,6 +141,8 @@ export default function MyPoolPostsView() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useShiftNotificationRefresh(fetchData);
 
   const handleCancel = async (id: string) => {
     try {

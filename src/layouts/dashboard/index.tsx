@@ -15,6 +15,7 @@ import { useBoolean } from 'src/hooks/use-boolean';
 import { useResponsive } from 'src/hooks/use-responsive';
 import { useMobileView } from 'src/hooks/use-mobile-view';
 import { SyncNotificationProvider } from 'src/hooks/use-sync-notification';
+import { useShiftNotificationAlert } from 'src/hooks/use-shift-notification-alert';
 
 import Iconify from 'src/components/iconify';
 import { useSettingsContext } from 'src/components/settings';
@@ -32,6 +33,14 @@ import NavBottom from './nav-bottom';
 import NavVertical from './nav-vertical';
 import NavHorizontal from './nav-horizontal';
 import { BOTTOM_NAV } from '../config-layout';
+
+// ----------------------------------------------------------------------
+
+// Component nhỏ để gọi hook trong cây provider đúng chỗ
+function ShiftNotificationAlert() {
+  useShiftNotificationAlert();
+  return null;
+}
 
 // ----------------------------------------------------------------------
 
@@ -124,6 +133,7 @@ export default function DashboardLayout({ children }: Props) {
     return (
       <SyncNotificationProvider>
         <MessengerProvider>
+          <ShiftNotificationAlert />
           <Header onOpenNav={nav.onTrue} />
           {lgUp ? renderHorizontal : renderNavVertical}
           <Main sx={mobileNavSx}>{children}</Main>
@@ -144,6 +154,7 @@ export default function DashboardLayout({ children }: Props) {
     return (
       <SyncNotificationProvider>
         <MessengerProvider>
+          <ShiftNotificationAlert />
           <Header onOpenNav={nav.onTrue} />
           <Box
             sx={{
@@ -171,6 +182,7 @@ export default function DashboardLayout({ children }: Props) {
   return (
     <SyncNotificationProvider>
       <MessengerProvider>
+        <ShiftNotificationAlert />
         <Header onOpenNav={nav.onTrue} />
         <Box
           sx={{
