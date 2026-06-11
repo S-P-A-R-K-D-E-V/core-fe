@@ -44,7 +44,7 @@ import Label from 'src/components/label';
 import { IShiftSchedule, IShiftAssignment, IAttendanceLog, IShiftPoolPost, PoolNeedType } from 'src/types/corecms-api';
 import { ICalendarEvent, ICalendarView } from 'src/types/calendar';
 import { getMySchedule, getMyAttendanceLogs, getShiftSchedulesByDateRange } from 'src/api/attendance';
-import { claimShiftPoolPost, createShiftPoolPost, getMyShiftPoolClaims, getMyShiftPoolPosts, getOpenShiftPoolPosts } from 'src/api/shiftPool';
+import { cancelShiftPoolPost, claimShiftPoolPost, createShiftPoolPost, getMyShiftPoolClaims, getMyShiftPoolPosts, getOpenShiftPoolPosts } from 'src/api/shiftPool';
 import { fmtDate, needTypeHex, needTypeLabel, partialCoverSubTypeLabel, poolStatusColor, poolStatusLabel, statusHex } from 'src/sections/shift-pool/view/pool-helpers';
 import LegendDot from 'src/sections/shift-pool/view/pool-legend';
 
@@ -171,6 +171,10 @@ export default function MyScheduleView() {
   const [claimMyAssignments, setClaimMyAssignments] = useState<IShiftAssignment[]>([]);
   const [claimSubmitting, setClaimSubmitting] = useState(false);
   const [claimDetailTarget, setClaimDetailTarget] = useState<IShiftPoolPost | null>(null);
+
+  // Manage-post dialog (khi click ca amber đang có post active)
+  const [openManagePost, setOpenManagePost] = useState(false);
+  const [cancellingPost, setCancellingPost] = useState(false);
 
   // Tour state
   const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
@@ -326,11 +330,15 @@ export default function MyScheduleView() {
 
   const handleClickEvent = useCallback(
     (arg: EventClickArg) => {
-      const { layerType, assignmentId, post } = (arg.event.extendedProps ?? {}) as any;
+      const { layerType, assignmentId, hasActivePost, post } = (arg.event.extendedProps ?? {}) as any;
       if (layerType === 'personal') {
         const assignment = assignments.find((a) => a.assignmentId === assignmentId);
-        if (assignment) {
-          setSelectedEvent(assignment);
+        if (!assignment) return;
+        setSelectedEvent(assignment);
+        if (hasActivePost && postedMap.has(assignmentId)) {
+          // Ca đang có bài đăng pool → mở dialog quản lý post
+          setOpenManagePost(true);
+        } else {
           setOpenDialog(true);
         }
       } else if (layerType === 'open-pool') {
@@ -340,7 +348,7 @@ export default function MyScheduleView() {
       } else if (layerType === 'my-claim') {
         setClaimDetailTarget(post);
       } else {
-        // fallback for legacy events without extendedProps
+        // fallback cho events chưa có extendedProps
         const assignment = assignments.find((a) => a.assignmentId === arg.event.id);
         if (assignment) {
           setSelectedEvent(assignment);
@@ -348,7 +356,7 @@ export default function MyScheduleView() {
         }
       }
     },
-    [assignments]
+    [assignments, postedMap]
   );
 
   const handleCloseDialog = useCallback(() => {
@@ -419,8 +427,11 @@ export default function MyScheduleView() {
     }
   }, [selectedEvent, needType, partialStart, partialEnd, poolNote, enqueueSnackbar]);
 
-  // Chỉ cho đăng ca lên pool khi chưa check-in (ca chưa diễn ra)
-  const canPublishSelected = !!selectedEvent && !selectedEvent.attendanceLog?.checkInTime;
+  // Chỉ cho đăng ca lên pool khi chưa check-in và chưa có bài đăng active
+  const canPublishSelected =
+    !!selectedEvent &&
+    !selectedEvent.attendanceLog?.checkInTime &&
+    !postedMap.has(selectedEvent.assignmentId);
 
   // Load upcoming assignments for Swap claim
   useEffect(() => {
@@ -459,6 +470,24 @@ export default function MyScheduleView() {
       setClaimSubmitting(false);
     }
   }, [claimTarget, claimOfferedId, enqueueSnackbar, fetchSchedule]);
+
+  const handleCancelPost = useCallback(async () => {
+    if (!selectedEvent) return;
+    const post = postedMap.get(selectedEvent.assignmentId);
+    if (!post) return;
+    setCancellingPost(true);
+    try {
+      await cancelShiftPoolPost(post.id);
+      enqueueSnackbar('Đã huỷ bài đăng.', { variant: 'success' });
+      setOpenManagePost(false);
+      setSelectedEvent(null);
+      fetchSchedule();
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Huỷ thất bại!', { variant: 'error' });
+    } finally {
+      setCancellingPost(false);
+    }
+  }, [selectedEvent, postedMap, enqueueSnackbar, fetchSchedule]);
 
   // ── Tour definitions ──
 
@@ -930,6 +959,111 @@ export default function MyScheduleView() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Manage-post dialog — khi click ca amber đang có bài đăng pool active */}
+      {(() => {
+        const activePost = selectedEvent ? postedMap.get(selectedEvent.assignmentId) : undefined;
+        return (
+          <Dialog
+            fullWidth
+            maxWidth="xs"
+            open={openManagePost}
+            onClose={() => { setOpenManagePost(false); setSelectedEvent(null); }}
+          >
+            <DialogTitle>Bài đăng của bạn</DialogTitle>
+            <DialogContent>
+              {activePost && selectedEvent && (
+                <Stack spacing={2} sx={{ pt: 1 }}>
+                  {/* Assignment info */}
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Ca</Typography>
+                    <Typography variant="subtitle2">
+                      {selectedEvent.shiftName} · {new Date(selectedEvent.date).toLocaleDateString('vi-VN')} · {(selectedEvent.startTime || selectedEvent.shiftStartTime || '').slice(0,5)}-{(selectedEvent.endTime || selectedEvent.shiftEndTime || '').slice(0,5)}
+                    </Typography>
+                  </Box>
+
+                  {/* Post type */}
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Loại yêu cầu</Typography>
+                    <Typography variant="body2">{needTypeLabel(activePost.needType)}</Typography>
+                  </Box>
+
+                  {/* Partial time */}
+                  {activePost.needType === 'PartialCover' && activePost.partialStartTime && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Khoảng giờ</Typography>
+                      <Typography variant="body2">
+                        {activePost.partialStartTime.slice(0,5)} – {activePost.partialEndTime?.slice(0,5)}
+                        {' · '}{partialCoverSubTypeLabel(activePost.partialStartTime, activePost.partialEndTime, selectedEvent.startTime || selectedEvent.shiftStartTime, selectedEvent.endTime || selectedEvent.shiftEndTime).label}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Note */}
+                  {activePost.note && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Ghi chú</Typography>
+                      <Typography variant="body2">{activePost.note}</Typography>
+                    </Box>
+                  )}
+
+                  {/* Status */}
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Trạng thái</Typography>
+                    <Box sx={{ mt: 0.5 }}>
+                      <Label variant="soft" color={poolStatusColor(activePost.status)}>
+                        {poolStatusLabel(activePost.status)}
+                      </Label>
+                    </Box>
+                  </Box>
+
+                  {/* WaitingApproval: claimer info */}
+                  {activePost.status === 'WaitingApproval' && activePost.claimerName && (
+                    <Box sx={{ p: 1.5, bgcolor: 'warning.lighter', borderRadius: 1, border: '1px solid', borderColor: 'warning.light' }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                        Người muốn nhận ca
+                      </Typography>
+                      <Typography variant="body2" fontWeight={600}>{activePost.claimerName}</Typography>
+                      {activePost.needType === 'Swap' && activePost.claimerOfferedShiftName && (
+                        <Typography variant="caption" color="text.secondary">
+                          Đổi lại: {activePost.claimerOfferedShiftName}
+                          {activePost.claimerOfferedShiftDate ? ` · ${fmtDate(activePost.claimerOfferedShiftDate)}` : ''}
+                        </Typography>
+                      )}
+                      <Typography variant="caption" color="warning.dark" sx={{ display: 'block', mt: 0.5 }}>
+                        Đang chờ Admin/Manager duyệt
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Rejected note nếu có */}
+                  {activePost.lastClaimRejectedNote && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Lý do từ chối lần trước</Typography>
+                      <Typography variant="body2" color="error.main">{activePost.lastClaimRejectedNote}</Typography>
+                    </Box>
+                  )}
+                </Stack>
+              )}
+            </DialogContent>
+            <DialogActions>
+              {activePost?.status === 'Open' && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={handleCancelPost}
+                  disabled={cancellingPost}
+                >
+                  {cancellingPost ? 'Đang huỷ...' : 'Huỷ bài đăng'}
+                </Button>
+              )}
+              <Button color="inherit" onClick={() => { setOpenManagePost(false); setSelectedEvent(null); }}>
+                Đóng
+              </Button>
+            </DialogActions>
+          </Dialog>
+        );
+      })()}
 
       {/* Claim dialog — khi click vào ca trong Chợ ca */}
       <Dialog fullWidth maxWidth="xs" open={!!claimTarget} onClose={() => setClaimTarget(null)}>
