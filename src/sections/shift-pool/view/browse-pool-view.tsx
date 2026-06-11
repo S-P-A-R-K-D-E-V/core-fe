@@ -47,7 +47,7 @@ import { useShiftNotificationRefresh } from 'src/hooks/use-shift-notification-re
 
 import PoolCalendar from './pool-calendar';
 import LegendDot from './pool-legend';
-import { fmtDate, needTypeHex, needTypeLabel, partialCoverSubTypeLabel, poolStatusColor } from './pool-helpers';
+import { fmtDate, needTypeHex, needTypeLabel, partialCoverSubTypeLabel, partialSideLabel, poolStatusColor } from './pool-helpers';
 
 // ----------------------------------------------------------------------
 
@@ -353,7 +353,9 @@ export default function BrowsePoolView() {
                       <td style={{ padding: '16px' }}>{row.shiftName}</td>
                       <td style={{ padding: '16px' }}>{fmtDate(row.shiftDate)}</td>
                       <td style={{ padding: '16px' }}>
-                        {row.needType === 'PartialCover' && row.partialStartTime
+                        {row.needType === 'PartialCover' && row.partialSide
+                          ? partialSideLabel(row.partialSide)
+                          : row.needType === 'PartialCover' && row.partialStartTime
                           ? `${row.partialStartTime} - ${row.partialEndTime}`
                           : `${row.shiftStartTime} - ${row.shiftEndTime}`}
                       </td>
@@ -388,7 +390,9 @@ export default function BrowsePoolView() {
                 </Typography>
                 <Typography variant="subtitle2">
                   {target.shiftName} · {fmtDate(target.shiftDate)} ·{' '}
-                  {target.needType === 'PartialCover' && target.partialStartTime
+                  {target.needType === 'PartialCover' && target.partialSide
+                    ? partialSideLabel(target.partialSide)
+                    : target.needType === 'PartialCover' && target.partialStartTime
                     ? `${target.partialStartTime} - ${target.partialEndTime}`
                     : `${target.shiftStartTime} - ${target.shiftEndTime}`}
                 </Typography>
@@ -422,7 +426,19 @@ export default function BrowsePoolView() {
                   </TextField>
                 </>
               ) : target.needType === 'PartialCover' ? (
-                (() => {
+                target.partialSide ? (
+                  <Stack spacing={1}>
+                    <Typography variant="body2" fontWeight={600}>
+                      {partialSideLabel(target.partialSide)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {target.partialSide === 'LateArrive'
+                        ? 'Bạn cần có ca liền TRƯỚC ca này. Phụ cấp tính theo giờ người nhờ check-in thực tế.'
+                        : 'Bạn cần có ca liền SAU ca này. Phụ cấp tính theo giờ người nhờ check-out thực tế.'}{' '}
+                      Người đăng sẽ xác nhận sau khi bạn nhận.
+                    </Typography>
+                  </Stack>
+                ) : (() => {
                   const sub = partialCoverSubTypeLabel(
                     target.partialStartTime,
                     target.partialEndTime,
