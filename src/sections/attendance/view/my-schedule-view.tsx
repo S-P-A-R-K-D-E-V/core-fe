@@ -45,6 +45,7 @@ import { IShiftSchedule, IShiftAssignment, IAttendanceLog, IShiftPoolPost, PoolN
 import { ICalendarEvent, ICalendarView } from 'src/types/calendar';
 import { getMySchedule, getMyAttendanceLogs, getShiftSchedulesByDateRange } from 'src/api/attendance';
 import { cancelShiftPoolPost, claimShiftPoolPost, createShiftPoolPost, getMyShiftPoolClaims, getMyShiftPoolPosts, getOpenShiftPoolPosts, reviewShiftPoolPost } from 'src/api/shiftPool';
+import { useShiftNotificationRefresh } from 'src/hooks/use-shift-notification-refresh';
 import { fmtDate, needTypeHex, needTypeLabel, partialCoverSubTypeLabel, poolStatusColor, poolStatusLabel, statusHex } from 'src/sections/shift-pool/view/pool-helpers';
 import LegendDot from 'src/sections/shift-pool/view/pool-legend';
 
@@ -222,6 +223,9 @@ export default function MyScheduleView() {
   useEffect(() => {
     fetchSchedule();
   }, [fetchSchedule]);
+
+  // Auto-refresh calendar khi có thao tác ca liên quan đến bản thân (SignalR)
+  useShiftNotificationRefresh(fetchSchedule);
 
   // Set of my assignment IDs currently locked as offered in a WaitingApproval claim
   const lockedAsOfferedIds = useMemo(
