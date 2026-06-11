@@ -78,10 +78,11 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
 
   // 2. Connect SignalR + join group
   useEffect(() => {
-    if (!session?.sessionId || !HOST_API) return undefined;
+    if (!session?.sessionId) return undefined;
 
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl(`${HOST_API}/hubs/chat`, {
+      // HOST_API is empty on prod → relative same-origin hub URL via the ingress.
+      .withUrl(`${HOST_API || ''}/hubs/chat`, {
         accessTokenFactory: () =>
           (typeof window !== 'undefined' && sessionStorage.getItem('accessToken')) || '',
       })

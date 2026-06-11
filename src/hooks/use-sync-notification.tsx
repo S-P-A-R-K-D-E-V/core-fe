@@ -179,10 +179,13 @@ export function SyncNotificationProvider({ children }: Props) {
 
   // --- Connect to Notification Hub (persistent notifications) ---
   useEffect(() => {
-    if (!authReady || !HOST_API) return undefined;
+    // On prod HOST_API is empty (browser uses relative paths via the ingress),
+    // so DON'T gate on HOST_API — only wait for auth. Fall back to a same-origin
+    // relative hub URL when HOST_API is unset.
+    if (!authReady) return undefined;
 
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl(`${HOST_API}/hubs/notifications`, {
+      .withUrl(`${HOST_API || ''}/hubs/notifications`, {
         accessTokenFactory: () => sessionStorage.getItem('accessToken') || '',
       })
       .withAutomaticReconnect()
@@ -222,10 +225,10 @@ export function SyncNotificationProvider({ children }: Props) {
 
   // --- Connect to Sync Hub (ephemeral sync notifications) ---
   useEffect(() => {
-    if (!authReady || !HOST_API) return undefined;
+    if (!authReady) return undefined;
 
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl(`${HOST_API}/hubs/sync`, {
+      .withUrl(`${HOST_API || ''}/hubs/sync`, {
         accessTokenFactory: () => sessionStorage.getItem('accessToken') || '',
       })
       .withAutomaticReconnect()
