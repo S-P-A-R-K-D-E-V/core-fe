@@ -67,6 +67,31 @@ export const SyncNotificationContext = createContext<SyncNotificationContextType
 
 // ----------------------------------------------------------------------
 
+/**
+ * SignalR's JSON protocol preserves .NET property casing, so a hub payload may
+ * arrive as PascalCase ({ Category, Title, ... }) depending on the BE build,
+ * whereas the REST API + FE types use camelCase. Normalize defensively so every
+ * downstream consumer (popover, toast, calendar refresh) reads a consistent
+ * camelCase INotification regardless of which casing the server sent.
+ */
+function normalizeNotification(raw: any): INotification {
+  const pick = (a: string, b: string) => raw?.[a] ?? raw?.[b];
+  return {
+    id: pick('id', 'Id'),
+    title: pick('title', 'Title'),
+    message: pick('message', 'Message'),
+    category: pick('category', 'Category'),
+    actionUrl: pick('actionUrl', 'ActionUrl'),
+    data: pick('data', 'Data'),
+    isRead: pick('isRead', 'IsRead') ?? false,
+    readAt: pick('readAt', 'ReadAt'),
+    createdByName: pick('createdByName', 'CreatedByName'),
+    createdAt: pick('createdAt', 'CreatedAt') ?? new Date().toISOString(),
+  };
+}
+
+// ----------------------------------------------------------------------
+
 const SYNC_LABELS: Record<string, string> = {
   all: 'Đồng bộ toàn bộ KiotViet',
   invoices: 'Đồng bộ hóa đơn KiotViet',
@@ -164,11 +189,12 @@ export function SyncNotificationProvider({ children }: Props) {
       .configureLogging(signalR.LogLevel.Warning)
       .build();
 
-    connection.on('NewNotification', (notification: INotification) => {
+    connection.on('NewNotification', (raw: unknown) => {
+      const notification = normalizeNotification(raw);
       setDbNotifications((prev) => [notification, ...prev]);
       setDbUnreadCount((prev) => prev + 1);
       setDbTotalCount((prev) => prev + 1);
-      // Phát custom event để các component hiện toast + âm thanh
+      // Phát custom event để các component hiện toast + âm thanh + refresh calendar
       window.dispatchEvent(new CustomEvent('shift-notification', { detail: notification }));
     });
 
