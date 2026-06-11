@@ -211,18 +211,12 @@ export function useNavData(userRole?: string) {
           },
           
 
-          // ĐỔI CA & LÀM HỘ (pool hợp nhất)
+          // ĐỔI CA & LÀM HỘ (unified view — tabs: Chợ ca, Bài đăng, Ca nhận, Duyệt)
           {
             title: 'Đổi ca & Làm hộ',
             path: paths.dashboard.shiftPool.root,
             icon: ICONS.job,
             roles: ['Admin', 'Manager', 'Staff'],
-            children: [
-              { title: 'Chợ ca', path: paths.dashboard.shiftPool.browse },
-              { title: 'Bài đăng của tôi', path: paths.dashboard.shiftPool.myPosts },
-              { title: 'Ca tôi nhận', path: paths.dashboard.shiftPool.myClaims },
-              { title: 'Duyệt', path: paths.dashboard.shiftPool.pending, roles: ['Admin', 'Manager'] },
-            ],
           },
 
           // SHIFT AUDIT LOG (Admin, Manager)
