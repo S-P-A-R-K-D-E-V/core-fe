@@ -142,7 +142,11 @@ export default function MyScheduleView() {
   const smUp = useResponsive('up', 'sm');
   const calendarRef = useRef<any>(null);
 
-  const [monthOffset, setMonthOffset] = useState(0);
+  // visibleRange được cập nhật bởi datesSet callback của FullCalendar
+  // → đúng cho mọi view (month / week / list), không dùng monthOffset nữa
+  const [visibleRange, setVisibleRange] = useState<{ from: string; to: string }>(
+    () => getMonthRange(0)
+  );
   const [assignments, setAssignments] = useState<IAssignmentWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<ICalendarView>(smUp ? 'dayGridMonth' : 'listWeek');
@@ -183,14 +187,12 @@ export default function MyScheduleView() {
   // Tour state
   const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
 
-  const monthInfo = getMonthRange(monthOffset);
-
   const fetchSchedule = useCallback(async () => {
     setLoading(true);
     try {
       const [scheduleData, attendanceData, openPosts, myPosts, claims] = await Promise.all([
-        getMySchedule(monthInfo.from, monthInfo.to),
-        getMyAttendanceLogs(monthInfo.from, monthInfo.to),
+        getMySchedule(visibleRange.from, visibleRange.to),
+        getMyAttendanceLogs(visibleRange.from, visibleRange.to),
         getOpenShiftPoolPosts().catch(() => [] as IShiftPoolPost[]),
         getMyShiftPoolPosts().catch(() => [] as IShiftPoolPost[]),
         getMyShiftPoolClaims().catch(() => [] as IShiftPoolPost[]),
@@ -215,7 +217,7 @@ export default function MyScheduleView() {
     } finally {
       setLoading(false);
     }
-  }, [monthInfo.from, monthInfo.to]);
+  }, [visibleRange.from, visibleRange.to]);
 
   useEffect(() => {
     fetchSchedule();
@@ -247,9 +249,9 @@ export default function MyScheduleView() {
   const filteredOpenPosts = useMemo(
     () =>
       openPoolPosts.filter(
-        (p) => p.shiftDate >= monthInfo.from && p.shiftDate <= monthInfo.to
+        (p) => p.shiftDate >= visibleRange.from && p.shiftDate <= visibleRange.to
       ),
-    [openPoolPosts, monthInfo.from, monthInfo.to]
+    [openPoolPosts, visibleRange.from, visibleRange.to]
   );
 
   // Chỉ WaitingApproval claims hiện trên calendar dạng tentative.
@@ -258,11 +260,11 @@ export default function MyScheduleView() {
     () =>
       myClaims.filter(
         (p) =>
-          p.shiftDate >= monthInfo.from &&
-          p.shiftDate <= monthInfo.to &&
+          p.shiftDate >= visibleRange.from &&
+          p.shiftDate <= visibleRange.to &&
           p.status === 'WaitingApproval'
       ),
-    [myClaims, monthInfo.from, monthInfo.to]
+    [myClaims, visibleRange.from, visibleRange.to]
   );
 
   // PartialCover Approved (tôi là poster): badge "đang được làm hộ X giờ" trên Layer A
@@ -279,15 +281,15 @@ export default function MyScheduleView() {
   // Toàn bộ hoạt động pool tháng này (cả poster lẫn claimer) để hiện lịch sử
   const historyItems = useMemo(() => {
     const posterItems = myPoolPosts
-      .filter((p) => p.shiftDate >= monthInfo.from && p.shiftDate <= monthInfo.to)
+      .filter((p) => p.shiftDate >= visibleRange.from && p.shiftDate <= visibleRange.to)
       .map((p) => ({ role: 'poster' as const, post: p }));
     const claimerItems = myClaims
-      .filter((p) => p.shiftDate >= monthInfo.from && p.shiftDate <= monthInfo.to)
+      .filter((p) => p.shiftDate >= visibleRange.from && p.shiftDate <= visibleRange.to)
       .map((p) => ({ role: 'claimer' as const, post: p }));
     return [...posterItems, ...claimerItems].sort((a, b) =>
       b.post.shiftDate.localeCompare(a.post.shiftDate)
     );
-  }, [myPoolPosts, myClaims, monthInfo.from, monthInfo.to]);
+  }, [myPoolPosts, myClaims, visibleRange.from, visibleRange.to]);
 
   // 3-layer calendar events
   const allEvents = useMemo(() => {
@@ -351,7 +353,7 @@ export default function MyScheduleView() {
       const calendarApi = calendarRef.current.getApi();
       calendarApi.today();
       setDate(calendarApi.getDate());
-      setMonthOffset(0);
+      // datesSet sẽ fire và cập nhật visibleRange → fetch tự động
     }
   }, []);
 
@@ -360,7 +362,6 @@ export default function MyScheduleView() {
       const calendarApi = calendarRef.current.getApi();
       calendarApi.prev();
       setDate(calendarApi.getDate());
-      setMonthOffset((prev) => prev - 1);
     }
   }, []);
 
@@ -369,7 +370,6 @@ export default function MyScheduleView() {
       const calendarApi = calendarRef.current.getApi();
       calendarApi.next();
       setDate(calendarApi.getDate());
-      setMonthOffset((prev) => prev + 1);
     }
   }, []);
 
@@ -771,6 +771,14 @@ export default function MyScheduleView() {
                 events={allEvents as any}
                 headerToolbar={false}
                 eventClick={handleClickEvent}
+                datesSet={(arg) => {
+                  // FullCalendar end là exclusive — trừ 1 ngày để thành inclusive
+                  const from = arg.startStr.split('T')[0];
+                  const endExclusive = new Date(arg.end);
+                  endExclusive.setDate(endExclusive.getDate() - 1);
+                  const to = endExclusive.toISOString().split('T')[0];
+                  setVisibleRange((prev) => (prev.from === from && prev.to === to ? prev : { from, to }));
+                }}
                 height={smUp ? 720 : 'auto'}
                   plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
                   eventContent={(eventInfo) => {
