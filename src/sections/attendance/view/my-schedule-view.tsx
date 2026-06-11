@@ -48,7 +48,7 @@ import { ICalendarEvent, ICalendarView } from 'src/types/calendar';
 import { getMySchedule, getMyAttendanceLogs, getShiftSchedulesByDateRange } from 'src/api/attendance';
 import { cancelShiftPoolPost, claimShiftPoolPost, createShiftPoolPost, getMyShiftPoolClaims, getMyShiftPoolPosts, getOpenShiftPoolPosts, reviewShiftPoolPost } from 'src/api/shiftPool';
 import { useShiftNotificationRefresh } from 'src/hooks/use-shift-notification-refresh';
-import { fmtDate, needTypeHex, needTypeLabel, partialCoverSubTypeLabel, poolStatusColor, poolStatusLabel, statusHex } from 'src/sections/shift-pool/view/pool-helpers';
+import { fmtDate, needTypeHex, needTypeLabel, partialCoverSubTypeLabel, partialSideLabel, poolStatusColor, poolStatusLabel, statusHex } from 'src/sections/shift-pool/view/pool-helpers';
 import LegendDot from 'src/sections/shift-pool/view/pool-legend';
 
 import { usePageTours } from 'src/hooks/use-tour';
@@ -467,8 +467,9 @@ export default function MyScheduleView() {
       await createShiftPoolPost({
         shiftAssignmentId: selectedEvent.assignmentId || selectedEvent.id,
         needType,
-        partialStartTime: needType === 'PartialCover' ? partialStart : undefined,
-        partialEndTime: needType === 'PartialCover' ? partialEnd : undefined,
+        // Mô hình mới: PartialCover chỉ gửi phía (đi muộn/về sớm). Khoảng giờ
+        // được suy ra từ chấm công thực tế khi tính lương.
+        partialSide: needType === 'PartialCover' ? partialSubType : undefined,
         note: poolNote || undefined,
       });
       enqueueSnackbar('Đã đăng ca lên pool!', { variant: 'success' });
@@ -480,7 +481,7 @@ export default function MyScheduleView() {
     } finally {
       setPublishing(false);
     }
-  }, [selectedEvent, needType, partialStart, partialEnd, poolNote, enqueueSnackbar]);
+  }, [selectedEvent, needType, partialSubType, poolNote, enqueueSnackbar]);
 
   // Chỉ cho đăng ca lên pool khi chưa check-in, chưa có post active, và không đang dùng làm offered
   const canPublishSelected =
@@ -1254,8 +1255,19 @@ export default function MyScheduleView() {
                     <Typography variant="body2">{needTypeLabel(activePost.needType)}</Typography>
                   </Box>
 
-                  {/* Partial time */}
-                  {activePost.needType === 'PartialCover' && activePost.partialStartTime && (
+                  {/* Partial cover: phía (mô hình mới) hoặc khoảng giờ (dữ liệu cũ) */}
+                  {activePost.needType === 'PartialCover' && activePost.partialSide && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Loại làm hộ</Typography>
+                      <Typography variant="body2">{partialSideLabel(activePost.partialSide)}</Typography>
+                      {activePost.actualCoverStart && activePost.actualCoverEnd && (
+                        <Typography variant="caption" color="text.secondary">
+                          Khoảng đã làm hộ (theo chấm công): {activePost.actualCoverStart} → {activePost.actualCoverEnd}
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                  {activePost.needType === 'PartialCover' && !activePost.partialSide && activePost.partialStartTime && (
                     <Box>
                       <Typography variant="caption" color="text.secondary">Khoảng giờ</Typography>
                       <Typography variant="body2">
@@ -1409,7 +1421,18 @@ export default function MyScheduleView() {
                 <Typography variant="caption" color="text.secondary">Loại</Typography>
                 <Typography variant="body2">{needTypeLabel(claimTarget.needType)}</Typography>
               </Box>
-              {claimTarget.needType === 'PartialCover' && claimTarget.partialStartTime && (
+              {claimTarget.needType === 'PartialCover' && claimTarget.partialSide && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Loại làm hộ</Typography>
+                  <Typography variant="body2">{partialSideLabel(claimTarget.partialSide)}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {claimTarget.partialSide === 'LateArrive'
+                      ? 'Bạn cần có ca liền TRƯỚC ca này. Phụ cấp tính theo giờ thực tế người nhờ đến.'
+                      : 'Bạn cần có ca liền SAU ca này. Phụ cấp tính theo giờ thực tế người nhờ về.'}
+                  </Typography>
+                </Box>
+              )}
+              {claimTarget.needType === 'PartialCover' && !claimTarget.partialSide && claimTarget.partialStartTime && (
                 <Box>
                   <Typography variant="caption" color="text.secondary">Khoảng giờ cần làm hộ</Typography>
                   <Typography variant="body2">
@@ -1570,55 +1593,17 @@ export default function MyScheduleView() {
                   </ToggleButton>
                 </ToggleButtonGroup>
 
-                {/* Description hint */}
-                <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
-                  {partialSubType === 'LateArrive'
-                    ? 'Ca của bạn đã bắt đầu nhưng bạn chưa đến — nhờ nhân sự ca liền TRƯỚC ở lại làm hộ phần đầu ca.'
-                    : 'Bạn cần rời ca sớm — nhờ nhân sự ca liền SAU đến sớm hơn để làm hộ phần cuối ca.'}
-                </Typography>
-
-                {/* Time pickers */}
-                {partialSubType === 'LateArrive' ? (
-                  <Stack direction="row" spacing={2}>
-                    <TextField
-                      fullWidth
-                      type="time"
-                      label="Từ (đầu ca — cố định)"
-                      value={partialStart}
-                      disabled
-                      InputLabelProps={{ shrink: true }}
-                    />
-                    <TextField
-                      fullWidth
-                      type="time"
-                      label="Đến khi bạn đến *"
-                      value={partialEnd}
-                      onChange={(e) => setPartialEnd(e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                      helperText="Chọn giờ bạn dự kiến đến ca"
-                    />
-                  </Stack>
-                ) : (
-                  <Stack direction="row" spacing={2}>
-                    <TextField
-                      fullWidth
-                      type="time"
-                      label="Từ khi bạn về *"
-                      value={partialStart}
-                      onChange={(e) => setPartialStart(e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                      helperText="Chọn giờ bạn dự kiến rời ca"
-                    />
-                    <TextField
-                      fullWidth
-                      type="time"
-                      label="Đến (cuối ca — cố định)"
-                      value={partialEnd}
-                      disabled
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  </Stack>
-                )}
+                {/* Description hint — không cần nhập giờ, hệ thống tự tính theo chấm công */}
+                <Box sx={{ p: 1.5, bgcolor: 'info.lighter', borderRadius: 1, border: '1px solid', borderColor: 'info.light' }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    {partialSubType === 'LateArrive'
+                      ? '⏰ Nhờ nhân sự ca liền TRƯỚC ở lại làm hộ phần đầu ca. Khoảng làm hộ = từ đầu ca đến đúng lúc bạn check-in.'
+                      : '🚪 Nhờ nhân sự ca liền SAU đến sớm làm hộ phần cuối ca. Khoảng làm hộ = từ lúc bạn check-out đến hết ca.'}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontStyle: 'italic' }}>
+                    Bạn KHÔNG cần nhập giờ — hệ thống tự tính theo giờ check-in/out thực tế và ghi nhận phụ cấp cho người làm hộ.
+                  </Typography>
+                </Box>
               </Stack>
             )}
 

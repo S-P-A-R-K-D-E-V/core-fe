@@ -47,7 +47,7 @@ import { useShiftNotificationRefresh } from 'src/hooks/use-shift-notification-re
 
 import PoolCalendar from './pool-calendar';
 import LegendDot from './pool-legend';
-import { fmtDate, needTypeHex, needTypeLabel, partialCoverSubTypeLabel } from './pool-helpers';
+import { fmtDate, needTypeHex, needTypeLabel, partialCoverSubTypeLabel, partialSideLabel } from './pool-helpers';
 
 // ----------------------------------------------------------------------
 
@@ -314,7 +314,9 @@ export default function PendingPoolView() {
                         {row.shiftName}
                         <br />
                         <Typography variant="caption" color="text.secondary">
-                          {row.needType === 'PartialCover' && row.partialStartTime
+                          {row.needType === 'PartialCover' && row.partialSide
+                            ? partialSideLabel(row.partialSide)
+                            : row.needType === 'PartialCover' && row.partialStartTime
                             ? `${row.partialStartTime} - ${row.partialEndTime}`
                             : `${row.shiftStartTime} - ${row.shiftEndTime}`}
                         </Typography>
@@ -364,27 +366,27 @@ export default function PendingPoolView() {
                   Ca đổi lại: {target.claimerOfferedShiftName} ({fmtDate(target.claimerOfferedShiftDate)})
                 </Typography>
               )}
-              {target.needType === 'PartialCover' && target.partialStartTime && (
+              {target.needType === 'PartialCover' && target.partialSide && (
                 <>
                   <Typography variant="body2">
-                    Khoảng làm hộ: <strong>{target.partialStartTime} – {target.partialEndTime}</strong>
+                    Loại làm hộ: <strong>{partialSideLabel(target.partialSide)}</strong>
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {partialCoverSubTypeLabel(
-                      target.partialStartTime,
-                      target.partialEndTime,
-                      target.shiftStartTime,
-                      target.shiftEndTime
-                    ).label}
-                    {' — '}
-                    {partialCoverSubTypeLabel(
-                      target.partialStartTime,
-                      target.partialEndTime,
-                      target.shiftStartTime,
-                      target.shiftEndTime
-                    ).hint}
+                    {target.partialSide === 'LateArrive'
+                      ? 'Người làm hộ ở ca liền trước. Phụ cấp = giờ từ đầu ca đến lúc người nhờ check-in, tính tại kỳ lương.'
+                      : 'Người làm hộ ở ca liền sau. Phụ cấp = giờ từ lúc người nhờ check-out đến hết ca, tính tại kỳ lương.'}
                   </Typography>
+                  {target.actualCoverStart && target.actualCoverEnd && (
+                    <Typography variant="caption" color="text.secondary">
+                      Khoảng đã làm hộ (chấm công): {target.actualCoverStart} → {target.actualCoverEnd}
+                    </Typography>
+                  )}
                 </>
+              )}
+              {target.needType === 'PartialCover' && !target.partialSide && target.partialStartTime && (
+                <Typography variant="body2">
+                  Khoảng làm hộ: <strong>{target.partialStartTime} – {target.partialEndTime}</strong>
+                </Typography>
               )}
 
               <Stack direction="row" spacing={1} flexWrap="wrap">

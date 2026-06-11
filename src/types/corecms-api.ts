@@ -841,6 +841,8 @@ export interface IReviewLateCoverRequestDto {
 // --- Shift Pool (đổi ca & làm hộ hợp nhất) ---
 export type PoolNeedType = 'Swap' | 'FullCover' | 'PartialCover';
 export type PoolPostStatus = 'Open' | 'WaitingApproval' | 'Approved' | 'Cancelled';
+/** PartialCover: đi muộn (nhờ ca trước) hay về sớm (nhờ ca sau) — thay cho set giờ thủ công. */
+export type PartialCoverSide = 'LateArrive' | 'EarlyLeave';
 
 export interface IShiftPoolPost {
   id: string;
@@ -852,6 +854,7 @@ export interface IShiftPoolPost {
   shiftStartTime: string;
   shiftEndTime: string;
   needType: PoolNeedType;
+  partialSide?: PartialCoverSide;
   partialStartTime?: string;
   partialEndTime?: string;
   note?: string;
@@ -861,10 +864,13 @@ export interface IShiftPoolPost {
   claimerOfferedAssignmentId?: string;
   claimerOfferedShiftName?: string;
   claimerOfferedShiftDate?: string;
+  claimerAdjacentAssignmentId?: string;
   claimedAt?: string;
   coveringHours?: number;
   hourlyRate?: number;
   extraPayAmount?: number;
+  actualCoverStart?: string;
+  actualCoverEnd?: string;
   reviewedBy?: string;
   reviewerName?: string;
   reviewedAt?: string;
@@ -877,8 +883,9 @@ export interface IShiftPoolPost {
 export interface ICreateShiftPoolPostDto {
   shiftAssignmentId: string;
   needType: PoolNeedType;
-  partialStartTime?: string;
-  partialEndTime?: string;
+  partialSide?: PartialCoverSide;   // bắt buộc khi PartialCover (thay cho set giờ)
+  partialStartTime?: string;        // [deprecated]
+  partialEndTime?: string;          // [deprecated]
   note?: string;
 }
 

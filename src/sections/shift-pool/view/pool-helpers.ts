@@ -1,4 +1,4 @@
-import type { PoolNeedType, PoolPostStatus } from 'src/types/corecms-api';
+import type { PartialCoverSide, PoolNeedType, PoolPostStatus } from 'src/types/corecms-api';
 
 export function needTypeLabel(t: PoolNeedType | string): string {
   const map: Record<string, string> = {
@@ -7,6 +7,13 @@ export function needTypeLabel(t: PoolNeedType | string): string {
     PartialCover: 'Làm hộ 1 phần',
   };
   return map[t] ?? t;
+}
+
+/** Nhãn phía làm hộ 1 phần (mô hình mới — không set giờ). */
+export function partialSideLabel(side?: PartialCoverSide | string | null): string {
+  if (side === 'LateArrive') return 'Đi muộn (nhờ ca trước)';
+  if (side === 'EarlyLeave') return 'Về sớm (nhờ ca sau)';
+  return '';
 }
 
 /**
