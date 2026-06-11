@@ -10,6 +10,7 @@ import { EventClickArg } from '@fullcalendar/core';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
@@ -40,10 +41,12 @@ import { useSnackbar } from 'src/components/snackbar';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Label from 'src/components/label';
 
-import { IShiftSchedule, IShiftAssignment, IAttendanceLog, PoolNeedType } from 'src/types/corecms-api';
+import { IShiftSchedule, IShiftAssignment, IAttendanceLog, IShiftPoolPost, PoolNeedType } from 'src/types/corecms-api';
 import { ICalendarEvent, ICalendarView } from 'src/types/calendar';
 import { getMySchedule, getMyAttendanceLogs, getShiftSchedulesByDateRange } from 'src/api/attendance';
-import { createShiftPoolPost } from 'src/api/shiftPool';
+import { claimShiftPoolPost, createShiftPoolPost, getMyShiftPoolClaims, getMyShiftPoolPosts, getOpenShiftPoolPosts } from 'src/api/shiftPool';
+import { fmtDate, needTypeHex, needTypeLabel, partialCoverSubTypeLabel, poolStatusColor, poolStatusLabel, statusHex } from 'src/sections/shift-pool/view/pool-helpers';
+import LegendDot from 'src/sections/shift-pool/view/pool-legend';
 
 import { usePageTours } from 'src/hooks/use-tour';
 import type { TourDefinition } from 'src/hooks/use-tour';
@@ -98,6 +101,8 @@ function getStatusColor(status: string): 'success' | 'error' | 'warning' {
   if (status === 'Absent') return 'error';
   return 'warning';
 }
+
+const POOL_POSTED_COLOR = '#FF6F00'; // amber — ca cá nhân đang đăng pool
 
 function transformAssignmentToEvent(assignment: IAssignmentWithDetails): ICalendarEvent {
   const dateStr = assignment.date.split('T')[0];
@@ -154,6 +159,19 @@ export default function MyScheduleView() {
   const [poolNote, setPoolNote] = useState('');
   const [publishing, setPublishing] = useState(false);
 
+  // Pool overlay state
+  const [openPoolPosts, setOpenPoolPosts] = useState<IShiftPoolPost[]>([]);
+  const [myPoolPosts, setMyPoolPosts] = useState<IShiftPoolPost[]>([]);
+  const [myClaims, setMyClaims] = useState<IShiftPoolPost[]>([]);
+  const [visibleLayers, setVisibleLayers] = useState<Set<'personal' | 'open-pool' | 'my-claim'>>(
+    new Set(['personal', 'open-pool', 'my-claim'])
+  );
+  const [claimTarget, setClaimTarget] = useState<IShiftPoolPost | null>(null);
+  const [claimOfferedId, setClaimOfferedId] = useState('');
+  const [claimMyAssignments, setClaimMyAssignments] = useState<IShiftAssignment[]>([]);
+  const [claimSubmitting, setClaimSubmitting] = useState(false);
+  const [claimDetailTarget, setClaimDetailTarget] = useState<IShiftPoolPost | null>(null);
+
   // Tour state
   const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
 
@@ -162,9 +180,12 @@ export default function MyScheduleView() {
   const fetchSchedule = useCallback(async () => {
     setLoading(true);
     try {
-      const [scheduleData, attendanceData] = await Promise.all([
+      const [scheduleData, attendanceData, openPosts, myPosts, claims] = await Promise.all([
         getMySchedule(monthInfo.from, monthInfo.to),
         getMyAttendanceLogs(monthInfo.from, monthInfo.to),
+        getOpenShiftPoolPosts().catch(() => [] as IShiftPoolPost[]),
+        getMyShiftPoolPosts().catch(() => [] as IShiftPoolPost[]),
+        getMyShiftPoolClaims().catch(() => [] as IShiftPoolPost[]),
       ]);
 
       // Merge attendance data with shift assignments
@@ -178,6 +199,9 @@ export default function MyScheduleView() {
         };
       });
       setAssignments(enrichedAssignments);
+      setOpenPoolPosts(openPosts);
+      setMyPoolPosts(myPosts);
+      setMyClaims(claims);
     } catch (error) {
       console.error('Failed to fetch schedule:', error);
     } finally {
@@ -189,11 +213,81 @@ export default function MyScheduleView() {
     fetchSchedule();
   }, [fetchSchedule]);
 
-  // Transform assignments to calendar events
-  const events: ICalendarEvent[] = useMemo(
-    () => assignments.map(transformAssignmentToEvent),
-    [assignments]
+  // Map of active pool posts keyed by shiftAssignmentId (for amber colour)
+  const postedMap = useMemo(
+    () =>
+      new Map(
+        myPoolPosts
+          .filter((p) => p.status === 'Open' || p.status === 'WaitingApproval')
+          .map((p) => [p.shiftAssignmentId, p])
+      ),
+    [myPoolPosts]
   );
+
+  // Open posts from others, filtered to current month
+  const filteredOpenPosts = useMemo(
+    () =>
+      openPoolPosts.filter(
+        (p) => p.shiftDate >= monthInfo.from && p.shiftDate <= monthInfo.to
+      ),
+    [openPoolPosts, monthInfo.from, monthInfo.to]
+  );
+
+  // My claims (WaitingApproval or Approved), filtered to current month
+  const filteredMyClaims = useMemo(
+    () =>
+      myClaims.filter(
+        (p) =>
+          p.shiftDate >= monthInfo.from &&
+          p.shiftDate <= monthInfo.to &&
+          (p.status === 'WaitingApproval' || p.status === 'Approved')
+      ),
+    [myClaims, monthInfo.from, monthInfo.to]
+  );
+
+  // 3-layer calendar events
+  const allEvents = useMemo(() => {
+    const layerA = visibleLayers.has('personal')
+      ? assignments.map((a) => ({
+          ...transformAssignmentToEvent(a),
+          id: `personal-${a.assignmentId}`,
+          color: postedMap.has(a.assignmentId) ? POOL_POSTED_COLOR : getEventColor(a),
+          extendedProps: {
+            layerType: 'personal' as const,
+            assignmentId: a.assignmentId,
+            hasActivePost: postedMap.has(a.assignmentId),
+          },
+        }))
+      : [];
+
+    const layerB = visibleLayers.has('open-pool')
+      ? filteredOpenPosts.map((p) => ({
+          id: `pool-${p.id}`,
+          title: `🔄 ${needTypeLabel(p.needType)} · ${p.posterName}`,
+          start: new Date(`${p.shiftDate}T${p.shiftStartTime}`).getTime(),
+          end: new Date(`${p.shiftDate}T${p.shiftEndTime}`).getTime(),
+          allDay: false,
+          color: needTypeHex(p.needType),
+          description: p.note || '',
+          extendedProps: { layerType: 'open-pool' as const, post: p },
+        }))
+      : [];
+
+    const layerC = visibleLayers.has('my-claim')
+      ? filteredMyClaims.map((p) => ({
+          id: `claim-${p.id}`,
+          title: `✓ ${needTypeLabel(p.needType)} · ${p.shiftName}`,
+          start: new Date(`${p.shiftDate}T${p.shiftStartTime}`).getTime(),
+          end: new Date(`${p.shiftDate}T${p.shiftEndTime}`).getTime(),
+          allDay: false,
+          color: statusHex(p.status),
+          description: '',
+          extendedProps: { layerType: 'my-claim' as const, post: p },
+        }))
+      : [];
+
+    return [...layerA, ...layerB, ...layerC];
+  }, [assignments, visibleLayers, postedMap, filteredOpenPosts, filteredMyClaims]);
 
   const handleChangeView = useCallback((newView: ICalendarView) => {
       const calendarApi = calendarRef.current.getApi();
@@ -232,11 +326,26 @@ export default function MyScheduleView() {
 
   const handleClickEvent = useCallback(
     (arg: EventClickArg) => {
-      // Event id === assignment.assignmentId (xem transformAssignmentToEvent)
-      const assignment = assignments.find((a) => a.assignmentId === arg.event.id);
-      if (assignment) {
-        setSelectedEvent(assignment);
-        setOpenDialog(true);
+      const { layerType, assignmentId, post } = (arg.event.extendedProps ?? {}) as any;
+      if (layerType === 'personal') {
+        const assignment = assignments.find((a) => a.assignmentId === assignmentId);
+        if (assignment) {
+          setSelectedEvent(assignment);
+          setOpenDialog(true);
+        }
+      } else if (layerType === 'open-pool') {
+        setClaimTarget(post);
+        setClaimOfferedId('');
+        setClaimMyAssignments([]);
+      } else if (layerType === 'my-claim') {
+        setClaimDetailTarget(post);
+      } else {
+        // fallback for legacy events without extendedProps
+        const assignment = assignments.find((a) => a.assignmentId === arg.event.id);
+        if (assignment) {
+          setSelectedEvent(assignment);
+          setOpenDialog(true);
+        }
       }
     },
     [assignments]
@@ -312,6 +421,44 @@ export default function MyScheduleView() {
 
   // Chỉ cho đăng ca lên pool khi chưa check-in (ca chưa diễn ra)
   const canPublishSelected = !!selectedEvent && !selectedEvent.attendanceLog?.checkInTime;
+
+  // Load upcoming assignments for Swap claim
+  useEffect(() => {
+    if (!claimTarget || claimTarget.needType !== 'Swap') return;
+    const from = new Date().toISOString().split('T')[0];
+    const to = new Date(Date.now() + 60 * 24 * 3600 * 1000).toISOString().split('T')[0];
+    getMySchedule(from, to)
+      .then((all) => {
+        const now = Date.now();
+        const upcoming = all.filter((a) => {
+          const dateStr = (a.date ?? '').split('T')[0];
+          const start = a.startTime || (a as any).shiftStartTime || '00:00';
+          const startMs = new Date(`${dateStr}T${start}`).getTime();
+          const aid = a.id || (a as any).assignmentId;
+          return startMs > now && aid !== claimTarget.shiftAssignmentId;
+        });
+        setClaimMyAssignments(upcoming);
+      })
+      .catch(() => setClaimMyAssignments([]));
+  }, [claimTarget]);
+
+  const handleSubmitClaim = useCallback(async () => {
+    if (!claimTarget) return;
+    if (claimTarget.needType === 'Swap' && !claimOfferedId) return;
+    setClaimSubmitting(true);
+    try {
+      await claimShiftPoolPost(claimTarget.id, {
+        offeredAssignmentId: claimTarget.needType === 'Swap' ? claimOfferedId : undefined,
+      });
+      enqueueSnackbar('Đã nhận ca! Chờ người đăng xác nhận.', { variant: 'success' });
+      setClaimTarget(null);
+      fetchSchedule();
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Nhận ca thất bại!', { variant: 'error' });
+    } finally {
+      setClaimSubmitting(false);
+    }
+  }, [claimTarget, claimOfferedId, enqueueSnackbar, fetchSchedule]);
 
   // ── Tour definitions ──
 
@@ -448,6 +595,41 @@ export default function MyScheduleView() {
                 onChangeView={handleChangeView}
                 onOpenFilters={() => {}}
               />
+
+              {/* Layer filter chips */}
+              <Stack direction="row" spacing={1} sx={{ px: 2, pb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                {(
+                  [
+                    { key: 'personal', label: 'Lịch của tôi', color: '#42A5F5' },
+                    { key: 'open-pool', label: 'Chợ ca', color: '#1976d2' },
+                    { key: 'my-claim', label: 'Ca tôi nhận', color: '#2e7d32' },
+                  ] as const
+                ).map(({ key, label, color }) => {
+                  const active = visibleLayers.has(key);
+                  return (
+                    <Chip
+                      key={key}
+                      label={label}
+                      size="small"
+                      variant={active ? 'filled' : 'outlined'}
+                      onClick={() => {
+                        setVisibleLayers((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(key)) next.delete(key);
+                          else next.add(key);
+                          return next;
+                        });
+                      }}
+                      sx={{
+                        borderColor: color,
+                        color: active ? '#fff' : color,
+                        bgcolor: active ? color : 'transparent',
+                        '&:hover': { bgcolor: active ? color : `${color}22` },
+                      }}
+                    />
+                  );
+                })}
+              </Stack>
               </Box>
 
               <Box id="tour-calendar-body">
@@ -465,15 +647,21 @@ export default function MyScheduleView() {
                 initialView={view}
                 dayMaxEventRows={3}
                 eventDisplay="block"
-                events={events}
+                events={allEvents as any}
                 headerToolbar={false}
                 eventClick={handleClickEvent}
                 height={smUp ? 720 : 'auto'}
                   plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
                   eventContent={(eventInfo) => {
-                    const assignment = assignments.find((a) => a.assignmentId === eventInfo.event.id);
-                    const color = getEventColor(assignment!);
-                    console.log('Assignment for event:', assignment);
+                    const ep = (eventInfo.event.extendedProps ?? {}) as any;
+                    let color: string;
+                    if (ep.layerType === 'personal') {
+                      const assignment = assignments.find((a) => a.assignmentId === ep.assignmentId);
+                      color = assignment ? getEventColor(assignment) : '#9E9E9E';
+                      if (ep.hasActivePost) color = POOL_POSTED_COLOR;
+                    } else {
+                      color = eventInfo.event.backgroundColor || '#1976d2';
+                    }
                     return (
                       <Box
                         sx={{
@@ -483,15 +671,14 @@ export default function MyScheduleView() {
                           fontSize: 12
                         }}
                       >
-                        {/* Header */}
                         <Box
                           sx={{
                             px: 1,
                             py: 0.5,
                             fontWeight: 600,
                             borderBottom: "1px solid rgba(255,255,255,0.3)",
-                            color: color,
-                            backgroundColor: `${color}33`, // 20% opacity
+                            color,
+                            backgroundColor: `${color}33`,
                           }}
                         >
                           {eventInfo.event.title}
@@ -555,6 +742,25 @@ export default function MyScheduleView() {
                     Chưa chấm công
                   </Typography>
                 </Stack>
+              </Stack>
+
+              <Divider sx={{ my: 2 }} />
+
+              {/* Legend */}
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block', fontWeight: 600 }}>
+                Chú thích màu
+              </Typography>
+              <Stack direction="row" spacing={2} flexWrap="wrap" sx={{ gap: 1.5 }}>
+                <LegendDot color="#9E9E9E" label="Chưa chấm công" />
+                <LegendDot color="#42A5F5" label="Đã check-in" />
+                <LegendDot color="#FFA726" label="Đi muộn" />
+                <LegendDot color="#66BB6A" label="Hoàn thành" />
+                <LegendDot color={POOL_POSTED_COLOR} label="Đang đăng pool" />
+                <LegendDot color="#1976d2" label="Chợ ca – Đổi ca" />
+                <LegendDot color="#7b1fa2" label="Chợ ca – Làm hộ cả ca" />
+                <LegendDot color="#ed6c02" label="Chợ ca – Làm hộ 1 phần" />
+                <LegendDot color="#ed6c02" label="Ca nhận – Chờ duyệt" />
+                <LegendDot color="#2e7d32" label="Ca nhận – Đã duyệt" />
               </Stack>
             </Card>
           )}
@@ -722,6 +928,138 @@ export default function MyScheduleView() {
           <Button color="inherit" onClick={handleCloseDialog}>
             Đóng
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Claim dialog — khi click vào ca trong Chợ ca */}
+      <Dialog fullWidth maxWidth="xs" open={!!claimTarget} onClose={() => setClaimTarget(null)}>
+        <DialogTitle>Nhận ca từ Chợ ca</DialogTitle>
+        <DialogContent>
+          {claimTarget && (
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              <Box>
+                <Typography variant="caption" color="text.secondary">Ca</Typography>
+                <Typography variant="subtitle2">
+                  {claimTarget.shiftName} · {fmtDate(claimTarget.shiftDate)} · {claimTarget.shiftStartTime?.slice(0,5)}-{claimTarget.shiftEndTime?.slice(0,5)}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">Người đăng</Typography>
+                <Typography variant="body2">{claimTarget.posterName}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">Loại</Typography>
+                <Typography variant="body2">{needTypeLabel(claimTarget.needType)}</Typography>
+              </Box>
+              {claimTarget.needType === 'PartialCover' && claimTarget.partialStartTime && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Khoảng giờ cần làm hộ</Typography>
+                  <Typography variant="body2">
+                    {claimTarget.partialStartTime?.slice(0,5)} – {claimTarget.partialEndTime?.slice(0,5)}
+                    {' · '}{partialCoverSubTypeLabel(claimTarget.partialStartTime, claimTarget.partialEndTime, claimTarget.shiftStartTime, claimTarget.shiftEndTime).label}
+                  </Typography>
+                </Box>
+              )}
+              {claimTarget.note && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Ghi chú</Typography>
+                  <Typography variant="body2">{claimTarget.note}</Typography>
+                </Box>
+              )}
+              {claimTarget.needType === 'Swap' && (
+                <TextField
+                  select
+                  fullWidth
+                  label="Ca của bạn để đổi lại *"
+                  value={claimOfferedId}
+                  onChange={(e) => setClaimOfferedId(e.target.value)}
+                  helperText="Chọn ca sắp tới của bạn để đưa đổi"
+                >
+                  {claimMyAssignments.length === 0 ? (
+                    <MenuItem disabled value="">Không có ca phù hợp</MenuItem>
+                  ) : (
+                    claimMyAssignments.map((a) => {
+                      const aid = (a as any).assignmentId || a.id;
+                      const dateStr = ((a as any).date ?? '').split('T')[0];
+                      return (
+                        <MenuItem key={aid} value={aid}>
+                          {(a as any).shiftName} · {new Date(dateStr).toLocaleDateString('vi-VN')} · {(a.startTime || (a as any).shiftStartTime || '').slice(0,5)}
+                        </MenuItem>
+                      );
+                    })
+                  )}
+                </TextField>
+              )}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" onClick={() => setClaimTarget(null)}>Huỷ</Button>
+          <Button
+            variant="contained"
+            onClick={handleSubmitClaim}
+            disabled={claimSubmitting || (claimTarget?.needType === 'Swap' && !claimOfferedId)}
+          >
+            {claimSubmitting ? 'Đang nhận...' : 'Nhận ca'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Claim-detail dialog — khi click vào ca tôi nhận */}
+      <Dialog fullWidth maxWidth="xs" open={!!claimDetailTarget} onClose={() => setClaimDetailTarget(null)}>
+        <DialogTitle>Ca tôi đã nhận</DialogTitle>
+        <DialogContent>
+          {claimDetailTarget && (
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              <Box>
+                <Typography variant="caption" color="text.secondary">Ca</Typography>
+                <Typography variant="subtitle2">
+                  {claimDetailTarget.shiftName} · {fmtDate(claimDetailTarget.shiftDate)} · {claimDetailTarget.shiftStartTime?.slice(0,5)}-{claimDetailTarget.shiftEndTime?.slice(0,5)}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">Người đăng</Typography>
+                <Typography variant="body2">{claimDetailTarget.posterName}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">Loại</Typography>
+                <Typography variant="body2">{needTypeLabel(claimDetailTarget.needType)}</Typography>
+              </Box>
+              {claimDetailTarget.needType === 'PartialCover' && claimDetailTarget.partialStartTime && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Khoảng giờ</Typography>
+                  <Typography variant="body2">
+                    {claimDetailTarget.partialStartTime?.slice(0,5)} – {claimDetailTarget.partialEndTime?.slice(0,5)}
+                  </Typography>
+                </Box>
+              )}
+              {claimDetailTarget.extraPayAmount != null && claimDetailTarget.extraPayAmount > 0 && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Phụ cấp</Typography>
+                  <Typography variant="body2" color="success.main" fontWeight={600}>
+                    +{claimDetailTarget.extraPayAmount.toLocaleString('vi-VN')}đ
+                  </Typography>
+                </Box>
+              )}
+              <Box>
+                <Typography variant="caption" color="text.secondary">Trạng thái</Typography>
+                <Box sx={{ mt: 0.5 }}>
+                  <Label variant="soft" color={poolStatusColor(claimDetailTarget.status)}>
+                    {poolStatusLabel(claimDetailTarget.status)}
+                  </Label>
+                </Box>
+              </Box>
+              {claimDetailTarget.reviewNote && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Ghi chú duyệt</Typography>
+                  <Typography variant="body2">{claimDetailTarget.reviewNote}</Typography>
+                </Box>
+              )}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" onClick={() => setClaimDetailTarget(null)}>Đóng</Button>
         </DialogActions>
       </Dialog>
 
