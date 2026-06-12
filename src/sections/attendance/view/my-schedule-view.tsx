@@ -33,6 +33,7 @@ import Divider from '@mui/material/Divider';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { useTheme } from '@mui/material/styles';
+import GlobalStyles from '@mui/material/GlobalStyles';
 
 import { paths } from 'src/routes/paths';
 
@@ -656,35 +657,38 @@ export default function MyScheduleView() {
           },
           {
             element: '#tour-layer-chips',
-            onHighlightStarted: () => { setTimeout(() => tourDemoRef.current('publish'), 1000); },
+            onHighlightStarted: () => tourDemoRef.current('publish'),
             popover: {
               title: '1️⃣ Đăng ca lên Chợ',
               description:
-                'Nhấn vào một ca của bạn trên lịch → chọn "Đăng lên pool". Chọn 1 trong 3 loại nhu cầu (xem popup mẫu phía dưới):\n\n• Đổi ca — đổi lấy ca của người nhận\n• Làm hộ cả ca — nhờ người khác làm trọn ca\n• Làm hộ 1 phần — chỉ nhờ một khoảng giờ (đến muộn / về sớm)\n\nSau khi đăng, ca xuất hiện ở Chợ ca cho người khác nhận.',
+                'Nhấn vào một ca của bạn trên lịch → chọn "Đăng lên pool". Chọn 1 trong 3 loại nhu cầu (xem popup mẫu phía trên):\n\n• Đổi ca — đổi lấy ca của người nhận\n• Làm hộ cả ca — nhờ người khác làm trọn ca\n• Làm hộ 1 phần — chỉ nhờ một khoảng giờ (đến muộn / về sớm)\n\nSau khi đăng, ca xuất hiện ở Chợ ca cho người khác nhận.',
               side: 'bottom' as const,
               align: 'start' as const,
+              popoverClass: 'driver-popover-demo-bottom',
             },
           },
           {
             element: '#tour-layer-chips',
-            onHighlightStarted: () => { setTimeout(() => tourDemoRef.current('claim'), 1000); },
+            onHighlightStarted: () => tourDemoRef.current('claim'),
             popover: {
               title: '2️⃣ Nhận / Đổi ca từ Chợ',
               description:
-                'Bật lớp "Chợ ca", nhấn vào ca của người khác để mở popup nhận (xem mẫu phía dưới):\n\n• Làm hộ → xác nhận nhận ca, xem phụ cấp (nếu là làm hộ 1 phần)\n• Đổi ca → chọn một ca của bạn để đổi lại\n\nSau khi nhận, ca chuyển sang trạng thái "Chờ duyệt".',
+                'Bật lớp "Chợ ca", nhấn vào ca của người khác để mở popup nhận (xem mẫu phía trên):\n\n• Làm hộ → xác nhận nhận ca, xem phụ cấp (nếu là làm hộ 1 phần)\n• Đổi ca → chọn một ca của bạn để đổi lại\n\nSau khi nhận, ca chuyển sang trạng thái "Chờ duyệt".',
               side: 'bottom' as const,
               align: 'start' as const,
+              popoverClass: 'driver-popover-demo-bottom',
             },
           },
           {
             element: '#tour-layer-chips',
-            onHighlightStarted: () => { setTimeout(() => tourDemoRef.current('manage'), 1000); },
+            onHighlightStarted: () => tourDemoRef.current('manage'),
             popover: {
               title: '3️⃣ Duyệt người nhận',
               description:
-                'Ca bạn đã đăng và có người nhận sẽ hiển thị viền cam. Nhấn vào để mở popup quản lý (xem mẫu phía dưới): bạn có thể Duyệt ngay hoặc Từ chối người nhận, hoặc để Admin/Manager xử lý.\n\nTrạng thái: Đang mở → Chờ duyệt → Đã duyệt.',
+                'Ca bạn đã đăng và có người nhận sẽ hiển thị viền cam. Nhấn vào để mở popup quản lý (xem mẫu phía trên): bạn có thể Duyệt ngay hoặc Từ chối người nhận, hoặc để Admin/Manager xử lý.\n\nTrạng thái: Đang mở → Chờ duyệt → Đã duyệt.',
               side: 'bottom' as const,
               align: 'start' as const,
+              popoverClass: 'driver-popover-demo-bottom',
             },
           },
           {
@@ -1639,6 +1643,20 @@ export default function MyScheduleView() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* CSS override: pin demo-bottom popover to bottom of viewport, hide arrow */}
+      <GlobalStyles styles={{
+        '.driver-popover-demo-bottom': {
+          bottom: '24px !important',
+          top: 'auto !important',
+          left: '50% !important',
+          transform: 'translateX(-50%) !important',
+          maxWidth: 'min(420px, 90vw) !important',
+        },
+        '.driver-popover-demo-bottom .driver-popover-arrow': {
+          display: 'none !important',
+        },
+      }} />
 
       {/* ── Popup MẪU cho tour "Đổi ca & Làm hộ" (chỉ minh hoạ, không thao tác thật) ── */}
       {tourDemo && (
