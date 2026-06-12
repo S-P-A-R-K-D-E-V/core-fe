@@ -655,27 +655,36 @@ export default function MyScheduleView() {
             },
           },
           {
+            element: '#tour-layer-chips',
             onHighlightStarted: () => tourDemoRef.current('publish'),
             popover: {
               title: '1️⃣ Đăng ca lên Chợ',
               description:
-                'Nhấn vào một ca của bạn trên lịch → chọn "Đăng lên pool". Chọn 1 trong 3 loại nhu cầu (xem popup mẫu bên trên):\n\n• Đổi ca — đổi lấy ca của người nhận\n• Làm hộ cả ca — nhờ người khác làm trọn ca\n• Làm hộ 1 phần — chỉ nhờ một khoảng giờ (đến muộn / về sớm)\n\nSau khi đăng, ca xuất hiện ở Chợ ca cho người khác nhận.',
+                'Nhấn vào một ca của bạn trên lịch → chọn "Đăng lên pool". Chọn 1 trong 3 loại nhu cầu (xem popup mẫu bên phải):\n\n• Đổi ca — đổi lấy ca của người nhận\n• Làm hộ cả ca — nhờ người khác làm trọn ca\n• Làm hộ 1 phần — chỉ nhờ một khoảng giờ (đến muộn / về sớm)\n\nSau khi đăng, ca xuất hiện ở Chợ ca cho người khác nhận.',
+              side: 'bottom' as const,
+              align: 'start' as const,
             },
           },
           {
+            element: '#tour-layer-chips',
             onHighlightStarted: () => tourDemoRef.current('claim'),
             popover: {
               title: '2️⃣ Nhận / Đổi ca từ Chợ',
               description:
-                'Bật lớp "Chợ ca", nhấn vào ca của người khác để mở popup nhận (xem mẫu bên trên):\n\n• Làm hộ → xác nhận nhận ca, xem phụ cấp (nếu là làm hộ 1 phần)\n• Đổi ca → chọn một ca của bạn để đổi lại\n\nSau khi nhận, ca chuyển sang trạng thái "Chờ duyệt".',
+                'Bật lớp "Chợ ca", nhấn vào ca của người khác để mở popup nhận (xem mẫu bên phải):\n\n• Làm hộ → xác nhận nhận ca, xem phụ cấp (nếu là làm hộ 1 phần)\n• Đổi ca → chọn một ca của bạn để đổi lại\n\nSau khi nhận, ca chuyển sang trạng thái "Chờ duyệt".',
+              side: 'bottom' as const,
+              align: 'start' as const,
             },
           },
           {
+            element: '#tour-layer-chips',
             onHighlightStarted: () => tourDemoRef.current('manage'),
             popover: {
               title: '3️⃣ Duyệt người nhận',
               description:
-                'Ca bạn đã đăng và có người nhận sẽ hiển thị viền cam. Nhấn vào để mở popup quản lý (xem mẫu bên trên): bạn có thể Duyệt ngay hoặc Từ chối người nhận, hoặc để Admin/Manager xử lý.\n\nTrạng thái: Đang mở → Chờ duyệt → Đã duyệt.',
+                'Ca bạn đã đăng và có người nhận sẽ hiển thị viền cam. Nhấn vào để mở popup quản lý (xem mẫu bên phải): bạn có thể Duyệt ngay hoặc Từ chối người nhận, hoặc để Admin/Manager xử lý.\n\nTrạng thái: Đang mở → Chờ duyệt → Đã duyệt.',
+              side: 'bottom' as const,
+              align: 'start' as const,
             },
           },
           {
@@ -1639,15 +1648,16 @@ export default function MyScheduleView() {
             sx={{
               position: 'fixed',
               top: 76,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 'min(380px, 92vw)',
-              maxHeight: '42vh',
+              right: 16,
+              left: 'auto',
+              transform: 'none',
+              width: 'min(340px, 38vw)',
+              maxHeight: '72vh',
               overflowY: 'auto',
               p: 2,
               borderRadius: 2,
-              // Trên overlay tối của driver (z-index 1e9) để popup mẫu hiển thị rõ.
-              // pointerEvents:none nên dù có chồng lên popover tour, nút "Tiếp" vẫn bấm được.
+              // Trên overlay tối của driver (z-index 1_000_000_000) nhưng KHÔNG dùng z-index cao hơn
+              // popover driver (1_000_000_001) — thay vào đó đặt sang phải để không chồng popover.
               zIndex: 1_000_000_002,
               pointerEvents: 'none',
             }}
