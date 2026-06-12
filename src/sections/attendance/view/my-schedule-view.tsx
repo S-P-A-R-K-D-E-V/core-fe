@@ -1656,9 +1656,9 @@ export default function MyScheduleView() {
               overflowY: 'auto',
               p: 2,
               borderRadius: 2,
-              // Trên overlay tối của driver (z-index 1_000_000_000) nhưng KHÔNG dùng z-index cao hơn
-              // popover driver (1_000_000_001) — thay vào đó đặt sang phải để không chồng popover.
-              zIndex: 1_000_000_002,
+              // Overlay driver: z-index 10000 (inline JS); Popover driver: z-index 1_000_000_000 (CSS).
+              // Đặt popup mẫu GIỮA hai giá trị này → hiện trên nền tối nhưng để popover tour đè lên trên.
+              zIndex: 500_000,
               pointerEvents: 'none',
             }}
           >
