@@ -664,6 +664,10 @@ export default function AttendanceAssignmentsView() {
       return p ? p.lateCount + p.earlyLeaveCount : 0;
     };
 
+    // Chỉ gợi ý phân công cho những nhân viên đã được tích chọn
+    const selectedSet = new Set(bulkStaffIds);
+    const selectedUsers = users.filter((u) => selectedSet.has(u.id));
+
     const MIN_STAFF = 2;
     const result: IAutoAssignSlot[] = [];
 
@@ -676,8 +680,8 @@ export default function AttendanceAssignmentsView() {
       const existingSet = new Set(existingIds);
       const registeredIds = registrationMap.get(slotKey) || [];
 
-      // Tier 1: registered but not yet assigned — always included
-      const tier1 = registeredIds.filter((id) => !existingSet.has(id));
+      // Tier 1: nhân viên đã đăng ký, đã tích chọn và chưa được phân công
+      const tier1 = registeredIds.filter((id) => !existingSet.has(id) && selectedSet.has(id));
       const tier1Set = new Set(tier1);
       const toAdd: string[] = [...tier1];
       const currentTotal = existingSet.size + toAdd.length;
@@ -687,13 +691,13 @@ export default function AttendanceAssignmentsView() {
         const handled = new Set([...existingSet, ...tier1Set]);
         const templateId = schedule.shiftTemplateId;
 
-        // Tier 2: prefers this template (shuffled among equals)
-        const tier2Pool = users.filter((u) => !handled.has(u.id) && (prefsMap.get(u.id)?.has(templateId) ?? false));
+        // Tier 2: prefers this template (shuffled among equals) — chỉ trong nhân viên đã chọn
+        const tier2Pool = selectedUsers.filter((u) => !handled.has(u.id) && (prefsMap.get(u.id)?.has(templateId) ?? false));
         // Group tier2 by (runningCount, punctScore) and shuffle within each group
         const tier2 = groupAndShuffle(tier2Pool, (u) => `${runningCount.get(u.id) || 0}_${punctScore(u.id)}`, seed + slot.date.length);
 
-        // Tier 3: everyone else (fewer shifts first, punctual first, shuffled within same rank)
-        const tier3Pool = users.filter((u) => !handled.has(u.id) && !tier2Pool.some((t) => t.id === u.id));
+        // Tier 3: nhân viên đã chọn còn lại (fewer shifts first, punctual first, shuffled within same rank)
+        const tier3Pool = selectedUsers.filter((u) => !handled.has(u.id) && !tier2Pool.some((t) => t.id === u.id));
         const tier3 = groupAndShuffle(tier3Pool, (u) => `${runningCount.get(u.id) || 0}_${punctScore(u.id)}`, seed + slot.scheduleId.length);
 
         const fillers = [...tier2, ...tier3].slice(0, needed).map((u) => u.id);
@@ -720,6 +724,12 @@ export default function AttendanceAssignmentsView() {
   };
 
   const handleAutoAssign = async () => {
+    // Bắt buộc chọn nhân viên trước khi gợi ý phân công
+    if (bulkStaffIds.length === 0) {
+      enqueueSnackbar('Vui lòng chọn nhân viên trước khi phân công tự động', { variant: 'warning' });
+      return;
+    }
+
     // Fetch preferences if not cached
     let prefsData = allStaffPrefs;
     if (prefsData.length === 0) {
@@ -2060,15 +2070,18 @@ export default function AttendanceAssignmentsView() {
           <Button variant="outlined" onClick={bulkDialog.onFalse}>
             Hủy
           </Button>
-          <Tooltip title="Phân công tự động cho toàn tuần: ưu tiên nhân viên đăng ký ca, đảm bảo ≥ 2 người/ca, chỉ định thêm theo ca ưa thích → số ca ít → đúng giờ. Hiển thị preview trước khi lưu.">
-            <Button
-              variant="outlined"
-              color="info"
-              onClick={handleAutoAssign}
-              startIcon={<Iconify icon="eva:flash-fill" />}
-            >
-              Phân công tự động
-            </Button>
+          <Tooltip title={bulkStaffIds.length === 0 ? 'Hãy chọn nhân viên trước — chỉ phân công tự động cho những nhân viên đã tích chọn' : 'Phân công tự động cho toàn tuần (chỉ trong nhân viên đã chọn): ưu tiên nhân viên đăng ký ca, đảm bảo ≥ 2 người/ca, chỉ định thêm theo ca ưa thích → số ca ít → đúng giờ. Hiển thị preview trước khi lưu.'}>
+            <span>
+              <Button
+                variant="outlined"
+                color="info"
+                onClick={handleAutoAssign}
+                disabled={bulkStaffIds.length === 0}
+                startIcon={<Iconify icon="eva:flash-fill" />}
+              >
+                Phân công tự động
+              </Button>
+            </span>
           </Tooltip>
           <LoadingButton
             variant="contained"
@@ -2131,6 +2144,8 @@ export default function AttendanceAssignmentsView() {
               end.setDate(end.getDate() + 6);
               return end.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
             })()}
+            {' · '}
+            Chỉ phân công cho {bulkStaffIds.length} nhân viên đã chọn
           </Typography>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 1.5 }}>
