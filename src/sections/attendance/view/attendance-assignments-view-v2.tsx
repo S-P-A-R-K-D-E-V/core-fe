@@ -69,6 +69,7 @@ import { IShiftSchedule, IShiftAssignment, IShiftRegistration, IStaffShiftPrefer
 import { ICalendarEvent, ICalendarView, ICalendarScheduleEvent } from 'src/types/calendar';
 import {
   getShiftAssignments,
+  getAllAttendanceReports,
   createShiftAssignment,
   deleteShiftAssignment,
   bulkAssignShiftSchedule,
@@ -115,15 +116,40 @@ const toLocalDateStr = (d: Date): string => {
   return `${y}-${m}-${day}`;
 };
 
-interface IAutoAssignSlotPreview {
+interface IAutoAssignSlot {
   scheduleId: string;
   date: string;
   scheduleName: string;
+  color: string;
   startTime: string;
   endTime: string;
-  existingStaffCount: number;
-  toAddStaffIds: string[];
+  existingStaffIds: string[];   // already assigned
+  toAddStaffIds: string[];      // newly proposed by algorithm
   registeredStaffIds: Set<string>; // subset of toAddStaffIds that were registered
+}
+
+// Seeded LCG shuffle — same seed produces same order
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const a = [...arr];
+  let s = seed;
+  for (let i = a.length - 1; i > 0; i--) {
+    s = Math.imul(s, 1664525) + 1013904223;
+    const j = Math.abs(s) % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Group items by keyFn, sort by key, shuffle within each group using the given seed
+function groupAndShuffle<T>(arr: T[], keyFn: (item: T) => string, seed: number): T[] {
+  const groups = new Map<string, T[]>();
+  arr.forEach((item) => {
+    const key = keyFn(item);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(item);
+  });
+  const sortedKeys = Array.from(groups.keys()).sort();
+  return sortedKeys.flatMap((key) => seededShuffle(groups.get(key)!, seed));
 }
 
 // Ca đã đến giờ bắt đầu chưa (so theo giờ máy client — giờ VN)
@@ -251,9 +277,11 @@ export default function AttendanceAssignmentsView() {
   const [bulkTab, setBulkTab] = useState(0);
   const bulkConfirm = useBoolean();
   const autoAssignDialog = useBoolean();
-  const [autoAssignPreview, setAutoAssignPreview] = useState<IAutoAssignSlotPreview[]>([]);
+  const [autoAssignSlots, setAutoAssignSlots] = useState<IAutoAssignSlot[]>([]);
   const [autoAssigning, setAutoAssigning] = useState(false);
+  const [autoAssignSeed, setAutoAssignSeed] = useState(0);
   const [allStaffPrefs, setAllStaffPrefs] = useState<IStaffShiftPreferenceSummary[]>([]);
+  const [punctualityMap, setPunctualityMap] = useState<Map<string, { lateCount: number; earlyLeaveCount: number }>>(new Map());
 
   const fetchAssignments = useCallback(async () => {
     try {
@@ -584,37 +612,36 @@ export default function AttendanceAssignmentsView() {
     doBulkAssign();
   };
 
-  const handleAutoAssign = async () => {
-    if (bulkSelectedSlots.length === 0) {
-      enqueueSnackbar('Vui lòng chọn ít nhất 1 ca trên lịch', { variant: 'warning' });
-      return;
+  // Core algorithm: compute proposals for all slots in the visible week given a seed
+  const computeAutoAssignSlots = (
+    prefsMap: Map<string, Set<string>>,
+    punctMap: Map<string, { lateCount: number; earlyLeaveCount: number }>,
+    seed: number
+  ): IAutoAssignSlot[] => {
+    const weekEnd = new Date(bulkWeekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+
+    // Build all applicable slots for the week
+    const allSlots: { scheduleId: string; date: string }[] = [];
+    for (let d = new Date(bulkWeekStart); d <= weekEnd; d.setDate(d.getDate() + 1)) {
+      const dateStr = toLocalDateStr(new Date(d));
+      schedules.forEach((s) => {
+        if (!s.isActive) return;
+        const from = s.fromDate.split('T')[0];
+        const to = s.toDate ? s.toDate.split('T')[0] : null;
+        if (dateStr >= from && (to === null || dateStr <= to)) {
+          allSlots.push({ scheduleId: s.id, date: dateStr });
+        }
+      });
     }
 
-    // Fetch all staff preferences if not yet loaded
-    let prefsData = allStaffPrefs;
-    if (prefsData.length === 0) {
-      try {
-        prefsData = await getAllStaffShiftPreferences();
-        setAllStaffPrefs(prefsData);
-      } catch {
-        // If fetch fails, proceed without preference data
-        prefsData = [];
-      }
-    }
-
-    // Build preference map: staffId → Set<templateId>
-    const prefsMap = new Map<string, Set<string>>();
-    prefsData.forEach((p) => {
-      prefsMap.set(p.userId, new Set(p.shiftTemplateIds));
-    });
-
-    // Build existing assignment map: slotKey → Set<staffId>
-    const existingMap = new Map<string, Set<string>>();
+    // Build existing assignment map: slotKey → staffId[]
+    const existingMap = new Map<string, string[]>();
     bulkWeekAssignments.forEach((a) => {
       const dateStr = a.date.split('T')[0];
       const key = `${a.shiftScheduleId}_${dateStr}`;
-      if (!existingMap.has(key)) existingMap.set(key, new Set());
-      existingMap.get(key)!.add(a.staffId);
+      if (!existingMap.has(key)) existingMap.set(key, []);
+      existingMap.get(key)!.push(a.staffId);
     });
 
     // Build registration map: slotKey → staffId[]
@@ -626,96 +653,131 @@ export default function AttendanceAssignmentsView() {
       registrationMap.get(key)!.push(r.staffId);
     });
 
-    // Running weekly assignment count (updates as we auto-assign, for fair distribution)
+    // Running count starts from existing assignments, increments as we propose
     const runningCount = new Map<string, number>();
     bulkWeekAssignments.forEach((a) => {
       runningCount.set(a.staffId, (runningCount.get(a.staffId) || 0) + 1);
     });
 
-    const MIN_STAFF = 2;
-    const preview: IAutoAssignSlotPreview[] = [];
+    const punctScore = (id: string) => {
+      const p = punctMap.get(id);
+      return p ? p.lateCount + p.earlyLeaveCount : 0;
+    };
 
-    for (const slot of bulkSelectedSlots) {
+    const MIN_STAFF = 2;
+    const result: IAutoAssignSlot[] = [];
+
+    allSlots.forEach((slot) => {
       const schedule = schedules.find((s) => s.id === slot.scheduleId);
-      if (!schedule) continue;
+      if (!schedule) return;
 
       const slotKey = `${slot.scheduleId}_${slot.date}`;
-      const existing = existingMap.get(slotKey) || new Set<string>();
+      const existingIds = existingMap.get(slotKey) || [];
+      const existingSet = new Set(existingIds);
       const registeredIds = registrationMap.get(slotKey) || [];
 
-      // Staff to newly add: registered but not yet assigned
-      const toAdd: string[] = registeredIds.filter((id) => !existing.has(id));
-      const registeredToAdd = new Set<string>(toAdd);
-
-      const currentTotal = existing.size + toAdd.length;
+      // Tier 1: registered but not yet assigned — always included
+      const tier1 = registeredIds.filter((id) => !existingSet.has(id));
+      const tier1Set = new Set(tier1);
+      const toAdd: string[] = [...tier1];
+      const currentTotal = existingSet.size + toAdd.length;
 
       if (currentTotal < MIN_STAFF) {
         const needed = MIN_STAFF - currentTotal;
-        const alreadyHandled = new Set([...existing, ...toAdd]);
+        const handled = new Set([...existingSet, ...tier1Set]);
+        const templateId = schedule.shiftTemplateId;
 
-        const candidates = users
-          .filter((u) => !alreadyHandled.has(u.id))
-          .sort((a, b) => {
-            const templateId = schedule.shiftTemplateId;
-            const aPrefers = prefsMap.get(a.id)?.has(templateId) ?? false;
-            const bPrefers = prefsMap.get(b.id)?.has(templateId) ?? false;
-            if (aPrefers !== bPrefers) return bPrefers ? 1 : -1;
-            return (runningCount.get(a.id) || 0) - (runningCount.get(b.id) || 0);
-          });
+        // Tier 2: prefers this template (shuffled among equals)
+        const tier2Pool = users.filter((u) => !handled.has(u.id) && (prefsMap.get(u.id)?.has(templateId) ?? false));
+        // Group tier2 by (runningCount, punctScore) and shuffle within each group
+        const tier2 = groupAndShuffle(tier2Pool, (u) => `${runningCount.get(u.id) || 0}_${punctScore(u.id)}`, seed + slot.date.length);
 
-        const fillers = candidates.slice(0, needed).map((u) => u.id);
+        // Tier 3: everyone else (fewer shifts first, punctual first, shuffled within same rank)
+        const tier3Pool = users.filter((u) => !handled.has(u.id) && !tier2Pool.some((t) => t.id === u.id));
+        const tier3 = groupAndShuffle(tier3Pool, (u) => `${runningCount.get(u.id) || 0}_${punctScore(u.id)}`, seed + slot.scheduleId.length);
+
+        const fillers = [...tier2, ...tier3].slice(0, needed).map((u) => u.id);
         toAdd.push(...fillers);
       }
 
-      // Update running count so later slots distribute more evenly
+      // Increment running count for later slots
       toAdd.forEach((id) => runningCount.set(id, (runningCount.get(id) || 0) + 1));
 
-      if (toAdd.length > 0) {
-        preview.push({
-          scheduleId: slot.scheduleId,
-          date: slot.date,
-          scheduleName: schedule.templateName,
-          startTime: schedule.startTime,
-          endTime: schedule.endTime,
-          existingStaffCount: existing.size,
-          toAddStaffIds: toAdd,
-          registeredStaffIds: registeredToAdd,
-        });
-      }
+      result.push({
+        scheduleId: slot.scheduleId,
+        date: slot.date,
+        scheduleName: schedule.templateName,
+        color: schedule.color,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        existingStaffIds: existingIds,
+        toAddStaffIds: toAdd,
+        registeredStaffIds: new Set(tier1),
+      });
+    });
+
+    return result;
+  };
+
+  const handleAutoAssign = async () => {
+    // Fetch preferences if not cached
+    let prefsData = allStaffPrefs;
+    if (prefsData.length === 0) {
+      try { prefsData = await getAllStaffShiftPreferences(); setAllStaffPrefs(prefsData); } catch { prefsData = []; }
     }
 
-    if (preview.length === 0) {
-      enqueueSnackbar('Tất cả ca đã đủ nhân viên, không cần bổ sung.', { variant: 'info' });
-      return;
+    // Fetch last month punctuality if not cached
+    let pMap = punctualityMap;
+    if (pMap.size === 0) {
+      try {
+        const now = new Date();
+        const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        const fmt = (d: Date) => toLocalDateStr(d);
+        const reports = await getAllAttendanceReports(fmt(firstOfLastMonth), fmt(lastOfLastMonth));
+        pMap = new Map(reports.map((r) => [r.staffId, { lateCount: r.lateCount, earlyLeaveCount: r.earlyLeaveCount ?? 0 }]));
+        setPunctualityMap(pMap);
+      } catch { pMap = new Map(); }
     }
 
-    setAutoAssignPreview(preview);
+    const prefsMap = new Map<string, Set<string>>();
+    prefsData.forEach((p) => prefsMap.set(p.userId, new Set(p.shiftTemplateIds)));
+
+    const newSeed = Date.now();
+    setAutoAssignSeed(newSeed);
+    const slots = computeAutoAssignSlots(prefsMap, pMap, newSeed);
+    setAutoAssignSlots(slots);
     autoAssignDialog.onTrue();
+  };
+
+  const handleRegenerateAutoAssign = () => {
+    const prefsMap = new Map<string, Set<string>>();
+    allStaffPrefs.forEach((p) => prefsMap.set(p.userId, new Set(p.shiftTemplateIds)));
+    const newSeed = autoAssignSeed + 1;
+    setAutoAssignSeed(newSeed);
+    const slots = computeAutoAssignSlots(prefsMap, punctualityMap, newSeed);
+    setAutoAssignSlots(slots);
   };
 
   const doAutoAssign = async () => {
     try {
       setAutoAssigning(true);
       let count = 0;
-      for (const slot of autoAssignPreview) {
+      for (const slot of autoAssignSlots) {
         for (const staffId of slot.toAddStaffIds) {
-          await createShiftAssignment({
-            staffId,
-            shiftScheduleId: slot.scheduleId,
-            date: slot.date,
-          });
+          // eslint-disable-next-line no-await-in-loop
+          await createShiftAssignment({ staffId, shiftScheduleId: slot.scheduleId, date: slot.date });
           count += 1;
         }
       }
-      enqueueSnackbar(`Tự phân công thành công: ${count} phân công mới!`, { variant: 'success' });
+      enqueueSnackbar(`Phân công tự động thành công: ${count} phân công mới!`, { variant: 'success' });
       autoAssignDialog.onFalse();
       bulkDialog.onFalse();
       setBulkSelectedSlots([]);
       setBulkStaffIds([]);
       fetchAssignments();
     } catch (error: any) {
-      const msg = error?.title || error?.message || 'Tự phân công thất bại!';
-      enqueueSnackbar(msg, { variant: 'error' });
+      enqueueSnackbar(error?.title || error?.message || 'Phân công thất bại!', { variant: 'error' });
     } finally {
       setAutoAssigning(false);
     }
@@ -1998,15 +2060,14 @@ export default function AttendanceAssignmentsView() {
           <Button variant="outlined" onClick={bulkDialog.onFalse}>
             Hủy
           </Button>
-          <Tooltip title="Tự động phân công: ưu tiên nhân viên đã đăng ký, đảm bảo mỗi ca ≥ 2 người, chỉ định thêm theo ca ưa thích → số ca ít nhất">
+          <Tooltip title="Phân công tự động cho toàn tuần: ưu tiên nhân viên đăng ký ca, đảm bảo ≥ 2 người/ca, chỉ định thêm theo ca ưa thích → số ca ít → đúng giờ. Hiển thị preview trước khi lưu.">
             <Button
               variant="outlined"
               color="info"
               onClick={handleAutoAssign}
-              disabled={bulkSelectedSlots.length === 0}
               startIcon={<Iconify icon="eva:flash-fill" />}
             >
-              Tự phân công
+              Phân công tự động
             </Button>
           </Tooltip>
           <LoadingButton
@@ -2057,60 +2118,137 @@ export default function AttendanceAssignmentsView() {
         }
       />
 
-      {/* Auto-assign preview dialog */}
-      <Dialog open={autoAssignDialog.value} onClose={autoAssignDialog.onFalse} maxWidth="sm" fullWidth>
-        <DialogTitle>Xem trước tự phân công</DialogTitle>
-        <DialogContent dividers sx={{ p: 0 }}>
-          <Scrollbar sx={{ maxHeight: 480 }}>
-            {autoAssignPreview.map((slot) => {
-              const staffNameMap = new Map(users.map((u) => [u.id, u.fullName]));
+      {/* Auto-assign preview dialog — week calendar grid */}
+      <Dialog open={autoAssignDialog.value} onClose={autoAssignDialog.onFalse} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h6">Xem trước Phân công tự động</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+            Tuần{' '}
+            {bulkWeekStart.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+            {' — '}
+            {(() => {
+              const end = new Date(bulkWeekStart);
+              end.setDate(end.getDate() + 6);
+              return end.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            })()}
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 1.5 }}>
+          {/* Legend */}
+          <Stack direction="row" spacing={2} sx={{ mb: 1.5 }}>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'text.disabled', flexShrink: 0 }} />
+              <Typography variant="caption" color="text.secondary">Đã phân công</Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main', flexShrink: 0 }} />
+              <Typography variant="caption" color="text.secondary">Mới — đăng ký ca</Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'warning.main', flexShrink: 0 }} />
+              <Typography variant="caption" color="text.secondary">Mới — chỉ định</Typography>
+            </Stack>
+          </Stack>
+
+          {/* 7-column grid */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1 }}>
+            {/* Day headers */}
+            {Array.from({ length: 7 }, (_, i) => {
+              const d = new Date(bulkWeekStart);
+              d.setDate(d.getDate() + i);
+              const dateStr = toLocalDateStr(d);
+              const isToday = dateStr === toLocalDateStr(new Date());
+              const DAY_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
               return (
                 <Box
-                  key={`${slot.scheduleId}_${slot.date}`}
-                  sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}
+                  key={dateStr}
+                  sx={{ textAlign: 'center', pb: 1, borderBottom: '1px solid', borderColor: 'divider', mb: 0.5 }}
                 >
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.75 }}>
-                    <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-                      {slot.scheduleName} · {slot.date}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {slot.startTime}–{slot.endTime}
-                    </Typography>
-                    {slot.existingStaffCount > 0 && (
-                      <Chip
-                        size="small"
-                        label={`Đã có ${slot.existingStaffCount} NV`}
-                        variant="outlined"
-                        color="default"
-                      />
-                    )}
-                  </Stack>
-                  <Stack spacing={0.5}>
-                    {slot.toAddStaffIds.map((id) => {
-                      const isRegistered = slot.registeredStaffIds.has(id);
-                      return (
-                        <Stack key={id} direction="row" alignItems="center" spacing={0.75}>
-                          <Chip
-                            size="small"
-                            label={isRegistered ? 'Đăng ký' : 'Chỉ định'}
-                            color={isRegistered ? 'success' : 'warning'}
-                            sx={{ minWidth: 68, fontSize: 10 }}
-                          />
-                          <Typography variant="body2">
-                            {staffNameMap.get(id) || id}
-                          </Typography>
-                        </Stack>
-                      );
-                    })}
-                  </Stack>
+                  <Typography variant="caption" color={isToday ? 'primary.main' : 'text.secondary'} display="block">
+                    {DAY_NAMES[d.getDay()]}
+                  </Typography>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{
+                      width: 26, height: 26, mx: 'auto', borderRadius: '50%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      bgcolor: isToday ? 'primary.main' : 'transparent',
+                      color: isToday ? 'primary.contrastText' : 'text.primary',
+                      fontSize: 12,
+                    }}
+                  >
+                    {d.getDate()}
+                  </Typography>
                 </Box>
               );
             })}
-          </Scrollbar>
+
+            {/* Slot cells per day */}
+            {Array.from({ length: 7 }, (_, i) => {
+              const d = new Date(bulkWeekStart);
+              d.setDate(d.getDate() + i);
+              const dateStr = toLocalDateStr(d);
+              const daySlots = autoAssignSlots.filter((s) => s.date === dateStr);
+              return (
+                <Box key={dateStr} sx={{ minHeight: 80 }}>
+                  {daySlots.map((slot) => (
+                    <Box
+                      key={slot.scheduleId}
+                      sx={{
+                        mb: 0.5, p: 0.75, borderRadius: 1,
+                        border: '2px solid', borderColor: slot.color,
+                        bgcolor: alpha(slot.color, 0.07),
+                      }}
+                    >
+                      <Typography variant="caption" fontWeight={600} noWrap sx={{ color: slot.color, display: 'block' }}>
+                        {slot.scheduleName}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', mb: 0.25 }}>
+                        {slot.startTime}–{slot.endTime}
+                      </Typography>
+                      {slot.existingStaffIds.map((id) => (
+                        <Typography key={id} variant="caption" sx={{ display: 'block', fontSize: 10, color: 'text.disabled', lineHeight: 1.4 }} noWrap>
+                          👤 {staffInfoMap.get(id)?.name || id}
+                        </Typography>
+                      ))}
+                      {slot.toAddStaffIds.map((id) => {
+                        const isRegistered = slot.registeredStaffIds.has(id);
+                        return (
+                          <Stack key={id} direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.25 }}>
+                            <Box sx={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, bgcolor: isRegistered ? 'success.main' : 'warning.main' }} />
+                            <Typography
+                              variant="caption"
+                              noWrap
+                              sx={{ fontSize: 10, lineHeight: 1.3, color: isRegistered ? 'success.dark' : 'warning.dark' }}
+                            >
+                              {staffInfoMap.get(id)?.name || id}
+                            </Typography>
+                          </Stack>
+                        );
+                      })}
+                    </Box>
+                  ))}
+                  {daySlots.length === 0 && (
+                    <Typography variant="caption" color="text.disabled" sx={{ display: 'block', textAlign: 'center', pt: 2 }}>
+                      —
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button variant="outlined" onClick={autoAssignDialog.onFalse}>
             Huỷ
+          </Button>
+          <Button
+            variant="outlined"
+            color="info"
+            onClick={handleRegenerateAutoAssign}
+            startIcon={<Iconify icon="eva:refresh-fill" />}
+          >
+            Gợi ý lại
           </Button>
           <LoadingButton
             variant="contained"
