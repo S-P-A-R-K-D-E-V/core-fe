@@ -852,10 +852,17 @@ export default function MyScheduleView() {
                 eventClick={handleClickEvent}
                 datesSet={(arg) => {
                   // FullCalendar end là exclusive — trừ 1 ngày để thành inclusive
+                  // Dùng local date methods để tránh lệch múi giờ UTC+7 khi dùng toISOString()
+                  const fmtLocalDate = (d: Date) => {
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${day}`;
+                  };
                   const from = arg.startStr.split('T')[0];
-                  const endExclusive = new Date(arg.end);
-                  endExclusive.setDate(endExclusive.getDate() - 1);
-                  const to = endExclusive.toISOString().split('T')[0];
+                  const endDate = new Date(arg.end);
+                  endDate.setDate(endDate.getDate() - 1);
+                  const to = fmtLocalDate(endDate);
                   setVisibleRange((prev) => (prev.from === from && prev.to === to ? prev : { from, to }));
                 }}
                 height={smUp ? 720 : 'auto'}
@@ -1633,7 +1640,7 @@ export default function MyScheduleView() {
           <Button
             variant="contained"
             onClick={handlePublishSubmit}
-            disabled={publishing || (needType === 'PartialCover' && (!partialStart || !partialEnd))}
+            disabled={publishing || (needType === 'PartialCover' && !partialSubType)}
           >
             Đăng
           </Button>
