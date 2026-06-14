@@ -65,7 +65,7 @@ import {
   TablePaginationCustom,
 } from 'src/components/table';
 
-import { IShiftSchedule, IShiftAssignment, IShiftRegistration, IUser } from 'src/types/corecms-api';
+import { IShiftSchedule, IShiftAssignment, IShiftRegistration, IStaffShiftPreferenceSummary, IUser } from 'src/types/corecms-api';
 import { ICalendarEvent, ICalendarView, ICalendarScheduleEvent } from 'src/types/calendar';
 import {
   getShiftAssignments,
@@ -77,6 +77,7 @@ import {
   getShiftSchedulesByDateRange,
 } from 'src/api/attendance';
 import { getShiftRegistrations } from 'src/api/shiftRegistration';
+import { getAllStaffShiftPreferences } from 'src/api/userPreference';
 import { getAllUsers } from 'src/api/users';
 
 
@@ -113,6 +114,17 @@ const toLocalDateStr = (d: Date): string => {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
+
+interface IAutoAssignSlotPreview {
+  scheduleId: string;
+  date: string;
+  scheduleName: string;
+  startTime: string;
+  endTime: string;
+  existingStaffCount: number;
+  toAddStaffIds: string[];
+  registeredStaffIds: Set<string>; // subset of toAddStaffIds that were registered
+}
 
 // Ca đã đến giờ bắt đầu chưa (so theo giờ máy client — giờ VN)
 const isShiftStarted = (date: string, startTime?: string): boolean => {
@@ -238,6 +250,10 @@ export default function AttendanceAssignmentsView() {
   const [bulkOverwrite, setBulkOverwrite] = useState(false);
   const [bulkTab, setBulkTab] = useState(0);
   const bulkConfirm = useBoolean();
+  const autoAssignDialog = useBoolean();
+  const [autoAssignPreview, setAutoAssignPreview] = useState<IAutoAssignSlotPreview[]>([]);
+  const [autoAssigning, setAutoAssigning] = useState(false);
+  const [allStaffPrefs, setAllStaffPrefs] = useState<IStaffShiftPreferenceSummary[]>([]);
 
   const fetchAssignments = useCallback(async () => {
     try {
@@ -566,6 +582,143 @@ export default function AttendanceAssignmentsView() {
       return;
     }
     doBulkAssign();
+  };
+
+  const handleAutoAssign = async () => {
+    if (bulkSelectedSlots.length === 0) {
+      enqueueSnackbar('Vui lòng chọn ít nhất 1 ca trên lịch', { variant: 'warning' });
+      return;
+    }
+
+    // Fetch all staff preferences if not yet loaded
+    let prefsData = allStaffPrefs;
+    if (prefsData.length === 0) {
+      try {
+        prefsData = await getAllStaffShiftPreferences();
+        setAllStaffPrefs(prefsData);
+      } catch {
+        // If fetch fails, proceed without preference data
+        prefsData = [];
+      }
+    }
+
+    // Build preference map: staffId → Set<templateId>
+    const prefsMap = new Map<string, Set<string>>();
+    prefsData.forEach((p) => {
+      prefsMap.set(p.userId, new Set(p.shiftTemplateIds));
+    });
+
+    // Build existing assignment map: slotKey → Set<staffId>
+    const existingMap = new Map<string, Set<string>>();
+    bulkWeekAssignments.forEach((a) => {
+      const dateStr = a.date.split('T')[0];
+      const key = `${a.shiftScheduleId}_${dateStr}`;
+      if (!existingMap.has(key)) existingMap.set(key, new Set());
+      existingMap.get(key)!.add(a.staffId);
+    });
+
+    // Build registration map: slotKey → staffId[]
+    const registrationMap = new Map<string, string[]>();
+    bulkWeekRegistrations.forEach((r) => {
+      const dateStr = r.date.split('T')[0];
+      const key = `${r.shiftScheduleId}_${dateStr}`;
+      if (!registrationMap.has(key)) registrationMap.set(key, []);
+      registrationMap.get(key)!.push(r.staffId);
+    });
+
+    // Running weekly assignment count (updates as we auto-assign, for fair distribution)
+    const runningCount = new Map<string, number>();
+    bulkWeekAssignments.forEach((a) => {
+      runningCount.set(a.staffId, (runningCount.get(a.staffId) || 0) + 1);
+    });
+
+    const MIN_STAFF = 2;
+    const preview: IAutoAssignSlotPreview[] = [];
+
+    for (const slot of bulkSelectedSlots) {
+      const schedule = schedules.find((s) => s.id === slot.scheduleId);
+      if (!schedule) continue;
+
+      const slotKey = `${slot.scheduleId}_${slot.date}`;
+      const existing = existingMap.get(slotKey) || new Set<string>();
+      const registeredIds = registrationMap.get(slotKey) || [];
+
+      // Staff to newly add: registered but not yet assigned
+      const toAdd: string[] = registeredIds.filter((id) => !existing.has(id));
+      const registeredToAdd = new Set<string>(toAdd);
+
+      const currentTotal = existing.size + toAdd.length;
+
+      if (currentTotal < MIN_STAFF) {
+        const needed = MIN_STAFF - currentTotal;
+        const alreadyHandled = new Set([...existing, ...toAdd]);
+
+        const candidates = users
+          .filter((u) => !alreadyHandled.has(u.id))
+          .sort((a, b) => {
+            const templateId = schedule.shiftTemplateId;
+            const aPrefers = prefsMap.get(a.id)?.has(templateId) ?? false;
+            const bPrefers = prefsMap.get(b.id)?.has(templateId) ?? false;
+            if (aPrefers !== bPrefers) return bPrefers ? 1 : -1;
+            return (runningCount.get(a.id) || 0) - (runningCount.get(b.id) || 0);
+          });
+
+        const fillers = candidates.slice(0, needed).map((u) => u.id);
+        toAdd.push(...fillers);
+      }
+
+      // Update running count so later slots distribute more evenly
+      toAdd.forEach((id) => runningCount.set(id, (runningCount.get(id) || 0) + 1));
+
+      if (toAdd.length > 0) {
+        preview.push({
+          scheduleId: slot.scheduleId,
+          date: slot.date,
+          scheduleName: schedule.templateName,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+          existingStaffCount: existing.size,
+          toAddStaffIds: toAdd,
+          registeredStaffIds: registeredToAdd,
+        });
+      }
+    }
+
+    if (preview.length === 0) {
+      enqueueSnackbar('Tất cả ca đã đủ nhân viên, không cần bổ sung.', { variant: 'info' });
+      return;
+    }
+
+    setAutoAssignPreview(preview);
+    autoAssignDialog.onTrue();
+  };
+
+  const doAutoAssign = async () => {
+    try {
+      setAutoAssigning(true);
+      let count = 0;
+      for (const slot of autoAssignPreview) {
+        for (const staffId of slot.toAddStaffIds) {
+          await createShiftAssignment({
+            staffId,
+            shiftScheduleId: slot.scheduleId,
+            date: slot.date,
+          });
+          count += 1;
+        }
+      }
+      enqueueSnackbar(`Tự phân công thành công: ${count} phân công mới!`, { variant: 'success' });
+      autoAssignDialog.onFalse();
+      bulkDialog.onFalse();
+      setBulkSelectedSlots([]);
+      setBulkStaffIds([]);
+      fetchAssignments();
+    } catch (error: any) {
+      const msg = error?.title || error?.message || 'Tự phân công thất bại!';
+      enqueueSnackbar(msg, { variant: 'error' });
+    } finally {
+      setAutoAssigning(false);
+    }
   };
 
   const toggleBulkStaff = (staffId: string) => {
@@ -1845,6 +1998,17 @@ export default function AttendanceAssignmentsView() {
           <Button variant="outlined" onClick={bulkDialog.onFalse}>
             Hủy
           </Button>
+          <Tooltip title="Tự động phân công: ưu tiên nhân viên đã đăng ký, đảm bảo mỗi ca ≥ 2 người, chỉ định thêm theo ca ưa thích → số ca ít nhất">
+            <Button
+              variant="outlined"
+              color="info"
+              onClick={handleAutoAssign}
+              disabled={bulkSelectedSlots.length === 0}
+              startIcon={<Iconify icon="eva:flash-fill" />}
+            >
+              Tự phân công
+            </Button>
+          </Tooltip>
           <LoadingButton
             variant="contained"
             onClick={handleBulkAssign}
@@ -1892,6 +2056,72 @@ export default function AttendanceAssignmentsView() {
           </LoadingButton>
         }
       />
+
+      {/* Auto-assign preview dialog */}
+      <Dialog open={autoAssignDialog.value} onClose={autoAssignDialog.onFalse} maxWidth="sm" fullWidth>
+        <DialogTitle>Xem trước tự phân công</DialogTitle>
+        <DialogContent dividers sx={{ p: 0 }}>
+          <Scrollbar sx={{ maxHeight: 480 }}>
+            {autoAssignPreview.map((slot) => {
+              const staffNameMap = new Map(users.map((u) => [u.id, u.fullName]));
+              return (
+                <Box
+                  key={`${slot.scheduleId}_${slot.date}`}
+                  sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}
+                >
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.75 }}>
+                    <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
+                      {slot.scheduleName} · {slot.date}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {slot.startTime}–{slot.endTime}
+                    </Typography>
+                    {slot.existingStaffCount > 0 && (
+                      <Chip
+                        size="small"
+                        label={`Đã có ${slot.existingStaffCount} NV`}
+                        variant="outlined"
+                        color="default"
+                      />
+                    )}
+                  </Stack>
+                  <Stack spacing={0.5}>
+                    {slot.toAddStaffIds.map((id) => {
+                      const isRegistered = slot.registeredStaffIds.has(id);
+                      return (
+                        <Stack key={id} direction="row" alignItems="center" spacing={0.75}>
+                          <Chip
+                            size="small"
+                            label={isRegistered ? 'Đăng ký' : 'Chỉ định'}
+                            color={isRegistered ? 'success' : 'warning'}
+                            sx={{ minWidth: 68, fontSize: 10 }}
+                          />
+                          <Typography variant="body2">
+                            {staffNameMap.get(id) || id}
+                          </Typography>
+                        </Stack>
+                      );
+                    })}
+                  </Stack>
+                </Box>
+              );
+            })}
+          </Scrollbar>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="outlined" onClick={autoAssignDialog.onFalse}>
+            Huỷ
+          </Button>
+          <LoadingButton
+            variant="contained"
+            loading={autoAssigning}
+            onClick={doAutoAssign}
+            startIcon={<Iconify icon="eva:checkmark-circle-2-fill" />}
+          >
+            Xác nhận phân công
+          </LoadingButton>
+        </DialogActions>
+      </Dialog>
 
       {/* Manage Shift Dialog */}
       <Dialog

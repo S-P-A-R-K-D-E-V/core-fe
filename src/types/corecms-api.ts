@@ -911,6 +911,11 @@ export interface IUserShiftPreferenceResponse {
   color?: string;
 }
 
+export interface IStaffShiftPreferenceSummary {
+  userId: string;
+  shiftTemplateIds: string[];
+}
+
 export interface ISetShiftPreferencesDto {
   shiftTemplateIds: string[];
 }

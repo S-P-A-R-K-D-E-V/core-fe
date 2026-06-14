@@ -1,6 +1,6 @@
 import axios, { endpoints } from 'src/utils/axios';
 
-import type { ISetShiftPreferencesDto, IUserShiftPreferenceResponse } from 'src/types/corecms-api';
+import type { ISetShiftPreferencesDto, IStaffShiftPreferenceSummary, IUserShiftPreferenceResponse } from 'src/types/corecms-api';
 
 export async function getMyShiftPreferences(): Promise<IUserShiftPreferenceResponse[]> {
   const response = await axios.get<IUserShiftPreferenceResponse[]>(
@@ -18,6 +18,13 @@ export async function getStaffShiftPreferences(
 ): Promise<IUserShiftPreferenceResponse[]> {
   const response = await axios.get<IUserShiftPreferenceResponse[]>(
     endpoints.userPreference.staffShiftPreferences(userId)
+  );
+  return response.data;
+}
+
+export async function getAllStaffShiftPreferences(): Promise<IStaffShiftPreferenceSummary[]> {
+  const response = await axios.get<IStaffShiftPreferenceSummary[]>(
+    endpoints.userPreference.allStaffShiftPreferences
   );
   return response.data;
 }
