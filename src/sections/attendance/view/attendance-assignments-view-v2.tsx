@@ -39,6 +39,7 @@ import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormGroup from '@mui/material/FormGroup';
 import Tooltip from '@mui/material/Tooltip';
+import Popover from '@mui/material/Popover';
 import { useTheme, alpha } from '@mui/material/styles';
 
 import Chart, { useChart } from 'src/components/chart';
@@ -282,6 +283,15 @@ export default function AttendanceAssignmentsView() {
   const [autoAssignSeed, setAutoAssignSeed] = useState(0);
   const [allStaffPrefs, setAllStaffPrefs] = useState<IStaffShiftPreferenceSummary[]>([]);
   const [punctualityMap, setPunctualityMap] = useState<Map<string, { lateCount: number; earlyLeaveCount: number }>>(new Map());
+  // exclusionMap: slotKey → staffId[] — nhân viên không được xếp vào ca đó (bất khả kháng)
+  const [exclusionMap, setExclusionMap] = useState<Record<string, string[]>>({});
+  // Trạng thái popover chọn ngoại trừ (chuột phải vào ô ca)
+  const [exclusionAnchor, setExclusionAnchor] = useState<{
+    el: HTMLElement;
+    slotKey: string;
+    scheduleName: string;
+    date: string;
+  } | null>(null);
 
   const fetchAssignments = useCallback(async () => {
     try {
@@ -343,6 +353,8 @@ export default function AttendanceAssignmentsView() {
     getShiftRegistrations(from, to)
       .then((data) => setBulkWeekRegistrations(data))
       .catch(() => setBulkWeekRegistrations([]));
+    // Đổi tuần → reset ngoại trừ
+    setExclusionMap({});
   }, [bulkWeekStart, bulkDialog.value]);
 
   // Map: "scheduleId_date" → assigned staff names (for tooltip)
@@ -703,6 +715,8 @@ export default function AttendanceAssignmentsView() {
       const existingIds = existingMap.get(slotKey) || [];
       const registeredSet = new Set(registrationMap.get(slotKey) || []);
       const templateId = schedule.shiftTemplateId;
+      // Nhân viên bị ngoại trừ khỏi ca này (bất khả kháng)
+      const excludedSet = new Set(exclusionMap[slotKey] || []);
 
       // Ghi đè: bỏ qua phân công cũ, chọn lại tối đa 2 người từ nhân viên đã tích chọn.
       const chosen: string[] = [];
@@ -710,26 +724,27 @@ export default function AttendanceAssignmentsView() {
       const pick = (ids: string[]) => {
         for (const id of ids) {
           if (chosen.length >= MAX_STAFF) break;
-          if (!taken.has(id)) {
+          // Bỏ qua nhân viên bị ngoại trừ khỏi ca này
+          if (!taken.has(id) && !excludedSet.has(id)) {
             chosen.push(id);
             taken.add(id);
           }
         }
       };
 
-      // Tier 1: nhân viên đã đăng ký & đã tích chọn (ưu tiên số ca ít → đúng giờ → ngẫu nhiên)
-      const tier1Pool = selectedUsers.filter((u) => registeredSet.has(u.id));
+      // Tier 1: nhân viên đã đăng ký & đã tích chọn (không bị ngoại trừ)
+      const tier1Pool = selectedUsers.filter((u) => registeredSet.has(u.id) && !excludedSet.has(u.id));
       pick(groupAndShuffle(tier1Pool, rankKey, seed + slot.date.length).map((u) => u.id));
 
       if (chosen.length < MAX_STAFF) {
-        // Tier 2: nhân viên đã chọn có ca này trong ca ưa thích
-        const tier2Pool = selectedUsers.filter((u) => !taken.has(u.id) && (prefsMap.get(u.id)?.has(templateId) ?? false));
+        // Tier 2: nhân viên đã chọn có ca này trong ca ưa thích (không bị ngoại trừ)
+        const tier2Pool = selectedUsers.filter((u) => !taken.has(u.id) && !excludedSet.has(u.id) && (prefsMap.get(u.id)?.has(templateId) ?? false));
         pick(groupAndShuffle(tier2Pool, rankKey, seed + slot.date.length).map((u) => u.id));
       }
 
       if (chosen.length < MAX_STAFF) {
-        // Tier 3: nhân viên đã chọn còn lại
-        const tier3Pool = selectedUsers.filter((u) => !taken.has(u.id) && !(prefsMap.get(u.id)?.has(templateId) ?? false));
+        // Tier 3: nhân viên đã chọn còn lại (không bị ngoại trừ)
+        const tier3Pool = selectedUsers.filter((u) => !taken.has(u.id) && !excludedSet.has(u.id) && !(prefsMap.get(u.id)?.has(templateId) ?? false));
         pick(groupAndShuffle(tier3Pool, rankKey, seed + slot.scheduleId.length).map((u) => u.id));
       }
 
@@ -861,6 +876,22 @@ export default function AttendanceAssignmentsView() {
       if (exists) return prev.filter((s) => !(s.scheduleId === scheduleId && s.date === date));
       return [...prev, { scheduleId, date }];
     });
+  };
+
+  const toggleExclusion = (slotKey: string, staffId: string) => {
+    setExclusionMap((prev) => {
+      const current = prev[slotKey] || [];
+      const next = current.includes(staffId)
+        ? current.filter((id) => id !== staffId)
+        : [...current, staffId];
+      return { ...prev, [slotKey]: next };
+    });
+  };
+
+  const openExclusionPopover = (e: { preventDefault: () => void; stopPropagation: () => void; currentTarget: HTMLElement }, slotKey: string, scheduleName: string, date: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setExclusionAnchor({ el: e.currentTarget, slotKey, scheduleName, date });
   };
 
   // Calendar handlers
@@ -1752,10 +1783,13 @@ export default function AttendanceAssignmentsView() {
                           const registeredCheckedStaff = bulkCheckedRegistrationMap.get(slotKey) || [];
                           const hasCheckedRegistration = registeredCheckedStaff.length > 0;
                           const allRegisteredStaff = bulkAllRegistrationMap.get(slotKey) || [];
+                          const excludedIds = exclusionMap[slotKey] || [];
                           const tooltipParts: string[] = [];
                           if (assignedStaff.length > 0) tooltipParts.push(`Đã phân công (${assignedStaff.length}): ${assignedStaff.join(', ')}`);
                           if (allRegisteredStaff.length > 0) tooltipParts.push(`Đã đăng ký (${allRegisteredStaff.length}): ${allRegisteredStaff.join(', ')}`);
-                          const tooltipTitle = tooltipParts.length > 0 ? tooltipParts.join('\n') : 'Chưa có nhân viên';
+                          if (excludedIds.length > 0) tooltipParts.push(`Ngoại trừ (${excludedIds.length}): ${excludedIds.map((id) => staffInfoMap.get(id)?.name || id).join(', ')}`);
+                          tooltipParts.push('Chuột phải để đặt ngoại trừ');
+                          const tooltipTitle = tooltipParts.join('\n');
                           return (
                             <Tooltip
                               key={schedule.id}
@@ -1765,11 +1799,13 @@ export default function AttendanceAssignmentsView() {
                             >
                               <Box
                                 onClick={() => toggleBulkSlot(schedule.id, dateStr)}
+                                onContextMenu={(e) => openExclusionPopover(e, slotKey, schedule.templateName, dateStr)}
                                 sx={{
                                   mb: 0.5,
                                   p: 0.75,
                                   borderRadius: 1,
-                                  cursor: 'pointer',
+                                  cursor: 'context-menu',
+                                  position: 'relative',
                                   bgcolor: isSelected
                                     ? alpha(schedule.color, 0.22)
                                     : alpha(schedule.color, 0.07),
@@ -1798,25 +1834,28 @@ export default function AttendanceAssignmentsView() {
                                 >
                                   {schedule.startTime}–{schedule.endTime}
                                 </Typography>
-                                {/* {assignedStaff.length > 0 && (
+                                {assignedStaff.map((name) => (
                                   <Typography
+                                    key={name}
                                     variant="caption"
                                     sx={{ display: 'block', fontSize: 10, mt: 0.25, color: 'text.secondary' }}
                                   >
-                                    👤 {assignedStaff.length} người
+                                    👤 {name}
                                   </Typography>
-                                )} */}
-                                {
-                                  assignedStaff.map((name) => (
-                                    <Typography
-                                      key={name}
-                                      variant="caption"
-                                      sx={{ display: 'block', fontSize: 10, mt: 0.25, color: 'text.secondary' }}
-                                    > 
-                                      👤 {name}
-                                    </Typography>
-                                  ))
-                                }
+                                ))}
+                                {excludedIds.length > 0 && (
+                                  <Box
+                                    sx={{
+                                      position: 'absolute', top: 3, right: 3,
+                                      bgcolor: 'error.main', color: 'white',
+                                      borderRadius: '50%', width: 16, height: 16,
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      fontSize: 9, fontWeight: 700, lineHeight: 1,
+                                    }}
+                                  >
+                                    {excludedIds.length}
+                                  </Box>
+                                )}
                               </Box>
                             </Tooltip>
                           );
@@ -2047,24 +2086,29 @@ export default function AttendanceAssignmentsView() {
                             const registeredCheckedStaffMobile = bulkCheckedRegistrationMap.get(slotKey) || [];
                             const hasCheckedRegistrationMobile = registeredCheckedStaffMobile.length > 0;
                             const allRegisteredStaffMobile = bulkAllRegistrationMap.get(slotKey) || [];
+                            const excludedIdsMobile = exclusionMap[slotKey] || [];
                             const tooltipPartsMobile: string[] = [];
                             if (assignedStaff.length > 0) tooltipPartsMobile.push(`Đã phân công (${assignedStaff.length}): ${assignedStaff.join(', ')}`);
                             if (allRegisteredStaffMobile.length > 0) tooltipPartsMobile.push(`Đã đăng ký (${allRegisteredStaffMobile.length}): ${allRegisteredStaffMobile.join(', ')}`);
-                            const tooltipTitleMobile = tooltipPartsMobile.length > 0 ? tooltipPartsMobile.join('\n') : 'Chưa có nhân viên';
+                            if (excludedIdsMobile.length > 0) tooltipPartsMobile.push(`Ngoại trừ (${excludedIdsMobile.length}): ${excludedIdsMobile.map((id) => staffInfoMap.get(id)?.name || id).join(', ')}`);
+                            tooltipPartsMobile.push('Nhấn giữ để đặt ngoại trừ');
+                            const tooltipTitleMobile = tooltipPartsMobile.join('\n');
                             return (
                               <Tooltip key={schedule.id} title={tooltipTitleMobile} arrow placement="top">
                               <Box
                                 onClick={() => toggleBulkSlot(schedule.id, dateStr)}
+                                onContextMenu={(e) => openExclusionPopover(e, slotKey, schedule.templateName, dateStr)}
                                 sx={{
                                   flex: 1,
                                   minWidth: 0,
                                   px: 1.5,
                                   py: 1,
                                   borderRadius: 1,
-                                  cursor: 'pointer',
+                                  cursor: 'context-menu',
                                   transition: 'all 0.15s',
                                   userSelect: 'none',
                                   textAlign: 'center',
+                                  position: 'relative',
                                   bgcolor: isSelected
                                     ? alpha(schedule.color, 0.22)
                                     : alpha(schedule.color, 0.07),
@@ -2096,6 +2140,19 @@ export default function AttendanceAssignmentsView() {
                                     {assignedStaff.length > 0 && allRegisteredStaffMobile.length > 0 && ' · '}
                                     {allRegisteredStaffMobile.length > 0 && `📝 ${allRegisteredStaffMobile.length}`}
                                   </Typography>
+                                )}
+                                {excludedIdsMobile.length > 0 && (
+                                  <Box
+                                    sx={{
+                                      position: 'absolute', top: 3, right: 3,
+                                      bgcolor: 'error.main', color: 'white',
+                                      borderRadius: '50%', width: 16, height: 16,
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      fontSize: 9, fontWeight: 700,
+                                    }}
+                                  >
+                                    {excludedIdsMobile.length}
+                                  </Box>
                                 )}
                               </Box>
                               </Tooltip>
@@ -2217,6 +2274,70 @@ export default function AttendanceAssignmentsView() {
         }
       />
 
+      {/* Exclusion popover — chuột phải vào ô ca để chọn nhân viên không xếp ca đó */}
+      <Popover
+        open={Boolean(exclusionAnchor)}
+        anchorEl={exclusionAnchor?.el}
+        onClose={() => setExclusionAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        PaperProps={{ sx: { p: 1.5, minWidth: 240, maxWidth: 300 } }}
+      >
+        {exclusionAnchor && (
+          <>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+              <Typography variant="subtitle2" noWrap>
+                Ngoại trừ — {exclusionAnchor.scheduleName}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">{exclusionAnchor.date}</Typography>
+            </Stack>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              Chọn nhân viên KHÔNG được xếp vào ca này
+            </Typography>
+            {bulkStaffIds.length === 0 ? (
+              <Typography variant="caption" color="warning.main">
+                Chưa chọn nhân viên nào trong danh sách
+              </Typography>
+            ) : (
+              <FormGroup sx={{ maxHeight: 260, overflowY: 'auto' }}>
+                {users
+                  .filter((u) => bulkStaffIds.includes(u.id))
+                  .map((u) => {
+                    const isExcluded = (exclusionMap[exclusionAnchor.slotKey] || []).includes(u.id);
+                    return (
+                      <FormControlLabel
+                        key={u.id}
+                        control={
+                          <Checkbox
+                            size="small"
+                            checked={isExcluded}
+                            onChange={() => toggleExclusion(exclusionAnchor.slotKey, u.id)}
+                            sx={{ color: 'error.main', '&.Mui-checked': { color: 'error.main' } }}
+                          />
+                        }
+                        label={<Typography variant="body2" noWrap>{u.fullName}</Typography>}
+                        sx={{ mx: 0, my: 0.25 }}
+                      />
+                    );
+                  })}
+              </FormGroup>
+            )}
+            {(exclusionMap[exclusionAnchor.slotKey]?.length ?? 0) > 0 && (
+              <Button
+                size="small"
+                color="error"
+                sx={{ mt: 1 }}
+                onClick={() => {
+                  setExclusionMap((prev) => ({ ...prev, [exclusionAnchor.slotKey]: [] }));
+                }}
+              >
+                Xoá tất cả ngoại trừ
+              </Button>
+            )}
+          </>
+        )}
+      </Popover>
+
       {/* Auto-assign preview dialog — week calendar grid */}
       <Dialog open={autoAssignDialog.value} onClose={autoAssignDialog.onFalse} maxWidth="lg" fullWidth>
         <DialogTitle sx={{ pb: 1 }}>
@@ -2248,6 +2369,10 @@ export default function AttendanceAssignmentsView() {
             <Stack direction="row" alignItems="center" spacing={0.5}>
               <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'error.light', flexShrink: 0 }} />
               <Typography variant="caption" color="text.secondary" sx={{ textDecoration: 'line-through' }}>Bị ghi đè</Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Iconify icon="eva:slash-outline" width={10} sx={{ color: 'error.main' }} />
+              <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>Ngoại trừ (bất khả kháng)</Typography>
             </Stack>
             <Typography variant="caption" color="text.secondary">✓ giữ nguyên · tối đa 2 người/ca</Typography>
           </Stack>
@@ -2308,6 +2433,19 @@ export default function AttendanceAssignmentsView() {
                       <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', mb: 0.25 }}>
                         {slot.startTime}–{slot.endTime}
                       </Typography>
+                      {/* Nhân viên bị ngoại trừ (bất khả kháng) */}
+                      {(exclusionMap[`${slot.scheduleId}_${slot.date}`] || []).map((id) => (
+                        <Stack key={`excl_${id}`} direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.25 }}>
+                          <Iconify icon="eva:slash-outline" width={10} sx={{ color: 'error.main', flexShrink: 0 }} />
+                          <Typography
+                            variant="caption"
+                            noWrap
+                            sx={{ fontSize: 10, lineHeight: 1.3, color: 'error.main', fontStyle: 'italic' }}
+                          >
+                            {staffInfoMap.get(id)?.name || id}
+                          </Typography>
+                        </Stack>
+                      ))}
                       {/* Nhân viên bị gỡ khi ghi đè (đã phân công nhưng không nằm trong đề xuất) */}
                       {slot.existingStaffIds
                         .filter((id) => !slot.proposedStaffIds.includes(id))
