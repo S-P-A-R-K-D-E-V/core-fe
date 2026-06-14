@@ -327,6 +327,7 @@ export interface IBulkAssignShiftScheduleRequest {
   fromDate: string;
   toDate: string;
   filterDays?: number | number[]; // Optional: WeekDays flags bitmask or array of day numbers
+  overwrite?: boolean; // Ghi đè: gỡ nhân viên chưa được chọn khỏi ca rồi thêm nhân viên đang chọn
 }
 
 export interface IManageShiftAssignmentsRequest {

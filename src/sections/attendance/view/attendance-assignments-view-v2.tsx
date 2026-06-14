@@ -235,7 +235,9 @@ export default function AttendanceAssignmentsView() {
   const [bulkAssigning, setBulkAssigning] = useState(false);
   const [bulkWeekAssignments, setBulkWeekAssignments] = useState<IShiftAssignment[]>([]);
   const [bulkWeekRegistrations, setBulkWeekRegistrations] = useState<IShiftRegistration[]>([]);
+  const [bulkOverwrite, setBulkOverwrite] = useState(false);
   const [bulkTab, setBulkTab] = useState(0);
+  const bulkConfirm = useBoolean();
 
   const fetchAssignments = useCallback(async () => {
     try {
@@ -471,7 +473,32 @@ export default function AttendanceAssignmentsView() {
     }
   };
 
-  const handleBulkAssign = async () => {
+  // Selected slots that already have at least one registered staff (for warning)
+  const bulkSelectedRegisteredSlots = useMemo(() => {
+    const regMap = new Map<string, string[]>();
+    bulkWeekRegistrations.forEach((r) => {
+      const dateStr = r.date.split('T')[0];
+      const key = `${r.shiftScheduleId}_${dateStr}`;
+      if (!regMap.has(key)) regMap.set(key, []);
+      regMap.get(key)!.push(r.staffName);
+    });
+    return bulkSelectedSlots
+      .map((slot) => {
+        const key = `${slot.scheduleId}_${slot.date}`;
+        const staffNames = regMap.get(key);
+        if (!staffNames || staffNames.length === 0) return null;
+        const schedule = schedules.find((s) => s.id === slot.scheduleId);
+        return {
+          scheduleId: slot.scheduleId,
+          date: slot.date,
+          shiftName: schedule?.templateName || 'Ca',
+          staffNames,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+  }, [bulkSelectedSlots, bulkWeekRegistrations, schedules]);
+
+  const doBulkAssign = async () => {
     try {
       setBulkAssigning(true);
       // Group selected slots by scheduleId
@@ -500,21 +527,33 @@ export default function AttendanceAssignmentsView() {
           fromDate: sortedDates[0],
           toDate: sortedDates[sortedDates.length - 1],
           filterDays: dayMask || undefined,
+          overwrite: bulkOverwrite,
         });
         totalCount += result.count;
       }
-      enqueueSnackbar(`Bulk assigned ${totalCount} shifts!`, { variant: 'success' });
+      enqueueSnackbar(`Đã phân công ${totalCount} ca!`, { variant: 'success' });
+      bulkConfirm.onFalse();
       bulkDialog.onFalse();
       setBulkStaffIds([]);
       setBulkSelectedSlots([]);
+      setBulkOverwrite(false);
       fetchAssignments();
     } catch (error: any) {
       console.error(error);
-      const msg = error?.title || error?.message || 'Bulk assign failed!';
+      const msg = error?.title || error?.message || 'Phân công thất bại!';
       enqueueSnackbar(msg, { variant: 'error' });
     } finally {
       setBulkAssigning(false);
     }
+  };
+
+  const handleBulkAssign = () => {
+    // Cảnh báo nếu có ca đã được nhân viên đăng ký → hỏi xác nhận trước khi gán
+    if (bulkSelectedRegisteredSlots.length > 0) {
+      bulkConfirm.onTrue();
+      return;
+    }
+    doBulkAssign();
   };
 
   const toggleBulkStaff = (staffId: string) => {
@@ -1768,7 +1807,19 @@ export default function AttendanceAssignmentsView() {
           </Box>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
+          <Tooltip title="Khi bật: gỡ những nhân viên chưa được chọn khỏi ca rồi thêm nhân viên đang chọn. Nhân viên đã chấm công sẽ được giữ nguyên.">
+            <FormControlLabel
+              sx={{ mr: 'auto' }}
+              control={
+                <Checkbox
+                  checked={bulkOverwrite}
+                  onChange={(e) => setBulkOverwrite(e.target.checked)}
+                />
+              }
+              label="Ghi đè ca đã có người"
+            />
+          </Tooltip>
           <Button variant="outlined" onClick={bulkDialog.onFalse}>
             Hủy
           </Button>
@@ -1782,6 +1833,43 @@ export default function AttendanceAssignmentsView() {
           </LoadingButton>
         </DialogActions>
       </Dialog>
+
+      {/* Bulk assign confirmation: some selected slots already have registered staff */}
+      <ConfirmDialog
+        open={bulkConfirm.value}
+        onClose={bulkConfirm.onFalse}
+        title="Ca đã có nhân viên đăng ký"
+        content={
+          <Stack spacing={1}>
+            <Typography variant="body2">
+              {bulkSelectedRegisteredSlots.length} ca bạn đang phân công đã có nhân viên đăng ký
+              {bulkOverwrite
+                ? '. Bật "Ghi đè" sẽ gỡ những nhân viên chưa được chọn khỏi các ca này (trừ người đã chấm công).'
+                : '. Bạn vẫn muốn tiếp tục phân công?'}
+            </Typography>
+            <Box
+              sx={{
+                maxHeight: 200,
+                overflowY: 'auto',
+                bgcolor: 'background.neutral',
+                borderRadius: 1,
+                p: 1.5,
+              }}
+            >
+              {bulkSelectedRegisteredSlots.map((slot) => (
+                <Typography key={`${slot.scheduleId}_${slot.date}`} variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+                  • <b>{slot.shiftName}</b> ({slot.date}): {slot.staffNames.join(', ')}
+                </Typography>
+              ))}
+            </Box>
+          </Stack>
+        }
+        action={
+          <LoadingButton variant="contained" color="warning" loading={bulkAssigning} onClick={doBulkAssign}>
+            Tiếp tục phân công
+          </LoadingButton>
+        }
+      />
 
       {/* Manage Shift Dialog */}
       <Dialog
