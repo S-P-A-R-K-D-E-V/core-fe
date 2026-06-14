@@ -197,6 +197,7 @@ export const endpoints = {
   userPreference: {
     myShiftPreferences: '/users/me/shift-preferences',
     staffShiftPreferences: (userId: string) => `/users/${userId}/shift-preferences`,
+    allStaffShiftPreferences: '/users/shift-preferences/all',
   },
   holidayPolicy: {
     list: '/holiday-policies',
