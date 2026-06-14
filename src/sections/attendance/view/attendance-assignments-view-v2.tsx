@@ -123,9 +123,9 @@ interface IAutoAssignSlot {
   color: string;
   startTime: string;
   endTime: string;
-  existingStaffIds: string[];   // already assigned
-  toAddStaffIds: string[];      // newly proposed by algorithm
-  registeredStaffIds: Set<string>; // subset of toAddStaffIds that were registered
+  existingStaffIds: string[];      // currently assigned (some may be overwritten)
+  proposedStaffIds: string[];      // final staff after auto-assign (tối đa 2)
+  registeredStaffIds: Set<string>; // subset of proposedStaffIds that registered the slot
 }
 
 // Seeded LCG shuffle — same seed produces same order
@@ -395,6 +395,31 @@ export default function AttendanceAssignmentsView() {
     };
   }, [bulkWeekAssignments]);
 
+  // Chart data: số ca mỗi nhân viên sau khi phân công tự động (xem phân bổ)
+  const autoAssignChartData = useMemo(() => {
+    const countMap = new Map<string, number>();
+    autoAssignSlots.forEach((slot) => {
+      slot.proposedStaffIds.forEach((id) => {
+        const name = staffInfoMap.get(id)?.name || id;
+        countMap.set(name, (countMap.get(name) || 0) + 1);
+      });
+    });
+    const entries = Array.from(countMap.entries()).sort((a, b) => b[1] - a[1]);
+    return {
+      categories: entries.map(([name]) => name),
+      series: entries.map(([, count]) => count),
+    };
+  }, [autoAssignSlots, staffInfoMap]);
+
+  // Map: staffId → số ca nhân viên đã đăng ký trong tuần đang hiển thị
+  const bulkRegistrationCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    bulkWeekRegistrations.forEach((r) => {
+      map.set(r.staffId, (map.get(r.staffId) || 0) + 1);
+    });
+    return map;
+  }, [bulkWeekRegistrations]);
+
   // Transform assignments to calendar events
   const events = useMemo(() => {
     if (!schedules.length) return [];
@@ -653,11 +678,9 @@ export default function AttendanceAssignmentsView() {
       registrationMap.get(key)!.push(r.staffId);
     });
 
-    // Running count starts from existing assignments, increments as we propose
+    // Toàn bộ ca trong tuần sẽ được phân công lại (ghi đè), nên running count bắt đầu từ 0
+    // và chỉ tăng theo các đề xuất mới → phân bổ số ca đều cho nhân viên đã chọn.
     const runningCount = new Map<string, number>();
-    bulkWeekAssignments.forEach((a) => {
-      runningCount.set(a.staffId, (runningCount.get(a.staffId) || 0) + 1);
-    });
 
     const punctScore = (id: string) => {
       const p = punctMap.get(id);
@@ -667,8 +690,9 @@ export default function AttendanceAssignmentsView() {
     // Chỉ gợi ý phân công cho những nhân viên đã được tích chọn
     const selectedSet = new Set(bulkStaffIds);
     const selectedUsers = users.filter((u) => selectedSet.has(u.id));
+    const rankKey = (u: IUser) => `${runningCount.get(u.id) || 0}_${punctScore(u.id)}`;
 
-    const MIN_STAFF = 2;
+    const MAX_STAFF = 2; // mỗi ca tối đa 2 người
     const result: IAutoAssignSlot[] = [];
 
     allSlots.forEach((slot) => {
@@ -677,35 +701,40 @@ export default function AttendanceAssignmentsView() {
 
       const slotKey = `${slot.scheduleId}_${slot.date}`;
       const existingIds = existingMap.get(slotKey) || [];
-      const existingSet = new Set(existingIds);
-      const registeredIds = registrationMap.get(slotKey) || [];
+      const registeredSet = new Set(registrationMap.get(slotKey) || []);
+      const templateId = schedule.shiftTemplateId;
 
-      // Tier 1: nhân viên đã đăng ký, đã tích chọn và chưa được phân công
-      const tier1 = registeredIds.filter((id) => !existingSet.has(id) && selectedSet.has(id));
-      const tier1Set = new Set(tier1);
-      const toAdd: string[] = [...tier1];
-      const currentTotal = existingSet.size + toAdd.length;
+      // Ghi đè: bỏ qua phân công cũ, chọn lại tối đa 2 người từ nhân viên đã tích chọn.
+      const chosen: string[] = [];
+      const taken = new Set<string>();
+      const pick = (ids: string[]) => {
+        for (const id of ids) {
+          if (chosen.length >= MAX_STAFF) break;
+          if (!taken.has(id)) {
+            chosen.push(id);
+            taken.add(id);
+          }
+        }
+      };
 
-      if (currentTotal < MIN_STAFF) {
-        const needed = MIN_STAFF - currentTotal;
-        const handled = new Set([...existingSet, ...tier1Set]);
-        const templateId = schedule.shiftTemplateId;
+      // Tier 1: nhân viên đã đăng ký & đã tích chọn (ưu tiên số ca ít → đúng giờ → ngẫu nhiên)
+      const tier1Pool = selectedUsers.filter((u) => registeredSet.has(u.id));
+      pick(groupAndShuffle(tier1Pool, rankKey, seed + slot.date.length).map((u) => u.id));
 
-        // Tier 2: prefers this template (shuffled among equals) — chỉ trong nhân viên đã chọn
-        const tier2Pool = selectedUsers.filter((u) => !handled.has(u.id) && (prefsMap.get(u.id)?.has(templateId) ?? false));
-        // Group tier2 by (runningCount, punctScore) and shuffle within each group
-        const tier2 = groupAndShuffle(tier2Pool, (u) => `${runningCount.get(u.id) || 0}_${punctScore(u.id)}`, seed + slot.date.length);
-
-        // Tier 3: nhân viên đã chọn còn lại (fewer shifts first, punctual first, shuffled within same rank)
-        const tier3Pool = selectedUsers.filter((u) => !handled.has(u.id) && !tier2Pool.some((t) => t.id === u.id));
-        const tier3 = groupAndShuffle(tier3Pool, (u) => `${runningCount.get(u.id) || 0}_${punctScore(u.id)}`, seed + slot.scheduleId.length);
-
-        const fillers = [...tier2, ...tier3].slice(0, needed).map((u) => u.id);
-        toAdd.push(...fillers);
+      if (chosen.length < MAX_STAFF) {
+        // Tier 2: nhân viên đã chọn có ca này trong ca ưa thích
+        const tier2Pool = selectedUsers.filter((u) => !taken.has(u.id) && (prefsMap.get(u.id)?.has(templateId) ?? false));
+        pick(groupAndShuffle(tier2Pool, rankKey, seed + slot.date.length).map((u) => u.id));
       }
 
-      // Increment running count for later slots
-      toAdd.forEach((id) => runningCount.set(id, (runningCount.get(id) || 0) + 1));
+      if (chosen.length < MAX_STAFF) {
+        // Tier 3: nhân viên đã chọn còn lại
+        const tier3Pool = selectedUsers.filter((u) => !taken.has(u.id) && !(prefsMap.get(u.id)?.has(templateId) ?? false));
+        pick(groupAndShuffle(tier3Pool, rankKey, seed + slot.scheduleId.length).map((u) => u.id));
+      }
+
+      // Tăng running count cho các ca sau
+      chosen.forEach((id) => runningCount.set(id, (runningCount.get(id) || 0) + 1));
 
       result.push({
         scheduleId: slot.scheduleId,
@@ -715,8 +744,8 @@ export default function AttendanceAssignmentsView() {
         startTime: schedule.startTime,
         endTime: schedule.endTime,
         existingStaffIds: existingIds,
-        toAddStaffIds: toAdd,
-        registeredStaffIds: new Set(tier1),
+        proposedStaffIds: chosen,
+        registeredStaffIds: new Set(chosen.filter((id) => registeredSet.has(id))),
       });
     });
 
@@ -772,15 +801,42 @@ export default function AttendanceAssignmentsView() {
   const doAutoAssign = async () => {
     try {
       setAutoAssigning(true);
-      let count = 0;
+
+      // Lookup assignmentId theo (scheduleId, date, staffId) để gỡ phân công cũ khi ghi đè
+      const assignmentIdMap = new Map<string, string>();
+      bulkWeekAssignments.forEach((a) => {
+        const dateStr = a.date.split('T')[0];
+        assignmentIdMap.set(`${a.shiftScheduleId}_${dateStr}_${a.staffId}`, a.id);
+      });
+
+      let added = 0;
+      let removed = 0;
       for (const slot of autoAssignSlots) {
-        for (const staffId of slot.toAddStaffIds) {
-          // eslint-disable-next-line no-await-in-loop
-          await createShiftAssignment({ staffId, shiftScheduleId: slot.scheduleId, date: slot.date });
-          count += 1;
+        const proposedSet = new Set(slot.proposedStaffIds);
+        const existingSet = new Set(slot.existingStaffIds);
+
+        // Ghi đè: gỡ nhân viên đã phân công trước đó nhưng không nằm trong đề xuất mới
+        for (const staffId of slot.existingStaffIds) {
+          if (!proposedSet.has(staffId)) {
+            const aid = assignmentIdMap.get(`${slot.scheduleId}_${slot.date}_${staffId}`);
+            if (aid) {
+              // eslint-disable-next-line no-await-in-loop
+              await deleteShiftAssignment(aid);
+              removed += 1;
+            }
+          }
+        }
+
+        // Thêm nhân viên mới chưa có trong ca
+        for (const staffId of slot.proposedStaffIds) {
+          if (!existingSet.has(staffId)) {
+            // eslint-disable-next-line no-await-in-loop
+            await createShiftAssignment({ staffId, shiftScheduleId: slot.scheduleId, date: slot.date });
+            added += 1;
+          }
         }
       }
-      enqueueSnackbar(`Phân công tự động thành công: ${count} phân công mới!`, { variant: 'success' });
+      enqueueSnackbar(`Phân công tự động: +${added} thêm mới, -${removed} gỡ bỏ`, { variant: 'success' });
       autoAssignDialog.onFalse();
       bulkDialog.onFalse();
       setBulkSelectedSlots([]);
@@ -1509,24 +1565,40 @@ export default function AttendanceAssignmentsView() {
               </Box>
               <Box sx={{ flex: 1, overflowY: 'auto', p: 1 }}>
                 <FormGroup>
-                  {users.map((user) => (
-                    <FormControlLabel
-                      key={user.id}
-                      control={
-                        <Checkbox
-                          checked={bulkStaffIds.includes(user.id)}
-                          onChange={() => toggleBulkStaff(user.id)}
-                          size="small"
-                        />
-                      }
-                      label={
-                        <Typography variant="body2" noWrap>
-                          {user.fullName}
-                        </Typography>
-                      }
-                      sx={{ mx: 0, my: 0.25 }}
-                    />
-                  ))}
+                  {users.map((user) => {
+                    const regCount = bulkRegistrationCountMap.get(user.id) || 0;
+                    return (
+                      <FormControlLabel
+                        key={user.id}
+                        control={
+                          <Checkbox
+                            checked={bulkStaffIds.includes(user.id)}
+                            onChange={() => toggleBulkStaff(user.id)}
+                            size="small"
+                          />
+                        }
+                        label={
+                          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ width: '100%' }}>
+                            <Typography variant="body2" noWrap sx={{ flexGrow: 1 }}>
+                              {user.fullName}
+                            </Typography>
+                            {regCount > 0 && (
+                              <Tooltip title={`Đã đăng ký ${regCount} ca trong tuần này`} arrow>
+                                <Chip
+                                  size="small"
+                                  label={`📝 ${regCount}`}
+                                  color="info"
+                                  variant="soft"
+                                  sx={{ height: 18, fontSize: 10, '& .MuiChip-label': { px: 0.75 } }}
+                                />
+                              </Tooltip>
+                            )}
+                          </Stack>
+                        }
+                        sx={{ mx: 0, my: 0.25, width: '100%', '& .MuiFormControlLabel-label': { flexGrow: 1, minWidth: 0 } }}
+                      />
+                    );
+                  })}
                 </FormGroup>
               </Box>
               <Box sx={{ p: 1, borderTop: '1px solid', borderColor: 'divider' }}>
@@ -1825,24 +1897,38 @@ export default function AttendanceAssignmentsView() {
                   </Button>
                 </Stack>
                 <FormGroup>
-                  {users.map((user) => (
-                    <FormControlLabel
-                      key={user.id}
-                      control={
-                        <Checkbox
-                          checked={bulkStaffIds.includes(user.id)}
-                          onChange={() => toggleBulkStaff(user.id)}
-                          size="small"
-                        />
-                      }
-                      label={
-                        <Typography variant="body2" noWrap>
-                          {user.fullName}
-                        </Typography>
-                      }
-                      sx={{ mx: 0, my: 0.25 }}
-                    />
-                  ))}
+                  {users.map((user) => {
+                    const regCount = bulkRegistrationCountMap.get(user.id) || 0;
+                    return (
+                      <FormControlLabel
+                        key={user.id}
+                        control={
+                          <Checkbox
+                            checked={bulkStaffIds.includes(user.id)}
+                            onChange={() => toggleBulkStaff(user.id)}
+                            size="small"
+                          />
+                        }
+                        label={
+                          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ width: '100%' }}>
+                            <Typography variant="body2" noWrap sx={{ flexGrow: 1 }}>
+                              {user.fullName}
+                            </Typography>
+                            {regCount > 0 && (
+                              <Chip
+                                size="small"
+                                label={`📝 ${regCount}`}
+                                color="info"
+                                variant="soft"
+                                sx={{ height: 18, fontSize: 10, '& .MuiChip-label': { px: 0.75 } }}
+                              />
+                            )}
+                          </Stack>
+                        }
+                        sx={{ mx: 0, my: 0.25, width: '100%', '& .MuiFormControlLabel-label': { flexGrow: 1, minWidth: 0 } }}
+                      />
+                    );
+                  })}
                 </FormGroup>
               </Box>
             )}
@@ -2150,19 +2236,20 @@ export default function AttendanceAssignmentsView() {
         </DialogTitle>
         <DialogContent dividers sx={{ p: 1.5 }}>
           {/* Legend */}
-          <Stack direction="row" spacing={2} sx={{ mb: 1.5 }}>
-            <Stack direction="row" alignItems="center" spacing={0.5}>
-              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'text.disabled', flexShrink: 0 }} />
-              <Typography variant="caption" color="text.secondary">Đã phân công</Typography>
-            </Stack>
+          <Stack direction="row" spacing={2} sx={{ mb: 1.5, flexWrap: 'wrap', rowGap: 0.5 }}>
             <Stack direction="row" alignItems="center" spacing={0.5}>
               <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main', flexShrink: 0 }} />
-              <Typography variant="caption" color="text.secondary">Mới — đăng ký ca</Typography>
+              <Typography variant="caption" color="text.secondary">Đăng ký ca</Typography>
             </Stack>
             <Stack direction="row" alignItems="center" spacing={0.5}>
               <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'warning.main', flexShrink: 0 }} />
-              <Typography variant="caption" color="text.secondary">Mới — chỉ định</Typography>
+              <Typography variant="caption" color="text.secondary">Chỉ định</Typography>
             </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'error.light', flexShrink: 0 }} />
+              <Typography variant="caption" color="text.secondary" sx={{ textDecoration: 'line-through' }}>Bị ghi đè</Typography>
+            </Stack>
+            <Typography variant="caption" color="text.secondary">✓ giữ nguyên · tối đa 2 người/ca</Typography>
           </Stack>
 
           {/* 7-column grid */}
@@ -2221,13 +2308,25 @@ export default function AttendanceAssignmentsView() {
                       <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', mb: 0.25 }}>
                         {slot.startTime}–{slot.endTime}
                       </Typography>
-                      {slot.existingStaffIds.map((id) => (
-                        <Typography key={id} variant="caption" sx={{ display: 'block', fontSize: 10, color: 'text.disabled', lineHeight: 1.4 }} noWrap>
-                          👤 {staffInfoMap.get(id)?.name || id}
-                        </Typography>
-                      ))}
-                      {slot.toAddStaffIds.map((id) => {
+                      {/* Nhân viên bị gỡ khi ghi đè (đã phân công nhưng không nằm trong đề xuất) */}
+                      {slot.existingStaffIds
+                        .filter((id) => !slot.proposedStaffIds.includes(id))
+                        .map((id) => (
+                          <Stack key={id} direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.25 }}>
+                            <Box sx={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, bgcolor: 'error.light' }} />
+                            <Typography
+                              variant="caption"
+                              noWrap
+                              sx={{ fontSize: 10, lineHeight: 1.3, color: 'error.main', textDecoration: 'line-through' }}
+                            >
+                              {staffInfoMap.get(id)?.name || id}
+                            </Typography>
+                          </Stack>
+                        ))}
+                      {/* Nhân viên trong đề xuất cuối cùng (tối đa 2) */}
+                      {slot.proposedStaffIds.map((id) => {
                         const isRegistered = slot.registeredStaffIds.has(id);
+                        const isKept = slot.existingStaffIds.includes(id);
                         return (
                           <Stack key={id} direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.25 }}>
                             <Box sx={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, bgcolor: isRegistered ? 'success.main' : 'warning.main' }} />
@@ -2237,6 +2336,7 @@ export default function AttendanceAssignmentsView() {
                               sx={{ fontSize: 10, lineHeight: 1.3, color: isRegistered ? 'success.dark' : 'warning.dark' }}
                             >
                               {staffInfoMap.get(id)?.name || id}
+                              {isKept && ' ✓'}
                             </Typography>
                           </Stack>
                         );
@@ -2252,6 +2352,33 @@ export default function AttendanceAssignmentsView() {
               );
             })}
           </Box>
+
+          {/* Chart: số ca mỗi nhân viên sau phân công — xem phân bổ */}
+          {autoAssignChartData.categories.length > 0 && (
+            <Box sx={{ mt: 2.5 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Phân bổ số ca mỗi nhân viên trong tuần
+              </Typography>
+              <Chart
+                type="bar"
+                series={[{ name: 'Số ca', data: autoAssignChartData.series }]}
+                options={{
+                  chart: { toolbar: { show: false }, zoom: { enabled: false } },
+                  plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '60%' } },
+                  xaxis: {
+                    categories: autoAssignChartData.categories,
+                    labels: { style: { fontSize: '11px' } },
+                  },
+                  yaxis: { labels: { style: { fontSize: '12px' } } },
+                  tooltip: { y: { formatter: (val: number) => `${val} ca` } },
+                  dataLabels: { enabled: true, style: { fontSize: '11px' } },
+                  colors: [theme.palette.info.main],
+                  grid: { borderColor: theme.palette.divider, strokeDashArray: 3 },
+                }}
+                height={Math.max(180, autoAssignChartData.categories.length * 36)}
+              />
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button variant="outlined" onClick={autoAssignDialog.onFalse}>
