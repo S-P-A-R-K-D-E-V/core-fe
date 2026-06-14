@@ -65,7 +65,7 @@ import {
   TablePaginationCustom,
 } from 'src/components/table';
 
-import { IShiftSchedule, IShiftAssignment, IUser } from 'src/types/corecms-api';
+import { IShiftSchedule, IShiftAssignment, IShiftRegistration, IUser } from 'src/types/corecms-api';
 import { ICalendarEvent, ICalendarView, ICalendarScheduleEvent } from 'src/types/calendar';
 import {
   getShiftAssignments,
@@ -234,6 +234,7 @@ export default function AttendanceAssignmentsView() {
   const [bulkSelectedSlots, setBulkSelectedSlots] = useState<{ scheduleId: string; date: string }[]>([]);
   const [bulkAssigning, setBulkAssigning] = useState(false);
   const [bulkWeekAssignments, setBulkWeekAssignments] = useState<IShiftAssignment[]>([]);
+  const [bulkWeekRegistrations, setBulkWeekRegistrations] = useState<IShiftRegistration[]>([]);
   const [bulkTab, setBulkTab] = useState(0);
 
   const fetchAssignments = useCallback(async () => {
@@ -286,6 +287,18 @@ export default function AttendanceAssignmentsView() {
       .catch(() => setBulkWeekAssignments([]));
   }, [bulkWeekStart, bulkDialog.value]);
 
+  // Fetch registrations for the bulk dialog's visible week
+  useEffect(() => {
+    if (!bulkDialog.value) return;
+    const weekEnd = new Date(bulkWeekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const from = toLocalDateStr(bulkWeekStart);
+    const to = toLocalDateStr(weekEnd);
+    getShiftRegistrations(from, to)
+      .then((data) => setBulkWeekRegistrations(data))
+      .catch(() => setBulkWeekRegistrations([]));
+  }, [bulkWeekStart, bulkDialog.value]);
+
   // Map: "scheduleId_date" → assigned staff names (for tooltip)
   const bulkSlotStaffMap = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -297,6 +310,19 @@ export default function AttendanceAssignmentsView() {
     });
     return map;
   }, [bulkWeekAssignments]);
+
+  // Map: "scheduleId_date" → registered staff names for checked staff only (for dashed border)
+  const bulkCheckedRegistrationMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    bulkWeekRegistrations.forEach((r) => {
+      if (!bulkStaffIds.includes(r.staffId)) return;
+      const dateStr = r.date.split('T')[0];
+      const key = `${r.shiftScheduleId}_${dateStr}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r.staffName);
+    });
+    return map;
+  }, [bulkWeekRegistrations, bulkStaffIds]);
 
   // Chart data: staff assignment counts for the bulk dialog week
   const bulkChartData = useMemo(() => {
@@ -1375,6 +1401,8 @@ export default function AttendanceAssignmentsView() {
                             (s) => s.scheduleId === schedule.id && s.date === dateStr
                           );
                           const assignedStaff = bulkSlotStaffMap.get(slotKey) || [];
+                          const registeredCheckedStaff = bulkCheckedRegistrationMap.get(slotKey) || [];
+                          const hasCheckedRegistration = registeredCheckedStaff.length > 0;
                           const tooltipTitle = assignedStaff.length > 0
                             ? `Đã phân công (${assignedStaff.length}):\n${assignedStaff.join(', ')}`
                             : 'Chưa có nhân viên';
@@ -1395,8 +1423,8 @@ export default function AttendanceAssignmentsView() {
                                   bgcolor: isSelected
                                     ? alpha(schedule.color, 0.22)
                                     : alpha(schedule.color, 0.07),
-                                  border: '2px solid',
-                                  borderColor: isSelected ? schedule.color : 'transparent',
+                                  border: isSelected ? '2px solid' : hasCheckedRegistration ? '2px dashed' : '2px solid',
+                                  borderColor: isSelected ? schedule.color : hasCheckedRegistration ? schedule.color : 'transparent',
                                   transition: 'all 0.15s',
                                   '&:hover': {
                                     bgcolor: alpha(schedule.color, 0.15),
@@ -1652,6 +1680,8 @@ export default function AttendanceAssignmentsView() {
                               (s) => s.scheduleId === schedule.id && s.date === dateStr
                             );
                             const assignedStaff = bulkSlotStaffMap.get(slotKey) || [];
+                            const registeredCheckedStaffMobile = bulkCheckedRegistrationMap.get(slotKey) || [];
+                            const hasCheckedRegistrationMobile = registeredCheckedStaffMobile.length > 0;
                             return (
                               <Box
                                 key={schedule.id}
@@ -1669,8 +1699,8 @@ export default function AttendanceAssignmentsView() {
                                   bgcolor: isSelected
                                     ? alpha(schedule.color, 0.22)
                                     : alpha(schedule.color, 0.07),
-                                  border: '2px solid',
-                                  borderColor: isSelected ? schedule.color : 'transparent',
+                                  border: isSelected ? '2px solid' : hasCheckedRegistrationMobile ? '2px dashed' : '2px solid',
+                                  borderColor: isSelected ? schedule.color : hasCheckedRegistrationMobile ? schedule.color : 'transparent',
                                 }}
                               >
                                 <Typography
