@@ -326,6 +326,18 @@ export default function AttendanceAssignmentsView() {
     return map;
   }, [bulkWeekRegistrations, bulkStaffIds]);
 
+  // Map: "scheduleId_date" → all registered staff names (for tooltip)
+  const bulkAllRegistrationMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    bulkWeekRegistrations.forEach((r) => {
+      const dateStr = r.date.split('T')[0];
+      const key = `${r.shiftScheduleId}_${dateStr}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r.staffName);
+    });
+    return map;
+  }, [bulkWeekRegistrations]);
+
   // Chart data: staff assignment counts for the bulk dialog week
   const bulkChartData = useMemo(() => {
     const countMap = new Map<string, number>();
@@ -1442,9 +1454,11 @@ export default function AttendanceAssignmentsView() {
                           const assignedStaff = bulkSlotStaffMap.get(slotKey) || [];
                           const registeredCheckedStaff = bulkCheckedRegistrationMap.get(slotKey) || [];
                           const hasCheckedRegistration = registeredCheckedStaff.length > 0;
-                          const tooltipTitle = assignedStaff.length > 0
-                            ? `Đã phân công (${assignedStaff.length}):\n${assignedStaff.join(', ')}`
-                            : 'Chưa có nhân viên';
+                          const allRegisteredStaff = bulkAllRegistrationMap.get(slotKey) || [];
+                          const tooltipParts: string[] = [];
+                          if (assignedStaff.length > 0) tooltipParts.push(`Đã phân công (${assignedStaff.length}): ${assignedStaff.join(', ')}`);
+                          if (allRegisteredStaff.length > 0) tooltipParts.push(`Đã đăng ký (${allRegisteredStaff.length}): ${allRegisteredStaff.join(', ')}`);
+                          const tooltipTitle = tooltipParts.length > 0 ? tooltipParts.join('\n') : 'Chưa có nhân viên';
                           return (
                             <Tooltip
                               key={schedule.id}
@@ -1721,9 +1735,14 @@ export default function AttendanceAssignmentsView() {
                             const assignedStaff = bulkSlotStaffMap.get(slotKey) || [];
                             const registeredCheckedStaffMobile = bulkCheckedRegistrationMap.get(slotKey) || [];
                             const hasCheckedRegistrationMobile = registeredCheckedStaffMobile.length > 0;
+                            const allRegisteredStaffMobile = bulkAllRegistrationMap.get(slotKey) || [];
+                            const tooltipPartsMobile: string[] = [];
+                            if (assignedStaff.length > 0) tooltipPartsMobile.push(`Đã phân công (${assignedStaff.length}): ${assignedStaff.join(', ')}`);
+                            if (allRegisteredStaffMobile.length > 0) tooltipPartsMobile.push(`Đã đăng ký (${allRegisteredStaffMobile.length}): ${allRegisteredStaffMobile.join(', ')}`);
+                            const tooltipTitleMobile = tooltipPartsMobile.length > 0 ? tooltipPartsMobile.join('\n') : 'Chưa có nhân viên';
                             return (
+                              <Tooltip key={schedule.id} title={tooltipTitleMobile} arrow placement="top">
                               <Box
-                                key={schedule.id}
                                 onClick={() => toggleBulkSlot(schedule.id, dateStr)}
                                 sx={{
                                   flex: 1,
@@ -1757,15 +1776,18 @@ export default function AttendanceAssignmentsView() {
                                 >
                                   {schedule.startTime}–{schedule.endTime}
                                 </Typography>
-                                {assignedStaff.length > 0 && (
+                                {(assignedStaff.length > 0 || allRegisteredStaffMobile.length > 0) && (
                                   <Typography
                                     variant="caption"
                                     sx={{ display: 'block', fontSize: 10, mt: 0.25, color: 'text.secondary' }}
                                   >
-                                    👤 {assignedStaff.length}
+                                    {assignedStaff.length > 0 && `👤 ${assignedStaff.length}`}
+                                    {assignedStaff.length > 0 && allRegisteredStaffMobile.length > 0 && ' · '}
+                                    {allRegisteredStaffMobile.length > 0 && `📝 ${allRegisteredStaffMobile.length}`}
                                   </Typography>
                                 )}
                               </Box>
+                              </Tooltip>
                             );
                           })}
                         </Stack>
