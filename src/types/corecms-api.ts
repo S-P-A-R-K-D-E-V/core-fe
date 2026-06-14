@@ -481,6 +481,7 @@ export interface IAttendanceReport {
   lateCount: number;
   totalLateMinutes: number;
   overtimeHours: number;
+  earlyLeaveCount: number;
 }
 
 // --- Branch Location (for geofencing) ---

@@ -355,6 +355,16 @@ export async function getAttendanceReport(
   return response.data;
 }
 
+export async function getAllAttendanceReports(
+  fromDate: string,
+  toDate: string
+): Promise<IAttendanceReport[]> {
+  const response = await axios.get<IAttendanceReport[]>(endpoints.attendance.report, {
+    params: { fromDate, toDate },
+  });
+  return response.data;
+}
+
 export async function getMyAttendanceReport(
   fromDate: string,
   toDate: string
