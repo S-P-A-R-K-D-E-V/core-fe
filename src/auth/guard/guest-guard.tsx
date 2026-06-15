@@ -27,14 +27,29 @@ function Container({ children }: Props) {
   const searchParams = useSearchParams();
 
   const returnTo = searchParams.get('returnTo') || paths.dashboard.root;
+  const isMobile = searchParams.get('mobile') === 'true';
+  const mobileRedirectUri = searchParams.get('redirect_uri');
 
   const { authenticated } = useAuthContext();
 
   const check = useCallback(() => {
-    if (authenticated) {
-      router.replace(returnTo);
+    if (!authenticated) return;
+
+    // Mobile deep-link flow (app-mobile / Expo Go): the in-app browser may already
+    // carry a logged-in web session, so the login form's redirect handler never runs.
+    // Bounce straight back to the app with the stored session token instead of
+    // silently landing on the dashboard.
+    if (isMobile && mobileRedirectUri) {
+      const sessionToken =
+        typeof window !== 'undefined' ? localStorage.getItem('sessionToken') : null;
+      if (sessionToken) {
+        window.location.href = `${mobileRedirectUri}?sessionToken=${encodeURIComponent(sessionToken)}`;
+        return;
+      }
     }
-  }, [authenticated, returnTo, router]);
+
+    router.replace(returnTo);
+  }, [authenticated, isMobile, mobileRedirectUri, returnTo, router]);
 
   useEffect(() => {
     check();
