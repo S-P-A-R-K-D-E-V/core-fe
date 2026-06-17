@@ -1163,6 +1163,8 @@ export interface IShiftCashFinalization {
   id: string;
   openingBalance: number;
   closingBalance: number;
+  /** Chênh tiền tổng tại thời điểm chốt = tiền mặt kiểm đếm - tồn cuối dự kiến (dương = thừa, âm = thiếu) */
+  difference: number;
   finalizedAt?: string;
   finalizedByName?: string;
 }

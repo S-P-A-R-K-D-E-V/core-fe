@@ -88,6 +88,18 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('vi-VN').format(value);
 }
 
+// Tách đơn vị hàng nghìn khi hiển thị số tiền đang nhập: "1000000" -> "1.000.000"
+function formatAmountInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  return new Intl.NumberFormat('vi-VN').format(Number(digits));
+}
+
+// Lấy lại chuỗi số thuần (chỉ chữ số) từ giá trị đã định dạng để lưu vào state
+function parseAmountInput(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
 // ======================================================================
 // Tour definitions
 // ======================================================================
@@ -958,6 +970,7 @@ export default function ShiftCashDashboardView() {
                       </Typography>
                       {summary.finalizations.map((f, idx) => {
                         const diff = f.closingBalance - f.openingBalance;
+                        const totalDiff = f.difference ?? 0;
                         const isFirst = idx === 0;
                         return (
                           <Box
@@ -999,7 +1012,7 @@ export default function ShiftCashDashboardView() {
                                 </Typography>
                               </Stack>
                               <Stack flex={1} alignItems="center">
-                                <Typography variant="caption" color="text.disabled">Chênh lệch</Typography>
+                                <Typography variant="caption" color="text.disabled">Chênh tiền mặt</Typography>
                                 <Typography
                                   variant="caption"
                                   fontWeight={600}
@@ -1008,6 +1021,47 @@ export default function ShiftCashDashboardView() {
                                   {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
                                 </Typography>
                               </Stack>
+                            </Stack>
+                            <Stack
+                              direction="row"
+                              justifyContent="space-between"
+                              alignItems="center"
+                              sx={{
+                                pl: 3.5,
+                                mt: 0.75,
+                                pt: 0.75,
+                                borderTop: `1px dashed ${alpha(theme.palette.divider, 0.6)}`,
+                              }}
+                            >
+                              <Stack direction="row" spacing={0.5} alignItems="center">
+                                <Iconify
+                                  icon={
+                                    totalDiff === 0
+                                      ? 'solar:check-circle-bold'
+                                      : 'solar:danger-triangle-bold'
+                                  }
+                                  width={14}
+                                  sx={{ color: totalDiff === 0 ? 'success.main' : 'warning.main' }}
+                                />
+                                <Typography variant="caption" color="text.secondary">
+                                  Chênh tiền tổng
+                                </Typography>
+                              </Stack>
+                              <Typography
+                                variant="caption"
+                                fontWeight={700}
+                                color={
+                                  totalDiff === 0
+                                    ? 'success.main'
+                                    : totalDiff > 0
+                                      ? 'warning.main'
+                                      : 'error.main'
+                                }
+                              >
+                                {totalDiff === 0
+                                  ? 'Khớp'
+                                  : `${totalDiff > 0 ? '+' : ''}${formatCurrency(totalDiff)} (${totalDiff > 0 ? 'thừa' : 'thiếu'})`}
+                              </Typography>
                             </Stack>
                           </Box>
                         );
@@ -1749,9 +1803,10 @@ export default function ShiftCashDashboardView() {
             <TextField
               fullWidth
               label="Số tiền"
-              type="number"
-              value={txAmount}
-              onChange={(e) => setTxAmount(e.target.value)}
+              type="text"
+              value={formatAmountInput(txAmount)}
+              onChange={(e) => setTxAmount(parseAmountInput(e.target.value))}
+              inputProps={{ inputMode: 'numeric' }}
               InputProps={{
                 endAdornment: <InputAdornment position="end">VNĐ</InputAdornment>,
               }}
