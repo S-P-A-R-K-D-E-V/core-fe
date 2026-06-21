@@ -275,6 +275,10 @@ export default function AttendanceAssignmentsView() {
   const [bulkWeekAssignments, setBulkWeekAssignments] = useState<IShiftAssignment[]>([]);
   const [bulkWeekRegistrations, setBulkWeekRegistrations] = useState<IShiftRegistration[]>([]);
   const [bulkOverwrite, setBulkOverwrite] = useState(false);
+  // Danh sách staffId chỉ được xếp những ca chính họ đã đăng ký (rule xếp lịch theo từng nhân viên)
+  const [bulkOnlyRegisteredIds, setBulkOnlyRegisteredIds] = useState<string[]>([]);
+  // staffId đang hover trong cột nhân viên → tô viền các ca nhân viên đó đã đăng ký
+  const [bulkHoverStaffId, setBulkHoverStaffId] = useState<string | null>(null);
   const [bulkTab, setBulkTab] = useState(0);
   const bulkConfirm = useBoolean();
   const autoAssignDialog = useBoolean();
@@ -428,6 +432,19 @@ export default function AttendanceAssignmentsView() {
     const map = new Map<string, number>();
     bulkWeekRegistrations.forEach((r) => {
       map.set(r.staffId, (map.get(r.staffId) || 0) + 1);
+    });
+    return map;
+  }, [bulkWeekRegistrations]);
+
+  // Map: staffId → Set("scheduleId_date") các ca nhân viên đã đăng ký
+  // (dùng để tô viền các ca khi hover vào nhân viên trong danh sách)
+  const bulkStaffRegistrationSlotsMap = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    bulkWeekRegistrations.forEach((r) => {
+      const dateStr = r.date.split('T')[0];
+      const key = `${r.shiftScheduleId}_${dateStr}`;
+      if (!map.has(r.staffId)) map.set(r.staffId, new Set());
+      map.get(r.staffId)!.add(key);
     });
     return map;
   }, [bulkWeekRegistrations]);
@@ -630,6 +647,8 @@ export default function AttendanceAssignmentsView() {
       setBulkStaffIds([]);
       setBulkSelectedSlots([]);
       setBulkOverwrite(false);
+      setBulkOnlyRegisteredIds([]);
+      setBulkHoverStaffId(null);
       fetchAssignments();
     } catch (error: any) {
       console.error(error);
@@ -702,6 +721,8 @@ export default function AttendanceAssignmentsView() {
     // Chỉ gợi ý phân công cho những nhân viên đã được tích chọn
     const selectedSet = new Set(bulkStaffIds);
     const selectedUsers = users.filter((u) => selectedSet.has(u.id));
+    // Nhân viên chỉ được xếp ca chính họ đã đăng ký → không xét ở các tier dự phòng
+    const onlyRegisteredSet = new Set(bulkOnlyRegisteredIds);
     const rankKey = (u: IUser) => `${runningCount.get(u.id) || 0}_${punctScore(u.id)}`;
 
     const MAX_STAFF = 2; // mỗi ca tối đa 2 người
@@ -738,13 +759,15 @@ export default function AttendanceAssignmentsView() {
 
       if (chosen.length < MAX_STAFF) {
         // Tier 2: nhân viên đã chọn có ca này trong ca ưa thích (không bị ngoại trừ)
-        const tier2Pool = selectedUsers.filter((u) => !taken.has(u.id) && !excludedSet.has(u.id) && (prefsMap.get(u.id)?.has(templateId) ?? false));
+        // Bỏ qua nhân viên "chỉ xếp ca đã đăng ký" vì họ không đăng ký ca này.
+        const tier2Pool = selectedUsers.filter((u) => !taken.has(u.id) && !excludedSet.has(u.id) && !onlyRegisteredSet.has(u.id) && (prefsMap.get(u.id)?.has(templateId) ?? false));
         pick(groupAndShuffle(tier2Pool, rankKey, seed + slot.date.length).map((u) => u.id));
       }
 
       if (chosen.length < MAX_STAFF) {
         // Tier 3: nhân viên đã chọn còn lại (không bị ngoại trừ)
-        const tier3Pool = selectedUsers.filter((u) => !taken.has(u.id) && !excludedSet.has(u.id) && !(prefsMap.get(u.id)?.has(templateId) ?? false));
+        // Bỏ qua nhân viên "chỉ xếp ca đã đăng ký".
+        const tier3Pool = selectedUsers.filter((u) => !taken.has(u.id) && !excludedSet.has(u.id) && !onlyRegisteredSet.has(u.id) && !(prefsMap.get(u.id)?.has(templateId) ?? false));
         pick(groupAndShuffle(tier3Pool, rankKey, seed + slot.scheduleId.length).map((u) => u.id));
       }
 
@@ -856,6 +879,8 @@ export default function AttendanceAssignmentsView() {
       bulkDialog.onFalse();
       setBulkSelectedSlots([]);
       setBulkStaffIds([]);
+      setBulkOnlyRegisteredIds([]);
+      setBulkHoverStaffId(null);
       fetchAssignments();
     } catch (error: any) {
       enqueueSnackbar(error?.title || error?.message || 'Phân công thất bại!', { variant: 'error' });
@@ -866,6 +891,13 @@ export default function AttendanceAssignmentsView() {
 
   const toggleBulkStaff = (staffId: string) => {
     setBulkStaffIds((prev) =>
+      prev.includes(staffId) ? prev.filter((id) => id !== staffId) : [...prev, staffId]
+    );
+  };
+
+  // Bật/tắt rule "chỉ xếp ca đã đăng ký" cho 1 nhân viên cụ thể
+  const toggleBulkOnlyRegistered = (staffId: string) => {
+    setBulkOnlyRegisteredIds((prev) =>
       prev.includes(staffId) ? prev.filter((id) => id !== staffId) : [...prev, staffId]
     );
   };
@@ -1593,14 +1625,21 @@ export default function AttendanceAssignmentsView() {
                 <Typography variant="subtitle2">
                   Nhân viên ({bulkStaffIds.length}/{users.length})
                 </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, lineHeight: 1.3 }}>
+                  Di chuột vào nhân viên để xem ca họ đã đăng ký · bật{' '}
+                  <Iconify icon="solar:lock-keyhole-bold" width={12} sx={{ verticalAlign: 'text-bottom' }} /> để chỉ xếp ca đã đăng ký
+                </Typography>
               </Box>
               <Box sx={{ flex: 1, overflowY: 'auto', p: 1 }}>
                 <FormGroup>
                   {users.map((user) => {
                     const regCount = bulkRegistrationCountMap.get(user.id) || 0;
+                    const isOnlyReg = bulkOnlyRegisteredIds.includes(user.id);
                     return (
                       <FormControlLabel
                         key={user.id}
+                        onMouseEnter={() => setBulkHoverStaffId(user.id)}
+                        onMouseLeave={() => setBulkHoverStaffId((prev) => (prev === user.id ? null : prev))}
                         control={
                           <Checkbox
                             checked={bulkStaffIds.includes(user.id)}
@@ -1624,9 +1663,40 @@ export default function AttendanceAssignmentsView() {
                                 />
                               </Tooltip>
                             )}
+                            <Tooltip
+                              title={
+                                isOnlyReg
+                                  ? 'Đang bật: chỉ xếp những ca nhân viên này đã đăng ký — bấm để tắt'
+                                  : 'Chỉ xếp những ca nhân viên này đã đăng ký (không xếp ca khác)'
+                              }
+                              arrow
+                            >
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  toggleBulkOnlyRegistered(user.id);
+                                }}
+                                sx={{ p: 0.25, color: isOnlyReg ? 'primary.main' : 'text.disabled' }}
+                              >
+                                <Iconify
+                                  icon={isOnlyReg ? 'solar:lock-keyhole-bold' : 'solar:lock-keyhole-minimalistic-linear'}
+                                  width={16}
+                                />
+                              </IconButton>
+                            </Tooltip>
                           </Stack>
                         }
-                        sx={{ mx: 0, my: 0.25, width: '100%', '& .MuiFormControlLabel-label': { flexGrow: 1, minWidth: 0 } }}
+                        sx={{
+                          mx: 0,
+                          my: 0.25,
+                          width: '100%',
+                          borderRadius: 1,
+                          transition: 'background-color 0.15s',
+                          bgcolor: bulkHoverStaffId === user.id ? alpha(theme.palette.warning.main, 0.12) : 'transparent',
+                          '& .MuiFormControlLabel-label': { flexGrow: 1, minWidth: 0 },
+                        }}
                       />
                     );
                   })}
@@ -1783,6 +1853,10 @@ export default function AttendanceAssignmentsView() {
                           const registeredCheckedStaff = bulkCheckedRegistrationMap.get(slotKey) || [];
                           const hasCheckedRegistration = registeredCheckedStaff.length > 0;
                           const allRegisteredStaff = bulkAllRegistrationMap.get(slotKey) || [];
+                          // Khi hover vào 1 nhân viên: tô viền các ca nhân viên đó đã đăng ký
+                          const isHoverRegistered =
+                            !!bulkHoverStaffId &&
+                            (bulkStaffRegistrationSlotsMap.get(bulkHoverStaffId)?.has(slotKey) ?? false);
                           const excludedIds = exclusionMap[slotKey] || [];
                           const tooltipParts: string[] = [];
                           if (assignedStaff.length > 0) tooltipParts.push(`Đã phân công (${assignedStaff.length}): ${assignedStaff.join(', ')}`);
@@ -1811,6 +1885,8 @@ export default function AttendanceAssignmentsView() {
                                     : alpha(schedule.color, 0.07),
                                   border: isSelected ? '2px solid' : hasCheckedRegistration ? '2px dashed' : '2px solid',
                                   borderColor: isSelected ? schedule.color : hasCheckedRegistration ? schedule.color : 'transparent',
+                                  // Hover nhân viên → viền nổi bật các ca họ đã đăng ký
+                                  boxShadow: isHoverRegistered ? `0 0 0 2px ${theme.palette.warning.main}` : 'none',
                                   transition: 'all 0.15s',
                                   '&:hover': {
                                     bgcolor: alpha(schedule.color, 0.15),
@@ -1938,9 +2014,12 @@ export default function AttendanceAssignmentsView() {
                 <FormGroup>
                   {users.map((user) => {
                     const regCount = bulkRegistrationCountMap.get(user.id) || 0;
+                    const isOnlyReg = bulkOnlyRegisteredIds.includes(user.id);
                     return (
                       <FormControlLabel
                         key={user.id}
+                        onMouseEnter={() => setBulkHoverStaffId(user.id)}
+                        onMouseLeave={() => setBulkHoverStaffId((prev) => (prev === user.id ? null : prev))}
                         control={
                           <Checkbox
                             checked={bulkStaffIds.includes(user.id)}
@@ -1962,9 +2041,39 @@ export default function AttendanceAssignmentsView() {
                                 sx={{ height: 18, fontSize: 10, '& .MuiChip-label': { px: 0.75 } }}
                               />
                             )}
+                            <Tooltip
+                              title={
+                                isOnlyReg
+                                  ? 'Đang bật: chỉ xếp những ca nhân viên này đã đăng ký — bấm để tắt'
+                                  : 'Chỉ xếp những ca nhân viên này đã đăng ký (không xếp ca khác)'
+                              }
+                              arrow
+                            >
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  toggleBulkOnlyRegistered(user.id);
+                                }}
+                                sx={{ p: 0.25, color: isOnlyReg ? 'primary.main' : 'text.disabled' }}
+                              >
+                                <Iconify
+                                  icon={isOnlyReg ? 'solar:lock-keyhole-bold' : 'solar:lock-keyhole-minimalistic-linear'}
+                                  width={16}
+                                />
+                              </IconButton>
+                            </Tooltip>
                           </Stack>
                         }
-                        sx={{ mx: 0, my: 0.25, width: '100%', '& .MuiFormControlLabel-label': { flexGrow: 1, minWidth: 0 } }}
+                        sx={{
+                          mx: 0,
+                          my: 0.25,
+                          width: '100%',
+                          borderRadius: 1,
+                          bgcolor: bulkHoverStaffId === user.id ? alpha(theme.palette.warning.main, 0.12) : 'transparent',
+                          '& .MuiFormControlLabel-label': { flexGrow: 1, minWidth: 0 },
+                        }}
                       />
                     );
                   })}
@@ -2086,6 +2195,9 @@ export default function AttendanceAssignmentsView() {
                             const registeredCheckedStaffMobile = bulkCheckedRegistrationMap.get(slotKey) || [];
                             const hasCheckedRegistrationMobile = registeredCheckedStaffMobile.length > 0;
                             const allRegisteredStaffMobile = bulkAllRegistrationMap.get(slotKey) || [];
+                            const isHoverRegisteredMobile =
+                              !!bulkHoverStaffId &&
+                              (bulkStaffRegistrationSlotsMap.get(bulkHoverStaffId)?.has(slotKey) ?? false);
                             const excludedIdsMobile = exclusionMap[slotKey] || [];
                             const tooltipPartsMobile: string[] = [];
                             if (assignedStaff.length > 0) tooltipPartsMobile.push(`Đã phân công (${assignedStaff.length}): ${assignedStaff.join(', ')}`);
@@ -2114,6 +2226,7 @@ export default function AttendanceAssignmentsView() {
                                     : alpha(schedule.color, 0.07),
                                   border: isSelected ? '2px solid' : hasCheckedRegistrationMobile ? '2px dashed' : '2px solid',
                                   borderColor: isSelected ? schedule.color : hasCheckedRegistrationMobile ? schedule.color : 'transparent',
+                                  boxShadow: isHoverRegisteredMobile ? `0 0 0 2px ${theme.palette.warning.main}` : 'none',
                                 }}
                               >
                                 <Typography
