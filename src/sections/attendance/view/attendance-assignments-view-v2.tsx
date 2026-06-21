@@ -40,6 +40,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import FormGroup from '@mui/material/FormGroup';
 import Tooltip from '@mui/material/Tooltip';
 import Popover from '@mui/material/Popover';
+import Alert from '@mui/material/Alert';
 import { useTheme, alpha } from '@mui/material/styles';
 
 import Chart, { useChart } from 'src/components/chart';
@@ -372,6 +373,22 @@ export default function AttendanceAssignmentsView() {
       const key = `${a.shiftScheduleId}_${dateStr}`;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(a.staffName);
+    });
+    return map;
+  }, [bulkWeekAssignments]);
+
+  // Map: "scheduleId_date" → nhân viên đã chấm công (checkin/checkout) trong ca đó
+  // Dùng để cảnh báo khi chỉ định/ghi đè vào ca đã có người chấm công.
+  const bulkSlotAttendanceMap = useMemo(() => {
+    const map = new Map<string, { staffId: string; staffName: string; checkedIn: boolean; checkedOut: boolean }[]>();
+    bulkWeekAssignments.forEach((a) => {
+      const checkedIn = !!a.attendanceLog?.checkInTime;
+      const checkedOut = !!a.attendanceLog?.checkOutTime;
+      if (!checkedIn && !checkedOut) return;
+      const dateStr = a.date.split('T')[0];
+      const key = `${a.shiftScheduleId}_${dateStr}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({ staffId: a.staffId, staffName: a.staffName, checkedIn, checkedOut });
     });
     return map;
   }, [bulkWeekAssignments]);
@@ -1890,10 +1907,14 @@ export default function AttendanceAssignmentsView() {
                             (bulkStaffRegistrationSlotsMap.get(bulkHoverStaffId)?.has(slotKey) ?? false);
                           const excludedIds = exclusionMap[slotKey] || [];
                           const designatedIds = designationMap[slotKey] || [];
+                          // Cảnh báo: chỉ định/ghi đè vào ca đã có người chấm công (không phải chính người được chỉ định)
+                          const attendanceAtRisk = (bulkSlotAttendanceMap.get(slotKey) || []).filter((s) => !designatedIds.includes(s.staffId));
+                          const designationOverwriteRisk = designatedIds.length > 0 && attendanceAtRisk.length > 0;
                           const tooltipParts: string[] = [];
                           if (assignedStaff.length > 0) tooltipParts.push(`Đã phân công (${assignedStaff.length}): ${assignedStaff.join(', ')}`);
                           if (allRegisteredStaff.length > 0) tooltipParts.push(`Đã đăng ký (${allRegisteredStaff.length}): ${allRegisteredStaff.join(', ')}`);
                           if (designatedIds.length > 0) tooltipParts.push(`Chỉ định (${designatedIds.length}): ${designatedIds.map((id) => staffInfoMap.get(id)?.name || id).join(', ')}`);
+                          if (designationOverwriteRisk) tooltipParts.push(`⚠️ Sẽ ghi đè người đã chấm công: ${attendanceAtRisk.map((s) => s.staffName).join(', ')}`);
                           if (excludedIds.length > 0) tooltipParts.push(`Ngoại trừ (${excludedIds.length}): ${excludedIds.map((id) => staffInfoMap.get(id)?.name || id).join(', ')}`);
                           tooltipParts.push('Chuột phải để chỉ định / ngoại trừ');
                           const tooltipTitle = tooltipParts.join('\n');
@@ -1969,13 +1990,13 @@ export default function AttendanceAssignmentsView() {
                                   <Box
                                     sx={{
                                       position: 'absolute', top: 3, left: 3,
-                                      bgcolor: 'primary.main', color: 'white',
+                                      bgcolor: designationOverwriteRisk ? 'warning.main' : 'primary.main', color: 'white',
                                       borderRadius: 1, height: 16, px: 0.5,
                                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                                       fontSize: 9, fontWeight: 700, lineHeight: 1, gap: 0.25,
                                     }}
                                   >
-                                    📌 {designatedIds.length}
+                                    {designationOverwriteRisk ? '⚠️' : '📌'} {designatedIds.length}
                                   </Box>
                                 )}
                               </Box>
@@ -2244,10 +2265,13 @@ export default function AttendanceAssignmentsView() {
                               (bulkStaffRegistrationSlotsMap.get(bulkHoverStaffId)?.has(slotKey) ?? false);
                             const excludedIdsMobile = exclusionMap[slotKey] || [];
                             const designatedIdsMobile = designationMap[slotKey] || [];
+                            const attendanceAtRiskMobile = (bulkSlotAttendanceMap.get(slotKey) || []).filter((s) => !designatedIdsMobile.includes(s.staffId));
+                            const designationOverwriteRiskMobile = designatedIdsMobile.length > 0 && attendanceAtRiskMobile.length > 0;
                             const tooltipPartsMobile: string[] = [];
                             if (assignedStaff.length > 0) tooltipPartsMobile.push(`Đã phân công (${assignedStaff.length}): ${assignedStaff.join(', ')}`);
                             if (allRegisteredStaffMobile.length > 0) tooltipPartsMobile.push(`Đã đăng ký (${allRegisteredStaffMobile.length}): ${allRegisteredStaffMobile.join(', ')}`);
                             if (designatedIdsMobile.length > 0) tooltipPartsMobile.push(`Chỉ định (${designatedIdsMobile.length}): ${designatedIdsMobile.map((id) => staffInfoMap.get(id)?.name || id).join(', ')}`);
+                            if (designationOverwriteRiskMobile) tooltipPartsMobile.push(`⚠️ Sẽ ghi đè người đã chấm công: ${attendanceAtRiskMobile.map((s) => s.staffName).join(', ')}`);
                             if (excludedIdsMobile.length > 0) tooltipPartsMobile.push(`Ngoại trừ (${excludedIdsMobile.length}): ${excludedIdsMobile.map((id) => staffInfoMap.get(id)?.name || id).join(', ')}`);
                             tooltipPartsMobile.push('Nhấn giữ để chỉ định / ngoại trừ');
                             const tooltipTitleMobile = tooltipPartsMobile.join('\n');
@@ -2317,13 +2341,13 @@ export default function AttendanceAssignmentsView() {
                                   <Box
                                     sx={{
                                       position: 'absolute', top: 3, left: 3,
-                                      bgcolor: 'primary.main', color: 'white',
+                                      bgcolor: designationOverwriteRiskMobile ? 'warning.main' : 'primary.main', color: 'white',
                                       borderRadius: 1, height: 16, px: 0.5,
                                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                                       fontSize: 9, fontWeight: 700, gap: 0.25,
                                     }}
                                   >
-                                    📌 {designatedIdsMobile.length}
+                                    {designationOverwriteRiskMobile ? '⚠️' : '📌'} {designatedIdsMobile.length}
                                   </Box>
                                 )}
                               </Box>
@@ -2467,6 +2491,24 @@ export default function AttendanceAssignmentsView() {
               <Box component="span" sx={{ color: 'primary.main', fontWeight: 600 }}>📌 Chỉ định</Box>: luôn xếp NV vào ca này (không bị ảnh hưởng bởi rule chọn) ·{' '}
               <Box component="span" sx={{ color: 'error.main', fontWeight: 600 }}>🚫 Ngoại trừ</Box>: không xếp
             </Typography>
+            {(() => {
+              // Cảnh báo: đang chỉ định vào ca đã có nhân viên chấm công (sẽ bị ghi đè khi phân công tự động)
+              const designatedThisSlot = designationMap[exclusionAnchor.slotKey] || [];
+              const attendance = bulkSlotAttendanceMap.get(exclusionAnchor.slotKey) || [];
+              const atRisk = attendance.filter((s) => !designatedThisSlot.includes(s.staffId));
+              if (designatedThisSlot.length === 0 || atRisk.length === 0) return null;
+              return (
+                <Alert
+                  severity="warning"
+                  icon={<Iconify icon="solar:danger-triangle-bold" width={18} />}
+                  sx={{ mb: 1, py: 0.5, '& .MuiAlert-message': { fontSize: 12, py: 0.25 } }}
+                >
+                  Ca này đã có {atRisk.length} nhân viên chấm công:{' '}
+                  {atRisk.map((s) => `${s.staffName} (${s.checkedOut ? 'đã check-out' : 'đã check-in'})`).join(', ')}.
+                  Chỉ định / ghi đè có thể gỡ phân công của họ.
+                </Alert>
+              );
+            })()}
             <Box sx={{ maxHeight: 280, overflowY: 'auto' }}>
               {users.map((u) => {
                 const isDesignated = (designationMap[exclusionAnchor.slotKey] || []).includes(u.id);
