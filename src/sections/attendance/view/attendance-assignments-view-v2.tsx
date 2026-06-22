@@ -66,7 +66,7 @@ import {
   TablePaginationCustom,
 } from 'src/components/table';
 
-import { IShiftSchedule, IShiftAssignment, IShiftRegistration, IStaffShiftPreferenceSummary, IUser } from 'src/types/corecms-api';
+import { IShiftSchedule, IShiftAssignment, IShiftRegistration, IStaffShiftPreferenceSummary, IUser, IRegistrationLock } from 'src/types/corecms-api';
 import { ICalendarEvent, ICalendarView, ICalendarScheduleEvent } from 'src/types/calendar';
 import {
   getShiftAssignments,
@@ -78,7 +78,12 @@ import {
   swapShiftAssignments,
   getShiftSchedulesByDateRange,
 } from 'src/api/attendance';
-import { getShiftRegistrations } from 'src/api/shiftRegistration';
+import {
+  getShiftRegistrations,
+  getRegistrationLock,
+  setRegistrationLock,
+  clearRegistrationLock,
+} from 'src/api/shiftRegistration';
 import { getAllStaffShiftPreferences } from 'src/api/userPreference';
 import { getAllUsers } from 'src/api/users';
 
@@ -116,6 +121,16 @@ const toLocalDateStr = (d: Date): string => {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
+
+// ISO (UTC) ↔ giá trị input datetime-local (giờ local của trình duyệt)
+const isoToLocalInput = (iso: string): string => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const localInputToIso = (local: string): string => new Date(local).toISOString();
 
 interface IAutoAssignSlot {
   scheduleId: string;
@@ -272,6 +287,10 @@ export default function AttendanceAssignmentsView() {
   });
   const [bulkSelectedSlots, setBulkSelectedSlots] = useState<{ scheduleId: string; date: string }[]>([]);
   const [bulkAssigning, setBulkAssigning] = useState(false);
+  // Khóa đăng ký ca cho tuần đang xem trong dialog (Admin/Manager đặt mốc)
+  const [bulkLock, setBulkLock] = useState<IRegistrationLock | null>(null);
+  const [bulkLockEditAt, setBulkLockEditAt] = useState(''); // datetime-local value
+  const [bulkLockSaving, setBulkLockSaving] = useState(false);
   const [bulkWeekAssignments, setBulkWeekAssignments] = useState<IShiftAssignment[]>([]);
   const [bulkWeekRegistrations, setBulkWeekRegistrations] = useState<IShiftRegistration[]>([]);
   const [bulkOverwrite, setBulkOverwrite] = useState(false);
@@ -363,6 +382,57 @@ export default function AttendanceAssignmentsView() {
     setExclusionMap({});
     setDesignationMap({});
   }, [bulkWeekStart, bulkDialog.value]);
+
+  // Fetch mốc khóa đăng ký cho tuần đang xem
+  useEffect(() => {
+    if (!bulkDialog.value) return;
+    const weekStartStr = toLocalDateStr(bulkWeekStart);
+    getRegistrationLock(weekStartStr)
+      .then((l) => {
+        setBulkLock(l);
+        setBulkLockEditAt(isoToLocalInput(l.lockAt));
+      })
+      .catch(() => {
+        setBulkLock(null);
+        setBulkLockEditAt('');
+      });
+  }, [bulkWeekStart, bulkDialog.value]);
+
+  const handleSaveLock = async () => {
+    if (!bulkLockEditAt) return;
+    setBulkLockSaving(true);
+    try {
+      const updated = await setRegistrationLock(
+        toLocalDateStr(bulkWeekStart),
+        localInputToIso(bulkLockEditAt)
+      );
+      setBulkLock(updated);
+      setBulkLockEditAt(isoToLocalInput(updated.lockAt));
+      enqueueSnackbar('Đã lưu mốc khóa đăng ký cho tuần này', { variant: 'success' });
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Lưu mốc khóa thất bại', {
+        variant: 'error',
+      });
+    } finally {
+      setBulkLockSaving(false);
+    }
+  };
+
+  const handleClearLock = async () => {
+    setBulkLockSaving(true);
+    try {
+      const reverted = await clearRegistrationLock(toLocalDateStr(bulkWeekStart));
+      setBulkLock(reverted);
+      setBulkLockEditAt(isoToLocalInput(reverted.lockAt));
+      enqueueSnackbar('Đã khôi phục mốc khóa mặc định', { variant: 'success' });
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Khôi phục thất bại', {
+        variant: 'error',
+      });
+    } finally {
+      setBulkLockSaving(false);
+    }
+  };
 
   // Map: "scheduleId_date" → assigned staff names (for tooltip)
   const bulkSlotStaffMap = useMemo(() => {
@@ -1617,6 +1687,53 @@ export default function AttendanceAssignmentsView() {
                 <Iconify icon="mingcute:close-line" />
               </IconButton>
             )}
+          </Stack>
+
+          {/* Khóa đăng ký ca cho tuần đang xem */}
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            spacing={1}
+            sx={{ mt: 1, p: 1, borderRadius: 1, bgcolor: 'background.neutral' }}
+          >
+            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0 }}>
+              <Iconify icon="solar:lock-keyhole-bold" width={18} />
+              <Typography variant="caption" fontWeight={600}>
+                Khóa đăng ký tuần
+              </Typography>
+            </Stack>
+            <TextField
+              type="datetime-local"
+              size="small"
+              value={bulkLockEditAt}
+              onChange={(e) => setBulkLockEditAt(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ flexGrow: 1, minWidth: 200 }}
+            />
+            {bulkLock && (
+              <Chip
+                size="small"
+                color={bulkLock.isLocked ? 'error' : 'default'}
+                variant="outlined"
+                label={bulkLock.isDefault ? 'Mặc định' : 'Tùy chỉnh'}
+              />
+            )}
+            <LoadingButton
+              size="small"
+              variant="contained"
+              loading={bulkLockSaving}
+              onClick={handleSaveLock}
+            >
+              Lưu
+            </LoadingButton>
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={bulkLockSaving || !!bulkLock?.isDefault}
+              onClick={handleClearLock}
+            >
+              Khôi phục mặc định
+            </Button>
           </Stack>
           {!smUp && (
             <Tabs

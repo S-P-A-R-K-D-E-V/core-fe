@@ -1844,6 +1844,13 @@ export interface IRegisterShiftRequest {
   note?: string;
 }
 
+export interface IRegistrationLock {
+  weekStart: string; // yyyy-MM-dd (thứ 2 đầu tuần)
+  lockAt: string; // ISO datetime (UTC)
+  isDefault: boolean; // true nếu chưa có override → đang dùng mốc mặc định
+  isLocked: boolean; // true nếu hiện tại đã quá mốc khóa
+}
+
 export interface IUnregisterShiftRequest {
   shiftScheduleId: string;
   date: string;

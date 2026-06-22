@@ -256,6 +256,7 @@ export const endpoints = {
     bulkRegister: '/shift-registrations/bulk-register',
     list: '/shift-registrations/range',
     myRegistrations: '/shift-registrations/my-registrations',
+    lock: '/shift-registrations/lock',
   },
   checkinFace: {
     face: '/checkin/face',
