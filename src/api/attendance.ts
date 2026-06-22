@@ -229,6 +229,17 @@ export async function syncAssignmentsFromCheckin(
   return response.data;
 }
 
+export async function syncWeekAssignmentsFromCheckin(
+  fromDate: string,
+  toDate: string
+): Promise<{ slotsChanged: number; added: number; removed: number }> {
+  const response = await axios.post<{ slotsChanged: number; added: number; removed: number }>(
+    endpoints.shiftAssignments.syncWeekFromCheckin,
+    { fromDate, toDate }
+  );
+  return response.data;
+}
+
 export interface IAutoAssignSlotInput {
   scheduleId: string;
   date: string;
