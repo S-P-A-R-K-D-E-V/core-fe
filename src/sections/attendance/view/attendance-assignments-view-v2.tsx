@@ -14,7 +14,9 @@ import Table from '@mui/material/Table';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
+import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
 import Container from '@mui/material/Container';
 import TableBody from '@mui/material/TableBody';
@@ -79,6 +81,10 @@ import {
   getShiftSchedulesByDateRange,
   getShiftCheckins,
   syncAssignmentsFromCheckin,
+  applyAutoAssign,
+  getAssignmentHistory,
+  undoAssignmentOperation,
+  IAssignmentHistoryItem,
 } from 'src/api/attendance';
 import {
   getShiftRegistrations,
@@ -234,6 +240,11 @@ export default function AttendanceAssignmentsView() {
   const [originalRegisteredIds, setOriginalRegisteredIds] = useState<string[]>([]);
   const [manageSaving, setManageSaving] = useState(false);
   const [syncingFromCheckin, setSyncingFromCheckin] = useState(false);
+
+  // Lịch sử phân công + hoàn tác
+  const [assignmentHistory, setAssignmentHistory] = useState<IAssignmentHistoryItem[]>([]);
+  const [historyAnchor, setHistoryAnchor] = useState<null | HTMLElement>(null);
+  const [undoingId, setUndoingId] = useState<string | null>(null);
 
   // Swap dialog state
   const swapDialog = useBoolean();
@@ -735,6 +746,7 @@ export default function AttendanceAssignmentsView() {
       setExclusionMap({});
       setDesignationMap({});
       fetchAssignments();
+      refreshHistory();
     } catch (error: any) {
       console.error(error);
       const msg = error?.title || error?.message || 'Phân công thất bại!';
@@ -945,45 +957,63 @@ export default function AttendanceAssignmentsView() {
     setAutoAssignSlots(slots);
   };
 
+  const refreshHistory = useCallback(async () => {
+    try {
+      setAssignmentHistory(await getAssignmentHistory(10));
+    } catch {
+      // ignore — lịch sử là phụ trợ
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshHistory();
+  }, [refreshHistory]);
+
+  const OPERATION_LABELS: Record<string, string> = {
+    BulkAssign: 'Phân công hàng loạt',
+    AutoAssign: 'Phân công tự động',
+    Overwrite: 'Ghi đè phân công',
+    SyncFromCheckin: 'Set lại từ chấm công',
+    ManageSlot: 'Sửa phân công ca',
+  };
+
+  const handleUndo = async (id: string) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Hoàn tác thao tác phân công này?')) return;
+    setUndoingId(id);
+    try {
+      const res = await undoAssignmentOperation(id);
+      const conflictMsg = res.conflicts > 0 ? ` (${res.conflicts} mục đã đổi, bỏ qua)` : '';
+      enqueueSnackbar(`Đã hoàn tác ${res.reversed} thay đổi${conflictMsg}`, {
+        variant: res.conflicts > 0 ? 'warning' : 'success',
+      });
+      setHistoryAnchor(null);
+      await fetchAssignments();
+      await refreshHistory();
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Hoàn tác thất bại!', { variant: 'error' });
+    } finally {
+      setUndoingId(null);
+    }
+  };
+
   const doAutoAssign = async () => {
     try {
       setAutoAssigning(true);
 
-      // Lookup assignmentId theo (scheduleId, date, staffId) để gỡ phân công cũ khi ghi đè
-      const assignmentIdMap = new Map<string, string>();
-      bulkWeekAssignments.forEach((a) => {
-        const dateStr = a.date.split('T')[0];
-        assignmentIdMap.set(`${a.shiftScheduleId}_${dateStr}_${a.staffId}`, a.id);
+      // Áp dụng server-side trong 1 thao tác (atomic + ghi lịch sử để hoàn tác).
+      // Mỗi slot đặt đúng tập nhân viên đề xuất; server tự tính thêm/gỡ.
+      const slots = autoAssignSlots.map((s) => ({
+        scheduleId: s.scheduleId,
+        date: s.date,
+        staffIds: s.proposedStaffIds,
+      }));
+
+      const result = await applyAutoAssign(slots);
+
+      enqueueSnackbar(`Phân công tự động: +${result.added} thêm mới, -${result.removed} gỡ bỏ`, {
+        variant: 'success',
       });
-
-      let added = 0;
-      let removed = 0;
-      for (const slot of autoAssignSlots) {
-        const proposedSet = new Set(slot.proposedStaffIds);
-        const existingSet = new Set(slot.existingStaffIds);
-
-        // Ghi đè: gỡ nhân viên đã phân công trước đó nhưng không nằm trong đề xuất mới
-        for (const staffId of slot.existingStaffIds) {
-          if (!proposedSet.has(staffId)) {
-            const aid = assignmentIdMap.get(`${slot.scheduleId}_${slot.date}_${staffId}`);
-            if (aid) {
-              // eslint-disable-next-line no-await-in-loop
-              await deleteShiftAssignment(aid);
-              removed += 1;
-            }
-          }
-        }
-
-        // Thêm nhân viên mới chưa có trong ca
-        for (const staffId of slot.proposedStaffIds) {
-          if (!existingSet.has(staffId)) {
-            // eslint-disable-next-line no-await-in-loop
-            await createShiftAssignment({ staffId, shiftScheduleId: slot.scheduleId, date: slot.date });
-            added += 1;
-          }
-        }
-      }
-      enqueueSnackbar(`Phân công tự động: +${added} thêm mới, -${removed} gỡ bỏ`, { variant: 'success' });
       autoAssignDialog.onFalse();
       bulkDialog.onFalse();
       setBulkSelectedSlots([]);
@@ -993,6 +1023,7 @@ export default function AttendanceAssignmentsView() {
       setExclusionMap({});
       setDesignationMap({});
       fetchAssignments();
+      refreshHistory();
     } catch (error: any) {
       enqueueSnackbar(error?.title || error?.message || 'Phân công thất bại!', { variant: 'error' });
     } finally {
@@ -1230,6 +1261,7 @@ export default function AttendanceAssignmentsView() {
           variant: 'success',
         });
         await fetchAssignments();
+        refreshHistory();
       }
       manageDialog.onFalse();
     } catch (error: any) {
@@ -1276,6 +1308,7 @@ export default function AttendanceAssignmentsView() {
         variant: 'success',
       });
       await fetchAssignments();
+      refreshHistory();
       manageDialog.onFalse();
     } catch (error: any) {
       console.error(error);
@@ -1428,6 +1461,18 @@ export default function AttendanceAssignmentsView() {
             <Stack direction="row" spacing={1}>
               <Button
                 variant="outlined"
+                color="warning"
+                disabled={assignmentHistory.length === 0}
+                startIcon={<Iconify icon="solar:undo-left-round-bold" />}
+                onClick={(e) => {
+                  setHistoryAnchor(e.currentTarget);
+                  refreshHistory();
+                }}
+              >
+                Hoàn tác
+              </Button>
+              <Button
+                variant="outlined"
                 startIcon={<Iconify icon="solar:calendar-add-bold-duotone" />}
                 onClick={() => {
                   setAssignMode('bulk');
@@ -1450,6 +1495,49 @@ export default function AttendanceAssignmentsView() {
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
+
+        {/* Lịch sử thao tác phân công — hoàn tác */}
+        <Menu
+          anchorEl={historyAnchor}
+          open={Boolean(historyAnchor)}
+          onClose={() => setHistoryAnchor(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          slotProps={{ paper: { sx: { minWidth: 320, maxWidth: 380 } } }}
+        >
+          <Typography variant="subtitle2" sx={{ px: 2, py: 1 }}>
+            Thao tác gần đây
+          </Typography>
+          <Divider />
+          {assignmentHistory.length === 0 ? (
+            <MenuItem disabled>Chưa có thao tác nào để hoàn tác</MenuItem>
+          ) : (
+            assignmentHistory.map((h) => (
+              <MenuItem
+                key={h.id}
+                onClick={() => handleUndo(h.id)}
+                disabled={undoingId !== null}
+                sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1 }}
+              >
+                <Iconify icon="solar:undo-left-round-bold" width={18} sx={{ color: 'warning.main' }} />
+                <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                  <Typography variant="body2" noWrap>
+                    {OPERATION_LABELS[h.operationType] || h.operationType}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    +{h.addedCount} / -{h.removedCount} ·{' '}
+                    {new Date(h.performedAt).toLocaleString('vi-VN', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      day: '2-digit',
+                      month: '2-digit',
+                    })}
+                  </Typography>
+                </Box>
+              </MenuItem>
+            ))
+          )}
+        </Menu>
 
         {/* Filters */}
         <Card sx={{ mb: 3, p: 2.5 }}>

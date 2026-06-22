@@ -229,6 +229,47 @@ export async function syncAssignmentsFromCheckin(
   return response.data;
 }
 
+export interface IAutoAssignSlotInput {
+  scheduleId: string;
+  date: string;
+  staffIds: string[];
+}
+
+export async function applyAutoAssign(
+  slots: IAutoAssignSlotInput[]
+): Promise<{ added: number; removed: number }> {
+  const response = await axios.post<{ added: number; removed: number }>(
+    endpoints.shiftAssignments.autoAssignApply,
+    { slots }
+  );
+  return response.data;
+}
+
+export interface IAssignmentHistoryItem {
+  id: string;
+  operationType: string;
+  performedAt: string;
+  performedBy: string;
+  addedCount: number;
+  removedCount: number;
+}
+
+export async function getAssignmentHistory(take = 10): Promise<IAssignmentHistoryItem[]> {
+  const response = await axios.get<IAssignmentHistoryItem[]>(endpoints.shiftAssignments.history, {
+    params: { take },
+  });
+  return response.data;
+}
+
+export async function undoAssignmentOperation(
+  id: string
+): Promise<{ reversed: number; conflicts: number }> {
+  const response = await axios.post<{ reversed: number; conflicts: number }>(
+    endpoints.shiftAssignments.undo(id)
+  );
+  return response.data;
+}
+
 export async function swapShiftAssignments(
   data: ISwapShiftAssignmentsRequest
 ): Promise<{ success: boolean }> {
