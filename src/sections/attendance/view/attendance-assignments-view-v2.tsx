@@ -81,6 +81,7 @@ import {
   getShiftSchedulesByDateRange,
   getShiftCheckins,
   syncAssignmentsFromCheckin,
+  syncWeekAssignmentsFromCheckin,
   applyAutoAssign,
   getAssignmentHistory,
   undoAssignmentOperation,
@@ -305,6 +306,7 @@ export default function AttendanceAssignmentsView() {
   const [bulkLock, setBulkLock] = useState<IRegistrationLock | null>(null);
   const [bulkLockEditAt, setBulkLockEditAt] = useState(''); // datetime-local value
   const [bulkLockSaving, setBulkLockSaving] = useState(false);
+  const [syncingWeek, setSyncingWeek] = useState(false);
   const [bulkWeekAssignments, setBulkWeekAssignments] = useState<IShiftAssignment[]>([]);
   const [bulkWeekRegistrations, setBulkWeekRegistrations] = useState<IShiftRegistration[]>([]);
   const [bulkOverwrite, setBulkOverwrite] = useState(false);
@@ -429,6 +431,43 @@ export default function AttendanceAssignmentsView() {
       });
     } finally {
       setBulkLockSaving(false);
+    }
+  };
+
+  // Set lại phân công CẢ TUẦN theo dữ liệu chấm công (khôi phục hàng loạt)
+  const handleSyncWeekFromCheckin = async () => {
+    const weekEnd = new Date(bulkWeekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const from = toLocalDateStr(bulkWeekStart);
+    const to = toLocalDateStr(weekEnd);
+
+    // eslint-disable-next-line no-alert
+    if (
+      !window.confirm(
+        `Đặt lại phân công TẤT CẢ ca trong tuần (${from} → ${to}) = đúng tập nhân viên đã check-in?\n\nThêm người đã check-in chưa được phân, gỡ người được phân nhưng không check-in.`
+      )
+    )
+      return;
+
+    setSyncingWeek(true);
+    try {
+      const res = await syncWeekAssignmentsFromCheckin(from, to);
+      enqueueSnackbar(
+        `Đã đồng bộ ${res.slotsChanged} ca từ chấm công (+${res.added} / -${res.removed})`,
+        { variant: res.slotsChanged > 0 ? 'success' : 'info' }
+      );
+      // Làm mới dữ liệu tuần trong popup + lịch + lịch sử
+      getShiftAssignments(from, to)
+        .then((data) => setBulkWeekAssignments(data))
+        .catch(() => {});
+      await fetchAssignments();
+      refreshHistory();
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Đồng bộ từ chấm công thất bại!', {
+        variant: 'error',
+      });
+    } finally {
+      setSyncingWeek(false);
     }
   };
 
@@ -1842,7 +1881,7 @@ export default function AttendanceAssignmentsView() {
       </Dialog>
 
       {/* Bulk Assign Dialog */}
-      <Dialog open={assignMode === 'bulk' && bulkDialog.value} onClose={bulkDialog.onFalse} maxWidth="lg" fullWidth fullScreen={!smUp}>
+      <Dialog open={assignMode === 'bulk' && bulkDialog.value} onClose={bulkDialog.onFalse} maxWidth="xl" fullWidth fullScreen={!smUp} PaperProps={{ sx: { width: '100%', maxWidth: 1320 } }}>
         <DialogTitle sx={{ pb: 1, px: { xs: 2, sm: 3 } }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between">
             <Typography variant="h6">Phân công hàng loạt</Typography>
@@ -1927,7 +1966,7 @@ export default function AttendanceAssignmentsView() {
             {/* ===== Left: Staff List ===== */}
             <Box
               sx={{
-                width: 240,
+                width: 300,
                 flexShrink: 0,
                 borderRight: '1px solid',
                 borderColor: 'divider',
@@ -1962,83 +2001,89 @@ export default function AttendanceAssignmentsView() {
                           />
                         }
                         label={
-                          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ width: '100%' }}>
-                            <Typography variant="body2" noWrap sx={{ flexGrow: 1 }}>
+                          <Stack spacing={0.25} sx={{ width: '100%', py: 0.25 }}>
+                            {/* Dòng 1: tên nhân viên (đủ rộng, dễ đọc) */}
+                            <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3 }}>
                               {user.fullName}
                             </Typography>
-                            <Tooltip title="Ưu tiên xếp ca (cao hơn = chọn trước). Bấm +/- để chỉnh." arrow>
-                              <Stack direction="row" alignItems="center" sx={{ flexShrink: 0 }}>
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleAdjustPriority(user.id, -1);
-                                  }}
-                                  sx={{ p: 0.125 }}
-                                >
-                                  <Iconify icon="solar:minus-circle-linear" width={14} />
-                                </IconButton>
-                                <Chip
-                                  size="small"
-                                  label={`⭐ ${user.schedulingPriority ?? 0}`}
-                                  variant="soft"
-                                  color={(user.schedulingPriority ?? 0) > 0 ? 'warning' : 'default'}
-                                  sx={{ height: 18, fontSize: 10, '& .MuiChip-label': { px: 0.5 } }}
-                                />
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleAdjustPriority(user.id, 1);
-                                  }}
-                                  sx={{ p: 0.125 }}
-                                >
-                                  <Iconify icon="solar:add-circle-linear" width={14} />
-                                </IconButton>
-                              </Stack>
-                            </Tooltip>
-                            {regCount > 0 && (
-                              <Tooltip title={`Đã đăng ký ${regCount} ca trong tuần này`} arrow>
-                                <Chip
-                                  size="small"
-                                  label={`📝 ${regCount}`}
-                                  color="info"
-                                  variant="soft"
-                                  sx={{ height: 18, fontSize: 10, '& .MuiChip-label': { px: 0.75 } }}
-                                />
+                            {/* Dòng 2: ưu tiên + ca đăng ký + rule chỉ-xếp-ca-đăng-ký */}
+                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                              <Tooltip title="Ưu tiên xếp ca (cao hơn = chọn trước). Bấm +/- để chỉnh." arrow>
+                                <Stack direction="row" alignItems="center" sx={{ flexShrink: 0 }}>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleAdjustPriority(user.id, -1);
+                                    }}
+                                    sx={{ p: 0.125 }}
+                                  >
+                                    <Iconify icon="solar:minus-circle-linear" width={14} />
+                                  </IconButton>
+                                  <Chip
+                                    size="small"
+                                    label={`⭐ ${user.schedulingPriority ?? 0}`}
+                                    variant="soft"
+                                    color={(user.schedulingPriority ?? 0) > 0 ? 'warning' : 'default'}
+                                    sx={{ height: 18, fontSize: 10, '& .MuiChip-label': { px: 0.5 } }}
+                                  />
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleAdjustPriority(user.id, 1);
+                                    }}
+                                    sx={{ p: 0.125 }}
+                                  >
+                                    <Iconify icon="solar:add-circle-linear" width={14} />
+                                  </IconButton>
+                                </Stack>
                               </Tooltip>
-                            )}
-                            <Tooltip
-                              title={
-                                isOnlyReg
-                                  ? 'Đang bật: chỉ xếp những ca nhân viên này đã đăng ký — bấm để tắt'
-                                  : 'Chỉ xếp những ca nhân viên này đã đăng ký (không xếp ca khác)'
-                              }
-                              arrow
-                            >
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  toggleBulkOnlyRegistered(user.id);
-                                }}
-                                sx={{ p: 0.25, color: isOnlyReg ? 'primary.main' : 'text.disabled' }}
+                              {regCount > 0 && (
+                                <Tooltip title={`Đã đăng ký ${regCount} ca trong tuần này`} arrow>
+                                  <Chip
+                                    size="small"
+                                    label={`📝 ${regCount}`}
+                                    color="info"
+                                    variant="soft"
+                                    sx={{ height: 18, fontSize: 10, '& .MuiChip-label': { px: 0.75 } }}
+                                  />
+                                </Tooltip>
+                              )}
+                              <Box sx={{ flexGrow: 1 }} />
+                              <Tooltip
+                                title={
+                                  isOnlyReg
+                                    ? 'Đang bật: chỉ xếp những ca nhân viên này đã đăng ký — bấm để tắt'
+                                    : 'Chỉ xếp những ca nhân viên này đã đăng ký (không xếp ca khác)'
+                                }
+                                arrow
                               >
-                                <Iconify
-                                  icon={isOnlyReg ? 'solar:lock-keyhole-bold' : 'solar:lock-keyhole-minimalistic-linear'}
-                                  width={16}
-                                />
-                              </IconButton>
-                            </Tooltip>
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    toggleBulkOnlyRegistered(user.id);
+                                  }}
+                                  sx={{ p: 0.25, color: isOnlyReg ? 'primary.main' : 'text.disabled' }}
+                                >
+                                  <Iconify
+                                    icon={isOnlyReg ? 'solar:lock-keyhole-bold' : 'solar:lock-keyhole-minimalistic-linear'}
+                                    width={16}
+                                  />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
                           </Stack>
                         }
                         sx={{
                           mx: 0,
                           my: 0.25,
                           width: '100%',
+                          alignItems: 'flex-start',
                           borderRadius: 1,
                           transition: 'background-color 0.15s',
                           bgcolor: bulkHoverStaffId === user.id ? alpha(theme.palette.warning.main, 0.12) : 'transparent',
@@ -2699,6 +2744,17 @@ export default function AttendanceAssignmentsView() {
           <Button variant="outlined" onClick={bulkDialog.onFalse}>
             Hủy
           </Button>
+          <Tooltip title="Đặt lại phân công TẤT CẢ ca trong tuần đang xem = đúng tập nhân viên đã check-in (khôi phục hàng loạt khi lỡ ghi đè)">
+            <LoadingButton
+              variant="outlined"
+              color="warning"
+              loading={syncingWeek}
+              onClick={handleSyncWeekFromCheckin}
+              startIcon={<Iconify icon="solar:refresh-bold" />}
+            >
+              Set lại từ chấm công
+            </LoadingButton>
+          </Tooltip>
           <Tooltip title={bulkStaffIds.length === 0 && !hasAnyDesignation ? 'Hãy chọn nhân viên hoặc chỉ định nhân viên cho ca trước' : 'Phân công tự động cho toàn tuần: nhân viên chỉ định luôn được xếp trước (bỏ qua rule), sau đó ưu tiên nhân viên đăng ký ca → ca ưa thích → số ca ít → đúng giờ. Hiển thị preview trước khi lưu.'}>
             <span>
               <Button
