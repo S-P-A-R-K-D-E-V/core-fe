@@ -118,6 +118,7 @@ export const endpoints = {
     swap: '/shift-assignments/swap',
     checkins: '/shift-assignments/checkins',
     syncFromCheckin: '/shift-assignments/sync-from-checkin',
+    syncWeekFromCheckin: '/shift-assignments/sync-week-from-checkin',
     autoAssignApply: '/shift-assignments/auto-assign-apply',
     history: '/shift-assignments/history',
     undo: (id: string) => `/shift-assignments/history/${id}/undo`,
