@@ -85,7 +85,7 @@ import {
   clearRegistrationLock,
 } from 'src/api/shiftRegistration';
 import { getAllStaffShiftPreferences } from 'src/api/userPreference';
-import { getAllUsers } from 'src/api/users';
+import { getAllUsers, setSchedulingPriority } from 'src/api/users';
 
 
 import { StyledCalendar } from '../../calendar/styles';
@@ -415,6 +415,26 @@ export default function AttendanceAssignmentsView() {
       });
     } finally {
       setBulkLockSaving(false);
+    }
+  };
+
+  // Chỉnh nhanh ưu tiên xếp ca của nhân viên (inline trong cột nhân viên)
+  const handleAdjustPriority = async (userId: string, delta: number) => {
+    const current = users.find((u) => u.id === userId)?.schedulingPriority ?? 0;
+    const next = Math.max(0, current + delta);
+    if (next === current) return;
+    // optimistic update
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, schedulingPriority: next } : u)));
+    try {
+      await setSchedulingPriority(userId, next);
+    } catch (error: any) {
+      // revert nếu lỗi
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, schedulingPriority: current } : u))
+      );
+      enqueueSnackbar(error?.title || error?.message || 'Cập nhật ưu tiên thất bại', {
+        variant: 'error',
+      });
     }
   };
 
@@ -785,7 +805,14 @@ export default function AttendanceAssignmentsView() {
     const selectedUsers = users.filter((u) => selectedSet.has(u.id));
     // Nhân viên chỉ được xếp ca chính họ đã đăng ký → không xét ở các tier dự phòng
     const onlyRegisteredSet = new Set(bulkOnlyRegisteredIds);
-    const rankKey = (u: IUser) => `${runningCount.get(u.id) || 0}_${punctScore(u.id)}`;
+    // Tie-break trong mỗi tier: ưu tiên cao trước → ít ca trước → ít vi phạm trước.
+    // groupAndShuffle so sánh rankKey dạng chuỗi nên cần zero-pad để sắp xếp số đúng.
+    const usersById = new Map(users.map((u) => [u.id, u]));
+    const priorityOf = (id: string) => usersById.get(id)?.schedulingPriority ?? 0;
+    const rankKey = (u: IUser) =>
+      `${String(100000 - priorityOf(u.id)).padStart(6, '0')}_` +
+      `${String(runningCount.get(u.id) || 0).padStart(4, '0')}_` +
+      `${String(punctScore(u.id)).padStart(4, '0')}`;
 
     const MAX_STAFF = 2; // mỗi ca tối đa 2 người
     const result: IAutoAssignSlot[] = [];
@@ -1802,6 +1829,39 @@ export default function AttendanceAssignmentsView() {
                             <Typography variant="body2" noWrap sx={{ flexGrow: 1 }}>
                               {user.fullName}
                             </Typography>
+                            <Tooltip title="Ưu tiên xếp ca (cao hơn = chọn trước). Bấm +/- để chỉnh." arrow>
+                              <Stack direction="row" alignItems="center" sx={{ flexShrink: 0 }}>
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleAdjustPriority(user.id, -1);
+                                  }}
+                                  sx={{ p: 0.125 }}
+                                >
+                                  <Iconify icon="solar:minus-circle-linear" width={14} />
+                                </IconButton>
+                                <Chip
+                                  size="small"
+                                  label={`⭐ ${user.schedulingPriority ?? 0}`}
+                                  variant="soft"
+                                  color={(user.schedulingPriority ?? 0) > 0 ? 'warning' : 'default'}
+                                  sx={{ height: 18, fontSize: 10, '& .MuiChip-label': { px: 0.5 } }}
+                                />
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleAdjustPriority(user.id, 1);
+                                  }}
+                                  sx={{ p: 0.125 }}
+                                >
+                                  <Iconify icon="solar:add-circle-linear" width={14} />
+                                </IconButton>
+                              </Stack>
+                            </Tooltip>
                             {regCount > 0 && (
                               <Tooltip title={`Đã đăng ký ${regCount} ca trong tuần này`} arrow>
                                 <Chip

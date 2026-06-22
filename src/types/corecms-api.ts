@@ -22,6 +22,7 @@ export interface IUser {
   profileImageUrl?: string;
   idCardFrontUrl?: string;
   idCardBackUrl?: string;
+  schedulingPriority?: number;
   roles: string[];
 }
 
@@ -75,6 +76,7 @@ export interface IUpdateUserRequest {
   bankCode?: string;
   bankNo?: string;
   profileImageUrl?: string;
+  schedulingPriority?: number;
 }
 
 export interface IUpdateProfileRequest {

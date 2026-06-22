@@ -46,6 +46,10 @@ export default function UserQuickEditForm({ currentUser, open, onClose, onRefres
     address: Yup.string(),
     bankCode: Yup.string(),
     bankNo: Yup.string(),
+    schedulingPriority: Yup.number()
+      .transform((v, o) => (o === '' ? 0 : v))
+      .min(0, 'Ưu tiên không được âm')
+      .typeError('Ưu tiên phải là số'),
     status: Yup.string<UserStatus>().required('Status is required'),
   });
 
@@ -58,6 +62,7 @@ export default function UserQuickEditForm({ currentUser, open, onClose, onRefres
       address: currentUser?.address || '',
       bankCode: currentUser?.bankCode || '',
       bankNo: currentUser?.bankNo || '',
+      schedulingPriority: currentUser?.schedulingPriority ?? 0,
       status: currentUser?.status || ('Active' as UserStatus),
     }),
     [currentUser]
@@ -85,6 +90,7 @@ export default function UserQuickEditForm({ currentUser, open, onClose, onRefres
         address: data.address || undefined,
         bankCode: data.bankCode || undefined,
         bankNo: data.bankNo || undefined,
+        schedulingPriority: Number(data.schedulingPriority) || 0,
       });
 
       // Update status if changed
@@ -148,6 +154,12 @@ export default function UserQuickEditForm({ currentUser, open, onClose, onRefres
             <RHFTextField name="address" label="Address" />
             <RHFTextField name="bankCode" label="Bank Code" />
             <RHFTextField name="bankNo" label="Bank Account No" />
+            <RHFTextField
+              name="schedulingPriority"
+              label="Ưu tiên xếp ca"
+              type="number"
+              helperText="Cao hơn = được ưu tiên chọn trước khi xếp ca tự động"
+            />
           </Box>
         </DialogContent>
 

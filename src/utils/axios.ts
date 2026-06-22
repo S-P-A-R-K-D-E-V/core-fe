@@ -56,6 +56,7 @@ export const endpoints = {
     uploadIdCard: (id: string) => `/users/${id}/id-card`,
     uploadMyIdCard: '/users/me/id-card',
     changePassword: '/users/me/change-password',
+    schedulingPriority: (id: string) => `/users/${id}/scheduling-priority`,
   },
   roles: {
     list: '/roles',
