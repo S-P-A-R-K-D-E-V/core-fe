@@ -116,6 +116,8 @@ export const endpoints = {
     bulkAssign: '/shift-assignments/bulk',
     manageShift: '/shift-assignments/manage-shift',
     swap: '/shift-assignments/swap',
+    checkins: '/shift-assignments/checkins',
+    syncFromCheckin: '/shift-assignments/sync-from-checkin',
     delete: (id: string) => `/shift-assignments/${id}`,
     byStaffAndDate: (staffId: string, date: string) => `/shift-assignments/staff/${staffId}/date/${date}`,
     byStaffAndDateRange: (staffId: string) => `/shift-assignments/staff/${staffId}/range`,

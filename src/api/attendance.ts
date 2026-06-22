@@ -204,6 +204,31 @@ export async function deleteShiftAssignment(id: string): Promise<void> {
   await axios.delete(endpoints.shiftAssignments.delete(id));
 }
 
+export interface ICheckinInfo {
+  staffId: string;
+  staffName: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+}
+
+export async function getShiftCheckins(scheduleId: string, date: string): Promise<ICheckinInfo[]> {
+  const response = await axios.get<ICheckinInfo[]>(endpoints.shiftAssignments.checkins, {
+    params: { scheduleId, date },
+  });
+  return response.data;
+}
+
+export async function syncAssignmentsFromCheckin(
+  scheduleId: string,
+  date: string
+): Promise<{ added: number; removed: number }> {
+  const response = await axios.post<{ added: number; removed: number }>(
+    endpoints.shiftAssignments.syncFromCheckin,
+    { scheduleId, date }
+  );
+  return response.data;
+}
+
 export async function swapShiftAssignments(
   data: ISwapShiftAssignmentsRequest
 ): Promise<{ success: boolean }> {

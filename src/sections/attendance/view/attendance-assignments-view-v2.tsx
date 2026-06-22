@@ -77,6 +77,8 @@ import {
   manageShiftAssignments,
   swapShiftAssignments,
   getShiftSchedulesByDateRange,
+  getShiftCheckins,
+  syncAssignmentsFromCheckin,
 } from 'src/api/attendance';
 import {
   getShiftRegistrations,
@@ -231,6 +233,7 @@ export default function AttendanceAssignmentsView() {
   const [initialAssignedIds, setInitialAssignedIds] = useState<string[]>([]);
   const [originalRegisteredIds, setOriginalRegisteredIds] = useState<string[]>([]);
   const [manageSaving, setManageSaving] = useState(false);
+  const [syncingFromCheckin, setSyncingFromCheckin] = useState(false);
 
   // Swap dialog state
   const swapDialog = useBoolean();
@@ -1235,6 +1238,52 @@ export default function AttendanceAssignmentsView() {
       enqueueSnackbar(msg, { variant: 'error' });
     } finally {
       setManageSaving(false);
+    }
+  };
+
+  // Set lại phân công ca = đúng tập nhân viên đã check-in (khôi phục khi lỡ ghi đè)
+  const handleSyncFromCheckin = async () => {
+    if (!managingEvent) return;
+    setSyncingFromCheckin(true);
+    try {
+      const checkins = await getShiftCheckins(managingEvent.scheduleId, managingEvent.date);
+      const checkinIds = checkins.map((c) => c.staffId);
+      const checkinSet = new Set(checkinIds);
+      const assignedSet = new Set(dndAssigned);
+      const toAdd = checkinIds.filter((id) => !assignedSet.has(id));
+      const toRemove = dndAssigned.filter((id) => !checkinSet.has(id));
+
+      if (toAdd.length === 0 && toRemove.length === 0) {
+        enqueueSnackbar('Phân công đã khớp với dữ liệu chấm công, không có thay đổi.', {
+          variant: 'info',
+        });
+        setSyncingFromCheckin(false);
+        return;
+      }
+
+      // eslint-disable-next-line no-alert
+      const ok = window.confirm(
+        `Đồng bộ phân công theo chấm công:\n+ Thêm ${toAdd.length} người đã check-in\n- Gỡ ${toRemove.length} người không check-in\n\nÁp dụng?`
+      );
+      if (!ok) {
+        setSyncingFromCheckin(false);
+        return;
+      }
+
+      const result = await syncAssignmentsFromCheckin(managingEvent.scheduleId, managingEvent.date);
+      setDndAssigned(checkinIds);
+      enqueueSnackbar(`Đã đồng bộ từ chấm công! (+${result.added} / -${result.removed})`, {
+        variant: 'success',
+      });
+      await fetchAssignments();
+      manageDialog.onFalse();
+    } catch (error: any) {
+      console.error(error);
+      enqueueSnackbar(error?.title || error?.message || 'Đồng bộ từ chấm công thất bại!', {
+        variant: 'error',
+      });
+    } finally {
+      setSyncingFromCheckin(false);
     }
   };
 
@@ -3332,6 +3381,18 @@ export default function AttendanceAssignmentsView() {
             </DialogContent>
 
             <DialogActions sx={{ px: 3, py: 2 }}>
+              <Tooltip title="Đặt phân công ca này = đúng tập nhân viên đã check-in (khôi phục khi lỡ ghi đè)">
+                <LoadingButton
+                  color="warning"
+                  variant="outlined"
+                  startIcon={<Iconify icon="solar:refresh-bold" />}
+                  onClick={handleSyncFromCheckin}
+                  loading={syncingFromCheckin}
+                >
+                  Set lại từ chấm công
+                </LoadingButton>
+              </Tooltip>
+              <Box sx={{ flexGrow: 1 }} />
               <Button variant="outlined" onClick={manageDialog.onFalse}>
                 Hủy
               </Button>
