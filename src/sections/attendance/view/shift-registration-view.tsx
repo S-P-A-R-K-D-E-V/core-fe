@@ -21,6 +21,7 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
+import Alert from '@mui/material/Alert';
 import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
@@ -41,7 +42,7 @@ import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
-import { IShiftSchedule, IShiftRegistration } from 'src/types/corecms-api';
+import { IShiftSchedule, IShiftRegistration, IRegistrationLock } from 'src/types/corecms-api';
 import { ICalendarView, ICalendarScheduleEvent } from 'src/types/calendar';
 import { getShiftSchedulesByDateRange } from 'src/api/attendance';
 import {
@@ -49,6 +50,7 @@ import {
   unregisterShift,
   getMyShiftRegistrations,
   getShiftRegistrations,
+  getRegistrationLock,
 } from 'src/api/shiftRegistration';
 import { useAuthContext } from 'src/auth/hooks';
 
@@ -137,6 +139,10 @@ export default function ShiftRegistrationView() {
   const [weekNote, setWeekNote] = useState('');
   const [weeklyRegistering, setWeeklyRegistering] = useState(false);
 
+  // Khóa đăng ký theo tuần (cho tuần trong dialog đăng ký nhanh & ca đang chọn trên lịch)
+  const [weekLock, setWeekLock] = useState<IRegistrationLock | null>(null);
+  const [detailLock, setDetailLock] = useState<IRegistrationLock | null>(null);
+
   // Tour state
   const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
   const tourWeeklyDialogRef = useRef(false);
@@ -182,6 +188,51 @@ export default function ShiftRegistrationView() {
   useEffect(() => {
     fetchRegistrations();
   }, [fetchRegistrations]);
+
+  // Lấy mốc khóa của tuần đang mở trong dialog đăng ký nhanh
+  useEffect(() => {
+    if (!weeklyDialog.value) return undefined;
+    let active = true;
+    getRegistrationLock(toLocalDateStr(weekStart))
+      .then((l) => {
+        if (active) setWeekLock(l);
+      })
+      .catch(() => {
+        if (active) setWeekLock(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [weeklyDialog.value, weekStart]);
+
+  // Lấy mốc khóa của tuần chứa ca đang chọn trên lịch (BE tự suy ra thứ 2 đầu tuần)
+  useEffect(() => {
+    if (!detailDialog.value || !selectedShift) return undefined;
+    let active = true;
+    getRegistrationLock(selectedShift.date)
+      .then((l) => {
+        if (active) setDetailLock(l);
+      })
+      .catch(() => {
+        if (active) setDetailLock(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [detailDialog.value, selectedShift]);
+
+  const formatLockDeadline = (iso: string) =>
+    new Date(iso).toLocaleString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+
+  // Nhân viên (không phải Admin/Manager) bị chặn khi tuần đã khóa
+  const weeklyLocked = !isAdmin && !!weekLock?.isLocked;
+  const detailLocked = !isAdmin && !!detailLock?.isLocked;
 
   // Weekly dialog helpers
   const weekDays = useMemo(() => {
@@ -916,6 +967,13 @@ export default function ShiftRegistrationView() {
                   />
                 )}
 
+                {detailLocked && detailLock && (
+                  <Alert severity="warning" icon={<Iconify icon="solar:lock-keyhole-bold" />}>
+                    Đã khóa đăng ký tuần này (hạn: {formatLockDeadline(detailLock.lockAt)}). Liên hệ
+                    quản lý nếu cần thay đổi.
+                  </Alert>
+                )}
+
                 {/* Registered staff list */}
                 {selectedShift.registeredStaff.length > 0 && (
                   <>
@@ -982,6 +1040,7 @@ export default function ShiftRegistrationView() {
                   variant="contained"
                   color="error"
                   loading={registering}
+                  disabled={detailLocked}
                   onClick={handleUnregister}
                   startIcon={<Iconify icon="solar:close-circle-bold" />}
                 >
@@ -992,6 +1051,7 @@ export default function ShiftRegistrationView() {
                   variant="contained"
                   color="primary"
                   loading={registering}
+                  disabled={detailLocked}
                   onClick={handleRegister}
                   startIcon={<Iconify icon="solar:check-circle-bold" />}
                 >
@@ -1059,6 +1119,12 @@ export default function ShiftRegistrationView() {
 
         <DialogContent sx={{ px: { xs: 1.5, sm: 2 } }}>
           <Stack id="tour-week-grid" spacing={2} sx={{ mt: 1 }}>
+            {weeklyLocked && weekLock && (
+              <Alert severity="warning" icon={<Iconify icon="solar:lock-keyhole-bold" />}>
+                Đã khóa đăng ký tuần này (hạn: {formatLockDeadline(weekLock.lockAt)}). Bạn không thể
+                thêm/sửa/xóa đăng ký cho tuần này.
+              </Alert>
+            )}
             {weekSchedules.length === 0 ? (
               <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
                 Không có ca làm nào trong tuần này
@@ -1317,6 +1383,7 @@ export default function ShiftRegistrationView() {
             variant="contained"
             onClick={handleWeeklySubmit}
             loading={weeklyRegistering}
+            disabled={weeklyLocked}
             startIcon={<Iconify icon="solar:check-circle-bold" />}
           >
             Xác nhận đăng ký

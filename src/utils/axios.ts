@@ -56,6 +56,7 @@ export const endpoints = {
     uploadIdCard: (id: string) => `/users/${id}/id-card`,
     uploadMyIdCard: '/users/me/id-card',
     changePassword: '/users/me/change-password',
+    schedulingPriority: (id: string) => `/users/${id}/scheduling-priority`,
   },
   roles: {
     list: '/roles',
@@ -115,6 +116,11 @@ export const endpoints = {
     bulkAssign: '/shift-assignments/bulk',
     manageShift: '/shift-assignments/manage-shift',
     swap: '/shift-assignments/swap',
+    checkins: '/shift-assignments/checkins',
+    syncFromCheckin: '/shift-assignments/sync-from-checkin',
+    autoAssignApply: '/shift-assignments/auto-assign-apply',
+    history: '/shift-assignments/history',
+    undo: (id: string) => `/shift-assignments/history/${id}/undo`,
     delete: (id: string) => `/shift-assignments/${id}`,
     byStaffAndDate: (staffId: string, date: string) => `/shift-assignments/staff/${staffId}/date/${date}`,
     byStaffAndDateRange: (staffId: string) => `/shift-assignments/staff/${staffId}/range`,
@@ -256,6 +262,7 @@ export const endpoints = {
     bulkRegister: '/shift-registrations/bulk-register',
     list: '/shift-registrations/range',
     myRegistrations: '/shift-registrations/my-registrations',
+    lock: '/shift-registrations/lock',
   },
   checkinFace: {
     face: '/checkin/face',

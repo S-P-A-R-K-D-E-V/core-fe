@@ -4,6 +4,7 @@ import {
   IRegisterShiftRequest,
   IUnregisterShiftRequest,
   IBulkRegisterShiftRequest,
+  IRegistrationLock,
 } from 'src/types/corecms-api';
 
 // ======================================================================
@@ -50,5 +51,34 @@ export async function getMyShiftRegistrations(
     endpoints.shiftRegistrations.myRegistrations,
     { params: { fromDate, toDate } }
   );
+  return response.data;
+}
+
+// ======================================================================
+// Khóa đăng ký ca theo tuần
+// ======================================================================
+
+export async function getRegistrationLock(weekStart: string): Promise<IRegistrationLock> {
+  const response = await axios.get<IRegistrationLock>(endpoints.shiftRegistrations.lock, {
+    params: { weekStart },
+  });
+  return response.data;
+}
+
+export async function setRegistrationLock(
+  weekStart: string,
+  lockAt: string
+): Promise<IRegistrationLock> {
+  const response = await axios.put<IRegistrationLock>(endpoints.shiftRegistrations.lock, {
+    weekStart,
+    lockAt,
+  });
+  return response.data;
+}
+
+export async function clearRegistrationLock(weekStart: string): Promise<IRegistrationLock> {
+  const response = await axios.delete<IRegistrationLock>(endpoints.shiftRegistrations.lock, {
+    params: { weekStart },
+  });
   return response.data;
 }

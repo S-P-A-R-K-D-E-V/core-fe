@@ -14,7 +14,9 @@ import Table from '@mui/material/Table';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
+import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
 import Container from '@mui/material/Container';
 import TableBody from '@mui/material/TableBody';
@@ -66,7 +68,7 @@ import {
   TablePaginationCustom,
 } from 'src/components/table';
 
-import { IShiftSchedule, IShiftAssignment, IShiftRegistration, IStaffShiftPreferenceSummary, IUser } from 'src/types/corecms-api';
+import { IShiftSchedule, IShiftAssignment, IShiftRegistration, IStaffShiftPreferenceSummary, IUser, IRegistrationLock } from 'src/types/corecms-api';
 import { ICalendarEvent, ICalendarView, ICalendarScheduleEvent } from 'src/types/calendar';
 import {
   getShiftAssignments,
@@ -77,10 +79,21 @@ import {
   manageShiftAssignments,
   swapShiftAssignments,
   getShiftSchedulesByDateRange,
+  getShiftCheckins,
+  syncAssignmentsFromCheckin,
+  applyAutoAssign,
+  getAssignmentHistory,
+  undoAssignmentOperation,
+  IAssignmentHistoryItem,
 } from 'src/api/attendance';
-import { getShiftRegistrations } from 'src/api/shiftRegistration';
+import {
+  getShiftRegistrations,
+  getRegistrationLock,
+  setRegistrationLock,
+  clearRegistrationLock,
+} from 'src/api/shiftRegistration';
 import { getAllStaffShiftPreferences } from 'src/api/userPreference';
-import { getAllUsers } from 'src/api/users';
+import { getAllUsers, setSchedulingPriority } from 'src/api/users';
 
 
 import { StyledCalendar } from '../../calendar/styles';
@@ -116,6 +129,16 @@ const toLocalDateStr = (d: Date): string => {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
+
+// ISO (UTC) ↔ giá trị input datetime-local (giờ local của trình duyệt)
+const isoToLocalInput = (iso: string): string => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const localInputToIso = (local: string): string => new Date(local).toISOString();
 
 interface IAutoAssignSlot {
   scheduleId: string;
@@ -216,6 +239,12 @@ export default function AttendanceAssignmentsView() {
   const [initialAssignedIds, setInitialAssignedIds] = useState<string[]>([]);
   const [originalRegisteredIds, setOriginalRegisteredIds] = useState<string[]>([]);
   const [manageSaving, setManageSaving] = useState(false);
+  const [syncingFromCheckin, setSyncingFromCheckin] = useState(false);
+
+  // Lịch sử phân công + hoàn tác
+  const [assignmentHistory, setAssignmentHistory] = useState<IAssignmentHistoryItem[]>([]);
+  const [historyAnchor, setHistoryAnchor] = useState<null | HTMLElement>(null);
+  const [undoingId, setUndoingId] = useState<string | null>(null);
 
   // Swap dialog state
   const swapDialog = useBoolean();
@@ -272,6 +301,10 @@ export default function AttendanceAssignmentsView() {
   });
   const [bulkSelectedSlots, setBulkSelectedSlots] = useState<{ scheduleId: string; date: string }[]>([]);
   const [bulkAssigning, setBulkAssigning] = useState(false);
+  // Khóa đăng ký ca cho tuần đang xem trong dialog (Admin/Manager đặt mốc)
+  const [bulkLock, setBulkLock] = useState<IRegistrationLock | null>(null);
+  const [bulkLockEditAt, setBulkLockEditAt] = useState(''); // datetime-local value
+  const [bulkLockSaving, setBulkLockSaving] = useState(false);
   const [bulkWeekAssignments, setBulkWeekAssignments] = useState<IShiftAssignment[]>([]);
   const [bulkWeekRegistrations, setBulkWeekRegistrations] = useState<IShiftRegistration[]>([]);
   const [bulkOverwrite, setBulkOverwrite] = useState(false);
@@ -363,6 +396,77 @@ export default function AttendanceAssignmentsView() {
     setExclusionMap({});
     setDesignationMap({});
   }, [bulkWeekStart, bulkDialog.value]);
+
+  // Fetch mốc khóa đăng ký cho tuần đang xem
+  useEffect(() => {
+    if (!bulkDialog.value) return;
+    const weekStartStr = toLocalDateStr(bulkWeekStart);
+    getRegistrationLock(weekStartStr)
+      .then((l) => {
+        setBulkLock(l);
+        setBulkLockEditAt(isoToLocalInput(l.lockAt));
+      })
+      .catch(() => {
+        setBulkLock(null);
+        setBulkLockEditAt('');
+      });
+  }, [bulkWeekStart, bulkDialog.value]);
+
+  const handleSaveLock = async () => {
+    if (!bulkLockEditAt) return;
+    setBulkLockSaving(true);
+    try {
+      const updated = await setRegistrationLock(
+        toLocalDateStr(bulkWeekStart),
+        localInputToIso(bulkLockEditAt)
+      );
+      setBulkLock(updated);
+      setBulkLockEditAt(isoToLocalInput(updated.lockAt));
+      enqueueSnackbar('Đã lưu mốc khóa đăng ký cho tuần này', { variant: 'success' });
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Lưu mốc khóa thất bại', {
+        variant: 'error',
+      });
+    } finally {
+      setBulkLockSaving(false);
+    }
+  };
+
+  // Chỉnh nhanh ưu tiên xếp ca của nhân viên (inline trong cột nhân viên)
+  const handleAdjustPriority = async (userId: string, delta: number) => {
+    const current = users.find((u) => u.id === userId)?.schedulingPriority ?? 0;
+    const next = Math.max(0, current + delta);
+    if (next === current) return;
+    // optimistic update
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, schedulingPriority: next } : u)));
+    try {
+      await setSchedulingPriority(userId, next);
+    } catch (error: any) {
+      // revert nếu lỗi
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, schedulingPriority: current } : u))
+      );
+      enqueueSnackbar(error?.title || error?.message || 'Cập nhật ưu tiên thất bại', {
+        variant: 'error',
+      });
+    }
+  };
+
+  const handleClearLock = async () => {
+    setBulkLockSaving(true);
+    try {
+      const reverted = await clearRegistrationLock(toLocalDateStr(bulkWeekStart));
+      setBulkLock(reverted);
+      setBulkLockEditAt(isoToLocalInput(reverted.lockAt));
+      enqueueSnackbar('Đã khôi phục mốc khóa mặc định', { variant: 'success' });
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Khôi phục thất bại', {
+        variant: 'error',
+      });
+    } finally {
+      setBulkLockSaving(false);
+    }
+  };
 
   // Map: "scheduleId_date" → assigned staff names (for tooltip)
   const bulkSlotStaffMap = useMemo(() => {
@@ -642,6 +746,7 @@ export default function AttendanceAssignmentsView() {
       setExclusionMap({});
       setDesignationMap({});
       fetchAssignments();
+      refreshHistory();
     } catch (error: any) {
       console.error(error);
       const msg = error?.title || error?.message || 'Phân công thất bại!';
@@ -715,7 +820,14 @@ export default function AttendanceAssignmentsView() {
     const selectedUsers = users.filter((u) => selectedSet.has(u.id));
     // Nhân viên chỉ được xếp ca chính họ đã đăng ký → không xét ở các tier dự phòng
     const onlyRegisteredSet = new Set(bulkOnlyRegisteredIds);
-    const rankKey = (u: IUser) => `${runningCount.get(u.id) || 0}_${punctScore(u.id)}`;
+    // Tie-break trong mỗi tier: ưu tiên cao trước → ít ca trước → ít vi phạm trước.
+    // groupAndShuffle so sánh rankKey dạng chuỗi nên cần zero-pad để sắp xếp số đúng.
+    const usersById = new Map(users.map((u) => [u.id, u]));
+    const priorityOf = (id: string) => usersById.get(id)?.schedulingPriority ?? 0;
+    const rankKey = (u: IUser) =>
+      `${String(100000 - priorityOf(u.id)).padStart(6, '0')}_` +
+      `${String(runningCount.get(u.id) || 0).padStart(4, '0')}_` +
+      `${String(punctScore(u.id)).padStart(4, '0')}`;
 
     const MAX_STAFF = 2; // mỗi ca tối đa 2 người
     const result: IAutoAssignSlot[] = [];
@@ -845,45 +957,63 @@ export default function AttendanceAssignmentsView() {
     setAutoAssignSlots(slots);
   };
 
+  const refreshHistory = useCallback(async () => {
+    try {
+      setAssignmentHistory(await getAssignmentHistory(10));
+    } catch {
+      // ignore — lịch sử là phụ trợ
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshHistory();
+  }, [refreshHistory]);
+
+  const OPERATION_LABELS: Record<string, string> = {
+    BulkAssign: 'Phân công hàng loạt',
+    AutoAssign: 'Phân công tự động',
+    Overwrite: 'Ghi đè phân công',
+    SyncFromCheckin: 'Set lại từ chấm công',
+    ManageSlot: 'Sửa phân công ca',
+  };
+
+  const handleUndo = async (id: string) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Hoàn tác thao tác phân công này?')) return;
+    setUndoingId(id);
+    try {
+      const res = await undoAssignmentOperation(id);
+      const conflictMsg = res.conflicts > 0 ? ` (${res.conflicts} mục đã đổi, bỏ qua)` : '';
+      enqueueSnackbar(`Đã hoàn tác ${res.reversed} thay đổi${conflictMsg}`, {
+        variant: res.conflicts > 0 ? 'warning' : 'success',
+      });
+      setHistoryAnchor(null);
+      await fetchAssignments();
+      await refreshHistory();
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Hoàn tác thất bại!', { variant: 'error' });
+    } finally {
+      setUndoingId(null);
+    }
+  };
+
   const doAutoAssign = async () => {
     try {
       setAutoAssigning(true);
 
-      // Lookup assignmentId theo (scheduleId, date, staffId) để gỡ phân công cũ khi ghi đè
-      const assignmentIdMap = new Map<string, string>();
-      bulkWeekAssignments.forEach((a) => {
-        const dateStr = a.date.split('T')[0];
-        assignmentIdMap.set(`${a.shiftScheduleId}_${dateStr}_${a.staffId}`, a.id);
+      // Áp dụng server-side trong 1 thao tác (atomic + ghi lịch sử để hoàn tác).
+      // Mỗi slot đặt đúng tập nhân viên đề xuất; server tự tính thêm/gỡ.
+      const slots = autoAssignSlots.map((s) => ({
+        scheduleId: s.scheduleId,
+        date: s.date,
+        staffIds: s.proposedStaffIds,
+      }));
+
+      const result = await applyAutoAssign(slots);
+
+      enqueueSnackbar(`Phân công tự động: +${result.added} thêm mới, -${result.removed} gỡ bỏ`, {
+        variant: 'success',
       });
-
-      let added = 0;
-      let removed = 0;
-      for (const slot of autoAssignSlots) {
-        const proposedSet = new Set(slot.proposedStaffIds);
-        const existingSet = new Set(slot.existingStaffIds);
-
-        // Ghi đè: gỡ nhân viên đã phân công trước đó nhưng không nằm trong đề xuất mới
-        for (const staffId of slot.existingStaffIds) {
-          if (!proposedSet.has(staffId)) {
-            const aid = assignmentIdMap.get(`${slot.scheduleId}_${slot.date}_${staffId}`);
-            if (aid) {
-              // eslint-disable-next-line no-await-in-loop
-              await deleteShiftAssignment(aid);
-              removed += 1;
-            }
-          }
-        }
-
-        // Thêm nhân viên mới chưa có trong ca
-        for (const staffId of slot.proposedStaffIds) {
-          if (!existingSet.has(staffId)) {
-            // eslint-disable-next-line no-await-in-loop
-            await createShiftAssignment({ staffId, shiftScheduleId: slot.scheduleId, date: slot.date });
-            added += 1;
-          }
-        }
-      }
-      enqueueSnackbar(`Phân công tự động: +${added} thêm mới, -${removed} gỡ bỏ`, { variant: 'success' });
       autoAssignDialog.onFalse();
       bulkDialog.onFalse();
       setBulkSelectedSlots([]);
@@ -893,6 +1023,7 @@ export default function AttendanceAssignmentsView() {
       setExclusionMap({});
       setDesignationMap({});
       fetchAssignments();
+      refreshHistory();
     } catch (error: any) {
       enqueueSnackbar(error?.title || error?.message || 'Phân công thất bại!', { variant: 'error' });
     } finally {
@@ -1130,6 +1261,7 @@ export default function AttendanceAssignmentsView() {
           variant: 'success',
         });
         await fetchAssignments();
+        refreshHistory();
       }
       manageDialog.onFalse();
     } catch (error: any) {
@@ -1138,6 +1270,53 @@ export default function AttendanceAssignmentsView() {
       enqueueSnackbar(msg, { variant: 'error' });
     } finally {
       setManageSaving(false);
+    }
+  };
+
+  // Set lại phân công ca = đúng tập nhân viên đã check-in (khôi phục khi lỡ ghi đè)
+  const handleSyncFromCheckin = async () => {
+    if (!managingEvent) return;
+    setSyncingFromCheckin(true);
+    try {
+      const checkins = await getShiftCheckins(managingEvent.scheduleId, managingEvent.date);
+      const checkinIds = checkins.map((c) => c.staffId);
+      const checkinSet = new Set(checkinIds);
+      const assignedSet = new Set(dndAssigned);
+      const toAdd = checkinIds.filter((id) => !assignedSet.has(id));
+      const toRemove = dndAssigned.filter((id) => !checkinSet.has(id));
+
+      if (toAdd.length === 0 && toRemove.length === 0) {
+        enqueueSnackbar('Phân công đã khớp với dữ liệu chấm công, không có thay đổi.', {
+          variant: 'info',
+        });
+        setSyncingFromCheckin(false);
+        return;
+      }
+
+      // eslint-disable-next-line no-alert
+      const ok = window.confirm(
+        `Đồng bộ phân công theo chấm công:\n+ Thêm ${toAdd.length} người đã check-in\n- Gỡ ${toRemove.length} người không check-in\n\nÁp dụng?`
+      );
+      if (!ok) {
+        setSyncingFromCheckin(false);
+        return;
+      }
+
+      const result = await syncAssignmentsFromCheckin(managingEvent.scheduleId, managingEvent.date);
+      setDndAssigned(checkinIds);
+      enqueueSnackbar(`Đã đồng bộ từ chấm công! (+${result.added} / -${result.removed})`, {
+        variant: 'success',
+      });
+      await fetchAssignments();
+      refreshHistory();
+      manageDialog.onFalse();
+    } catch (error: any) {
+      console.error(error);
+      enqueueSnackbar(error?.title || error?.message || 'Đồng bộ từ chấm công thất bại!', {
+        variant: 'error',
+      });
+    } finally {
+      setSyncingFromCheckin(false);
     }
   };
 
@@ -1282,6 +1461,18 @@ export default function AttendanceAssignmentsView() {
             <Stack direction="row" spacing={1}>
               <Button
                 variant="outlined"
+                color="warning"
+                disabled={assignmentHistory.length === 0}
+                startIcon={<Iconify icon="solar:undo-left-round-bold" />}
+                onClick={(e) => {
+                  setHistoryAnchor(e.currentTarget);
+                  refreshHistory();
+                }}
+              >
+                Hoàn tác
+              </Button>
+              <Button
+                variant="outlined"
                 startIcon={<Iconify icon="solar:calendar-add-bold-duotone" />}
                 onClick={() => {
                   setAssignMode('bulk');
@@ -1304,6 +1495,49 @@ export default function AttendanceAssignmentsView() {
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
+
+        {/* Lịch sử thao tác phân công — hoàn tác */}
+        <Menu
+          anchorEl={historyAnchor}
+          open={Boolean(historyAnchor)}
+          onClose={() => setHistoryAnchor(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          slotProps={{ paper: { sx: { minWidth: 320, maxWidth: 380 } } }}
+        >
+          <Typography variant="subtitle2" sx={{ px: 2, py: 1 }}>
+            Thao tác gần đây
+          </Typography>
+          <Divider />
+          {assignmentHistory.length === 0 ? (
+            <MenuItem disabled>Chưa có thao tác nào để hoàn tác</MenuItem>
+          ) : (
+            assignmentHistory.map((h) => (
+              <MenuItem
+                key={h.id}
+                onClick={() => handleUndo(h.id)}
+                disabled={undoingId !== null}
+                sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1 }}
+              >
+                <Iconify icon="solar:undo-left-round-bold" width={18} sx={{ color: 'warning.main' }} />
+                <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                  <Typography variant="body2" noWrap>
+                    {OPERATION_LABELS[h.operationType] || h.operationType}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    +{h.addedCount} / -{h.removedCount} ·{' '}
+                    {new Date(h.performedAt).toLocaleString('vi-VN', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      day: '2-digit',
+                      month: '2-digit',
+                    })}
+                  </Typography>
+                </Box>
+              </MenuItem>
+            ))
+          )}
+        </Menu>
 
         {/* Filters */}
         <Card sx={{ mb: 3, p: 2.5 }}>
@@ -1618,6 +1852,53 @@ export default function AttendanceAssignmentsView() {
               </IconButton>
             )}
           </Stack>
+
+          {/* Khóa đăng ký ca cho tuần đang xem */}
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            spacing={1}
+            sx={{ mt: 1, p: 1, borderRadius: 1, bgcolor: 'background.neutral' }}
+          >
+            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0 }}>
+              <Iconify icon="solar:lock-keyhole-bold" width={18} />
+              <Typography variant="caption" fontWeight={600}>
+                Khóa đăng ký tuần
+              </Typography>
+            </Stack>
+            <TextField
+              type="datetime-local"
+              size="small"
+              value={bulkLockEditAt}
+              onChange={(e) => setBulkLockEditAt(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ flexGrow: 1, minWidth: 200 }}
+            />
+            {bulkLock && (
+              <Chip
+                size="small"
+                color={bulkLock.isLocked ? 'error' : 'default'}
+                variant="outlined"
+                label={bulkLock.isDefault ? 'Mặc định' : 'Tùy chỉnh'}
+              />
+            )}
+            <LoadingButton
+              size="small"
+              variant="contained"
+              loading={bulkLockSaving}
+              onClick={handleSaveLock}
+            >
+              Lưu
+            </LoadingButton>
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={bulkLockSaving || !!bulkLock?.isDefault}
+              onClick={handleClearLock}
+            >
+              Khôi phục mặc định
+            </Button>
+          </Stack>
           {!smUp && (
             <Tabs
               value={bulkTab}
@@ -1685,6 +1966,39 @@ export default function AttendanceAssignmentsView() {
                             <Typography variant="body2" noWrap sx={{ flexGrow: 1 }}>
                               {user.fullName}
                             </Typography>
+                            <Tooltip title="Ưu tiên xếp ca (cao hơn = chọn trước). Bấm +/- để chỉnh." arrow>
+                              <Stack direction="row" alignItems="center" sx={{ flexShrink: 0 }}>
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleAdjustPriority(user.id, -1);
+                                  }}
+                                  sx={{ p: 0.125 }}
+                                >
+                                  <Iconify icon="solar:minus-circle-linear" width={14} />
+                                </IconButton>
+                                <Chip
+                                  size="small"
+                                  label={`⭐ ${user.schedulingPriority ?? 0}`}
+                                  variant="soft"
+                                  color={(user.schedulingPriority ?? 0) > 0 ? 'warning' : 'default'}
+                                  sx={{ height: 18, fontSize: 10, '& .MuiChip-label': { px: 0.5 } }}
+                                />
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleAdjustPriority(user.id, 1);
+                                  }}
+                                  sx={{ p: 0.125 }}
+                                >
+                                  <Iconify icon="solar:add-circle-linear" width={14} />
+                                </IconButton>
+                              </Stack>
+                            </Tooltip>
                             {regCount > 0 && (
                               <Tooltip title={`Đã đăng ký ${regCount} ca trong tuần này`} arrow>
                                 <Chip
@@ -3155,6 +3469,18 @@ export default function AttendanceAssignmentsView() {
             </DialogContent>
 
             <DialogActions sx={{ px: 3, py: 2 }}>
+              <Tooltip title="Đặt phân công ca này = đúng tập nhân viên đã check-in (khôi phục khi lỡ ghi đè)">
+                <LoadingButton
+                  color="warning"
+                  variant="outlined"
+                  startIcon={<Iconify icon="solar:refresh-bold" />}
+                  onClick={handleSyncFromCheckin}
+                  loading={syncingFromCheckin}
+                >
+                  Set lại từ chấm công
+                </LoadingButton>
+              </Tooltip>
+              <Box sx={{ flexGrow: 1 }} />
               <Button variant="outlined" onClick={manageDialog.onFalse}>
                 Hủy
               </Button>

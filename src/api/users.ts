@@ -26,6 +26,10 @@ export async function updateUser(id: string, data: IUpdateUserRequest): Promise<
   await axios.put(endpoints.users.update(id), data);
 }
 
+export async function setSchedulingPriority(id: string, priority: number): Promise<void> {
+  await axios.put(endpoints.users.schedulingPriority(id), { priority });
+}
+
 export async function deleteUser(id: string): Promise<void> {
   await axios.delete(endpoints.users.delete(id));
 }
