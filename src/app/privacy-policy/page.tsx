@@ -19,6 +19,10 @@ const SECTIONS = [
       '• Thông tin thiết bị: địa chỉ IP, loại trình duyệt, hệ điều hành, thông tin phiên đăng nhập.',
       '• Thông tin sử dụng: lịch sử hoạt động trong ứng dụng, nhật ký truy cập.',
       '• Dữ liệu nghiệp vụ: thông tin ca làm việc, chấm công, bảng lương và các dữ liệu liên quan mà bạn nhập vào hệ thống.',
+      '• Vị trí (GPS): khi bạn chấm công (check-in/check-out) trên ứng dụng di động, chúng tôi thu thập vị trí hiện tại để xác minh bạn đang ở đúng địa điểm làm việc.',
+      '• Ảnh khuôn mặt: khi chấm công, ứng dụng di động sử dụng camera để chụp ảnh xác thực khuôn mặt, dùng để đối chiếu danh tính người chấm công.',
+      '• Ảnh đại diện: nếu bạn chọn cập nhật ảnh đại diện, ứng dụng cần quyền truy cập thư viện ảnh trên thiết bị.',
+      '• Face ID: ứng dụng di động có thể dùng Face ID để đăng nhập nhanh hơn. Dữ liệu sinh trắc học Face ID được xử lý hoàn toàn cục bộ trên thiết bị (Secure Enclave của Apple) — chúng tôi không thu thập, không truyền và không lưu trữ dữ liệu sinh trắc học này trên server.',
     ],
   },
   {
@@ -26,6 +30,7 @@ const SECTIONS = [
     content: [
       'Chúng tôi sử dụng thông tin thu thập được để:',
       '• Cung cấp, vận hành và cải thiện các tính năng của ứng dụng.',
+      '• Xác minh vị trí và đối chiếu ảnh khuôn mặt khi chấm công để đảm bảo tính chính xác, chống gian lận chấm công.',
       '• Xác thực danh tính và bảo mật tài khoản người dùng.',
       '• Gửi thông báo liên quan đến hoạt động tài khoản và cập nhật dịch vụ.',
       '• Hỗ trợ kỹ thuật và giải quyết các sự cố phát sinh.',
@@ -65,6 +70,7 @@ const SECTIONS = [
     title: '6. Lưu trữ và xóa dữ liệu',
     content: [
       '• Dữ liệu tài khoản được lưu trữ trong suốt thời gian tài khoản còn hoạt động.',
+      '• Ảnh xác thực khuôn mặt và vị trí chấm công được lưu trữ phục vụ đối soát công và giải quyết tranh chấp chấm công, gắn liền với thời gian lưu trữ dữ liệu chấm công/bảng lương liên quan.',
       '• Khi bạn yêu cầu xóa tài khoản, dữ liệu cá nhân sẽ được xóa hoặc ẩn danh hóa trong vòng 30 ngày.',
       '• Một số dữ liệu nhật ký có thể được giữ lại tối đa 90 ngày vì lý do bảo mật và kiểm toán.',
     ],
@@ -116,7 +122,7 @@ export default function PrivacyPolicyPage() {
             Chính sách quyền riêng tư
           </Typography>
           <Typography variant="body1" sx={{ color: 'text.secondary' }}>
-            Cập nhật lần cuối: 19 tháng 5, 2026
+            Cập nhật lần cuối: 24 tháng 6, 2026
           </Typography>
         </Box>
 
