@@ -8,8 +8,9 @@ import Typography from '@mui/material/Typography';
 
 import Iconify from 'src/components/iconify';
 import { fTimeShort } from 'src/utils/format-time';
+import { getStorageUrl } from 'src/utils/storage';
 
-import type { DirectMessage, InternalUser } from 'src/api/messenger';
+import type { DirectMessage, InternalUser, MessageAttachment } from 'src/api/messenger';
 
 // ----------------------------------------------------------------------
 
@@ -22,6 +23,61 @@ function colorFor(userId: string) {
   let h = 0;
   for (let i = 0; i < userId.length; i++) h = (h * 31 + userId.charCodeAt(i)) & 0xffffffff;
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function AttachmentItem({ att, mine }: { att: MessageAttachment; mine: boolean }) {
+  const url = getStorageUrl(att.objectKey);
+  if (att.kind === 'image') {
+    return (
+      <Box
+        component="a"
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        sx={{ display: 'block', mt: 0.5 }}
+      >
+        <Box
+          component="img"
+          src={url}
+          alt={att.fileName}
+          loading="lazy"
+          sx={{ maxWidth: 200, maxHeight: 200, borderRadius: 1, display: 'block', objectFit: 'cover' }}
+        />
+      </Box>
+    );
+  }
+  return (
+    <Stack
+      component="a"
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      direction="row"
+      alignItems="center"
+      spacing={1}
+      sx={{
+        mt: 0.5,
+        p: 1,
+        borderRadius: 1,
+        textDecoration: 'none',
+        color: 'inherit',
+        bgcolor: mine ? 'rgba(255,255,255,0.18)' : 'action.hover',
+        maxWidth: 220,
+      }}
+    >
+      <Iconify icon="solar:document-bold" width={24} />
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="caption" noWrap sx={{ display: 'block', fontWeight: 600 }}>{att.fileName}</Typography>
+        <Typography variant="caption" sx={{ opacity: 0.7, fontSize: 10 }}>{formatSize(att.sizeBytes)}</Typography>
+      </Box>
+    </Stack>
+  );
 }
 
 // ----------------------------------------------------------------------
@@ -85,9 +141,14 @@ export default function MessageBubble({ message, mine, senderUser, showName, com
             whiteSpace: 'pre-wrap',
           }}
         >
-          <Typography variant={compact ? 'caption' : 'body2'}>
-            {message.isDeleted ? <em style={{ opacity: 0.6 }}>Tin nhắn đã bị xoá</em> : message.content}
-          </Typography>
+          {message.content ? (
+            <Typography variant={compact ? 'caption' : 'body2'}>
+              {message.isDeleted ? <em style={{ opacity: 0.6 }}>Tin nhắn đã bị xoá</em> : message.content}
+            </Typography>
+          ) : null}
+          {(message.attachments ?? []).map((att, i) => (
+            <AttachmentItem key={att.objectKey + i} att={att} mine={mine} />
+          ))}
         </Box>
 
         {/* Timestamp + Seen */}

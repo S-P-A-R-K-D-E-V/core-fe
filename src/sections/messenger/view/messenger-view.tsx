@@ -24,12 +24,14 @@ import { useSettingsContext } from 'src/components/settings';
 import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
 
-import { sendMessage as apiSendMessage } from 'src/api/messenger';
+import { sendMessage as apiSendMessage, sendAttachment } from 'src/api/messenger';
 import { useMessengerStore } from 'src/store/messenger-store';
 import { useMessengerCtx } from 'src/components/messenger/messenger-provider';
 import MessageBubble from 'src/components/messenger/message-bubble';
 
 import NewConversationDialog from '../new-conversation-dialog';
+
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB — đồng bộ giới hạn BE
 
 // ----------------------------------------------------------------------
 
@@ -58,8 +60,10 @@ export default function MessengerView() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Selectors must return stable store references — never create new arrays inside them.
   // The ?? [] fallback is applied in render body to avoid useSyncExternalStore tearing loops.
@@ -132,6 +136,27 @@ export default function MessengerView() {
       setDraft(text);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (!activeId || files.length === 0) return;
+    if (files.some((f) => f.size > MAX_ATTACHMENT_BYTES)) {
+      // eslint-disable-next-line no-alert
+      alert('Mỗi tệp không được vượt quá 10MB.');
+      return;
+    }
+    setUploading(true);
+    try {
+      await sendAttachment(activeId, files, draft.trim() || undefined);
+      setDraft('');
+    } catch {
+      // eslint-disable-next-line no-alert
+      alert('Gửi tệp thất bại. Vui lòng thử lại.');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -281,6 +306,19 @@ export default function MessengerView() {
               {/* Input */}
               <Box component="form" onSubmit={handleSend} sx={{ p: 1.5 }}>
                 <Stack direction="row" spacing={1} alignItems="flex-end">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    hidden
+                    multiple
+                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv"
+                    onChange={handleFiles}
+                  />
+                  <Tooltip title="Đính kèm ảnh/tệp (≤10MB)">
+                    <IconButton disabled={uploading || sending} onClick={() => fileInputRef.current?.click()}>
+                      <Iconify icon={uploading ? 'eos-icons:loading' : 'eva:attach-2-fill'} />
+                    </IconButton>
+                  </Tooltip>
                   <TextField
                     fullWidth
                     size="small"

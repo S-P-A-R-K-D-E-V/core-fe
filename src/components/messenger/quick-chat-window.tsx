@@ -18,10 +18,12 @@ import Typography from '@mui/material/Typography';
 import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
 
-import { sendMessage as apiSendMessage } from 'src/api/messenger';
+import { sendMessage as apiSendMessage, sendAttachment } from 'src/api/messenger';
 import { useMessengerStore } from 'src/store/messenger-store';
 import { useMessengerCtx } from './messenger-provider';
 import MessageBubble from './message-bubble';
+
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB — đồng bộ giới hạn BE
 
 // ----------------------------------------------------------------------
 
@@ -35,7 +37,9 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
   const [minimized, setMinimized] = useState(false);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const { openConversation, sendTyping } = useMessengerCtx();
 
@@ -88,6 +92,27 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
       setDraft(text);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ''; // cho phép chọn lại cùng tệp
+    if (files.length === 0) return;
+    if (files.some((f) => f.size > MAX_ATTACHMENT_BYTES)) {
+      // eslint-disable-next-line no-alert
+      alert('Mỗi tệp không được vượt quá 10MB.');
+      return;
+    }
+    setUploading(true);
+    try {
+      await sendAttachment(convId, files, draft.trim() || undefined);
+      setDraft('');
+    } catch {
+      // eslint-disable-next-line no-alert
+      alert('Gửi tệp thất bại. Vui lòng thử lại.');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -158,7 +183,18 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
           </Tooltip>
 
           <Stack sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="subtitle2" noWrap>
+            <Typography
+              variant="subtitle2"
+              title={title}
+              sx={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                lineHeight: 1.2,
+                wordBreak: 'break-word',
+              }}
+            >
               {title}
             </Typography>
             {conv?.type !== 'Group' && (
@@ -205,7 +241,22 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
           <Divider />
 
           {/* Input */}
-          <Box component="form" onSubmit={handleSend} sx={{ display: 'flex', p: 1, gap: 0.5 }}>
+          <Box component="form" onSubmit={handleSend} sx={{ display: 'flex', alignItems: 'center', p: 1, gap: 0.5 }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              hidden
+              multiple
+              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv"
+              onChange={handleFiles}
+            />
+            <IconButton
+              size="small"
+              disabled={uploading || sending}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Iconify icon={uploading ? 'eos-icons:loading' : 'eva:attach-2-fill'} width={20} />
+            </IconButton>
             <TextField
               fullWidth
               size="small"
