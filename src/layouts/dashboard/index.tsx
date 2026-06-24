@@ -19,7 +19,7 @@ import { useShiftNotificationAlert } from 'src/hooks/use-shift-notification-aler
 
 import Iconify from 'src/components/iconify';
 import { useSettingsContext } from 'src/components/settings';
-import { ChatbotWidget } from 'src/components/chatbot';
+// import { ChatbotWidget } from 'src/components/chatbot'; // tạm ẩn tính năng chat AI nội bộ
 import MessengerProvider from 'src/components/messenger/messenger-provider';
 import ProfileCompletionDialog from 'src/components/profile-completion';
 import ShiftPreferencePromptDialog from 'src/components/shift-preference-prompt/ShiftPreferencePromptDialog';
@@ -138,7 +138,7 @@ export default function DashboardLayout({ children }: Props) {
           {lgUp ? renderHorizontal : renderNavVertical}
           <Main sx={mobileNavSx}>{children}</Main>
           {isMobileView && <NavBottom onOpenMenu={nav.onTrue} />}
-          <ChatbotWidget />
+          {/* <ChatbotWidget /> — tạm ẩn tính năng chat AI nội bộ */}
           {renderMobilePrompt}
           <ProfileCompletionDialog />
           <ShiftPreferencePromptDialog
@@ -167,7 +167,7 @@ export default function DashboardLayout({ children }: Props) {
             <Main sx={mobileNavSx}>{children}</Main>
           </Box>
           {isMobileView && <NavBottom onOpenMenu={nav.onTrue} />}
-          <ChatbotWidget />
+          {/* <ChatbotWidget /> — tạm ẩn tính năng chat AI nội bộ */}
           {renderMobilePrompt}
           <ProfileCompletionDialog />
           <ShiftPreferencePromptDialog
@@ -195,7 +195,7 @@ export default function DashboardLayout({ children }: Props) {
           <Main sx={mobileNavSx}>{children}</Main>
         </Box>
         {isMobileView && <NavBottom onOpenMenu={nav.onTrue} />}
-        <ChatbotWidget />
+        {/* <ChatbotWidget /> — tạm ẩn tính năng chat AI nội bộ */}
         {renderMobilePrompt}
         <ProfileCompletionDialog />
         <ShiftPreferencePromptDialog
