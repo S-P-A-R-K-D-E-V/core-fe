@@ -849,6 +849,13 @@ export default function AttendanceAssignmentsView() {
     // và chỉ tăng theo các đề xuất mới → phân bổ số ca đều cho nhân viên đã chọn.
     const runningCount = new Map<string, number>();
 
+    // Rule: 1 nhân viên làm tối đa 2 ca/ngày (cap cứng). Đếm theo `${staffId}_${date}`,
+    // chỉ cộng dồn theo các đề xuất mới (overwrite cả tuần nên không cần seed từ ca cũ).
+    // Người được CHỈ ĐỊNH (Tier 0) vẫn được xếp vượt cap, nhưng vẫn TÍNH vào count
+    // để chặn các tier dự phòng / ca khác trong cùng ngày.
+    const MAX_SHIFTS_PER_DAY = 2;
+    const dailyCount = new Map<string, number>();
+
     const punctScore = (id: string) => {
       const p = punctMap.get(id);
       return p ? p.lateCount + p.earlyLeaveCount : 0;
@@ -884,14 +891,18 @@ export default function AttendanceAssignmentsView() {
       // Nhân viên được CHỈ ĐỊNH cho ca này — luôn xếp, không bị ảnh hưởng bởi rule chọn
       const designatedIds = designationMap[slotKey] || [];
 
+      // Đã đạt trần 2 ca/ngày thì không xếp thêm (cap cứng) — riêng Tier 0 chỉ định bỏ qua check này.
+      const atDailyCap = (id: string) =>
+        (dailyCount.get(`${id}_${slot.date}`) || 0) >= MAX_SHIFTS_PER_DAY;
+
       // Ghi đè: bỏ qua phân công cũ, chọn lại tối đa 2 người từ nhân viên đã tích chọn.
       const chosen: string[] = [];
       const taken = new Set<string>();
       const pick = (ids: string[]) => {
         for (const id of ids) {
           if (chosen.length >= MAX_STAFF) break;
-          // Bỏ qua nhân viên bị ngoại trừ khỏi ca này
-          if (!taken.has(id) && !excludedSet.has(id)) {
+          // Bỏ qua nhân viên bị ngoại trừ khỏi ca này hoặc đã đủ 2 ca trong ngày
+          if (!taken.has(id) && !excludedSet.has(id) && !atDailyCap(id)) {
             chosen.push(id);
             taken.add(id);
           }
@@ -925,8 +936,13 @@ export default function AttendanceAssignmentsView() {
         pick(groupAndShuffle(tier3Pool, rankKey, seed + slot.scheduleId.length).map((u) => u.id));
       }
 
-      // Tăng running count cho các ca sau
-      chosen.forEach((id) => runningCount.set(id, (runningCount.get(id) || 0) + 1));
+      // Tăng running count (cân bằng tuần) và daily count (trần 2 ca/ngày) cho các ca sau.
+      // Người chỉ định cũng cộng dailyCount để chặn các tier khác trong cùng ngày.
+      chosen.forEach((id) => {
+        runningCount.set(id, (runningCount.get(id) || 0) + 1);
+        const dk = `${id}_${slot.date}`;
+        dailyCount.set(dk, (dailyCount.get(dk) || 0) + 1);
+      });
 
       result.push({
         scheduleId: slot.scheduleId,
