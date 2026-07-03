@@ -11,8 +11,10 @@ import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
 import CircularProgress from '@mui/material/CircularProgress';
 import LoadingButton from '@mui/lab/LoadingButton';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 
 import { paths } from 'src/routes/paths';
+import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 import { RoleBasedGuard } from 'src/auth/guard';
 import { useSettingsContext } from 'src/components/settings';
@@ -40,6 +42,10 @@ export default function KiotVietSyncView() {
 
   const [syncLoading, setSyncLoading] = useState(false);
   const [transformLoading, setTransformLoading] = useState(false);
+
+  // Khoảng thời gian lấy dữ liệu giao dịch (Order/Return/SalesOrder). Mặc định 01/01/2026 → hiện tại.
+  const [fromDate, setFromDate] = useState('2026-01-01');
+  const [toDate, setToDate] = useState('');
 
   const [syncJob, setSyncJob] = useState<ISyncJobStatus | null>(null);
   const [transformJob, setTransformJob] = useState<ISyncJobStatus | null>(null);
@@ -101,10 +107,17 @@ export default function KiotVietSyncView() {
   }, []);
 
   const handleSync = useCallback(async () => {
+    if (fromDate && toDate && fromDate > toDate) {
+      enqueueSnackbar('"Từ ngày" không được lớn hơn "Đến ngày"', { variant: 'warning' });
+      return;
+    }
     setSyncLoading(true);
     setSyncJob(null);
     try {
-      const jobId = await startSync('all');
+      const jobId = await startSync('all', {
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+      });
       if (jobId) {
         enqueueSnackbar('Đã bắt đầu đồng bộ KiotViet', { variant: 'info' });
       }
@@ -119,7 +132,7 @@ export default function KiotVietSyncView() {
     } finally {
       setSyncLoading(false);
     }
-  }, [startSync, enqueueSnackbar]);
+  }, [startSync, enqueueSnackbar, fromDate, toDate]);
 
   const handleTransform = useCallback(async () => {
     setTransformLoading(true);
@@ -156,7 +169,13 @@ export default function KiotVietSyncView() {
 
     const completedSteps = job.steps?.filter((s) => !s.isRunning && s.error === null).length || 0;
     const totalSteps = job.steps?.length || 0;
-    const progress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+    const runningStep = job.steps?.find((s) => s.isRunning);
+    // Tiến trình tổng: số bước xong + % của bước đang chạy (mượt hơn so với chỉ đếm bước).
+    const overallProgress =
+      totalSteps > 0
+        ? ((completedSteps + (runningStep ? (runningStep.percent || 0) / 100 : 0)) / totalSteps) * 100
+        : 0;
+    const currentMessage = runningStep?.message ?? job.steps?.[totalSteps - 1]?.message ?? null;
 
     return (
       <Box sx={{ mt: 2 }}>
@@ -165,39 +184,65 @@ export default function KiotVietSyncView() {
           {job.status === 'Running' && totalSteps > 0 && ` (${completedSteps}/${totalSteps} bước)`}
         </Alert>
 
-        {job.status === 'Running' && <LinearProgress variant="determinate" value={progress} sx={{ mb: 1 }} />}
+        {job.status === 'Running' && (
+          <>
+            <LinearProgress
+              variant="determinate"
+              value={overallProgress}
+              sx={{ mb: 0.5 }}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              {currentMessage || 'Đang khởi tạo...'}
+            </Typography>
+          </>
+        )}
 
         {job.steps && job.steps.length > 0 && (
-          <Box sx={{ mt: 1, maxHeight: 300, overflow: 'auto' }}>
+          <Box sx={{ mt: 1, maxHeight: 340, overflow: 'auto' }}>
             {job.steps.map((step, index) => (
-              <Stack
-                key={index}
-                direction="row"
-                alignItems="center"
-                spacing={1}
-                sx={{ py: 0.5, px: 1, fontSize: 13 }}
-              >
-                {step.isRunning ? (
-                  <CircularProgress size={16} color="info" />
-                ) : (
-                  <Iconify
-                    icon={step.error === null ? 'eva:checkmark-circle-2-fill' : 'eva:close-circle-fill'}
-                    sx={{ color: step.error === null ? 'success.main' : 'error.main', width: 18 }}
+              <Box key={index} sx={{ py: 0.5, px: 1 }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ fontSize: 13 }}>
+                  {step.isRunning ? (
+                    <CircularProgress size={16} color="info" />
+                  ) : (
+                    <Iconify
+                      icon={step.error === null ? 'eva:checkmark-circle-2-fill' : 'eva:close-circle-fill'}
+                      sx={{ color: step.error === null ? 'success.main' : 'error.main', width: 18 }}
+                    />
+                  )}
+                  <Typography variant="body2" sx={{ flexGrow: 1 }}>
+                    {step.entity}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {step.isRunning
+                      ? step.totalKnown > 0
+                        ? `${step.processed}/${step.totalKnown} (${step.percent}%)`
+                        : '...'
+                      : step.error
+                        ? 'Lỗi'
+                        : `+${step.created} ~${step.updated}${step.skipped > 0 ? ` (bỏ qua ${step.skipped})` : ''}${step.totalKnown > 0 ? ` / ${step.totalKnown}` : ''}`}
+                  </Typography>
+                </Stack>
+
+                {/* Thanh % + message của bước đang chạy */}
+                {step.isRunning && step.totalKnown > 0 && (
+                  <LinearProgress
+                    variant="determinate"
+                    value={step.percent}
+                    sx={{ mt: 0.5, ml: 3.25, height: 4, borderRadius: 1 }}
                   />
                 )}
-                <Typography variant="body2" sx={{ flexGrow: 1 }}>
-                  {step.entity}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {step.isRunning
-                    ? step.totalKnown > 0
-                      ? `${step.totalKnown} bản ghi...`
-                      : '...'
-                    : step.error
-                      ? step.error
-                      : `+${step.created} ~${step.updated}${step.totalKnown > 0 ? ` / ${step.totalKnown}` : ''}`}
-                </Typography>
-              </Stack>
+                {step.isRunning && step.message && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 3.25 }}>
+                    {step.message}
+                  </Typography>
+                )}
+                {!step.isRunning && step.error && (
+                  <Typography variant="caption" color="error.main" sx={{ display: 'block', ml: 3.25 }}>
+                    {step.error}
+                  </Typography>
+                )}
+              </Box>
             ))}
           </Box>
         )}
@@ -233,6 +278,42 @@ export default function KiotVietSyncView() {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Bao gồm: Chi nhánh, Danh mục, Nhóm KH, Nhà cung cấp, Khách hàng, Tài khoản NH,
               Kênh bán hàng, Sản phẩm, Bảng giá, Đơn hàng, Trả hàng, Voucher...
+            </Typography>
+
+            {/* Khoảng thời gian — chỉ áp dụng cho Đơn đặt hàng, Trả hàng, Hóa đơn */}
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={2}
+              alignItems={{ sm: 'center' }}
+              sx={{ mb: 1 }}
+            >
+              <DatePicker
+                label="Từ ngày"
+                value={parseDateStr(fromDate)}
+                onChange={(val) => setFromDate(toDateStr(val))}
+                format="dd/MM/yyyy"
+                disabled={syncJob?.status === 'Running'}
+                slotProps={{ textField: { size: 'small', sx: { width: { xs: 1, sm: 180 } } } }}
+              />
+              <DatePicker
+                label="Đến ngày"
+                value={parseDateStr(toDate)}
+                onChange={(val) => setToDate(toDateStr(val))}
+                format="dd/MM/yyyy"
+                disabled={syncJob?.status === 'Running'}
+                slotProps={{
+                  textField: {
+                    size: 'small',
+                    placeholder: 'Hiện tại',
+                    sx: { width: { xs: 1, sm: 180 } },
+                  },
+                }}
+              />
+            </Stack>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+              Khoảng thời gian chỉ áp dụng cho <strong>Đơn đặt hàng, Trả hàng, Hóa đơn</strong>. Bỏ
+              trống → mặc định từ 01/01/2026 đến hiện tại. Dữ liệu danh mục (sản phẩm, khách hàng, nhà
+              cung cấp...) luôn lấy đầy đủ lịch sử.
             </Typography>
 
             <LoadingButton

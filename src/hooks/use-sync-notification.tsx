@@ -28,6 +28,15 @@ type SyncNotification = {
   isUnRead: boolean;
 };
 
+/**
+ * Khoảng thời gian lấy dữ liệu giao dịch (Order/Return/SalesOrder). Định dạng 'yyyy-MM-dd'.
+ * Chỉ áp dụng cho type 'all' và 'invoices'; master data luôn lấy đầy đủ lịch sử.
+ */
+export type SyncDateRange = {
+  fromDate?: string;
+  toDate?: string;
+};
+
 type SyncNotificationContextType = {
   // Persistent notifications (from DB)
   dbNotifications: INotification[];
@@ -40,7 +49,10 @@ type SyncNotificationContextType = {
   // Sync notifications (ephemeral/real-time)
   notifications: SyncNotification[];
   totalUnRead: number;
-  startSync: (type?: 'all' | 'invoices' | 'purchase-orders' | 'transform' | 'sync-and-transform') => Promise<string | null>;
+  startSync: (
+    type?: 'all' | 'invoices' | 'purchase-orders' | 'transform' | 'sync-and-transform',
+    options?: SyncDateRange
+  ) => Promise<string | null>;
   markAllAsRead: () => void;
   removeNotification: (id: string) => void;
   // Real-time job status via SignalR
@@ -247,10 +259,19 @@ export function SyncNotificationProvider({ children }: Props) {
           let message = '';
 
           if (status.status === 'Running') {
-            const lastStep = status.steps?.[completedSteps - 1];
-            message = lastStep
-              ? `Đang xử lý: ${lastStep.entity} (${completedSteps} bước hoàn thành)`
-              : 'Đang khởi tạo...';
+            // Ưu tiên bước đang chạy (kèm % + message chi tiết từ BE); fallback bước cuối.
+            const running = status.steps?.find((s) => s.isRunning);
+            const current = running ?? status.steps?.[completedSteps - 1];
+            if (current?.message) {
+              message =
+                running && running.percent > 0
+                  ? `${current.message} (${running.percent}%)`
+                  : current.message;
+            } else if (current) {
+              message = `Đang xử lý: ${current.entity}`;
+            } else {
+              message = 'Đang khởi tạo...';
+            }
           } else if (status.status === 'Completed') {
             message = `Hoàn thành ${completedSteps} bước đồng bộ`;
           } else if (status.status === 'Failed') {
@@ -307,9 +328,22 @@ export function SyncNotificationProvider({ children }: Props) {
   }, []);
 
   const startSync = useCallback(
-    async (type: 'all' | 'invoices' | 'purchase-orders' | 'transform' | 'sync-and-transform' = 'all'): Promise<string | null> => {
+    async (
+      type: 'all' | 'invoices' | 'purchase-orders' | 'transform' | 'sync-and-transform' = 'all',
+      options?: SyncDateRange
+    ): Promise<string | null> => {
       const endpoint = getSyncEndpoint(type);
-      const { data } = await axios.post<ISyncJobResponse>(endpoint);
+
+      // Khoảng thời gian chỉ áp dụng cho các job có lấy dữ liệu giao dịch.
+      const params = new URLSearchParams();
+      if ((type === 'all' || type === 'invoices' || type === 'sync-and-transform') && options) {
+        if (options.fromDate) params.set('fromDate', options.fromDate);
+        if (options.toDate) params.set('toDate', options.toDate);
+      }
+      const qs = params.toString();
+      const url = qs ? `${endpoint}?${qs}` : endpoint;
+
+      const { data } = await axios.post<ISyncJobResponse>(url);
       const { jobId } = data;
 
       const notification: SyncNotification = {
