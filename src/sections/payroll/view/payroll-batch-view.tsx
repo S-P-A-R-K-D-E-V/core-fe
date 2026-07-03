@@ -37,6 +37,7 @@ import { paths } from 'src/routes/paths';
 
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
+import { AppDatePicker, AppDateTimePicker } from 'src/components/date-time-picker';
 import Label from 'src/components/label';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
@@ -1167,20 +1168,18 @@ export default function PayrollBatchView() {
               value={periodName}
               onChange={(e) => setPeriodName(e.target.value)}
             />
-            <TextField
+            <AppDatePicker
               label="Từ ngày"
-              type="date"
               value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              onChange={setFromDate}
+              size="medium"
               fullWidth
             />
-            <TextField
+            <AppDatePicker
               label="Đến ngày"
-              type="date"
               value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              onChange={setToDate}
+              size="medium"
               fullWidth
             />
 
@@ -1692,12 +1691,10 @@ export default function PayrollBatchView() {
 
               <Box>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <TextField
+                  <AppDateTimePicker
                     label="Giờ vào"
-                    type="datetime-local"
                     value={checkInValue}
-                    onChange={(e) => setCheckInValue(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
+                    onChange={setCheckInValue}
                     fullWidth
                     size="small"
                   />
@@ -1711,12 +1708,10 @@ export default function PayrollBatchView() {
 
               <Box>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <TextField
+                  <AppDateTimePicker
                     label="Giờ ra"
-                    type="datetime-local"
                     value={checkOutValue}
-                    onChange={(e) => setCheckOutValue(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
+                    onChange={setCheckOutValue}
                     fullWidth
                     size="small"
                   />

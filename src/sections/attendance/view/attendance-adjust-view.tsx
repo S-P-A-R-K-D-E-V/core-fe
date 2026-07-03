@@ -63,6 +63,8 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 
 import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
+import { AppDateTimePicker } from 'src/components/date-time-picker';
+
 import { StyledCalendar } from '../../calendar/styles';
 import CalendarToolbar from '../../calendar/calendar-toolbar';
 import { useTheme } from '@mui/material';
@@ -812,12 +814,11 @@ export default function AttendanceAdjustView() {
 
                             <Box>
                                 <Stack direction="row" spacing={1} alignItems="center">
-                                    <TextField
+                                    <AppDateTimePicker
                                         label="Giờ vào"
-                                        type="datetime-local"
                                         value={checkInValue}
-                                        onChange={(e) => setCheckInValue(e.target.value)}
-                                        InputLabelProps={{ shrink: true }}
+                                        onChange={setCheckInValue}
+                                        size="medium"
                                         fullWidth
                                         helperText={checkInValue ? '' : 'Để trống = xóa giờ vào'}
                                     />
@@ -838,12 +839,11 @@ export default function AttendanceAdjustView() {
 
                             <Box>
                                 <Stack direction="row" spacing={1} alignItems="center">
-                                    <TextField
+                                    <AppDateTimePicker
                                         label="Giờ ra"
-                                        type="datetime-local"
                                         value={checkOutValue}
-                                        onChange={(e) => setCheckOutValue(e.target.value)}
-                                        InputLabelProps={{ shrink: true }}
+                                        onChange={setCheckOutValue}
+                                        size="medium"
                                         fullWidth
                                         helperText={checkOutValue ? '' : 'Để trống = xóa giờ ra'}
                                     />

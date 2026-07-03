@@ -34,6 +34,7 @@ import { useResponsive } from 'src/hooks/use-responsive';
 
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
+import { AppDatePicker } from 'src/components/date-time-picker';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
@@ -644,12 +645,11 @@ export default function AttendanceAssignmentsWeeklyView() {
               ))}
             </TextField>
 
-            <TextField
+            <AppDatePicker
               label="Ngày"
-              type="date"
               value={newDate.split('T')[0]}
-              onChange={(e) => setNewDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              onChange={setNewDate}
+              size="medium"
               fullWidth
             />
 
@@ -711,20 +711,18 @@ export default function AttendanceAssignmentsWeeklyView() {
             </TextField>
 
             <Stack direction="row" spacing={2}>
-              <TextField
+              <AppDatePicker
                 label="Từ ngày"
-                type="date"
                 value={bulkFromDate}
-                onChange={(e) => setBulkFromDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                onChange={setBulkFromDate}
+                size="medium"
                 fullWidth
               />
-              <TextField
+              <AppDatePicker
                 label="Đến ngày"
-                type="date"
                 value={bulkToDate}
-                onChange={(e) => setBulkToDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                onChange={setBulkToDate}
+                size="medium"
                 fullWidth
               />
             </Stack>

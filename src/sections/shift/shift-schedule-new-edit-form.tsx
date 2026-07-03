@@ -10,7 +10,6 @@ import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid2';
 import Stack from '@mui/material/Stack';
 import MenuItem from '@mui/material/MenuItem';
-import TextField from '@mui/material/TextField';
 import LoadingButton from '@mui/lab/LoadingButton';
 import FormGroup from '@mui/material/FormGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -21,7 +20,8 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { useSnackbar } from 'src/components/snackbar';
-import FormProvider, { RHFTextField, RHFSelect } from 'src/components/hook-form';
+import FormProvider, { RHFTextField, RHFSelect, RHFTimePicker } from 'src/components/hook-form';
+import { AppDatePicker } from 'src/components/date-time-picker';
 
 import { IShiftSchedule, IShiftTemplate } from 'src/types/corecms-api';
 import {
@@ -165,31 +165,20 @@ export default function ShiftScheduleNewEditForm({ currentSchedule }: Props) {
 
               <Box />
 
-              <RHFTextField
-                name="startTime"
-                label="Start Time"
-                type="time"
-                InputLabelProps={{ shrink: true }}
-              />
+              <RHFTimePicker name="startTime" label="Start Time" />
 
-              <RHFTextField
-                name="endTime"
-                label="End Time"
-                type="time"
-                InputLabelProps={{ shrink: true }}
-              />
+              <RHFTimePicker name="endTime" label="End Time" />
 
               <Controller
                 name="fromDate"
                 control={methods.control}
                 render={({ field, fieldState: { error } }) => (
-                  <TextField
+                  <AppDatePicker
                     label="From Date"
-                    type="date"
                     value={field.value ? field.value.split('T')[0] : ''}
-                    onChange={(e) => field.onChange(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
+                    onChange={field.onChange}
                     fullWidth
+                    size="medium"
                     error={!!error}
                     helperText={error?.message}
                   />
@@ -200,13 +189,12 @@ export default function ShiftScheduleNewEditForm({ currentSchedule }: Props) {
                 name="toDate"
                 control={methods.control}
                 render={({ field, fieldState: { error } }) => (
-                  <TextField
+                  <AppDatePicker
                     label="To Date (Optional)"
-                    type="date"
                     value={field.value ? field.value.split('T')[0] : ''}
-                    onChange={(e) => field.onChange(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
+                    onChange={field.onChange}
                     fullWidth
+                    size="medium"
                     error={!!error}
                     helperText={error?.message}
                   />

@@ -18,6 +18,7 @@ import { paths } from 'src/routes/paths';
 import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import Label from 'src/components/label';
+import { AppDatePicker } from 'src/components/date-time-picker';
 import Scrollbar from 'src/components/scrollbar';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import {
@@ -109,20 +110,16 @@ export default function AttendanceLogsView() {
 
       <Card sx={{ mb: 3, p: 2.5 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-          <TextField
+          <AppDatePicker
             label="From Date"
-            type="date"
             value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            InputLabelProps={{ shrink: true }}
+            onChange={setFromDate}
             sx={{ width: { xs: 1, md: 180 } }}
           />
-          <TextField
+          <AppDatePicker
             label="To Date"
-            type="date"
             value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            InputLabelProps={{ shrink: true }}
+            onChange={setToDate}
             sx={{ width: { xs: 1, md: 180 } }}
           />
           <TextField

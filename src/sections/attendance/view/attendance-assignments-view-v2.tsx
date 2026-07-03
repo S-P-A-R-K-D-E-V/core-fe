@@ -53,6 +53,7 @@ import { useBoolean } from 'src/hooks/use-boolean';
 import { useResponsive } from 'src/hooks/use-responsive';
 
 import Iconify from 'src/components/iconify';
+import { AppDatePicker, AppDateTimePicker } from 'src/components/date-time-picker';
 import Label from 'src/components/label';
 import Scrollbar from 'src/components/scrollbar';
 import { useSnackbar } from 'src/components/snackbar';
@@ -1597,20 +1598,16 @@ export default function AttendanceAssignmentsView() {
         {/* Filters */}
         <Card sx={{ mb: 3, p: 2.5 }}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
-            <TextField
+            <AppDatePicker
               label="Từ ngày"
-              type="date"
               value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              onChange={setFromDate}
               sx={{ width: { xs: 1, md: 180 } }}
             />
-            <TextField
+            <AppDatePicker
               label="Đến ngày"
-              type="date"
               value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              onChange={setToDate}
               sx={{ width: { xs: 1, md: 180 } }}
             />
 
@@ -1862,12 +1859,11 @@ export default function AttendanceAssignmentsView() {
               ))}
             </TextField>
 
-            <TextField
+            <AppDatePicker
               label="Ngày"
-              type="date"
               value={newDate.split('T')[0]}
-              onChange={(e) => setNewDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              onChange={setNewDate}
+              size="medium"
               fullWidth
             />
 
@@ -1921,12 +1917,10 @@ export default function AttendanceAssignmentsView() {
                 Khóa đăng ký tuần
               </Typography>
             </Stack>
-            <TextField
-              type="datetime-local"
-              size="small"
+            <AppDateTimePicker
               value={bulkLockEditAt}
-              onChange={(e) => setBulkLockEditAt(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              onChange={setBulkLockEditAt}
+              size="small"
               sx={{ flexGrow: 1, minWidth: 200 }}
             />
             {bulkLock && (
@@ -3652,12 +3646,11 @@ export default function AttendanceAssignmentsView() {
               </TextField>
 
               {/* Target date */}
-              <TextField
+              <AppDatePicker
                 label="Ngày đổi đến"
-                type="date"
                 value={swapTargetDate}
-                onChange={(e) => setSwapTargetDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                onChange={setSwapTargetDate}
+                size="medium"
                 fullWidth
               />
 

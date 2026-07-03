@@ -38,6 +38,7 @@ import { useResponsive } from 'src/hooks/use-responsive';
 
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
+import { AppDatePicker } from 'src/components/date-time-picker';
 import Label from 'src/components/label';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
@@ -495,13 +496,11 @@ export default function MyLateCoverRequestsView() {
                 {coverMode === 'need-cover' ? 'Ca của tôi (ca bị đi muộn)' : 'Ca của tôi (ca đang làm)'}
               </Typography>
               <Stack spacing={2}>
-                <TextField
+                <AppDatePicker
                   fullWidth
-                  type="date"
                   label="Chọn ngày"
                   value={myDate}
-                  onChange={(e) => setMyDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
+                  onChange={setMyDate}
                 />
                 <TextField
                   select

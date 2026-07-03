@@ -23,6 +23,7 @@ import { paths } from 'src/routes/paths';
 
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
+import { AppDatePicker } from 'src/components/date-time-picker';
 import Label from 'src/components/label';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
@@ -282,20 +283,16 @@ export default function PayrollCycleListView() {
             </TextField>
 
             <Stack direction="row" spacing={2}>
-              <TextField
+              <AppDatePicker
                 label="Từ ngày"
-                type="date"
                 value={formData.fromDate}
-                onChange={(e) => setFormData({ ...formData, fromDate: e.target.value })}
-                InputLabelProps={{ shrink: true }}
+                onChange={(val) => setFormData({ ...formData, fromDate: val })}
                 fullWidth
               />
-              <TextField
+              <AppDatePicker
                 label="Đến ngày"
-                type="date"
                 value={formData.toDate}
-                onChange={(e) => setFormData({ ...formData, toDate: e.target.value })}
-                InputLabelProps={{ shrink: true }}
+                onChange={(val) => setFormData({ ...formData, toDate: val })}
                 fullWidth
               />
             </Stack>

@@ -22,6 +22,7 @@ import { paths } from 'src/routes/paths';
 
 import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
+import { AppDatePicker } from 'src/components/date-time-picker';
 import Scrollbar from 'src/components/scrollbar';
 import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
@@ -168,21 +169,17 @@ export default function AttendanceReportView() {
               </Button>
             ))}
           </Stack>
-          <TextField
+          <AppDatePicker
             label="From"
-            type="date"
             value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            InputLabelProps={{ shrink: true }}
+            onChange={setFromDate}
             size="small"
             sx={{ width: 160 }}
           />
-          <TextField
+          <AppDatePicker
             label="To"
-            type="date"
             value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            InputLabelProps={{ shrink: true }}
+            onChange={setToDate}
             size="small"
             sx={{ width: 160 }}
           />
