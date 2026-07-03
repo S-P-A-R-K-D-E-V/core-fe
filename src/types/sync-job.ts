@@ -17,8 +17,15 @@ export interface ISyncJobStep {
   entity: string;
   created: number;
   updated: number;
+  skipped: number;
   total: number;
   totalKnown: number;
+  /** Số bản ghi đã xử lý trong bước hiện tại (created + updated + skipped). */
+  processed: number;
+  /** Phần trăm hoàn thành của bước (0–100). */
+  percent: number;
+  /** Thông điệp trạng thái hiện tại của bước. */
+  message: string | null;
   isRunning: boolean;
   error: string | null;
 }
