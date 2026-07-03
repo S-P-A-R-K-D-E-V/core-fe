@@ -16,7 +16,7 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { useSnackbar } from 'src/components/snackbar';
-import FormProvider, { RHFTextField, RHFSelect, RHFSwitch } from 'src/components/hook-form';
+import FormProvider, { RHFTextField, RHFSelect, RHFSwitch, RHFTimePicker } from 'src/components/hook-form';
 
 import { IShift } from 'src/types/corecms-api';
 import { createShift, updateShift } from 'src/api/attendance';
@@ -111,9 +111,9 @@ export default function ShiftNewEditForm({ currentShift }: Props) {
                 <MenuItem value="Extra">Phụ</MenuItem>
               </RHFSelect>
 
-              <RHFTextField name="startTime" label="Start Time" type="time" InputLabelProps={{ shrink: true }} />
+              <RHFTimePicker name="startTime" label="Start Time" />
 
-              <RHFTextField name="endTime" label="End Time" type="time" InputLabelProps={{ shrink: true }} />
+              <RHFTimePicker name="endTime" label="End Time" />
 
               <RHFTextField
                 name="checkInAllowedMinutesBefore"

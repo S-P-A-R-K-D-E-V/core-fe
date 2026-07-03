@@ -42,7 +42,7 @@ import { fCurrency } from 'src/utils/format-number';
 
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
-import FormProvider, { RHFTextField, RHFSelect } from 'src/components/hook-form';
+import FormProvider, { RHFTextField, RHFSelect, RHFDateTimePicker } from 'src/components/hook-form';
 
 import CircularProgress from '@mui/material/CircularProgress';
 
@@ -599,13 +599,6 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
   const paginatedEnd = paginatedStart + itemsRowsPerPage;
   const paginatedFields = fields.slice(paginatedStart, paginatedEnd);
 
-  // Current datetime default
-  const nowDatetime = useMemo(() => {
-    const d = new Date();
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().slice(0, 16);
-  }, []);
-
   return (
     <>
       <FormProvider methods={methods} onSubmit={onSubmit}>
@@ -921,13 +914,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
                     ))}
                 </RHFSelect>
 
-                <RHFTextField
-                  name="expectedDate"
-                  label="Ngày nhập hàng"
-                  type="datetime-local"
-                  InputLabelProps={{ shrink: true }}
-                  defaultValue={nowDatetime}
-                />
+                <RHFDateTimePicker name="expectedDate" label="Ngày nhập hàng" />
               </Card>
 
               {/* Summary */}

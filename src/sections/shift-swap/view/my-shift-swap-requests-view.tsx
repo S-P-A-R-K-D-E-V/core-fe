@@ -36,6 +36,7 @@ import { useResponsive } from 'src/hooks/use-responsive';
 
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
+import { AppDatePicker } from 'src/components/date-time-picker';
 import Label from 'src/components/label';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
@@ -406,14 +407,12 @@ export default function MyShiftSwapRequestsView() {
                 Ca của tôi
               </Typography>
               <Stack spacing={2}>
-                <TextField
+                <AppDatePicker
                   fullWidth
-                  type="date"
                   label="Chọn ngày"
                   value={myDate}
-                  onChange={(e) => setMyDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  inputProps={{ min: toDateStr(new Date()) }}
+                  onChange={setMyDate}
+                  minDate={toDateStr(new Date())}
                 />
                 <TextField
                   select
@@ -445,13 +444,11 @@ export default function MyShiftSwapRequestsView() {
                 Ca muốn đổi (của nhân viên kia)
               </Typography>
               <Stack spacing={2}>
-                <TextField
+                <AppDatePicker
                   fullWidth
-                  type="date"
                   label="Ngày ca muốn đổi"
                   value={targetDate}
-                  onChange={(e) => setTargetDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
+                  onChange={setTargetDate}
                 />
                 <TextField
                   select

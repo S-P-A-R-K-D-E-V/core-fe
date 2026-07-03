@@ -26,6 +26,7 @@ import { paths } from 'src/routes/paths';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
+import { AppDatePicker } from 'src/components/date-time-picker';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
 import { useSnackbar } from 'src/components/snackbar';
@@ -360,21 +361,19 @@ export default function SalaryConfigurationView() {
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
             />
 
-            <TextField
+            <AppDatePicker
               label="Hiệu lực từ ngày"
-              type="date"
               value={formData.effectiveFrom ? formData.effectiveFrom.split('T')[0] : ''}
-              onChange={(e) => setFormData({ ...formData, effectiveFrom: e.target.value })}
-              InputLabelProps={{ shrink: true }}
+              onChange={(val) => setFormData({ ...formData, effectiveFrom: val })}
+              size="medium"
               fullWidth
             />
 
-            <TextField
+            <AppDatePicker
               label="Hiệu lực đến ngày (tuỳ chọn)"
-              type="date"
               value={formData.effectiveTo ? formData.effectiveTo.split('T')[0] : ''}
-              onChange={(e) => setFormData({ ...formData, effectiveTo: e.target.value })}
-              InputLabelProps={{ shrink: true }}
+              onChange={(val) => setFormData({ ...formData, effectiveTo: val })}
+              size="medium"
               fullWidth
             />
 
@@ -427,21 +426,19 @@ export default function SalaryConfigurationView() {
               onChange={(e) => setEditFormData({ ...editFormData, amount: e.target.value })}
             />
 
-            <TextField
+            <AppDatePicker
               label="Hiệu lực từ ngày"
-              type="date"
-              value={editFormData.effectiveFrom}
-              onChange={(e) => setEditFormData({ ...editFormData, effectiveFrom: e.target.value })}
-              InputLabelProps={{ shrink: true }}
+              value={editFormData.effectiveFrom ? editFormData.effectiveFrom.split('T')[0] : ''}
+              onChange={(val) => setEditFormData({ ...editFormData, effectiveFrom: val })}
+              size="medium"
               fullWidth
             />
 
-            <TextField
+            <AppDatePicker
               label="Hiệu lực đến ngày (tuỳ chọn)"
-              type="date"
-              value={editFormData.effectiveTo}
-              onChange={(e) => setEditFormData({ ...editFormData, effectiveTo: e.target.value })}
-              InputLabelProps={{ shrink: true }}
+              value={editFormData.effectiveTo ? editFormData.effectiveTo.split('T')[0] : ''}
+              onChange={(val) => setEditFormData({ ...editFormData, effectiveTo: val })}
+              size="medium"
               fullWidth
             />
 

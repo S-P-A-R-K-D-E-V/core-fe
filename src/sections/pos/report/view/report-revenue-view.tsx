@@ -21,6 +21,7 @@ import Stack from '@mui/material/Stack';
 import { useSnackbar } from 'src/components/snackbar';
 import { fCurrency } from 'src/utils/format-number';
 import Iconify from 'src/components/iconify';
+import { AppDatePicker } from 'src/components/date-time-picker';
 import { IRevenueReport } from 'src/types/corecms-api';
 import { getRevenueReport, downloadExport } from 'src/api/reports';
 
@@ -90,22 +91,8 @@ export default function ReportRevenueView() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Stack direction="row" spacing={2}>
-            <TextField
-              type="date"
-              label="Từ ngày"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              size="small"
-            />
-            <TextField
-              type="date"
-              label="Đến ngày"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              size="small"
-            />
+            <AppDatePicker label="Từ ngày" value={fromDate} onChange={setFromDate} size="small" />
+            <AppDatePicker label="Đến ngày" value={toDate} onChange={setToDate} size="small" />
             <TextField
               select
               label="Nhóm theo"

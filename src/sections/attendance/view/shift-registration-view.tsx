@@ -39,6 +39,7 @@ import { useResponsive } from 'src/hooks/use-responsive';
 
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
+import { AppDatePicker } from 'src/components/date-time-picker';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
@@ -765,21 +766,17 @@ export default function ShiftRegistrationView() {
         <Card id="tour-date-filter" sx={{ mb: 3, p: { xs: 1.5, md: 2.5 } }}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
             <Stack direction="row" spacing={1} sx={{ width: { xs: 1, md: 'auto' } }}>
-              <TextField
+              <AppDatePicker
                 label="Từ ngày"
-                type="date"
                 value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                onChange={setFromDate}
                 size={smUp ? 'medium' : 'small'}
                 sx={{ flex: 1, minWidth: 0 }}
               />
-              <TextField
+              <AppDatePicker
                 label="Đến ngày"
-                type="date"
                 value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                onChange={setToDate}
                 size={smUp ? 'medium' : 'small'}
                 sx={{ flex: 1, minWidth: 0 }}
               />

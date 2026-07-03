@@ -41,6 +41,7 @@ import { useBoolean } from 'src/hooks/use-boolean';
 
 import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
+import { AppDatePicker } from 'src/components/date-time-picker';
 import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
@@ -678,12 +679,10 @@ export default function ShiftCashDashboardView() {
         {/* Date picker */}
         <Card id="tour-date-picker" sx={{ mb: 3, p: 2.5 }}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <TextField
+            <AppDatePicker
               label="Ngày"
-              type="date"
               value={currentDate}
-              onChange={(e) => setCurrentDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              onChange={setCurrentDate}
               sx={{ width: 200 }}
             />
             {isToday ? (

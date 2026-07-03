@@ -28,6 +28,7 @@ import { paths } from 'src/routes/paths';
 
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
+import { AppDatePicker } from 'src/components/date-time-picker';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
 
@@ -409,22 +410,18 @@ export default function ShiftAuditView() {
         <Stack spacing={2}>
           {/* Date range */}
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
-            <TextField
+            <AppDatePicker
               label="Từ ngày"
-              type="date"
               size="small"
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              onChange={setDateFrom}
               sx={{ minWidth: 160 }}
             />
-            <TextField
+            <AppDatePicker
               label="Đến ngày"
-              type="date"
               size="small"
               value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              onChange={setDateTo}
               sx={{ minWidth: 160 }}
             />
             <TextField

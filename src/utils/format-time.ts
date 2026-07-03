@@ -87,3 +87,22 @@ export function toDatetimeLocalStr(date: Date | null): string {
   if (!date || Number.isNaN(date.getTime())) return '';
   return format(date, "yyyy-MM-dd'T'HH:mm");
 }
+
+// Helpers for TimePicker ↔ time string (HH:mm) conversion.
+// A bare "HH:mm" has no date, so we anchor it to today for the Date object.
+export function parseTimeStr(str: string | null | undefined): Date | null {
+  if (!str) return null;
+  const m = /^(\d{1,2}):(\d{1,2})/.exec(str.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (Number.isNaN(h) || Number.isNaN(min) || h > 23 || min > 59) return null;
+  const d = new Date();
+  d.setHours(h, min, 0, 0);
+  return d;
+}
+
+export function toTimeStr(date: Date | null): string {
+  if (!date || Number.isNaN(date.getTime())) return '';
+  return format(date, 'HH:mm');
+}
