@@ -53,7 +53,7 @@ import type { IShiftAssignment, IShiftSwapRequest } from 'src/types/corecms-api'
 
 import { getMySchedule, getShiftAssignments } from 'src/api/attendance';
 import { createShiftSwapRequest, getMyShiftSwapRequests } from 'src/api/shiftSwap';
-import { getAllUsers } from 'src/api/users';
+import { getActiveStaffUsers } from 'src/api/users';
 
 import CalendarToolbar from '../../calendar/calendar-toolbar';
 import { StyledCalendar } from '../../calendar/styles';
@@ -175,7 +175,7 @@ export default function MyShiftSwapRequestsView() {
   // --- Open dialog ---
   const handleOpenDialog = async (prefilledAssignmentId?: string) => {
     try {
-      const userData = await getAllUsers();
+      const userData = await getActiveStaffUsers();
       setUsers(userData);
       if (prefilledAssignmentId && authUser?.id) {
         // Pre-fill from calendar click

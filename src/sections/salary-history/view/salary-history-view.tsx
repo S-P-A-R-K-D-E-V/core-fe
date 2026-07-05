@@ -30,7 +30,7 @@ import {
 import type { ISalaryHistory } from 'src/types/corecms-api';
 
 import { getMySalaryHistory } from 'src/api/salaryHistory';
-import { getAllUsers } from 'src/api/users';
+import { getActiveStaffUsers } from 'src/api/users';
 
 // ----------------------------------------------------------------------
 
@@ -78,7 +78,7 @@ export default function SalaryHistoryView() {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const data = await getAllUsers();
+      const data = await getActiveStaffUsers();
       setUsers(data);
     } catch (error) {
       console.error('Error fetching users:', error);
