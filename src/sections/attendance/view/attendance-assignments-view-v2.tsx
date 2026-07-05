@@ -38,6 +38,7 @@ import Chip from '@mui/material/Chip';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Checkbox from '@mui/material/Checkbox';
+import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormGroup from '@mui/material/FormGroup';
 import Tooltip from '@mui/material/Tooltip';
@@ -95,7 +96,7 @@ import {
   clearRegistrationLock,
 } from 'src/api/shiftRegistration';
 import { getAllStaffShiftPreferences } from 'src/api/userPreference';
-import { getAllUsers, setSchedulingPriority } from 'src/api/users';
+import { getActiveStaffUsers, setSchedulingPriority } from 'src/api/users';
 
 
 import { StyledCalendar } from '../../calendar/styles';
@@ -317,6 +318,46 @@ export default function AttendanceAssignmentsView() {
   const [bulkHoverStaffId, setBulkHoverStaffId] = useState<string | null>(null);
   const [bulkTab, setBulkTab] = useState(0);
   const bulkConfirm = useBoolean();
+
+  // ── Chế độ sắp xếp kéo-thả (thay cho tích chọn NV + tích chọn ca + Phân công) ──
+  const [dragModeOn, setDragModeOn] = useState(false);
+  // Nháp: slotKey ("scheduleId_date") → danh sách staffId đang được xếp trong ô đó.
+  // Chỉ áp dụng lên server khi bấm "Lưu thay đổi".
+  const [draftAssignments, setDraftAssignments] = useState<Record<string, string[]>>({});
+  const [staffSearchQuery, setStaffSearchQuery] = useState('');
+  const [savingDraft, setSavingDraft] = useState(false);
+  // Cảnh báo khi gỡ 1 NV đã có chấm công khỏi ca (vẫn cho gỡ nếu xác nhận)
+  const [removeConfirmTarget, setRemoveConfirmTarget] = useState<{
+    slotKey: string;
+    staffId: string;
+    staffName: string;
+    checkInTime?: string;
+  } | null>(null);
+
+  // ── Khóa mã 6 số cho "Set lại từ chấm công" (single-cell + cả tuần) ──
+  const [codeGateOpen, setCodeGateOpen] = useState(false);
+  const [codeGateValue, setCodeGateValue] = useState('');
+  const [codeGateError, setCodeGateError] = useState('');
+  const codeGateActionRef = useRef<(() => void) | null>(null);
+  const SYNC_FROM_CHECKIN_CODE = '250617';
+
+  const requestSyncFromCheckinCode = (action: () => void) => {
+    codeGateActionRef.current = action;
+    setCodeGateValue('');
+    setCodeGateError('');
+    setCodeGateOpen(true);
+  };
+
+  const handleConfirmCodeGate = () => {
+    if (codeGateValue !== SYNC_FROM_CHECKIN_CODE) {
+      setCodeGateError('Mã không đúng.');
+      return;
+    }
+    setCodeGateOpen(false);
+    const action = codeGateActionRef.current;
+    codeGateActionRef.current = null;
+    action?.();
+  };
   const autoAssignDialog = useBoolean();
   const [autoAssignSlots, setAutoAssignSlots] = useState<IAutoAssignSlot[]>([]);
   const [autoAssigning, setAutoAssigning] = useState(false);
@@ -354,18 +395,12 @@ export default function AttendanceAssignmentsView() {
       try {
         const [s, u] = await Promise.all([
           getShiftSchedulesByDateRange(fromDate, toDate),
-          getAllUsers(),
+          getActiveStaffUsers(),
         ]);
         // Schedules now have color from API
         setSchedules(s.filter((sc) => sc.isActive));
-        setUsers(
-          u.filter(
-            (usr) =>
-              usr.roles?.includes('Staff') ||
-              usr.roles?.includes('Admin') ||
-              usr.roles?.includes('Manager')
-          )
-        );
+        // Server đã lọc đúng Staff + Active (không Admin/Manager, không banned/pending).
+        setUsers(u);
       } catch (error) {
         console.error(error);
       }
@@ -519,6 +554,149 @@ export default function AttendanceAssignmentsView() {
     });
     return map;
   }, [bulkWeekAssignments]);
+
+  // Map: slotKey → assignment thực tế (giữ staffId + checkInTime) — nguồn khởi
+  // tạo nháp kéo-thả và để biết NV nào đã chấm công khi bị gỡ khỏi ca.
+  const bulkSlotAssignmentMap = useMemo(() => {
+    const map = new Map<string, IShiftAssignment[]>();
+    bulkWeekAssignments.forEach((a) => {
+      const dateStr = a.date.split('T')[0];
+      const key = `${a.shiftScheduleId}_${dateStr}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(a);
+    });
+    return map;
+  }, [bulkWeekAssignments]);
+
+  // Nạp lại nháp kéo-thả = đúng dữ liệu phân công thực tế của tuần đang xem.
+  const resetDraftFromServer = useCallback(() => {
+    const next: Record<string, string[]> = {};
+    bulkSlotAssignmentMap.forEach((list, key) => {
+      next[key] = list.map((a) => a.staffId);
+    });
+    setDraftAssignments(next);
+  }, [bulkSlotAssignmentMap]);
+
+  // Bật chế độ kéo-thả, đổi tuần, hoặc sau khi Lưu (dữ liệu server đổi) →
+  // snapshot lại dữ liệu hiện tại làm nháp.
+  useEffect(() => {
+    if (dragModeOn) resetDraftFromServer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragModeOn, bulkSlotAssignmentMap]);
+
+  // Tìm kiếm tên NV (bỏ dấu, không phân biệt hoa/thường) ở tab bên trái.
+  const normalizeSearchText = (s: string) =>
+    s
+      .normalize('NFD')
+      .replace(new RegExp('[\u0300-\u036f]', 'g'), '')
+      .toLowerCase();
+
+  const filteredBulkUsers = useMemo(() => {
+    const q = normalizeSearchText(staffSearchQuery.trim());
+    if (!q) return users;
+    return users.filter((u) => normalizeSearchText(u.fullName).includes(q));
+  }, [users, staffSearchQuery]);
+
+  // Kéo NV từ danh sách trái thả vào 1 ô ca → thêm vào nháp ô đó.
+  const handleDragModeDragEnd = (result: DropResult) => {
+    const { source, destination, draggableId } = result;
+    if (!destination) return;
+    if (!destination.droppableId.startsWith('cell:')) return;
+    const slotKey = destination.droppableId.slice('cell:'.length);
+    if (source.droppableId === destination.droppableId) return; // no reordering needed
+
+    setDraftAssignments((prev) => {
+      const current = prev[slotKey] || [];
+      if (current.includes(draggableId)) return prev;
+      return { ...prev, [slotKey]: [...current, draggableId] };
+    });
+  };
+
+  // Gỡ 1 NV khỏi 1 ô ca trong nháp — cảnh báo trước nếu đã có chấm công.
+  const handleRemoveFromDraftCell = (slotKey: string, staffId: string) => {
+    const original = bulkSlotAssignmentMap.get(slotKey) || [];
+    const assignment = original.find((a) => a.staffId === staffId);
+    if (assignment?.checkInTime) {
+      setRemoveConfirmTarget({
+        slotKey,
+        staffId,
+        staffName: staffInfoMap.get(staffId)?.name || staffId,
+        checkInTime: assignment.checkInTime,
+      });
+      return;
+    }
+    setDraftAssignments((prev) => ({
+      ...prev,
+      [slotKey]: (prev[slotKey] || []).filter((id) => id !== staffId),
+    }));
+  };
+
+  const confirmRemoveWithCheckin = () => {
+    if (!removeConfirmTarget) return;
+    const { slotKey, staffId } = removeConfirmTarget;
+    setDraftAssignments((prev) => ({
+      ...prev,
+      [slotKey]: (prev[slotKey] || []).filter((id) => id !== staffId),
+    }));
+    setRemoveConfirmTarget(null);
+  };
+
+  // Số ô ca có thay đổi so với dữ liệu gốc (để hiển thị số lượng + bật/tắt nút Lưu)
+  const draftChangedSlotKeys = useMemo(() => {
+    const keys = new Set<string>([
+      ...Object.keys(draftAssignments),
+      ...Array.from(bulkSlotAssignmentMap.keys()),
+    ]);
+    const changed: string[] = [];
+    keys.forEach((key) => {
+      const draft = new Set(draftAssignments[key] || []);
+      const original = new Set((bulkSlotAssignmentMap.get(key) || []).map((a) => a.staffId));
+      if (draft.size !== original.size || Array.from(draft).some((id) => !original.has(id))) {
+        changed.push(key);
+      }
+    });
+    return changed;
+  }, [draftAssignments, bulkSlotAssignmentMap]);
+
+  // Lưu toàn bộ thay đổi nháp: mỗi ô ca thay đổi gọi 1 lần manage-shift (replace
+  // toàn bộ danh sách NV của ô đó). Ca có checkin bị gỡ mà không phải Admin sẽ
+  // bị BE từ chối riêng lẻ — vẫn báo cáo rõ số ô thành công/thất bại.
+  const handleSaveDragDraft = async () => {
+    if (draftChangedSlotKeys.length === 0) return;
+    setSavingDraft(true);
+    let success = 0;
+    let failed = 0;
+    for (const key of draftChangedSlotKeys) {
+      const lastUnderscoreDate = key.lastIndexOf('_');
+      const scheduleId = key.slice(0, lastUnderscoreDate);
+      const date = key.slice(lastUnderscoreDate + 1);
+      try {
+        await manageShiftAssignments({
+          shiftScheduleId: scheduleId,
+          date,
+          staffIds: draftAssignments[key] || [],
+        });
+        success += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    setSavingDraft(false);
+    enqueueSnackbar(
+      failed > 0
+        ? `Đã lưu ${success} ca, lỗi ${failed} ca (có thể do ca đã có chấm công — chỉ Admin được gỡ).`
+        : `Đã lưu ${success} ca thay đổi.`,
+      { variant: failed > 0 ? 'warning' : 'success' }
+    );
+    const weekEnd = new Date(bulkWeekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const from = toLocalDateStr(bulkWeekStart);
+    const to = toLocalDateStr(weekEnd);
+    getShiftAssignments(from, to)
+      .then((data) => setBulkWeekAssignments(data))
+      .catch(() => {});
+    await fetchAssignments();
+  };
 
   // Map: "scheduleId_date" → all registered staff names (for tooltip)
   const bulkAllRegistrationMap = useMemo(() => {
@@ -1948,6 +2126,36 @@ export default function AttendanceAssignmentsView() {
               Khôi phục mặc định
             </Button>
           </Stack>
+
+          {/* Chế độ sắp xếp kéo-thả: thay cho tích chọn NV + tích chọn ca + nút Phân công */}
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={1}
+            sx={{ mt: 1, p: 1, borderRadius: 1, bgcolor: dragModeOn ? 'primary.lighter' : 'background.neutral' }}
+          >
+            <FormControlLabel
+              sx={{ mr: 1 }}
+              control={
+                <Switch
+                  size="small"
+                  checked={dragModeOn}
+                  onChange={(e) => setDragModeOn(e.target.checked)}
+                />
+              }
+              label={
+                <Typography variant="body2" fontWeight={600}>
+                  Chế độ sắp xếp (kéo-thả)
+                </Typography>
+              }
+            />
+            {dragModeOn && (
+              <Typography variant="caption" color="text.secondary">
+                Kéo nhân viên từ danh sách vào ca trong tuần · bấm ✕ trên tên để gỡ khỏi ca · nhớ bấm Lưu để áp dụng
+              </Typography>
+            )}
+          </Stack>
+
           {!smUp && (
             <Tabs
               value={bulkTab}
@@ -1972,6 +2180,7 @@ export default function AttendanceAssignmentsView() {
         <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
           {smUp ? (
           /* ===== Desktop: side-by-side layout ===== */
+          <DragDropContext onDragEnd={handleDragModeDragEnd}>
           <Stack direction="row" sx={{ height: 700 }}>
             {/* ===== Left: Staff List ===== */}
             <Box
@@ -1986,16 +2195,90 @@ export default function AttendanceAssignmentsView() {
             >
               <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
                 <Typography variant="subtitle2">
-                  Nhân viên ({bulkStaffIds.length}/{users.length})
+                  {dragModeOn
+                    ? `Nhân viên (${filteredBulkUsers.length}/${users.length})`
+                    : `Nhân viên (${bulkStaffIds.length}/${users.length})`}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, lineHeight: 1.3 }}>
-                  Di chuột vào nhân viên để xem ca họ đã đăng ký · bật{' '}
-                  <Iconify icon="solar:lock-keyhole-bold" width={12} sx={{ verticalAlign: 'text-bottom' }} /> để chỉ xếp ca đã đăng ký
+                  {dragModeOn
+                    ? 'Kéo tên nhân viên thả vào ca trong tuần bên phải'
+                    : (
+                      <>
+                        Di chuột vào nhân viên để xem ca họ đã đăng ký · bật{' '}
+                        <Iconify icon="solar:lock-keyhole-bold" width={12} sx={{ verticalAlign: 'text-bottom' }} /> để chỉ xếp ca đã đăng ký
+                      </>
+                    )}
                 </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Tìm nhân viên..."
+                  value={staffSearchQuery}
+                  onChange={(e) => setStaffSearchQuery(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Iconify icon="eva:search-fill" width={18} sx={{ color: 'text.disabled' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ mt: 1 }}
+                />
               </Box>
               <Box sx={{ flex: 1, overflowY: 'auto', p: 1 }}>
+                {dragModeOn ? (
+                  <Droppable droppableId="staffPool" type="STAFF" isDropDisabled>
+                    {(provided) => (
+                      <Box ref={provided.innerRef} {...provided.droppableProps}>
+                        {filteredBulkUsers.map((user, index) => (
+                          <Draggable key={user.id} draggableId={user.id} index={index}>
+                            {(dragProvided, dragSnapshot) => (
+                              <Stack
+                                ref={dragProvided.innerRef}
+                                {...dragProvided.draggableProps}
+                                {...dragProvided.dragHandleProps}
+                                direction="row"
+                                alignItems="center"
+                                spacing={1}
+                                sx={{
+                                  px: 1.25,
+                                  py: 1,
+                                  mb: 0.5,
+                                  borderRadius: 1,
+                                  cursor: 'grab',
+                                  bgcolor: dragSnapshot.isDragging ? 'primary.lighter' : 'background.neutral',
+                                  border: '1px solid',
+                                  borderColor: dragSnapshot.isDragging ? 'primary.main' : 'transparent',
+                                }}
+                              >
+                                <Iconify icon="mdi:drag" width={16} sx={{ color: 'text.disabled', flexShrink: 0 }} />
+                                <Avatar sx={{ width: 28, height: 28, fontSize: 12 }}>
+                                  {user.fullName
+                                    .split(' ')
+                                    .map((n) => n[0])
+                                    .join('')
+                                    .slice(-2)
+                                    .toUpperCase()}
+                                </Avatar>
+                                <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }}>
+                                  {user.fullName}
+                                </Typography>
+                              </Stack>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                        {filteredBulkUsers.length === 0 && (
+                          <Typography variant="caption" color="text.disabled" sx={{ display: 'block', textAlign: 'center', py: 2 }}>
+                            Không tìm thấy nhân viên
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+                  </Droppable>
+                ) : (
                 <FormGroup>
-                  {users.map((user) => {
+                  {filteredBulkUsers.map((user) => {
                     const regCount = bulkRegistrationCountMap.get(user.id) || 0;
                     const isOnlyReg = bulkOnlyRegisteredIds.includes(user.id);
                     return (
@@ -2103,7 +2386,9 @@ export default function AttendanceAssignmentsView() {
                     );
                   })}
                 </FormGroup>
+                )}
               </Box>
+              {!dragModeOn && (
               <Box sx={{ p: 1, borderTop: '1px solid', borderColor: 'divider' }}>
                 <Button
                   size="small"
@@ -2118,6 +2403,7 @@ export default function AttendanceAssignmentsView() {
                   {bulkStaffIds.length === users.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
                 </Button>
               </Box>
+              )}
             </Box>
 
             {/* ===== Right: Week Calendar ===== */}
@@ -2266,6 +2552,77 @@ export default function AttendanceAssignmentsView() {
                           if (excludedIds.length > 0) tooltipParts.push(`Ngoại trừ (${excludedIds.length}): ${excludedIds.map((id) => staffInfoMap.get(id)?.name || id).join(', ')}`);
                           tooltipParts.push('Chuột phải để chỉ định / ngoại trừ');
                           const tooltipTitle = tooltipParts.join('\n');
+
+                          if (dragModeOn) {
+                            const draftStaffIds = draftAssignments[slotKey] || [];
+                            return (
+                              <Droppable key={schedule.id} droppableId={`cell:${slotKey}`} type="STAFF">
+                                {(provided, snapshot) => (
+                                  <Box
+                                    ref={provided.innerRef}
+                                    {...provided.droppableProps}
+                                    sx={{
+                                      mb: 0.5,
+                                      p: 0.75,
+                                      minHeight: 56,
+                                      borderRadius: 1,
+                                      position: 'relative',
+                                      bgcolor: snapshot.isDraggingOver
+                                        ? alpha(schedule.color, 0.28)
+                                        : alpha(schedule.color, 0.07),
+                                      border: '2px dashed',
+                                      borderColor: snapshot.isDraggingOver ? schedule.color : alpha(schedule.color, 0.4),
+                                      transition: 'all 0.15s',
+                                    }}
+                                  >
+                                    <Typography
+                                      variant="caption"
+                                      fontWeight={600}
+                                      noWrap
+                                      sx={{ color: schedule.color, display: 'block' }}
+                                    >
+                                      {schedule.templateName}
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                      noWrap
+                                      sx={{ display: 'block', mb: 0.25 }}
+                                    >
+                                      {schedule.startTime}–{schedule.endTime}
+                                    </Typography>
+                                    {draftStaffIds.map((staffId) => (
+                                      <Chip
+                                        key={staffId}
+                                        size="small"
+                                        label={staffInfoMap.get(staffId)?.name || staffId}
+                                        onDelete={() => handleRemoveFromDraftCell(slotKey, staffId)}
+                                        sx={{
+                                          display: 'flex',
+                                          mb: 0.4,
+                                          height: 20,
+                                          fontSize: 10,
+                                          '& .MuiChip-label': { px: 0.75 },
+                                          '& .MuiChip-deleteIcon': { fontSize: 14, mr: 0.25 },
+                                        }}
+                                      />
+                                    ))}
+                                    {provided.placeholder}
+                                    {draftStaffIds.length === 0 && (
+                                      <Typography
+                                        variant="caption"
+                                        color="text.disabled"
+                                        sx={{ display: 'block', textAlign: 'center' }}
+                                      >
+                                        Thả NV vào đây
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                )}
+                              </Droppable>
+                            );
+                          }
+
                           return (
                             <Tooltip
                               key={schedule.id}
@@ -2404,6 +2761,7 @@ export default function AttendanceAssignmentsView() {
               </Box>
             </Box>
           </Stack>
+          </DragDropContext>
           ) : (
           /* ===== Mobile: tab-based layout ===== */
           <Box sx={{ flex: 1, overflow: 'auto' }}>
@@ -2739,53 +3097,123 @@ export default function AttendanceAssignmentsView() {
           )}
         </DialogContent>
         <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
-          <Tooltip title="Khi bật: gỡ những nhân viên chưa được chọn khỏi ca rồi thêm nhân viên đang chọn. Nhân viên đã chấm công sẽ được giữ nguyên.">
-            <FormControlLabel
-              sx={{ mr: 'auto' }}
-              control={
-                <Checkbox
-                  checked={bulkOverwrite}
-                  onChange={(e) => setBulkOverwrite(e.target.checked)}
-                />
-              }
-              label="Ghi đè ca đã có người"
-            />
-          </Tooltip>
-          <Button variant="outlined" onClick={bulkDialog.onFalse}>
+          {!dragModeOn && (
+            <Tooltip title="Khi bật: gỡ những nhân viên chưa được chọn khỏi ca rồi thêm nhân viên đang chọn. Nhân viên đã chấm công sẽ được giữ nguyên.">
+              <FormControlLabel
+                sx={{ mr: 'auto' }}
+                control={
+                  <Checkbox
+                    checked={bulkOverwrite}
+                    onChange={(e) => setBulkOverwrite(e.target.checked)}
+                  />
+                }
+                label="Ghi đè ca đã có người"
+              />
+            </Tooltip>
+          )}
+          <Button variant="outlined" onClick={bulkDialog.onFalse} sx={dragModeOn ? { mr: 'auto' } : undefined}>
             Hủy
           </Button>
-          <Tooltip title="Đặt lại phân công TẤT CẢ ca trong tuần đang xem = đúng tập nhân viên đã check-in (khôi phục hàng loạt khi lỡ ghi đè)">
+          <Tooltip title="Đặt lại phân công TẤT CẢ ca trong tuần đang xem = đúng tập nhân viên đã check-in (khôi phục hàng loạt khi lỡ ghi đè). Yêu cầu mã xác nhận.">
             <LoadingButton
               variant="outlined"
               color="warning"
               loading={syncingWeek}
-              onClick={handleSyncWeekFromCheckin}
+              onClick={() => requestSyncFromCheckinCode(handleSyncWeekFromCheckin)}
               startIcon={<Iconify icon="solar:refresh-bold" />}
             >
               Set lại từ chấm công
             </LoadingButton>
           </Tooltip>
-          <Tooltip title={bulkStaffIds.length === 0 && !hasAnyDesignation ? 'Hãy chọn nhân viên hoặc chỉ định nhân viên cho ca trước' : 'Phân công tự động cho toàn tuần: nhân viên chỉ định luôn được xếp trước (bỏ qua rule), sau đó ưu tiên nhân viên đăng ký ca → ca ưa thích → số ca ít → đúng giờ. Hiển thị preview trước khi lưu.'}>
-            <span>
-              <Button
-                variant="outlined"
-                color="info"
-                onClick={handleAutoAssign}
-                disabled={bulkStaffIds.length === 0 && !hasAnyDesignation}
-                startIcon={<Iconify icon="eva:flash-fill" />}
-              >
-                Phân công tự động
-              </Button>
-            </span>
-          </Tooltip>
-          <LoadingButton
-            variant="contained"
-            onClick={handleBulkAssign}
-            loading={bulkAssigning}
-            disabled={bulkStaffIds.length === 0 || bulkSelectedSlots.length === 0}
-          >
-            Phân công {bulkStaffIds.length} NV × {bulkSelectedSlots.length} ca
-          </LoadingButton>
+          {!dragModeOn && (
+            <Tooltip title={bulkStaffIds.length === 0 && !hasAnyDesignation ? 'Hãy chọn nhân viên hoặc chỉ định nhân viên cho ca trước' : 'Phân công tự động cho toàn tuần: nhân viên chỉ định luôn được xếp trước (bỏ qua rule), sau đó ưu tiên nhân viên đăng ký ca → ca ưa thích → số ca ít → đúng giờ. Hiển thị preview trước khi lưu.'}>
+              <span>
+                <Button
+                  variant="outlined"
+                  color="info"
+                  onClick={handleAutoAssign}
+                  disabled={bulkStaffIds.length === 0 && !hasAnyDesignation}
+                  startIcon={<Iconify icon="eva:flash-fill" />}
+                >
+                  Phân công tự động
+                </Button>
+              </span>
+            </Tooltip>
+          )}
+          {dragModeOn ? (
+            <LoadingButton
+              variant="contained"
+              onClick={handleSaveDragDraft}
+              loading={savingDraft}
+              disabled={draftChangedSlotKeys.length === 0}
+            >
+              Lưu thay đổi {draftChangedSlotKeys.length > 0 ? `(${draftChangedSlotKeys.length} ca)` : ''}
+            </LoadingButton>
+          ) : (
+            <LoadingButton
+              variant="contained"
+              onClick={handleBulkAssign}
+              loading={bulkAssigning}
+              disabled={bulkStaffIds.length === 0 || bulkSelectedSlots.length === 0}
+            >
+              Phân công {bulkStaffIds.length} NV × {bulkSelectedSlots.length} ca
+            </LoadingButton>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Xác nhận gỡ NV đã có chấm công (chế độ kéo-thả) */}
+      <ConfirmDialog
+        open={!!removeConfirmTarget}
+        onClose={() => setRemoveConfirmTarget(null)}
+        title="Nhân viên đã có chấm công"
+        content={
+          <>
+            <strong>{removeConfirmTarget?.staffName}</strong> đã check-in ca này lúc{' '}
+            {removeConfirmTarget?.checkInTime
+              ? new Date(removeConfirmTarget.checkInTime).toLocaleString('vi-VN')
+              : ''}
+            . Bạn có chắc muốn gỡ khỏi ca? (Chỉ Admin mới lưu được thay đổi này khi bấm Lưu.)
+          </>
+        }
+        action={
+          <Button variant="contained" color="error" onClick={confirmRemoveWithCheckin}>
+            Vẫn gỡ
+          </Button>
+        }
+      />
+
+      {/* Khóa mã 6 số trước khi "Set lại từ chấm công" */}
+      <Dialog open={codeGateOpen} onClose={() => setCodeGateOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Nhập mã xác nhận</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Thao tác này sẽ ghi đè phân công theo dữ liệu chấm công thực tế. Nhập mã xác nhận 6 số để tiếp tục.
+          </Typography>
+          <TextField
+            fullWidth
+            autoFocus
+            label="Mã xác nhận"
+            value={codeGateValue}
+            onChange={(e) => {
+              setCodeGateValue(e.target.value.replace(/\D/g, '').slice(0, 6));
+              setCodeGateError('');
+            }}
+            error={!!codeGateError}
+            helperText={codeGateError || ' '}
+            inputProps={{ inputMode: 'numeric', maxLength: 6 }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleConfirmCodeGate();
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button variant="outlined" onClick={() => setCodeGateOpen(false)}>
+            Hủy
+          </Button>
+          <Button variant="contained" onClick={handleConfirmCodeGate} disabled={codeGateValue.length !== 6}>
+            Xác nhận
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -3540,7 +3968,7 @@ export default function AttendanceAssignmentsView() {
                   color="warning"
                   variant="outlined"
                   startIcon={<Iconify icon="solar:refresh-bold" />}
-                  onClick={handleSyncFromCheckin}
+                  onClick={() => requestSyncFromCheckinCode(handleSyncFromCheckin)}
                   loading={syncingFromCheckin}
                 >
                   Set lại từ chấm công

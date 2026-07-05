@@ -8,7 +8,23 @@ const axiosInstance = axios.create({ baseURL: HOST_API });
 
 axiosInstance.interceptors.response.use(
   (res: any) => res,
-  (error: any) => Promise.reject((error.response && error.response.data) || 'Something went wrong')
+  (error: any) => {
+    // BE re-kiểm tra status mỗi request (xem ActiveUserJwtEvents ở Core-be) —
+    // banned/pending giữa phiên trả 401 dù access token còn hạn. Đăng xuất
+    // ngay thay vì để user thấy lỗi API lặp lại tới khi token hết hạn tự nhiên.
+    if (
+      typeof window !== 'undefined' &&
+      error?.response?.status === 401 &&
+      sessionStorage.getItem('accessToken') &&
+      !window.location.pathname.startsWith('/auth/')
+    ) {
+      sessionStorage.removeItem('accessToken');
+      sessionStorage.removeItem('refreshToken');
+      delete axiosInstance.defaults.headers.common.Authorization;
+      window.location.href = '/auth/jwt/login';
+    }
+    return Promise.reject((error.response && error.response.data) || 'Something went wrong');
+  }
 );
 
 export default axiosInstance;
@@ -45,6 +61,7 @@ export const endpoints = {
   },
   users: {
     list: '/users',
+    activeStaff: '/users/active-staff',
     details: (id: string) => `/users/${id}`,
     update: (id: string) => `/users/${id}`,
     delete: (id: string) => `/users/${id}`,
