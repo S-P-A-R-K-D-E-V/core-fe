@@ -6,6 +6,7 @@ import Alert from '@mui/material/Alert';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
@@ -64,7 +65,11 @@ type Props = {
   open: boolean;
   fromDate: string; // yyyy-MM-dd
   onClose: VoidFunction;
-  onProceed: VoidFunction; // called when user clicks "Tiếp tục"
+  /**
+   * Gọi khi bấm "Tiếp tục tính lương". `userIds` = danh sách nhân viên được
+   * tích chọn; `null` = chọn tất cả (giữ hành vi cũ — BE tính mọi NV active).
+   */
+  onProceed: (userIds: string[] | null) => void;
 };
 
 export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onProceed }: Props) {
@@ -72,6 +77,9 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onP
 
   const [items, setItems] = useState<ISalaryConfigPreviewItem[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Nhân viên được tích chọn để tính lương — mặc định chọn tất cả sau khi tải.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // Which row is currently being edited (userId → null = none)
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -89,7 +97,9 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onP
       // user — in that case we hide them.
       // This mirrors the BE's .Any(ur => ur.Role.Name == "Staff") behavior:
       // a user with Admin+Staff roles still passes (inclusive, not exclusive).
-      setItems(data.filter((item) => item.isStaff !== false));
+      const filtered = data.filter((item) => item.isStaff !== false);
+      setItems(filtered);
+      setSelected(new Set(filtered.map((i) => i.userId)));
     } catch {
       enqueueSnackbar('Không tải được cấu hình lương', { variant: 'error' });
     } finally {
@@ -102,6 +112,30 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onP
   }, [open, fetchPreview]);
 
   const missingCount = items.filter((i) => !i.hasActiveConfig).length;
+
+  const toggleSelect = (userId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected((prev) =>
+      prev.size === items.length ? new Set<string>() : new Set(items.map((i) => i.userId))
+    );
+  };
+
+  const handleProceed = () => {
+    if (selected.size === 0) {
+      enqueueSnackbar('Hãy chọn ít nhất 1 nhân viên để tính lương', { variant: 'warning' });
+      return;
+    }
+    // Chọn tất cả → null để BE giữ hành vi cũ (tính mọi NV active).
+    onProceed(selected.size === items.length ? null : Array.from(selected));
+  };
 
   const handleStartEdit = (item: ISalaryConfigPreviewItem) => {
     setEditingUserId(item.userId);
@@ -214,6 +248,13 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onP
               <Table size="small">
                 <TableHead>
                   <TableRow>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        indeterminate={selected.size > 0 && selected.size < items.length}
+                        checked={items.length > 0 && selected.size === items.length}
+                        onChange={toggleSelectAll}
+                      />
+                    </TableCell>
                     <TableCell>Nhân viên</TableCell>
                     <TableCell>Loại lương</TableCell>
                     <TableCell align="right">Mức lương</TableCell>
@@ -235,6 +276,12 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onP
                             : undefined,
                         }}
                       >
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={selected.has(item.userId)}
+                            onChange={() => toggleSelect(item.userId)}
+                          />
+                        </TableCell>
                         <TableCell>
                           <Stack direction="row" spacing={1} alignItems="center">
                             <Avatar sx={{ width: 28, height: 28, fontSize: '0.75rem' }}>
@@ -305,7 +352,7 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onP
 
                       {/* Inline edit row */}
                       <TableRow key={`${item.userId}-edit`}>
-                        <TableCell colSpan={7} sx={{ p: 0, borderBottom: 0 }}>
+                        <TableCell colSpan={8} sx={{ p: 0, borderBottom: 0 }}>
                           <Collapse in={editingUserId === item.userId} unmountOnExit>
                             <Box sx={{ p: 2, bgcolor: 'background.neutral', borderTop: '1px solid', borderColor: 'divider' }}>
                               <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
@@ -407,10 +454,11 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onP
         </Button>
         <Button
           variant="contained"
-          onClick={onProceed}
+          onClick={handleProceed}
+          disabled={selected.size === 0}
           endIcon={<Iconify icon="solar:arrow-right-bold" width={18} />}
         >
-          Tiếp tục tính lương
+          Tiếp tục tính lương ({selected.size}/{items.length})
         </Button>
       </DialogActions>
     </Dialog>

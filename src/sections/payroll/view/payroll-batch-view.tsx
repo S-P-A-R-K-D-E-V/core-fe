@@ -15,9 +15,11 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
 import Tab from '@mui/material/Tab';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -75,7 +77,7 @@ import {
   waivePenalty,
 } from 'src/api/payroll';
 import { adjustAttendanceTime } from 'src/api/attendance';
-import { getAllPayrollCycles } from 'src/api/payrollCycle';
+import { getAllPayrollCycles, setPayrollCycleVisibility } from 'src/api/payrollCycle';
 
 import SalaryConfigPreviewDialog from 'src/components/salary-config-preview-dialog';
 import PaymentQRDialog from 'src/components/payment-qr-dialog';
@@ -114,6 +116,7 @@ export default function PayrollBatchView() {
   const [generating, setGenerating] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
+  const [visibilityUpdating, setVisibilityUpdating] = useState(false);
   const [recalculatingRecordId, setRecalculatingRecordId] = useState<string | null>(null);
 
   // Track unfinalized record counts per cycle (populated after loading each cycle)
@@ -225,15 +228,45 @@ export default function PayrollBatchView() {
 
   // ── Actual API calls (invoked after salary config review) ────────────────
 
-  const executeRecalculate = async () => {
+  const executeRecalculate = async (userIds: string[] | null) => {
     if (!selectedCycleId) return;
     try {
       setRecalculating(true);
-      const result: IBatchPayrollResponse = await recalculatePayrollByCycle(selectedCycleId);
-      enqueueSnackbar(
-        `Tính lại thành công! ${result.successCount} nhân viên`,
-        { variant: 'success' }
-      );
+
+      if (userIds === null) {
+        // Chọn tất cả → tính lại toàn kỳ như cũ (recalculate-cycle).
+        const result: IBatchPayrollResponse = await recalculatePayrollByCycle(selectedCycleId);
+        enqueueSnackbar(`Tính lại thành công! ${result.successCount} nhân viên`, {
+          variant: 'success',
+        });
+      } else {
+        // Chọn một phần → tính lại TỪNG record của các NV được chọn.
+        // (Không dùng recalculate-cycle vì nó xoá và tính lại TẤT CẢ record,
+        // kể cả nhân viên không được chọn / đã chốt.)
+        const chosen = new Set(userIds);
+        const seen = new Set<string>();
+        const targets = (cycleDetail?.records ?? []).filter((r) => {
+          if (!chosen.has(r.userId) || seen.has(r.userId)) return false;
+          seen.add(r.userId);
+          return true;
+        });
+        let success = 0;
+        let failed = 0;
+        for (const record of targets) {
+          try {
+            await recalculatePayrollRecord(record.id);
+            success += 1;
+          } catch {
+            failed += 1;
+          }
+        }
+        const skipped = userIds.length - targets.length;
+        enqueueSnackbar(
+          `Tính lại ${success} nhân viên${failed ? `, lỗi ${failed}` : ''}${skipped ? `, ${skipped} chưa có bảng lương trong kỳ` : ''}`,
+          { variant: failed ? 'warning' : 'success' }
+        );
+      }
+
       setSelectedIds(new Set()); // clear selection on data refresh
       await fetchCycleDetail(selectedCycleId);
       await fetchSummaryAndCalendar(selectedCycleId);
@@ -245,7 +278,7 @@ export default function PayrollBatchView() {
     }
   };
 
-  const executeGenerateBatch = async () => {
+  const executeGenerateBatch = async (userIds: string[] | null) => {
     if (!periodName || !fromDate || !toDate) return;
     try {
       setGenerating(true);
@@ -253,6 +286,7 @@ export default function PayrollBatchView() {
         periodName,
         fromDate,
         toDate,
+        userIds,
       });
 
       enqueueSnackbar(
@@ -276,6 +310,33 @@ export default function PayrollBatchView() {
     }
   };
 
+  // Bật/tắt hiển thị chu kỳ cho nhân viên (staff chỉ thấy my-payroll khi bật).
+  const handleToggleVisibility = async () => {
+    if (!cycleDetail) return;
+    const next = !cycleDetail.isVisibleToStaff;
+    try {
+      setVisibilityUpdating(true);
+      await setPayrollCycleVisibility(cycleDetail.cycleId, { isVisibleToStaff: next });
+      setCycleDetail((prev) => (prev ? { ...prev, isVisibleToStaff: next } : prev));
+      setCycles((prev) =>
+        prev.map((c) => (c.id === cycleDetail.cycleId ? { ...c, isVisibleToStaff: next } : c))
+      );
+      enqueueSnackbar(
+        next
+          ? 'Đã bật hiển thị — nhân viên xem được bảng lương kỳ này'
+          : 'Đã ẩn bảng lương kỳ này với nhân viên',
+        { variant: 'success' }
+      );
+    } catch (error: any) {
+      console.error('Failed to toggle cycle visibility:', error);
+      enqueueSnackbar(error?.message || 'Không cập nhật được trạng thái hiển thị', {
+        variant: 'error',
+      });
+    } finally {
+      setVisibilityUpdating(false);
+    }
+  };
+
   // ── Interceptors that show salary config preview first ───────────────────
 
   const handleRecalculate = () => {
@@ -294,10 +355,10 @@ export default function PayrollBatchView() {
     setSalaryConfigOpen(true);
   };
 
-  const handleSalaryConfigProceed = async () => {
+  const handleSalaryConfigProceed = async (userIds: string[] | null) => {
     setSalaryConfigOpen(false);
-    if (pendingAction === 'generate') await executeGenerateBatch();
-    if (pendingAction === 'recalculate') await executeRecalculate();
+    if (pendingAction === 'generate') await executeGenerateBatch(userIds);
+    if (pendingAction === 'recalculate') await executeRecalculate(userIds);
     setPendingAction(null);
   };
 
@@ -725,6 +786,32 @@ export default function PayrollBatchView() {
                 <Typography variant="body2" color="text.secondary">
                   ({records.length} nhân viên)
                 </Typography>
+                <Box sx={{ flexGrow: 1 }} />
+                <Tooltip
+                  title={
+                    cycleDetail.isVisibleToStaff
+                      ? 'Nhân viên đang xem được bảng lương kỳ này ở "Lương của tôi"'
+                      : 'Đang ẩn — nhân viên chưa xem được bảng lương kỳ này'
+                  }
+                >
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        size="small"
+                        color="success"
+                        checked={cycleDetail.isVisibleToStaff}
+                        onChange={handleToggleVisibility}
+                        disabled={visibilityUpdating}
+                      />
+                    }
+                    label={
+                      <Typography variant="body2" color={cycleDetail.isVisibleToStaff ? 'success.main' : 'text.secondary'}>
+                        {cycleDetail.isVisibleToStaff ? 'NV xem được' : 'Ẩn với NV'}
+                      </Typography>
+                    }
+                    sx={{ mr: 0 }}
+                  />
+                </Tooltip>
               </Stack>
             )}
 

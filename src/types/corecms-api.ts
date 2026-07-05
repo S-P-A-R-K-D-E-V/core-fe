@@ -682,6 +682,8 @@ export interface IBatchPayrollCalculationRequest {
   periodName: string;
   fromDate: string; // "yyyy-MM-dd"
   toDate: string;   // "yyyy-MM-dd"
+  /** Chỉ tính cho các nhân viên này; bỏ trống/null = tất cả nhân viên active. */
+  userIds?: string[] | null;
 }
 
 export interface IBatchPayrollResponse {
@@ -701,6 +703,8 @@ export interface IPayrollCycleDetailResponse {
   fromDate: string;
   toDate: string;
   isLocked: boolean;
+  /** false = staff không thấy bảng lương của chu kỳ này ở my-payroll. */
+  isVisibleToStaff: boolean;
   records: IPayrollRecord[];
 }
 
@@ -1015,10 +1019,16 @@ export interface IPayrollCycle {
   toDate: string;
   standardWorkDays: number;
   isLocked: boolean;
+  /** false = staff không thấy bảng lương của chu kỳ này ở my-payroll. */
+  isVisibleToStaff: boolean;
   lockedBy?: string;
   lockedByName?: string;
   lockedAt?: string;
   createdAt: string;
+}
+
+export interface ISetPayrollCycleVisibilityRequest {
+  isVisibleToStaff: boolean;
 }
 
 export interface ICreatePayrollCycleRequest {
