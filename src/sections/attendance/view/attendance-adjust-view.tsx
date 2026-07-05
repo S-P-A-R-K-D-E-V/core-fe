@@ -57,7 +57,7 @@ import {
     getShiftSchedulesByDateRange,
     adjustAttendanceTime,
 } from 'src/api/attendance';
-import { getAllUsers } from 'src/api/users';
+import { getActiveStaffUsers } from 'src/api/users';
 
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 
@@ -188,7 +188,7 @@ export default function AttendanceAdjustView() {
             try {
                 const [s, u] = await Promise.all([
                     getShiftSchedulesByDateRange(fromDate, toDate),
-                    getAllUsers(),
+                    getActiveStaffUsers(),
                 ]);
                 setSchedules(s.filter((sc) => sc.isActive));
                 setUsers(u);

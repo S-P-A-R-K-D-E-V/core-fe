@@ -44,7 +44,7 @@ import {
   getAllSalaryConfigurations,
   updateSalaryConfiguration,
 } from 'src/api/salary';
-import { getAllUsers } from 'src/api/users';
+import { getActiveStaffUsers } from 'src/api/users';
 
 
 // ----------------------------------------------------------------------
@@ -128,7 +128,7 @@ export default function SalaryConfigurationView() {
   }, [fetchSalaries, pageNumber, pageSize]);
 
   useEffect(() => {
-    getAllUsers().then(setUsers).catch(console.error);
+    getActiveStaffUsers().then(setUsers).catch(console.error);
   }, []);
 
   // --- Create ---
