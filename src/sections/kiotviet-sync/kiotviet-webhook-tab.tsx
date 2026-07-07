@@ -115,7 +115,7 @@ export default function KiotVietWebhookTab() {
               </Label>
               <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                 <Typography variant="body2" fontWeight={600}>
-                  {w.type || 'all'}
+                  {w.events?.length ? w.events.join(', ') : 'all'}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
                   {w.url}

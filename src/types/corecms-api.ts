@@ -1804,7 +1804,7 @@ export interface IKiotVietFailedPushPagedResponse {
 
 export interface IKiotVietWebhook {
   id: number;
-  type?: string;
+  events?: string[];
   url?: string;
   isActive: boolean;
   description?: string;
