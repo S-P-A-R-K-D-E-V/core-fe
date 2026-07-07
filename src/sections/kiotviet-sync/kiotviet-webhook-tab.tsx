@@ -55,8 +55,16 @@ export default function KiotVietWebhookTab() {
   const handleRegister = useCallback(async () => {
     setRegistering(true);
     try {
-      await registerWebhook();
-      enqueueSnackbar('Đã đăng ký webhook KiotViet', { variant: 'success' });
+      const result = await registerWebhook();
+      if (result.registered.length > 0) {
+        enqueueSnackbar(`Đã đăng ký ${result.registered.length} webhook KiotViet`, { variant: 'success' });
+      }
+      if (result.failed.length > 0) {
+        enqueueSnackbar(
+          `${result.failed.length} loại thất bại: ${result.failed.map((f) => `${f.type} (${f.message})`).join('; ')}`,
+          { variant: 'warning' }
+        );
+      }
       fetchAll();
     } catch (error: any) {
       enqueueSnackbar(
@@ -115,7 +123,7 @@ export default function KiotVietWebhookTab() {
               </Label>
               <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                 <Typography variant="body2" fontWeight={600}>
-                  {w.events?.length ? w.events.join(', ') : 'all'}
+                  {w.type || 'all'}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
                   {w.url}
