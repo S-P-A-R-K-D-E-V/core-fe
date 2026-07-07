@@ -42,7 +42,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 import { ISalesOrder, IKiotVietBankAccount } from 'src/types/corecms-api';
-import { getAllSalesOrders, exportSalesOrdersExcel } from 'src/api/sales-orders';
+import { getAllSalesOrders, exportSalesOrdersExcel, retryPushSalesOrder } from 'src/api/sales-orders';
 import { getBankAccounts } from 'src/api/bank-accounts';
 
 // ----------------------------------------------------------------------
@@ -83,10 +83,27 @@ const TABLE_HEAD = [
   { id: 'totalAmount', label: 'Tổng tiền', width: 140, align: 'right' as const },
   { id: 'status', label: 'Trạng thái', width: 130 },
   { id: 'paymentStatus', label: 'Thanh toán', width: 130 },
+  { id: 'kiotVietSyncStatus', label: 'KiotViet', width: 130 },
   { id: 'createdByName', label: 'Người tạo', width: 150 },
   { id: 'createdAt', label: 'Ngày tạo', width: 170 },
   { id: '', width: 100 },
 ];
+
+const KIOTVIET_SYNC_COLOR: Record<string, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
+  None: 'default',
+  Pending: 'warning',
+  Pushing: 'info',
+  Synced: 'success',
+  Failed: 'error',
+};
+
+const KIOTVIET_SYNC_LABEL: Record<string, string> = {
+  None: 'Từ KiotViet',
+  Pending: 'Chờ đồng bộ',
+  Pushing: 'Đang đồng bộ',
+  Synced: 'Đã đồng bộ',
+  Failed: 'Lỗi đồng bộ',
+};
 
 // ----------------------------------------------------------------------
 
@@ -169,6 +186,16 @@ export default function SalesOrderListView() {
   const handleEditRow = useCallback((id: string) => {
     router.push(paths.dashboard.pos.salesOrder.edit(id));
   }, [router]);
+
+  const handleRetryPush = useCallback(async (id: string) => {
+    try {
+      await retryPushSalesOrder(id);
+      enqueueSnackbar('Đã gửi yêu cầu đồng bộ lại lên KiotViet', { variant: 'success' });
+      fetchData();
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || 'Không thể đồng bộ lại', { variant: 'error' });
+    }
+  }, [enqueueSnackbar, fetchData]);
 
   return (
     <Container maxWidth="lg">
@@ -283,6 +310,28 @@ export default function SalesOrderListView() {
                       <Label variant="soft" color={PAYMENT_STATUS_COLOR[row.paymentStatus]}>
                         {PAYMENT_STATUS_LABEL[row.paymentStatus] || row.paymentStatus}
                       </Label>
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title={row.kiotVietSyncError || row.kiotVietOrderCode || ''}>
+                        <span>
+                          <Label
+                            variant="soft"
+                            color={KIOTVIET_SYNC_COLOR[row.kiotVietSyncStatus || 'None']}
+                          >
+                            {KIOTVIET_SYNC_LABEL[row.kiotVietSyncStatus || 'None'] || row.kiotVietSyncStatus}
+                          </Label>
+                        </span>
+                      </Tooltip>
+                      {(row.kiotVietSyncStatus === 'Failed' || row.kiotVietSyncStatus === 'Pending') && (
+                        <Tooltip title="Đẩy lại lên KiotViet">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); handleRetryPush(row.id); }}
+                          >
+                            <Iconify icon="solar:refresh-bold" width={16} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </TableCell>
                     <TableCell>{row.createdByName}</TableCell>
                     <TableCell>{fDateTime(row.createdAt)}</TableCell>

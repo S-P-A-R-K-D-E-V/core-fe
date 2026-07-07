@@ -41,6 +41,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 import { fCurrency } from 'src/utils/format-number';
+import { useAuthContext } from 'src/auth/hooks';
 
 import { IProduct, IProductListItem, IProductChild, ICustomer, IWarehouse } from 'src/types/corecms-api';
 import { getAllProducts } from 'src/api/products';
@@ -155,6 +156,8 @@ function createEmptyOrder(): DraftOrder {
 export default function PosSaleView() {
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
+  const { user } = useAuthContext();
+  const sellerName = user ? `${user.lastName || ''} ${user.firstName || ''}`.trim() || user.email : 'Admin';
 
   // Restore dialog
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
@@ -625,23 +628,30 @@ export default function PosSaleView() {
           discount: activeOrder.discountAmount,
           totalPayment: grandTotal > 0 ? grandTotal : 0,
           method: payments[0]?.method || 'Cash',
+          warehouseId: selectedWarehouse.id,
+          note: activeOrder.note || undefined,
+          couponCode: activeOrder.couponCode || undefined,
+          soldByName: sellerName,
           invoiceDetails: activeOrder.items.map((item) => ({
             productId: item.productId,
+            productVariantId: item.productVariantId || undefined,
             productCode: item.sku || undefined,
             productName: item.name,
             quantity: item.quantity,
             price: item.unitPrice,
             discount: item.discountAmount,
+            note: item.note || undefined,
           })),
           payments: payments
             .filter((p) => p.amount > 0)
             .map((p) => ({
               method: p.method,
               amount: p.amount,
+              transactionRef: p.transactionRef || undefined,
             })),
         });
 
-        enqueueSnackbar('Thanh toán thành công!', { variant: 'success' });
+        enqueueSnackbar('Đã tạo đơn — đang đồng bộ KiotViet', { variant: 'success' });
         setPaymentDrawerOpen(false);
 
         // Reset current order and relabel
@@ -665,7 +675,7 @@ export default function PosSaleView() {
         enqueueSnackbar(message, { variant: 'error' });
       }
     },
-    [activeOrder, activeOrderId, selectedWarehouse, enqueueSnackbar]
+    [activeOrder, activeOrderId, selectedWarehouse, sellerName, enqueueSnackbar]
   );
 
   // Quick sale payment
@@ -1275,7 +1285,7 @@ export default function PosSaleView() {
               <Stack spacing={0.75} sx={{ px: 2, py: 1.5, bgcolor: theme.palette.grey[50] }}>
                 <Stack direction="row" justifyContent="space-between">
                   <Typography variant="caption" color="text.secondary">Người bán</Typography>
-                  <Typography variant="caption" fontWeight={600}>Admin</Typography>
+                  <Typography variant="caption" fontWeight={600}>{sellerName}</Typography>
                 </Stack>
                 <Stack direction="row" justifyContent="space-between">
                   <Typography variant="caption" color="text.secondary">Thời gian</Typography>
@@ -1775,7 +1785,7 @@ export default function PosSaleView() {
         customerName={activeOrder.customerName}
         customers={customers}
         warehouseName={selectedWarehouse?.name}
-        sellerName="Admin"
+        sellerName={sellerName}
         onCustomerChange={handleSetCustomer}
         onDiscountChange={handleSetDiscount}
         onCouponChange={handleSetCoupon}

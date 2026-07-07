@@ -274,6 +274,8 @@ export const endpoints = {
     syncRunning: '/kiotviet/sync/running',
     transform: '/kiotviet/transform',
     syncAndTransform: '/kiotviet/sync-and-transform',
+    pushRetry: (id: string) => `/kiotviet/push/sales-orders/${id}/retry`,
+    pushFailed: '/kiotviet/push/failed',
   },
   shiftRegistrations: {
     register: '/shift-registrations/register',

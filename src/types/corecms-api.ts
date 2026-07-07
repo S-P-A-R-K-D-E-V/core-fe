@@ -2133,6 +2133,12 @@ export interface ISalesOrder {
   updatedAt?: string;
   items: ISalesOrderItem[];
   payments: IPayment[];
+  /** Trạng thái đẩy đơn lên KiotViet: None|Pending|Pushing|Synced|Failed */
+  kiotVietSyncStatus?: string;
+  kiotVietSyncError?: string;
+  kiotVietSyncAttempts?: number;
+  kiotVietSyncedAt?: string;
+  kiotVietOrderCode?: string;
 }
 
 export interface ISalesOrderItem {
@@ -2167,6 +2173,14 @@ export interface ICreateSalesOrderRequest {
   method?: string;
   invoiceDetails: ICreateInvoiceDetailRequest[];
   payments?: ICreateInvoicePaymentRequest[];
+  /** Kho FE chọn trên màn POS — BE trừ tồn kho đúng kho này */
+  warehouseId?: string;
+  /** Ghi chú đơn hàng */
+  note?: string;
+  /** Mã coupon áp dụng */
+  couponCode?: string;
+  /** Tên nhân viên bán (user đăng nhập) */
+  soldByName?: string;
 }
 
 export interface ICreateInvoiceDetailRequest {
@@ -2179,6 +2193,8 @@ export interface ICreateInvoiceDetailRequest {
   discountRatio?: number;
   note?: string;
   serialNumbers?: string;
+  /** Id product row biến thể (con) — BE trừ kho đúng biến thể */
+  productVariantId?: string;
 }
 
 export interface ICreateInvoicePaymentRequest {
@@ -2187,6 +2203,8 @@ export interface ICreateInvoicePaymentRequest {
   accountId?: number;
   voucherId?: number;
   voucherCampaignId?: number;
+  /** Mã tra soát giao dịch (QR/chuyển khoản) */
+  transactionRef?: string;
 }
 
 export interface IAddPaymentRequest {
