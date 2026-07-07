@@ -23,10 +23,14 @@ export async function getFailedPushes(page = 1, pageSize = 20): Promise<IKiotVie
   return response.data;
 }
 
-/** Đăng ký webhook KiotViet (mặc định tất cả loại event) trỏ về endpoint public đã cấu hình */
-export async function registerWebhook(type = 'all'): Promise<IKiotVietWebhook> {
+/**
+ * Đăng ký webhook KiotViet trỏ về endpoint public đã cấu hình.
+ * @param events Danh sách event ghi đè (vd ['product.updated', 'order.created']).
+ *   Bỏ trống → BE dùng danh sách mặc định (KiotVietWebhookEvents.Default).
+ */
+export async function registerWebhook(events?: string[]): Promise<IKiotVietWebhook> {
   const response = await axios.post<IKiotVietWebhook>(endpoints.kiotViet.webhooksRegister, null, {
-    params: { type },
+    params: events?.length ? { events: events.join(',') } : undefined,
   });
   return response.data;
 }
