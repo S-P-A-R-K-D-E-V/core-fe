@@ -1782,6 +1782,51 @@ export interface IKiotVietBankAccount {
   description?: string;
 }
 
+// --- KiotViet Push/Webhook monitoring (Admin) ---
+
+export interface IKiotVietFailedPush {
+  id: string;
+  code: string;
+  total: number;
+  customerName?: string;
+  createdDate: string;
+  kiotVietSyncStatus: string;
+  kiotVietSyncAttempts: number;
+  kiotVietSyncError?: string;
+}
+
+export interface IKiotVietFailedPushPagedResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  data: IKiotVietFailedPush[];
+}
+
+export interface IKiotVietWebhook {
+  id: number;
+  type?: string;
+  url?: string;
+  isActive: boolean;
+  description?: string;
+}
+
+export interface IKiotVietWebhookLog {
+  id: string;
+  event?: string;
+  processed: boolean;
+  processedAt?: string;
+  error?: string;
+  enqueuedJobId?: string;
+  receivedAt: string;
+}
+
+export interface IKiotVietWebhookLogPagedResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  data: IKiotVietWebhookLog[];
+}
+
 // --- KiotViet Sales Query (Admin) ---
 
 export interface IKiotVietSalesQueryParams {
@@ -2133,6 +2178,12 @@ export interface ISalesOrder {
   updatedAt?: string;
   items: ISalesOrderItem[];
   payments: IPayment[];
+  /** Trạng thái đẩy đơn lên KiotViet: None|Pending|Pushing|Synced|Failed */
+  kiotVietSyncStatus?: string;
+  kiotVietSyncError?: string;
+  kiotVietSyncAttempts?: number;
+  kiotVietSyncedAt?: string;
+  kiotVietOrderCode?: string;
 }
 
 export interface ISalesOrderItem {
@@ -2167,6 +2218,14 @@ export interface ICreateSalesOrderRequest {
   method?: string;
   invoiceDetails: ICreateInvoiceDetailRequest[];
   payments?: ICreateInvoicePaymentRequest[];
+  /** Kho FE chọn trên màn POS — BE trừ tồn kho đúng kho này */
+  warehouseId?: string;
+  /** Ghi chú đơn hàng */
+  note?: string;
+  /** Mã coupon áp dụng */
+  couponCode?: string;
+  /** Tên nhân viên bán (user đăng nhập) */
+  soldByName?: string;
 }
 
 export interface ICreateInvoiceDetailRequest {
@@ -2179,6 +2238,8 @@ export interface ICreateInvoiceDetailRequest {
   discountRatio?: number;
   note?: string;
   serialNumbers?: string;
+  /** Id product row biến thể (con) — BE trừ kho đúng biến thể */
+  productVariantId?: string;
 }
 
 export interface ICreateInvoicePaymentRequest {
@@ -2187,6 +2248,8 @@ export interface ICreateInvoicePaymentRequest {
   accountId?: number;
   voucherId?: number;
   voucherCampaignId?: number;
+  /** Mã tra soát giao dịch (QR/chuyển khoản) */
+  transactionRef?: string;
 }
 
 export interface IAddPaymentRequest {

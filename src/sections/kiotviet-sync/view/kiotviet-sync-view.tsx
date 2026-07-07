@@ -3,6 +3,8 @@
 import { useState, useEffect, useContext, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
@@ -24,14 +26,23 @@ import Iconify from 'src/components/iconify';
 
 import { SyncNotificationContext } from 'src/hooks/use-sync-notification';
 
+import KiotVietJobHistoryTab from '../kiotviet-job-history-tab';
+import KiotVietWebhookTab from '../kiotviet-webhook-tab';
+import KiotVietPendingPushTab from '../kiotviet-pending-push-tab';
+
 import type { ISyncJobStatus } from 'src/types/sync-job';
 
 import axios, { endpoints } from 'src/utils/axios';
 
 // Job types that belong to the "sync" card
 const SYNC_TYPES = new Set(['SyncAll', 'SyncInvoices', 'SyncPurchaseOrders', 'SyncAndTransform']);
-// Job types that belong to the "transform" card
-const TRANSFORM_TYPES = new Set(['Transform', 'SyncAndTransform']);
+
+const TABS = [
+  { value: 'sync', label: 'Đồng bộ', icon: 'mdi:cloud-sync' },
+  { value: 'history', label: 'Lịch sử', icon: 'mdi:history' },
+  { value: 'webhook', label: 'Webhook', icon: 'mdi:webhook' },
+  { value: 'pending-push', label: 'Đơn chờ đẩy', icon: 'mdi:cloud-upload-outline' },
+];
 
 // ----------------------------------------------------------------------
 
@@ -40,24 +51,20 @@ export default function KiotVietSyncView() {
   const { enqueueSnackbar } = useSnackbar();
   const { startSync, subscribeToJob, onJobUpdate } = useContext(SyncNotificationContext);
 
+  const [currentTab, setCurrentTab] = useState('sync');
   const [syncLoading, setSyncLoading] = useState(false);
-  const [transformLoading, setTransformLoading] = useState(false);
 
   // Khoảng thời gian lấy dữ liệu giao dịch (Order/Return/SalesOrder). Mặc định 01/01/2026 → hiện tại.
   const [fromDate, setFromDate] = useState('2026-01-01');
   const [toDate, setToDate] = useState('');
 
   const [syncJob, setSyncJob] = useState<ISyncJobStatus | null>(null);
-  const [transformJob, setTransformJob] = useState<ISyncJobStatus | null>(null);
 
   // Listen to SignalR real-time updates
   useEffect(() => {
     const unsubscribe = onJobUpdate((status: ISyncJobStatus) => {
       if (SYNC_TYPES.has(status.type)) {
         setSyncJob(status);
-      }
-      if (TRANSFORM_TYPES.has(status.type)) {
-        setTransformJob(status);
       }
     });
     return unsubscribe;
@@ -72,14 +79,6 @@ export default function KiotVietSyncView() {
     }
   }, [syncJob?.status, syncJob?.error, enqueueSnackbar]);
 
-  useEffect(() => {
-    if (transformJob?.status === 'Completed') {
-      enqueueSnackbar('Chuyển đổi hoàn thành!', { variant: 'success' });
-    } else if (transformJob?.status === 'Failed') {
-      enqueueSnackbar(transformJob.error || 'Chuyển đổi thất bại', { variant: 'error' });
-    }
-  }, [transformJob?.status, transformJob?.error, enqueueSnackbar]);
-
   // Check running jobs on mount and subscribe via SignalR
   useEffect(() => {
     const checkRunning = async () => {
@@ -89,13 +88,8 @@ export default function KiotVietSyncView() {
           setSyncJob(data.sync);
           subscribeToJob(data.sync.jobId);
         }
-        if (data.transform) {
-          setTransformJob(data.transform);
-          subscribeToJob(data.transform.jobId);
-        }
         if (data.syncAndTransform) {
           setSyncJob(data.syncAndTransform);
-          setTransformJob(data.syncAndTransform);
           subscribeToJob(data.syncAndTransform.jobId);
         }
       } catch (error) {
@@ -133,27 +127,6 @@ export default function KiotVietSyncView() {
       setSyncLoading(false);
     }
   }, [startSync, enqueueSnackbar, fromDate, toDate]);
-
-  const handleTransform = useCallback(async () => {
-    setTransformLoading(true);
-    setTransformJob(null);
-    try {
-      const jobId = await startSync('transform');
-      if (jobId) {
-        enqueueSnackbar('Đã bắt đầu chuyển đổi KiotViet → ERP', { variant: 'info' });
-      }
-    } catch (error: any) {
-      const status = error?.response?.status ?? error?.status;
-      const msg = error?.response?.data?.message ?? error?.message;
-      if (status === 409 || msg?.includes('đang chạy')) {
-        enqueueSnackbar('Đang có tiến trình chuyển đổi đang chạy', { variant: 'warning' });
-      } else {
-        enqueueSnackbar(msg || 'Không thể bắt đầu chuyển đổi', { variant: 'error' });
-      }
-    } finally {
-      setTransformLoading(false);
-    }
-  }, [startSync, enqueueSnackbar]);
 
   const renderJobStatus = (job: ISyncJobStatus | null, label: string) => {
     if (!job) return null;
@@ -262,110 +235,103 @@ export default function KiotVietSyncView() {
       />
 
       <RoleBasedGuard hasContent roles={['Admin']}>
-        <Stack spacing={3}>
-          {/* Sync KiotViet */}
-          <Card sx={{ p: 3 }}>
-            <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-              <Iconify icon="mdi:cloud-sync" width={32} sx={{ color: 'primary.main' }} />
-              <Box>
-                <Typography variant="h6">Đồng bộ dữ liệu KiotViet</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Tải toàn bộ dữ liệu từ KiotViet API về các bảng staging (KiotViet*)
-                </Typography>
-              </Box>
-            </Stack>
+        <Tabs
+          value={currentTab}
+          onChange={(_, value) => setCurrentTab(value)}
+          sx={{ mb: 3 }}
+        >
+          {TABS.map((tab) => (
+            <Tab
+              key={tab.value}
+              value={tab.value}
+              label={tab.label}
+              icon={<Iconify icon={tab.icon} width={20} />}
+              iconPosition="start"
+            />
+          ))}
+        </Tabs>
 
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Bao gồm: Chi nhánh, Danh mục, Nhóm KH, Nhà cung cấp, Khách hàng, Tài khoản NH,
-              Kênh bán hàng, Sản phẩm, Bảng giá, Đơn hàng, Trả hàng, Voucher...
-            </Typography>
+        {currentTab === 'sync' && (
+          <Stack spacing={3}>
+            <Card sx={{ p: 3 }}>
+              <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+                <Iconify icon="mdi:cloud-sync" width={32} sx={{ color: 'primary.main' }} />
+                <Box>
+                  <Typography variant="h6">Đồng bộ dữ liệu KiotViet</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Tải toàn bộ dữ liệu từ KiotViet API về các bảng KiotViet* — tầng dữ liệu vận hành duy nhất
+                  </Typography>
+                </Box>
+              </Stack>
 
-            {/* Khoảng thời gian — chỉ áp dụng cho Đơn đặt hàng, Trả hàng, Hóa đơn */}
-            <Stack
-              direction={{ xs: 'column', sm: 'row' }}
-              spacing={2}
-              alignItems={{ sm: 'center' }}
-              sx={{ mb: 1 }}
-            >
-              <DatePicker
-                label="Từ ngày"
-                value={parseDateStr(fromDate)}
-                onChange={(val) => setFromDate(toDateStr(val))}
-                format="dd/MM/yyyy"
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Bao gồm: Chi nhánh, Danh mục, Nhóm KH, Nhà cung cấp, Khách hàng, Tài khoản NH,
+                Kênh bán hàng, Sản phẩm, Bảng giá, Đơn hàng, Trả hàng, Voucher...
+              </Typography>
+
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Hệ thống tự động đồng bộ hóa đơn mỗi 30 phút, đồng bộ toàn bộ hằng đêm, và nhận
+                webhook gần thời gian thực (tab <strong>Webhook</strong>). Nút bên dưới dùng khi cần
+                đồng bộ ngay hoặc theo khoảng ngày cụ thể.
+              </Alert>
+
+              {/* Khoảng thời gian — chỉ áp dụng cho Đơn đặt hàng, Trả hàng, Hóa đơn */}
+              <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={2}
+                alignItems={{ sm: 'center' }}
+                sx={{ mb: 1 }}
+              >
+                <DatePicker
+                  label="Từ ngày"
+                  value={parseDateStr(fromDate)}
+                  onChange={(val) => setFromDate(toDateStr(val))}
+                  format="dd/MM/yyyy"
+                  disabled={syncJob?.status === 'Running'}
+                  slotProps={{ textField: { size: 'small', sx: { width: { xs: 1, sm: 180 } } } }}
+                />
+                <DatePicker
+                  label="Đến ngày"
+                  value={parseDateStr(toDate)}
+                  onChange={(val) => setToDate(toDateStr(val))}
+                  format="dd/MM/yyyy"
+                  disabled={syncJob?.status === 'Running'}
+                  slotProps={{
+                    textField: {
+                      size: 'small',
+                      placeholder: 'Hiện tại',
+                      sx: { width: { xs: 1, sm: 180 } },
+                    },
+                  }}
+                />
+              </Stack>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                Khoảng thời gian chỉ áp dụng cho <strong>Đơn đặt hàng, Trả hàng, Hóa đơn</strong>. Bỏ
+                trống → mặc định từ 01/01/2026 đến hiện tại. Dữ liệu danh mục (sản phẩm, khách hàng, nhà
+                cung cấp...) luôn lấy đầy đủ lịch sử.
+              </Typography>
+
+              <LoadingButton
+                variant="contained"
+                color="primary"
+                size="large"
+                loading={syncLoading}
                 disabled={syncJob?.status === 'Running'}
-                slotProps={{ textField: { size: 'small', sx: { width: { xs: 1, sm: 180 } } } }}
-              />
-              <DatePicker
-                label="Đến ngày"
-                value={parseDateStr(toDate)}
-                onChange={(val) => setToDate(toDateStr(val))}
-                format="dd/MM/yyyy"
-                disabled={syncJob?.status === 'Running'}
-                slotProps={{
-                  textField: {
-                    size: 'small',
-                    placeholder: 'Hiện tại',
-                    sx: { width: { xs: 1, sm: 180 } },
-                  },
-                }}
-              />
-            </Stack>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-              Khoảng thời gian chỉ áp dụng cho <strong>Đơn đặt hàng, Trả hàng, Hóa đơn</strong>. Bỏ
-              trống → mặc định từ 01/01/2026 đến hiện tại. Dữ liệu danh mục (sản phẩm, khách hàng, nhà
-              cung cấp...) luôn lấy đầy đủ lịch sử.
-            </Typography>
+                startIcon={<Iconify icon="mdi:cloud-download" />}
+                onClick={handleSync}
+                sx={{ minWidth: 200 }}
+              >
+                {syncJob?.status === 'Running' ? 'Đang đồng bộ...' : 'Đồng bộ KiotViet'}
+              </LoadingButton>
 
-            <LoadingButton
-              variant="contained"
-              color="primary"
-              size="large"
-              loading={syncLoading}
-              disabled={syncJob?.status === 'Running'}
-              startIcon={<Iconify icon="mdi:cloud-download" />}
-              onClick={handleSync}
-              sx={{ minWidth: 200 }}
-            >
-              {syncJob?.status === 'Running' ? 'Đang đồng bộ...' : 'Đồng bộ KiotViet'}
-            </LoadingButton>
+              {renderJobStatus(syncJob, 'Đồng bộ KiotViet')}
+            </Card>
+          </Stack>
+        )}
 
-            {renderJobStatus(syncJob, 'Đồng bộ KiotViet')}
-          </Card>
-
-          {/* Transform KiotViet → ERP */}
-          <Card sx={{ p: 3 }}>
-            <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-              <Iconify icon="mdi:swap-horizontal-bold" width={32} sx={{ color: 'warning.main' }} />
-              <Box>
-                <Typography variant="h6">Chuyển đổi KiotViet → ERP</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Chuyển dữ liệu từ bảng staging (KiotViet*) sang bảng ERP chính thức (Erp*)
-                </Typography>
-              </Box>
-            </Stack>
-
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Bao gồm: Chi nhánh, Danh mục, Nhóm KH, NCC, KH, TK NH, Kênh bán, Đơn vị tính,
-              Thương hiệu, Sản phẩm, Biến thể, Hình ảnh, Thuế, Bảng giá, Đơn bán, Trả hàng,
-              Đơn nhập, Voucher, Tồn kho
-            </Typography>
-
-            <LoadingButton
-              variant="contained"
-              color="warning"
-              size="large"
-              loading={transformLoading}
-              disabled={transformJob?.status === 'Running'}
-              startIcon={<Iconify icon="mdi:database-arrow-right" />}
-              onClick={handleTransform}
-              sx={{ minWidth: 200 }}
-            >
-              {transformJob?.status === 'Running' ? 'Đang chuyển đổi...' : 'Chuyển đổi sang ERP'}
-            </LoadingButton>
-
-            {renderJobStatus(transformJob, 'Chuyển đổi ERP')}
-          </Card>
-        </Stack>
+        {currentTab === 'history' && <KiotVietJobHistoryTab />}
+        {currentTab === 'webhook' && <KiotVietWebhookTab />}
+        {currentTab === 'pending-push' && <KiotVietPendingPushTab />}
       </RoleBasedGuard>
     </Container>
   );

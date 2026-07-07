@@ -76,3 +76,9 @@ export async function addPayment(id: string, data: IAddPaymentRequest): Promise<
   const response = await axios.post<{ id: string }>(endpoints.salesOrders.payment(id), data);
   return response.data;
 }
+
+/** Đẩy lại đơn bán lên KiotViet (đơn ở trạng thái Failed/Pending) */
+export async function retryPushSalesOrder(id: string): Promise<{ jobId: string }> {
+  const response = await axios.post<{ jobId: string }>(endpoints.kiotViet.pushRetry(id));
+  return response.data;
+}
