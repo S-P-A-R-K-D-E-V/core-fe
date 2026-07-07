@@ -274,8 +274,13 @@ export const endpoints = {
     syncRunning: '/kiotviet/sync/running',
     transform: '/kiotviet/transform',
     syncAndTransform: '/kiotviet/sync-and-transform',
+    syncJobs: '/kiotviet/sync/jobs',
     pushRetry: (id: string) => `/kiotviet/push/sales-orders/${id}/retry`,
     pushFailed: '/kiotviet/push/failed',
+    webhooksRegister: '/kiotviet/webhooks/register',
+    webhooks: '/kiotviet/webhooks',
+    webhookById: (id: number) => `/kiotviet/webhooks/${id}`,
+    webhookLogs: '/kiotviet/webhooks/logs',
   },
   shiftRegistrations: {
     register: '/shift-registrations/register',

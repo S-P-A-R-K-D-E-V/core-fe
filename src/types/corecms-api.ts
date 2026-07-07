@@ -1782,6 +1782,51 @@ export interface IKiotVietBankAccount {
   description?: string;
 }
 
+// --- KiotViet Push/Webhook monitoring (Admin) ---
+
+export interface IKiotVietFailedPush {
+  id: string;
+  code: string;
+  total: number;
+  customerName?: string;
+  createdDate: string;
+  kiotVietSyncStatus: string;
+  kiotVietSyncAttempts: number;
+  kiotVietSyncError?: string;
+}
+
+export interface IKiotVietFailedPushPagedResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  data: IKiotVietFailedPush[];
+}
+
+export interface IKiotVietWebhook {
+  id: number;
+  type?: string;
+  url?: string;
+  isActive: boolean;
+  description?: string;
+}
+
+export interface IKiotVietWebhookLog {
+  id: string;
+  event?: string;
+  processed: boolean;
+  processedAt?: string;
+  error?: string;
+  enqueuedJobId?: string;
+  receivedAt: string;
+}
+
+export interface IKiotVietWebhookLogPagedResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  data: IKiotVietWebhookLog[];
+}
+
 // --- KiotViet Sales Query (Admin) ---
 
 export interface IKiotVietSalesQueryParams {
