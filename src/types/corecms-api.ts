@@ -1804,10 +1804,15 @@ export interface IKiotVietFailedPushPagedResponse {
 
 export interface IKiotVietWebhook {
   id: number;
-  events?: string[];
+  type?: string;
   url?: string;
   isActive: boolean;
   description?: string;
+}
+
+export interface IKiotVietWebhookRegisterResult {
+  registered: IKiotVietWebhook[];
+  failed: { type: string; message: string }[];
 }
 
 export interface IKiotVietWebhookLog {

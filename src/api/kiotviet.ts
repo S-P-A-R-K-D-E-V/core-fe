@@ -5,6 +5,7 @@ import type {
   IKiotVietWebhook,
   IKiotVietFailedPushPagedResponse,
   IKiotVietWebhookLogPagedResponse,
+  IKiotVietWebhookRegisterResult,
 } from 'src/types/corecms-api';
 
 /** Lịch sử job đồng bộ gần nhất (tối đa 50, mới nhất trước) */
@@ -24,12 +25,13 @@ export async function getFailedPushes(page = 1, pageSize = 20): Promise<IKiotVie
 }
 
 /**
- * Đăng ký webhook KiotViet trỏ về endpoint public đã cấu hình.
- * @param events Danh sách event ghi đè (vd ['product.updated', 'order.created']).
+ * Đăng ký webhook KiotViet trỏ về endpoint public đã cấu hình. BE gọi POST /webhooks
+ * riêng cho từng Type (API KiotViet chỉ nhận 1 Type/lần) và trả kết quả từng cái.
+ * @param events Danh sách Type ghi đè (vd ['product', 'order']).
  *   Bỏ trống → BE dùng danh sách mặc định (KiotVietWebhookEvents.Default).
  */
-export async function registerWebhook(events?: string[]): Promise<IKiotVietWebhook> {
-  const response = await axios.post<IKiotVietWebhook>(endpoints.kiotViet.webhooksRegister, null, {
+export async function registerWebhook(events?: string[]): Promise<IKiotVietWebhookRegisterResult> {
+  const response = await axios.post<IKiotVietWebhookRegisterResult>(endpoints.kiotViet.webhooksRegister, null, {
     params: events?.length ? { events: events.join(',') } : undefined,
   });
   return response.data;
