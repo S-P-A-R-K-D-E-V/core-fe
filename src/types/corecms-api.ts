@@ -1819,10 +1819,26 @@ export interface IKiotVietWebhookLog {
   id: string;
   event?: string;
   processed: boolean;
-  processedAt?: string;
   error?: string;
   enqueuedJobId?: string;
   receivedAt: string;
+}
+
+/** Chi tiết đầy đủ 1 lần gọi webhook — header/query/body — dùng để trace lỗi kết nối */
+export interface IKiotVietWebhookLogDetail {
+  id: string;
+  receivedAt: string;
+  method: string;
+  path: string;
+  remoteIp?: string;
+  headers: Record<string, string>;
+  queryParams: Record<string, string>;
+  rawBody: string;
+  event?: string;
+  processed: boolean;
+  processedAt?: string;
+  error?: string;
+  enqueuedJobId?: string;
 }
 
 export interface IKiotVietWebhookLogPagedResponse {
