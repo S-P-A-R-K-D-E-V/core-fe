@@ -305,6 +305,7 @@ export const endpoints = {
     markAsRead: (id: string) => `/notifications/${id}/read`,
     markAllAsRead: '/notifications/read-all',
     delete: (id: string) => `/notifications/${id}`,
+    sendManual: '/notifications/send-manual',
   },
   userTours: {
     batch: '/user-tours/batch',
