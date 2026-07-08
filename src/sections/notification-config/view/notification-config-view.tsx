@@ -18,10 +18,13 @@ import TableHead from '@mui/material/TableHead';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import CardHeader from '@mui/material/CardHeader';
 import DialogTitle from '@mui/material/DialogTitle';
+import Autocomplete from '@mui/material/Autocomplete';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
+import LoadingButton from '@mui/lab/LoadingButton';
 
 import { paths } from 'src/routes/paths';
 import { useBoolean } from 'src/hooks/use-boolean';
@@ -31,12 +34,14 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
 
-import { INotificationConfig } from 'src/types/corecms-api';
+import { INotificationConfig, IUser } from 'src/types/corecms-api';
 import {
   getNotificationConfigs,
   createNotificationConfig,
   updateNotificationConfig,
 } from 'src/api/checkinFace';
+import { getAllUsers } from 'src/api/users';
+import { sendManualNotification } from 'src/api/notifications';
 
 // ----------------------------------------------------------------------
 
@@ -57,6 +62,13 @@ export default function NotificationConfigView() {
   const [formIsActive, setFormIsActive] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Gửi thông báo thủ công — test luồng OpsBridge notification bridge
+  const [users, setUsers] = useState<IUser[]>([]);
+  const [manualTargetUser, setManualTargetUser] = useState<IUser | null>(null);
+  const [manualTitle, setManualTitle] = useState('');
+  const [manualContent, setManualContent] = useState('');
+  const [manualSending, setManualSending] = useState(false);
+
   const fetchConfigs = useCallback(async () => {
     setLoading(true);
     try {
@@ -71,7 +83,32 @@ export default function NotificationConfigView() {
 
   useEffect(() => {
     fetchConfigs();
-  }, [fetchConfigs]);
+    getAllUsers()
+      .then(setUsers)
+      .catch(() => enqueueSnackbar('Không thể tải danh sách người dùng', { variant: 'error' }));
+  }, [fetchConfigs, enqueueSnackbar]);
+
+  const handleSendManual = async () => {
+    if (!manualTargetUser || !manualTitle.trim() || !manualContent.trim()) {
+      enqueueSnackbar('Vui lòng chọn người nhận, nhập tiêu đề và nội dung', { variant: 'warning' });
+      return;
+    }
+    setManualSending(true);
+    try {
+      await sendManualNotification({
+        userId: manualTargetUser.id,
+        title: manualTitle.trim(),
+        content: manualContent.trim(),
+      });
+      enqueueSnackbar('Đã gửi thông báo tới ' + manualTargetUser.fullName);
+      setManualTitle('');
+      setManualContent('');
+    } catch (error) {
+      enqueueSnackbar('Gửi thông báo thất bại', { variant: 'error' });
+    } finally {
+      setManualSending(false);
+    }
+  };
 
   const resetForm = () => {
     setFormType('telegram');
@@ -207,6 +244,50 @@ export default function NotificationConfigView() {
         }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
+
+      <Card sx={{ mb: 3 }}>
+        <CardHeader
+          title="Gửi thông báo thủ công (Test)"
+          subheader="Giả lập thông báo đẩy tới app CiCi trên điện thoại test — dùng để kiểm tra OpsBridge (Notification Listener) khi chưa có app ngân hàng thật"
+        />
+        <Stack spacing={2.5} sx={{ p: 3 }}>
+          <Autocomplete
+            fullWidth
+            options={users}
+            getOptionLabel={(option) => `${option.fullName} - ${option.email}`}
+            value={manualTargetUser}
+            onChange={(_, value) => setManualTargetUser(value)}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            renderInput={(params) => <TextField {...params} label="Người nhận *" />}
+          />
+          <TextField
+            label="Tiêu đề *"
+            value={manualTitle}
+            onChange={(e) => setManualTitle(e.target.value)}
+            fullWidth
+          />
+          <TextField
+            label="Nội dung *"
+            value={manualContent}
+            onChange={(e) => setManualContent(e.target.value)}
+            placeholder='VD: TK 1234567890 +500,000VND luc 14:32 08/07/2026. ND: NGUYEN VAN A CHUYEN KHOAN DH0000123'
+            helperText="Gõ đúng format thông báo ngân hàng giả định để OpsBridge parse được (số tiền dạng +xxxVND, nội dung sau ND:)"
+            multiline
+            rows={3}
+            fullWidth
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <LoadingButton
+              variant="contained"
+              loading={manualSending}
+              onClick={handleSendManual}
+              startIcon={<Iconify icon="solar:bell-bold" />}
+            >
+              Gửi thông báo
+            </LoadingButton>
+          </Box>
+        </Stack>
+      </Card>
 
       <Card>
         <TableContainer sx={{ overflow: 'unset' }}>

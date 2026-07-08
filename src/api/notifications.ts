@@ -30,3 +30,11 @@ export async function markAllNotificationsAsRead(): Promise<void> {
 export async function deleteNotification(notificationId: string): Promise<void> {
   await axios.delete(endpoints.notifications.delete(notificationId));
 }
+
+export async function sendManualNotification(data: {
+  userId: string;
+  title: string;
+  content: string;
+}): Promise<void> {
+  await axios.post(endpoints.notifications.sendManual, data);
+}
