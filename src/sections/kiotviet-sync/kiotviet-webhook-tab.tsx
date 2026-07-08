@@ -5,14 +5,19 @@ import { useState, useEffect, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
+import Dialog from '@mui/material/Dialog';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import TextField from '@mui/material/TextField';
+import DialogTitle from '@mui/material/DialogTitle';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import DialogContent from '@mui/material/DialogContent';
+import CircularProgress from '@mui/material/CircularProgress';
 import LoadingButton from '@mui/lab/LoadingButton';
 
 import Label from 'src/components/label';
+import Scrollbar from 'src/components/scrollbar';
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 import { fDateTime } from 'src/utils/format-time';
@@ -22,9 +27,10 @@ import {
   getWebhooks,
   deleteWebhook,
   getWebhookLogs,
+  getWebhookLogDetail,
 } from 'src/api/kiotviet';
 
-import type { IKiotVietWebhook, IKiotVietWebhookLog } from 'src/types/corecms-api';
+import type { IKiotVietWebhook, IKiotVietWebhookLog, IKiotVietWebhookLogDetail } from 'src/types/corecms-api';
 
 export default function KiotVietWebhookTab() {
   const { enqueueSnackbar } = useSnackbar();
@@ -33,6 +39,10 @@ export default function KiotVietWebhookTab() {
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [customEvents, setCustomEvents] = useState('');
+
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<IKiotVietWebhookLogDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -93,6 +103,24 @@ export default function KiotVietWebhookTab() {
       }
     },
     [enqueueSnackbar, fetchAll]
+  );
+
+  const handleOpenDetail = useCallback(
+    async (id: string) => {
+      setDetailId(id);
+      setDetail(null);
+      setDetailLoading(true);
+      try {
+        const data = await getWebhookLogDetail(id);
+        setDetail(data);
+      } catch (error: any) {
+        enqueueSnackbar(error?.message || 'Không tải được chi tiết webhook', { variant: 'error' });
+        setDetailId(null);
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [enqueueSnackbar]
   );
 
   return (
@@ -159,7 +187,10 @@ export default function KiotVietWebhookTab() {
       </Card>
 
       <Card sx={{ p: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>Log webhook gần đây</Typography>
+        <Typography variant="h6" sx={{ mb: 0.5 }}>Log webhook gần đây</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Bấm vào 1 dòng để xem đầy đủ header/query/body — dùng để trace lỗi kết nối lúc mới tích hợp
+        </Typography>
 
         {!loading && logs.length === 0 && (
           <Typography variant="body2" color="text.secondary">
@@ -169,7 +200,14 @@ export default function KiotVietWebhookTab() {
 
         <Stack divider={<Divider flexItem />}>
           {logs.map((log) => (
-            <Stack key={log.id} direction="row" alignItems="center" spacing={2} sx={{ py: 1.25 }}>
+            <Stack
+              key={log.id}
+              direction="row"
+              alignItems="center"
+              spacing={2}
+              sx={{ py: 1.25, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
+              onClick={() => handleOpenDetail(log.id)}
+            >
               <Label variant="soft" color={log.processed ? 'success' : 'error'} sx={{ minWidth: 90 }}>
                 {log.processed ? 'Đã xử lý' : 'Lỗi'}
               </Label>
@@ -186,10 +224,117 @@ export default function KiotVietWebhookTab() {
                   </Typography>
                 )}
               </Box>
+              <Iconify icon="eva:arrow-ios-forward-fill" sx={{ color: 'text.disabled' }} />
             </Stack>
           ))}
         </Stack>
       </Card>
+
+      <Dialog open={!!detailId} onClose={() => setDetailId(null)} maxWidth="md" fullWidth>
+        <DialogTitle>Chi tiết webhook</DialogTitle>
+        <DialogContent dividers>
+          {detailLoading && (
+            <Stack alignItems="center" sx={{ py: 4 }}>
+              <CircularProgress size={28} />
+            </Stack>
+          )}
+
+          {!detailLoading && detail && (
+            <Stack spacing={2.5}>
+              <Stack direction="row" spacing={3} flexWrap="wrap" rowGap={1}>
+                <DetailField label="Thời gian" value={fDateTime(detail.receivedAt)} />
+                <DetailField label="Method" value={detail.method} />
+                <DetailField label="Path" value={detail.path} mono />
+                <DetailField label="IP nguồn" value={detail.remoteIp || '—'} />
+                <DetailField label="Action" value={detail.event || '—'} />
+                <DetailField
+                  label="Trạng thái"
+                  value={detail.processed ? 'Đã xử lý' : 'Lỗi'}
+                  color={detail.processed ? 'success.main' : 'error.main'}
+                />
+              </Stack>
+
+              {detail.error && (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>Lỗi</Typography>
+                  <Typography variant="body2" color="error.main">{detail.error}</Typography>
+                </Box>
+              )}
+
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>
+                  Headers ({Object.keys(detail.headers).length})
+                </Typography>
+                <RawBox>
+                  {Object.entries(detail.headers).map(([k, v]) => `${k}: ${v}`).join('\n')}
+                </RawBox>
+              </Box>
+
+              {Object.keys(detail.queryParams).length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>Query params</Typography>
+                  <RawBox>
+                    {Object.entries(detail.queryParams).map(([k, v]) => `${k}=${v}`).join('\n')}
+                  </RawBox>
+                </Box>
+              )}
+
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>Raw body</Typography>
+                <RawBox>{detail.rawBody}</RawBox>
+              </Box>
+            </Stack>
+          )}
+        </DialogContent>
+      </Dialog>
     </Stack>
+  );
+}
+
+function DetailField({
+  label,
+  value,
+  mono,
+  color,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  color?: string;
+}) {
+  return (
+    <Box>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+        {label}
+      </Typography>
+      <Typography
+        variant="body2"
+        sx={{ fontFamily: mono ? 'monospace' : undefined, color: color || 'text.primary' }}
+      >
+        {value}
+      </Typography>
+    </Box>
+  );
+}
+
+function RawBox({ children }: { children: string }) {
+  return (
+    <Scrollbar sx={{ maxHeight: 240 }}>
+      <Box
+        component="pre"
+        sx={{
+          m: 0,
+          p: 1.5,
+          bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'grey.800' : 'grey.100'),
+          borderRadius: 1,
+          fontSize: 12,
+          fontFamily: 'monospace',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-all',
+        }}
+      >
+        {children || '(rỗng)'}
+      </Box>
+    </Scrollbar>
   );
 }

@@ -281,6 +281,7 @@ export const endpoints = {
     webhooks: '/kiotviet/webhooks',
     webhookById: (id: number) => `/kiotviet/webhooks/${id}`,
     webhookLogs: '/kiotviet/webhooks/logs',
+    webhookLogDetail: (id: string) => `/kiotviet/webhooks/logs/${id}`,
   },
   shiftRegistrations: {
     register: '/shift-registrations/register',

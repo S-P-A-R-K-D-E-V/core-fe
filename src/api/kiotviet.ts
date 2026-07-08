@@ -5,6 +5,7 @@ import type {
   IKiotVietWebhook,
   IKiotVietFailedPushPagedResponse,
   IKiotVietWebhookLogPagedResponse,
+  IKiotVietWebhookLogDetail,
   IKiotVietWebhookRegisterResult,
 } from 'src/types/corecms-api';
 
@@ -46,10 +47,16 @@ export async function deleteWebhook(id: number): Promise<void> {
   await axios.delete(endpoints.kiotViet.webhookById(id));
 }
 
-/** Log webhook nhận từ KiotViet (phân trang, mới nhất trước) */
+/** Log webhook nhận từ KiotViet (phân trang, mới nhất trước) — rút gọn, không kèm header/body */
 export async function getWebhookLogs(page = 1, pageSize = 20): Promise<IKiotVietWebhookLogPagedResponse> {
   const response = await axios.get<IKiotVietWebhookLogPagedResponse>(endpoints.kiotViet.webhookLogs, {
     params: { page, pageSize },
   });
+  return response.data;
+}
+
+/** Chi tiết đầy đủ 1 lần gọi webhook — header/query/body — để trace lỗi kết nối */
+export async function getWebhookLogDetail(id: string): Promise<IKiotVietWebhookLogDetail> {
+  const response = await axios.get<IKiotVietWebhookLogDetail>(endpoints.kiotViet.webhookLogDetail(id));
   return response.data;
 }
