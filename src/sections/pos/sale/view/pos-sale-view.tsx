@@ -53,7 +53,6 @@ import PosDiscountPopover from '../pos-discount-popover';
 import PosProductDetailDrawer from '../pos-product-detail-drawer';
 import PosVariantPickerDrawer from '../pos-variant-picker-drawer';
 import PosPaymentDrawer, { PaymentLine } from '../pos-payment-drawer';
-import PosBankTransferPayment from '../pos-bank-transfer-payment';
 import PosQrPayment from '../pos-qr-payment';
 
 // ======================================================================
@@ -1484,12 +1483,15 @@ export default function PosSaleView() {
                               sx={{ mb: 0.5 }}
                             />
                             {pm.value === 'BankTransfer' && (
-                              <PosBankTransferPayment
+                              <PosQrPayment
                                 amount={quickMethodAmounts[pm.value] || grandTotal}
                                 onPaymentCompleted={(qrStatus) => {
                                   setQuickQrPaymentCompleted(true);
                                   setQuickMethodAmounts((prev) => ({ ...prev, BankTransfer: qrStatus.amount }));
-                                  setQuickMethodRefs((prev) => ({ ...prev, BankTransfer: qrStatus.traceNumber }));
+                                  setQuickMethodRefs((prev) => ({
+                                    ...prev,
+                                    BankTransfer: qrStatus.traceNumber || qrStatus.id.slice(0, 8),
+                                  }));
                                 }}
                               />
                             )}

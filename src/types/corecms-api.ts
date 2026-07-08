@@ -2287,35 +2287,42 @@ export interface IUpdateSalesOrderRequest {
   items?: IUpdateSalesOrderItemRequest[];
 }
 
-// ========== QR Payment (ACB Dynamic QR) ==========
+// ========== QR Payment (VietQR Quick Link) ==========
 
 export interface ICreateQrPaymentRequest {
   salesOrderId?: string;
+  bankAccountId: string;
   amount: number;
   description?: string;
 }
 
 export interface IQrPaymentResponse {
   id: string;
-  bankOrderId: string;
-  traceNumber: string;
+  bankOrderId?: string;
+  traceNumber?: string;
   virtualAccount?: string;
   qrDataUrl?: string;
   amount: number;
   status: string;
   createdAt: string;
+  bankAccountId?: string;
+  bankName?: string;
+  accountNumber?: string;
 }
 
 export interface IQrPaymentStatusResponse {
   id: string;
-  bankOrderId: string;
-  traceNumber: string;
+  bankOrderId?: string;
+  traceNumber?: string;
   amount: number;
   status: string;
   virtualAccount?: string;
   qrDataUrl?: string;
   createdAt: string;
   updatedAt: string;
+  bankAccountId?: string;
+  bankName?: string;
+  accountNumber?: string;
 }
 
 export interface IUpdateSalesOrderItemRequest {

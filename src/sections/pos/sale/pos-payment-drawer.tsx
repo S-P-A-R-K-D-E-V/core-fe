@@ -22,7 +22,7 @@ import Iconify from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
 import { ICustomer } from 'src/types/corecms-api';
 
-import PosBankTransferPayment from './pos-bank-transfer-payment';
+import PosQrPayment from './pos-qr-payment';
 
 // ----------------------------------------------------------------------
 
@@ -439,14 +439,14 @@ export default function PosPaymentDrawer({
                       )}
 
                       {pm.value === 'BankTransfer' && (
-                        <PosBankTransferPayment
+                        <PosQrPayment
                           amount={methodAmounts[pm.value] || totalAmount}
                           salesOrderId={salesOrderId}
                           orderCode={orderCode}
                           onPaymentCompleted={(qrStatus) => {
                             setQrPaymentCompleted(true);
                             handleAmountChange('BankTransfer', qrStatus.amount);
-                            handleRefChange('BankTransfer', qrStatus.traceNumber);
+                            handleRefChange('BankTransfer', qrStatus.traceNumber || qrStatus.id.slice(0, 8));
                           }}
                         />
                       )}
