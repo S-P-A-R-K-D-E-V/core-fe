@@ -252,6 +252,7 @@ export default function KiotVietWebhookTab() {
                   value={detail.processed ? 'Đã xử lý' : 'Lỗi'}
                   color={detail.processed ? 'success.main' : 'error.main'}
                 />
+                <DetailField label="Job đồng bộ" value={detail.enqueuedJobId || 'Không có (xử lý trực tiếp)'} mono={!!detail.enqueuedJobId} />
               </Stack>
 
               {detail.error && (
