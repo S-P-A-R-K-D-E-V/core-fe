@@ -25,7 +25,7 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
-import Checkbox from '@mui/material/Checkbox';
+import Radio from '@mui/material/Radio';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import CircularProgress from '@mui/material/CircularProgress';
 import Avatar from '@mui/material/Avatar';
@@ -52,7 +52,7 @@ import PosDiscountPopover from '../pos-discount-popover';
 import PosProductDetailDrawer from '../pos-product-detail-drawer';
 import PosVariantPickerDrawer from '../pos-variant-picker-drawer';
 import PosPaymentDrawer, { PaymentLine } from '../pos-payment-drawer';
-import PosAcbQrPayment from '../pos-acb-qr-payment';
+import PosBankTransferPayment from '../pos-bank-transfer-payment';
 import PosQrPayment from '../pos-qr-payment';
 
 // ======================================================================
@@ -738,28 +738,14 @@ export default function PosSaleView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grandTotal]);
 
-  // Quick payment method toggle
-  const handleQuickToggleMethod = useCallback((method: string) => {
-    setQuickSelectedMethods((prev) => {
-      if (prev.includes(method)) {
-        const next = prev.filter((m) => m !== method);
-        if (next.length === 0) return prev;
-        // Clear removed method amount
-        setQuickMethodAmounts((a) => {
-          const copy = { ...a };
-          delete copy[method];
-          return copy;
-        });
-        return next;
-      }
-      // Adding a new method — auto-fill its amount with remaining
-      const currentPaid = prev.reduce((s, m) => s + (quickMethodAmounts[m] || 0), 0);
-      const remaining = Math.max(0, grandTotal - currentPaid);
-      setQuickMethodAmounts((a) => ({ ...a, [method]: remaining }));
-      setQuickCustomerPayment(Math.max(currentPaid + remaining, grandTotal));
-      return [...prev, method];
-    });
-  }, [quickMethodAmounts, grandTotal]);
+  // Quick payment — chọn duy nhất 1 phương thức
+  const handleQuickSelectMethod = useCallback((method: string) => {
+    setQuickSelectedMethods([method]);
+    setQuickMethodAmounts({ [method]: grandTotal });
+    setQuickMethodRefs({});
+    setQuickCustomerPayment(grandTotal);
+    setQuickQrPaymentCompleted(false);
+  }, [grandTotal]);
 
   // ====== Render ======
 
@@ -1457,10 +1443,10 @@ export default function PosSaleView() {
                       <Box key={pm.value}>
                         <FormControlLabel
                           control={
-                            <Checkbox
+                            <Radio
                               size="small"
                               checked={isSelected}
-                              onChange={() => handleQuickToggleMethod(pm.value)}
+                              onChange={() => handleQuickSelectMethod(pm.value)}
                             />
                           }
                           label={
@@ -1488,7 +1474,7 @@ export default function PosSaleView() {
                               sx={{ mb: 0.5 }}
                             />
                             {pm.value === 'BankTransfer' && (
-                              <PosAcbQrPayment
+                              <PosBankTransferPayment
                                 amount={quickMethodAmounts[pm.value] || grandTotal}
                                 onPaymentCompleted={(qrStatus) => {
                                   setQuickQrPaymentCompleted(true);
