@@ -10,7 +10,7 @@ import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
-import Checkbox from '@mui/material/Checkbox';
+import Radio from '@mui/material/Radio';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Autocomplete from '@mui/material/Autocomplete';
 import InputAdornment from '@mui/material/InputAdornment';
@@ -22,15 +22,13 @@ import Iconify from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
 import { ICustomer } from 'src/types/corecms-api';
 
-import PosAcbQrPayment from './pos-acb-qr-payment';
-import { IQrPaymentStatusResponse } from 'src/types/corecms-api';
+import PosBankTransferPayment from './pos-bank-transfer-payment';
 
 // ----------------------------------------------------------------------
 
 const PAYMENT_METHODS = [
   { value: 'Cash', label: 'Tiền mặt', icon: 'solar:wallet-money-bold' },
   { value: 'BankTransfer', label: 'Chuyển khoản', icon: 'solar:card-transfer-bold' },
-  { value: 'QRCodeACB', label: 'QR ACB', icon: 'solar:qr-code-bold' },
   { value: 'Card', label: 'Thẻ', icon: 'solar:card-bold' },
   { value: 'EWallet', label: 'Ví', icon: 'solar:smartphone-bold' },
 ];
@@ -88,6 +86,7 @@ export default function PosPaymentDrawer({
   const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [qrPaymentCompleted, setQrPaymentCompleted] = useState(false);
+  // Chọn duy nhất 1 phương thức thanh toán (giữ dạng mảng để tương thích PaymentLine[])
   const [selectedMethods, setSelectedMethods] = useState<string[]>(['Cash']);
   const [methodAmounts, setMethodAmounts] = useState<Record<string, number>>({});
   const [methodRefs, setMethodRefs] = useState<Record<string, string>>({});
@@ -115,28 +114,14 @@ export default function PosPaymentDrawer({
     }
   }, [open, totalAmount, orderDiscount]);
 
-  const handleToggleMethod = useCallback(
+  const handleSelectMethod = useCallback(
     (method: string) => {
-      setSelectedMethods((prev) => {
-        if (prev.includes(method)) {
-          const newMethods = prev.filter((m) => m !== method);
-          if (newMethods.length === 0) return prev; // Must have at least 1
-          // Clear removed method amount
-          setMethodAmounts((a) => {
-            const copy = { ...a };
-            delete copy[method];
-            return copy;
-          });
-          return newMethods;
-        }
-        // Adding a new method — auto-fill its amount with remaining
-        const currentPaid = prev.reduce((s, m) => s + (methodAmounts[m] || 0), 0);
-        const remaining = Math.max(0, totalAmount - currentPaid);
-        setMethodAmounts((a) => ({ ...a, [method]: remaining }));
-        return [...prev, method];
-      });
+      setSelectedMethods([method]);
+      setMethodAmounts({ [method]: totalAmount });
+      setMethodRefs({});
+      setQrPaymentCompleted(false);
     },
-    [methodAmounts, totalAmount]
+    [totalAmount]
   );
 
   const handleAmountChange = useCallback((method: string, amount: number) => {
@@ -416,9 +401,9 @@ export default function PosPaymentDrawer({
                 <Box key={pm.value}>
                   <FormControlLabel
                     control={
-                      <Checkbox
+                      <Radio
                         checked={isSelected}
-                        onChange={() => handleToggleMethod(pm.value)}
+                        onChange={() => handleSelectMethod(pm.value)}
                       />
                     }
                     label={
@@ -454,7 +439,7 @@ export default function PosPaymentDrawer({
                       )}
 
                       {pm.value === 'BankTransfer' && (
-                        <PosAcbQrPayment
+                        <PosBankTransferPayment
                           amount={methodAmounts[pm.value] || totalAmount}
                           salesOrderId={salesOrderId}
                           orderCode={orderCode}
@@ -462,20 +447,6 @@ export default function PosPaymentDrawer({
                             setQrPaymentCompleted(true);
                             handleAmountChange('BankTransfer', qrStatus.amount);
                             handleRefChange('BankTransfer', qrStatus.traceNumber);
-                          }}
-                        />
-                      )}
-
-                      {pm.value === 'QRCodeACB' && (
-                        <PosAcbQrPayment
-                          amount={methodAmounts[pm.value] || totalAmount}
-                          salesOrderId={salesOrderId}
-                          orderCode={orderCode}
-                          onPaymentCompleted={(qrStatus) => {
-                            setQrPaymentCompleted(true);
-                            // Auto-fill amount from confirmed payment
-                            handleAmountChange('QRCodeACB', qrStatus.amount);
-                            handleRefChange('QRCodeACB', qrStatus.traceNumber);
                           }}
                         />
                       )}

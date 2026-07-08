@@ -131,7 +131,8 @@ export default function PosAcbQrPayment({
     } catch (err: any) {
       if (!mountedRef.current) return;
       setQrState('error');
-      setError(err?.message || err?.title || 'Không thể tạo mã QR. Vui lòng thử lại.');
+      // ProblemDetails từ BE: title = mã lỗi ACB, detail = message ACB
+      setError(err?.detail || err?.title || err?.message || 'Không thể tạo mã QR. Vui lòng thử lại.');
     }
   }, [amount, salesOrderId, orderCode, startPolling]);
 
