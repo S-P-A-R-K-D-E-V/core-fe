@@ -7,6 +7,7 @@ import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import LoadingButton from '@mui/lab/LoadingButton';
@@ -31,6 +32,7 @@ export default function KiotVietWebhookTab() {
   const [logs, setLogs] = useState<IKiotVietWebhookLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
+  const [customEvents, setCustomEvents] = useState('');
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -55,7 +57,11 @@ export default function KiotVietWebhookTab() {
   const handleRegister = useCallback(async () => {
     setRegistering(true);
     try {
-      const result = await registerWebhook();
+      const events = customEvents
+        .split(',')
+        .map((e) => e.trim())
+        .filter(Boolean);
+      const result = await registerWebhook(events.length ? events : undefined);
       if (result.registered.length > 0) {
         enqueueSnackbar(`Đã đăng ký ${result.registered.length} webhook KiotViet`, { variant: 'success' });
       }
@@ -92,18 +98,31 @@ export default function KiotVietWebhookTab() {
   return (
     <Stack spacing={3}>
       <Card sx={{ p: 3 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-          <Box>
+        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
+          <Box sx={{ flexGrow: 1 }}>
             <Typography variant="h6">Webhook KiotViet</Typography>
             <Typography variant="body2" color="text.secondary">
               Nhận thông báo thay đổi từ KiotViet gần như tức thời, bổ sung cho lịch đồng bộ tự động
             </Typography>
           </Box>
+        </Stack>
+
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'flex-start' }} sx={{ mb: 2 }}>
+          <TextField
+            size="small"
+            fullWidth
+            label="Danh sách Type tuỳ chỉnh (phân cách bởi dấu phẩy)"
+            placeholder="Bỏ trống → dùng danh sách mặc định (secret KiotViet:WebhookEvents nếu có, hoặc compiled default)"
+            value={customEvents}
+            onChange={(e) => setCustomEvents(e.target.value)}
+            helperText="Dùng để thử nhanh Type mới (vd order.update,invoice.create) mà không cần đổi cấu hình"
+          />
           <LoadingButton
             variant="contained"
             loading={registering}
             startIcon={<Iconify icon="mdi:webhook" />}
             onClick={handleRegister}
+            sx={{ minWidth: 160, flexShrink: 0 }}
           >
             Đăng ký webhook
           </LoadingButton>
