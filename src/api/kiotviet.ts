@@ -60,3 +60,9 @@ export async function getWebhookLogDetail(id: string): Promise<IKiotVietWebhookL
   const response = await axios.get<IKiotVietWebhookLogDetail>(endpoints.kiotViet.webhookLogDetail(id));
   return response.data;
 }
+
+/** Xoá toàn bộ log webhook đã lưu (MongoDB) — dùng dọn log rác/nhiễu lúc mới tích hợp */
+export async function clearWebhookLogs(): Promise<{ deletedCount: number }> {
+  const response = await axios.delete<{ deletedCount: number }>(endpoints.kiotViet.webhookLogs);
+  return response.data;
+}

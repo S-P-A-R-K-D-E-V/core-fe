@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
@@ -16,10 +17,13 @@ import DialogContent from '@mui/material/DialogContent';
 import CircularProgress from '@mui/material/CircularProgress';
 import LoadingButton from '@mui/lab/LoadingButton';
 
+import { useBoolean } from 'src/hooks/use-boolean';
+
 import Label from 'src/components/label';
 import Scrollbar from 'src/components/scrollbar';
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
+import { ConfirmDialog } from 'src/components/custom-dialog';
 import { fDateTime } from 'src/utils/format-time';
 
 import {
@@ -27,6 +31,7 @@ import {
   getWebhooks,
   deleteWebhook,
   getWebhookLogs,
+  clearWebhookLogs,
   getWebhookLogDetail,
 } from 'src/api/kiotviet';
 
@@ -38,7 +43,9 @@ export default function KiotVietWebhookTab() {
   const [logs, setLogs] = useState<IKiotVietWebhookLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [customEvents, setCustomEvents] = useState('');
+  const clearConfirm = useBoolean();
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<IKiotVietWebhookLogDetail | null>(null);
@@ -104,6 +111,20 @@ export default function KiotVietWebhookTab() {
     },
     [enqueueSnackbar, fetchAll]
   );
+
+  const handleClearLogs = useCallback(async () => {
+    setClearing(true);
+    try {
+      const { deletedCount } = await clearWebhookLogs();
+      enqueueSnackbar(`Đã xoá ${deletedCount} log webhook`, { variant: 'success' });
+      clearConfirm.onFalse();
+      fetchAll();
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || 'Không xoá được log webhook', { variant: 'error' });
+    } finally {
+      setClearing(false);
+    }
+  }, [enqueueSnackbar, fetchAll, clearConfirm]);
 
   const handleOpenDetail = useCallback(
     async (id: string) => {
@@ -187,10 +208,25 @@ export default function KiotVietWebhookTab() {
       </Card>
 
       <Card sx={{ p: 3 }}>
-        <Typography variant="h6" sx={{ mb: 0.5 }}>Log webhook gần đây</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Bấm vào 1 dòng để xem đầy đủ header/query/body — dùng để trace lỗi kết nối lúc mới tích hợp
-        </Typography>
+        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
+          <Box>
+            <Typography variant="h6" sx={{ mb: 0.5 }}>Log webhook gần đây</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Bấm vào 1 dòng để xem đầy đủ header/query/body — dùng để trace lỗi kết nối lúc mới tích hợp
+            </Typography>
+          </Box>
+          <Button
+            size="small"
+            color="error"
+            variant="outlined"
+            startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
+            onClick={clearConfirm.onTrue}
+            disabled={logs.length === 0}
+            sx={{ flexShrink: 0 }}
+          >
+            Xoá log
+          </Button>
+        </Stack>
 
         {!loading && logs.length === 0 && (
           <Typography variant="body2" color="text.secondary">
@@ -288,6 +324,18 @@ export default function KiotVietWebhookTab() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={clearConfirm.value}
+        onClose={clearConfirm.onFalse}
+        title="Xoá toàn bộ log webhook?"
+        content={`Sẽ xoá ${logs.length >= 20 ? 'toàn bộ' : logs.length} log webhook đã lưu trong MongoDB — không thể hoàn tác. Chỉ nên dùng để dọn log rác/nhiễu lúc mới tích hợp.`}
+        action={
+          <LoadingButton variant="contained" color="error" loading={clearing} onClick={handleClearLogs}>
+            Xoá
+          </LoadingButton>
+        }
+      />
     </Stack>
   );
 }
