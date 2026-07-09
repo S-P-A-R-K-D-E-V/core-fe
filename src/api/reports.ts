@@ -85,7 +85,6 @@ export async function getDebtSummary(params?: { asOfDate?: string }): Promise<ID
 export async function getBreakEvenAnalysis(params: {
   period: 'day' | 'month' | 'year';
   targetDate: string;
-  assumedCogsRatio?: number;
 }): Promise<IBreakEvenAnalysis> {
   const response = await axios.get<IBreakEvenAnalysis>(endpoints.reports.breakEven, { params });
   return response.data;

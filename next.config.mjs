@@ -18,7 +18,7 @@ const BACKEND_API_PREFIXES = [
   'categories', 'unit-of-measures', 'variant-attributes', 'products',
   'warehouses', 'inventory', 'suppliers', 'purchase-orders',
   'customers', 'sales-orders', 'bank-accounts', 'payment', 'reports',
-  'chatbot', 'messenger',
+  'chatbot', 'messenger', 'expenses',
 ];
 
 const nextConfig = {
