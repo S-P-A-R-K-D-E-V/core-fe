@@ -271,6 +271,17 @@ export const paths = {
         customers: `${ROOTS.DASHBOARD}/pos/report/customers`,
         inventory: `${ROOTS.DASHBOARD}/pos/report/inventory`,
         tax: `${ROOTS.DASHBOARD}/pos/report/tax`,
+        expense: `${ROOTS.DASHBOARD}/pos/report/expense`,
+        debt: `${ROOTS.DASHBOARD}/pos/report/debt`,
+        breakEven: `${ROOTS.DASHBOARD}/pos/report/break-even`,
+      },
+      expense: {
+        root: `${ROOTS.DASHBOARD}/pos/expense`,
+        list: `${ROOTS.DASHBOARD}/pos/expense/list`,
+        new: `${ROOTS.DASHBOARD}/pos/expense/new`,
+        edit: (id: string) => `${ROOTS.DASHBOARD}/pos/expense/${id}/edit`,
+        categories: `${ROOTS.DASHBOARD}/pos/expense/categories`,
+        recurringTemplates: `${ROOTS.DASHBOARD}/pos/expense/recurring-templates`,
       },
     },
     general: {

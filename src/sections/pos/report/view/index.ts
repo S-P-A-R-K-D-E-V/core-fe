@@ -4,3 +4,6 @@ export { default as ReportProductSalesView } from './report-product-sales-view';
 export { default as ReportCustomersView } from './report-customers-view';
 export { default as ReportInventoryView } from './report-inventory-view';
 export { default as ReportTaxView } from './report-tax-view';
+export { default as ReportExpenseView } from './report-expense-view';
+export { default as ReportDebtView } from './report-debt-view';
+export { default as ReportBreakEvenView } from './report-breakeven-view';

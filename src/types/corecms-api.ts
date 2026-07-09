@@ -2049,6 +2049,92 @@ export interface IUpdateSupplierRequest {
   isActive: boolean;
 }
 
+// --- Expense (Chi phí vận hành / OPEX) ---
+export type ExpenseType = 'Fixed' | 'Variable';
+export type ExpenseRecurrenceType = 'Monthly' | 'Yearly';
+
+export interface IExpenseCategory {
+  id: string;
+  name: string;
+  type: ExpenseType;
+  isActive: boolean;
+}
+
+export interface IExpense {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  categoryType: ExpenseType;
+  amount: number;
+  expenseDate: string;
+  note?: string;
+  sourceTemplateId?: string;
+  createdAt: string;
+}
+
+export interface IExpensesResponse {
+  items: IExpense[];
+  totalCount: number;
+  totalAmount: number;
+}
+
+export interface IRecurringExpenseTemplate {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  name: string;
+  amount: number;
+  recurrenceType: ExpenseRecurrenceType;
+  validFrom: string;
+  validTo?: string;
+  isActive: boolean;
+  lastGeneratedPeriod?: string;
+}
+
+export interface ICreateExpenseRequest {
+  categoryId: string;
+  amount: number;
+  expenseDate: string;
+  note?: string;
+}
+
+export interface IUpdateExpenseRequest {
+  categoryId: string;
+  amount: number;
+  expenseDate: string;
+  note?: string;
+}
+
+export interface ICreateExpenseCategoryRequest {
+  name: string;
+  type: ExpenseType;
+}
+
+export interface IUpdateExpenseCategoryRequest {
+  name: string;
+  type: ExpenseType;
+  isActive: boolean;
+}
+
+export interface ICreateRecurringExpenseTemplateRequest {
+  categoryId: string;
+  name: string;
+  amount: number;
+  recurrenceType: ExpenseRecurrenceType;
+  validFrom: string;
+  validTo?: string;
+}
+
+export interface IUpdateRecurringExpenseTemplateRequest {
+  categoryId: string;
+  name: string;
+  amount: number;
+  recurrenceType: ExpenseRecurrenceType;
+  validFrom: string;
+  validTo?: string;
+  isActive: boolean;
+}
+
 // --- Purchase Order ---
 export interface IPurchaseOrderPagedResponse {
   totalCount: number;
@@ -2462,4 +2548,72 @@ export interface TaxReportResult {
   totalAmount: number;
   totalTransactions: number;
   days: TaxReportDailyItem[];
+}
+
+// --- Expense Report ---
+export interface IExpensePeriod {
+  period: string;
+  amount: number;
+}
+
+export interface IExpenseCategoryBreakdown {
+  categoryId: string;
+  categoryName: string;
+  amount: number;
+}
+
+export interface IExpenseReport {
+  totalExpense: number;
+  periods: IExpensePeriod[];
+  byCategory: IExpenseCategoryBreakdown[];
+}
+
+// --- Debt Summary (công nợ phải thu/phải trả) ---
+export interface IReceivableItem {
+  orderId: string;
+  orderCode: string;
+  customerName?: string;
+  total: number;
+  paid: number;
+  due: number;
+  orderDate: string;
+  daysOverdue: number;
+}
+
+export interface IPayableItem {
+  orderId: string;
+  orderNumber: string;
+  supplierName?: string;
+  total: number;
+  paid: number;
+  due: number;
+  orderDate: string;
+  daysOverdue: number;
+}
+
+export interface IDebtAgingSummary {
+  days0To30: number;
+  days31To60: number;
+  days61To90: number;
+  daysOver90: number;
+}
+
+export interface IDebtSummary {
+  totalReceivable: number;
+  totalPayable: number;
+  receivables: IReceivableItem[];
+  payables: IPayableItem[];
+  receivableAging: IDebtAgingSummary;
+  payableAging: IDebtAgingSummary;
+}
+
+// --- Break-even Analysis (điểm hòa vốn) ---
+export interface IBreakEvenAnalysis {
+  period: string;
+  targetDate: string;
+  fixedCosts: number;
+  cogsRatio: number;
+  breakEvenRevenue: number;
+  actualRevenue: number;
+  gap: number;
 }
