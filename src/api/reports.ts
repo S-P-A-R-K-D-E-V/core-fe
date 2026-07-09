@@ -7,6 +7,9 @@ import {
   IInventoryReport,
   IPaymentMethodReport,
   IBarcodeLookup,
+  IExpenseReport,
+  IDebtSummary,
+  IBreakEvenAnalysis,
 } from 'src/types/corecms-api';
 
 export async function getDashboardSummary(): Promise<IDashboardSummary> {
@@ -62,6 +65,29 @@ export async function lookupBarcode(
   const response = await axios.get<IBarcodeLookup>(endpoints.reports.barcodeLookup(barcode), {
     params: warehouseId ? { warehouseId } : undefined,
   });
+  return response.data;
+}
+
+export async function getExpenseReport(params: {
+  fromDate: string;
+  toDate: string;
+  groupBy?: string;
+}): Promise<IExpenseReport> {
+  const response = await axios.get<IExpenseReport>(endpoints.reports.expenses, { params });
+  return response.data;
+}
+
+export async function getDebtSummary(params?: { asOfDate?: string }): Promise<IDebtSummary> {
+  const response = await axios.get<IDebtSummary>(endpoints.reports.debtSummary, { params });
+  return response.data;
+}
+
+export async function getBreakEvenAnalysis(params: {
+  period: 'day' | 'month' | 'year';
+  targetDate: string;
+  assumedCogsRatio?: number;
+}): Promise<IBreakEvenAnalysis> {
+  const response = await axios.get<IBreakEvenAnalysis>(endpoints.reports.breakEven, { params });
   return response.data;
 }
 

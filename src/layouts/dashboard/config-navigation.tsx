@@ -346,6 +346,18 @@ export function useNavData(userRole?: string) {
             ],
           },
           {
+            title: 'Chi phí & Công nợ',
+            path: paths.dashboard.pos.expense.root,
+            icon: ICONS.invoice,
+            roles: ['Admin'],
+            children: [
+              { title: 'Danh sách chi phí', path: paths.dashboard.pos.expense.list },
+              { title: 'Thêm chi phí', path: paths.dashboard.pos.expense.new },
+              { title: 'Danh mục chi phí', path: paths.dashboard.pos.expense.categories },
+              { title: 'Chi phí định kỳ', path: paths.dashboard.pos.expense.recurringTemplates },
+            ],
+          },
+          {
             title: 'Báo cáo',
             path: paths.dashboard.pos.report.root,
             icon: ICONS.analytics,
@@ -357,6 +369,9 @@ export function useNavData(userRole?: string) {
               { title: 'Khách hàng', path: paths.dashboard.pos.report.customers },
               { title: 'Tồn kho', path: paths.dashboard.pos.report.inventory },
               { title: 'Báo cáo thuế', path: paths.dashboard.pos.report.tax, roles: ['Admin', 'Manager'] },
+              { title: 'Chi phí', path: paths.dashboard.pos.report.expense, roles: ['Admin'] },
+              { title: 'Công nợ', path: paths.dashboard.pos.report.debt, roles: ['Admin'] },
+              { title: 'Điểm hòa vốn', path: paths.dashboard.pos.report.breakEven, roles: ['Admin'] },
             ],
           },
         ],
