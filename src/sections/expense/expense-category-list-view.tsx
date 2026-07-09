@@ -37,7 +37,7 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import FormProvider, { RHFTextField, RHFSelect, RHFSwitch } from 'src/components/hook-form';
 import { TableHeadCustom, TableNoData } from 'src/components/table';
 
-import { IExpenseCategory } from 'src/types/corecms-api';
+import { ExpenseType, IExpenseCategory } from 'src/types/corecms-api';
 import {
   getExpenseCategories,
   createExpenseCategory,
@@ -54,9 +54,21 @@ const TABLE_HEAD = [
   { id: '', width: 88 },
 ];
 
+const TYPE_LABEL: Record<ExpenseType, string> = {
+  Fixed: 'Cố định',
+  Variable: 'Biến đổi',
+  Income: 'Khoản thu',
+};
+
+const TYPE_COLOR: Record<ExpenseType, 'warning' | 'info' | 'success'> = {
+  Fixed: 'warning',
+  Variable: 'info',
+  Income: 'success',
+};
+
 const Schema = Yup.object().shape({
   name: Yup.string().required('Tên danh mục là bắt buộc'),
-  type: Yup.string().oneOf(['Fixed', 'Variable']).required(),
+  type: Yup.string().oneOf(['Fixed', 'Variable', 'Income']).required(),
   isActive: Yup.boolean().default(true),
 });
 
@@ -120,12 +132,12 @@ export default function ExpenseCategoryListView() {
       if (editing) {
         await updateExpenseCategory(editing.id, {
           name: data.name,
-          type: data.type as 'Fixed' | 'Variable',
+          type: data.type as ExpenseType,
           isActive: data.isActive,
         });
         enqueueSnackbar('Cập nhật thành công!');
       } else {
-        await createExpenseCategory({ name: data.name, type: data.type as 'Fixed' | 'Variable' });
+        await createExpenseCategory({ name: data.name, type: data.type as ExpenseType });
         enqueueSnackbar('Tạo thành công!');
       }
       dialog.onFalse();
@@ -177,8 +189,8 @@ export default function ExpenseCategoryListView() {
                     <TableRow key={row.id} hover>
                       <TableCell>{row.name}</TableCell>
                       <TableCell>
-                        <Label variant="soft" color={row.type === 'Fixed' ? 'warning' : 'info'}>
-                          {row.type === 'Fixed' ? 'Cố định' : 'Biến đổi'}
+                        <Label variant="soft" color={TYPE_COLOR[row.type] ?? 'info'}>
+                          {TYPE_LABEL[row.type] ?? row.type}
                         </Label>
                       </TableCell>
                       <TableCell>
@@ -223,6 +235,7 @@ export default function ExpenseCategoryListView() {
               <RHFSelect name="type" label="Loại chi phí">
                 <MenuItem value="Fixed">Cố định (dùng để tính điểm hòa vốn)</MenuItem>
                 <MenuItem value="Variable">Biến đổi</MenuItem>
+                <MenuItem value="Income">Khoản thu</MenuItem>
               </RHFSelect>
               {editing && <RHFSwitch name="isActive" label="Đang hoạt động" />}
             </Stack>

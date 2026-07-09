@@ -107,7 +107,8 @@ export default function ExpenseNewEditForm({ currentExpense }: Props) {
               <RHFSelect name="categoryId" label="Danh mục chi phí" disabled={isReadOnly}>
                 {categories.map((c) => (
                   <MenuItem key={c.id} value={c.id}>
-                    {c.name} ({c.type === 'Fixed' ? 'Cố định' : 'Biến đổi'})
+                    {c.name} (
+                    {c.type === 'Fixed' ? 'Cố định' : c.type === 'Income' ? 'Khoản thu' : 'Biến đổi'})
                   </MenuItem>
                 ))}
               </RHFSelect>
