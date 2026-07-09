@@ -108,7 +108,13 @@ export default function ExpenseNewEditForm({ currentExpense }: Props) {
                 {categories.map((c) => (
                   <MenuItem key={c.id} value={c.id}>
                     {c.name} (
-                    {c.type === 'Fixed' ? 'Cố định' : c.type === 'Income' ? 'Khoản thu' : 'Biến đổi'})
+                    {c.type === 'Fixed'
+                      ? 'Cố định'
+                      : c.type === 'Income'
+                        ? 'Khoản thu'
+                        : c.type === 'Expense'
+                          ? 'Chi phí'
+                          : 'Biến đổi'})
                   </MenuItem>
                 ))}
               </RHFSelect>
