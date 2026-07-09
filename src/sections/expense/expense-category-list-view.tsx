@@ -58,17 +58,19 @@ const TYPE_LABEL: Record<ExpenseType, string> = {
   Fixed: 'Cố định',
   Variable: 'Biến đổi',
   Income: 'Khoản thu',
+  Expense: 'Chi phí',
 };
 
-const TYPE_COLOR: Record<ExpenseType, 'warning' | 'info' | 'success'> = {
+const TYPE_COLOR: Record<ExpenseType, 'warning' | 'info' | 'success' | 'default'> = {
   Fixed: 'warning',
   Variable: 'info',
   Income: 'success',
+  Expense: 'default',
 };
 
 const Schema = Yup.object().shape({
   name: Yup.string().required('Tên danh mục là bắt buộc'),
-  type: Yup.string().oneOf(['Fixed', 'Variable', 'Income']).required(),
+  type: Yup.string().oneOf(['Fixed', 'Variable', 'Income', 'Expense']).required(),
   isActive: Yup.boolean().default(true),
 });
 
@@ -236,6 +238,7 @@ export default function ExpenseCategoryListView() {
                 <MenuItem value="Fixed">Cố định (dùng để tính điểm hòa vốn)</MenuItem>
                 <MenuItem value="Variable">Biến đổi</MenuItem>
                 <MenuItem value="Income">Khoản thu</MenuItem>
+                <MenuItem value="Expense">Chi phí</MenuItem>
               </RHFSelect>
               {editing && <RHFSwitch name="isActive" label="Đang hoạt động" />}
             </Stack>

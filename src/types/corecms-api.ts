@@ -2050,7 +2050,7 @@ export interface IUpdateSupplierRequest {
 }
 
 // --- Expense (Chi phí vận hành / OPEX) ---
-export type ExpenseType = 'Fixed' | 'Variable' | 'Income';
+export type ExpenseType = 'Fixed' | 'Variable' | 'Income' | 'Expense';
 export type ExpenseRecurrenceType = 'Monthly' | 'Yearly';
 
 export interface IExpenseCategory {
