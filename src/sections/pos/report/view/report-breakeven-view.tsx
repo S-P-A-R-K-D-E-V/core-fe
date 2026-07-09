@@ -89,7 +89,7 @@ export default function ReportBreakEvenView() {
               <AppDatePicker label="Ngày mục tiêu" value={targetDate} onChange={setTargetDate} size="small" />
             </Stack>
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              %Giá vốn và chi phí cố định được hệ thống tự tính từ dữ liệu bán hàng (giá vốn KiotViet) và chi phí đã nhập — không cần ước lượng tay.
+              %Giá vốn tự tính từ dữ liệu bán hàng (giá vốn KiotViet). Chi phí vận hành lấy từ tất cả danh mục chi phí (trừ khoản thu) đã nhập trong kỳ — không cần ước lượng tay.
             </Typography>
           </CardContent>
         </Card>
@@ -140,7 +140,7 @@ export default function ReportBreakEvenView() {
                   <Card>
                     <CardContent>
                       <Typography variant="subtitle2" color="text.secondary">
-                        Chi phí cố định (kỳ)
+                        Chi phí vận hành (kỳ)
                       </Typography>
                       <Typography variant="h5">{fCurrency(data.fixedCosts)}</Typography>
                     </CardContent>
