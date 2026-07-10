@@ -2608,6 +2608,24 @@ export interface IDebtSummary {
 }
 
 // --- Break-even Analysis (điểm hòa vốn) ---
+export interface IOperatingCostLine {
+  label: string;
+  amount: number;
+  isEstimated: boolean;
+  source: 'recorded' | 'recurring' | 'labor' | 'labor-estimated' | 'variable-estimated';
+}
+
+export interface IOperatingCostBreakdown {
+  recordedExpenses: number;
+  projectedRecurring: number;
+  laborActual: number;
+  laborEstimated: number;
+  variableEstimated: number;
+  total: number;
+  hasEstimates: boolean;
+  lines: IOperatingCostLine[];
+}
+
 export interface IBreakEvenAnalysis {
   period: string;
   targetDate: string;
@@ -2616,4 +2634,5 @@ export interface IBreakEvenAnalysis {
   breakEvenRevenue: number;
   actualRevenue: number;
   gap: number;
+  operatingCost: IOperatingCostBreakdown;
 }
