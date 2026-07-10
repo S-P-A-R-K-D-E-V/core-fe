@@ -383,6 +383,7 @@ export const endpoints = {
     createChannel: '/shareholders/channels',
     updateChannel: (id: string) => `/shareholders/channels/${id}`,
     deleteChannel: (id: string) => `/shareholders/channels/${id}`,
+    knownPaymentMethods: '/shareholders/channels/known-payment-methods',
     transactions: '/shareholders/transactions',
     createTransaction: '/shareholders/transactions',
     updateTransaction: (id: string) => `/shareholders/transactions/${id}`,

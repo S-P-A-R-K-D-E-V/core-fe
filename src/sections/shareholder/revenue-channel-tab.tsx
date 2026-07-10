@@ -34,9 +34,11 @@ import { TableHeadCustom, TableNoData } from 'src/components/table';
 import { AppDatePicker } from 'src/components/date-time-picker';
 
 import { IShareholder, IRevenueChannel, IKiotVietBankAccount } from 'src/types/corecms-api';
+import { fPaymentMethod } from 'src/utils/payment-method-label';
 import { getBankAccounts } from 'src/api/bank-accounts';
 import {
   getRevenueChannels,
+  getKnownPaymentMethods,
   createRevenueChannel,
   updateRevenueChannel,
   deleteRevenueChannel,
@@ -52,11 +54,10 @@ const TABLE_HEAD = [
   { id: '', width: 88 },
 ];
 
-const METHOD_LABEL: Record<string, string> = {
-  Cash: 'Tiền mặt',
-  Transfer: 'Chuyển khoản',
-  Card: 'Thẻ',
-};
+// Luôn hiện sẵn 3 phương thức phổ biến (kể cả khi hệ thống chưa có giao dịch nào) —
+// khớp với danh sách thực tế lấy từ getKnownPaymentMethods() để không bỏ sót phương thức
+// mới (VD: Wallet, MoMo...) mà KiotViet cho phép merchant tự thêm.
+const DEFAULT_METHODS = ['Cash', 'Transfer', 'Card'];
 
 const Schema = Yup.object().shape({
   paymentMethod: Yup.string().required('Chọn phương thức'),
@@ -79,17 +80,21 @@ export default function RevenueChannelTab({ shareholders }: Props) {
 
   const [channels, setChannels] = useState<IRevenueChannel[]>([]);
   const [bankAccounts, setBankAccounts] = useState<IKiotVietBankAccount[]>([]);
+  const [availableMethods, setAvailableMethods] = useState<string[]>(DEFAULT_METHODS);
   const [editing, setEditing] = useState<IRevenueChannel | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
-      const [channelsResult, banksResult] = await Promise.all([
+      const [channelsResult, banksResult, knownMethods] = await Promise.all([
         getRevenueChannels(),
         getBankAccounts(),
+        getKnownPaymentMethods(),
       ]);
       setChannels(channelsResult);
       setBankAccounts(banksResult);
+      // Hợp nhất method thực tế đã dùng với danh sách mặc định — không trùng, giữ thứ tự ổn định
+      setAvailableMethods(Array.from(new Set([...DEFAULT_METHODS, ...knownMethods])));
     } catch (error) {
       console.error(error);
       enqueueSnackbar('Không thể tải kênh thu tiền', { variant: 'error' });
@@ -198,7 +203,7 @@ export default function RevenueChannelTab({ shareholders }: Props) {
               <TableBody>
                 {channels.map((row) => (
                   <TableRow key={row.id} hover>
-                    <TableCell>{METHOD_LABEL[row.paymentMethod] ?? row.paymentMethod}</TableCell>
+                    <TableCell>{fPaymentMethod(row.paymentMethod)}</TableCell>
                     <TableCell>{row.bankAccountName || 'Tất cả'}</TableCell>
                     <TableCell>{row.shareholderName}</TableCell>
                     <TableCell>
@@ -238,10 +243,16 @@ export default function RevenueChannelTab({ shareholders }: Props) {
           <DialogTitle>{editing ? 'Sửa kênh thu tiền' : 'Thêm kênh thu tiền'}</DialogTitle>
           <DialogContent>
             <Stack spacing={2.5} sx={{ pt: 1 }}>
-              <RHFSelect name="paymentMethod" label="Phương thức thanh toán">
-                <MenuItem value="Cash">Tiền mặt</MenuItem>
-                <MenuItem value="Transfer">Chuyển khoản</MenuItem>
-                <MenuItem value="Card">Thẻ</MenuItem>
+              <RHFSelect
+                name="paymentMethod"
+                label="Phương thức thanh toán"
+                helperText="Chỉ hiện các phương thức thực tế đã ghi nhận trong giao dịch (hoặc 3 phương thức phổ biến nếu chưa có dữ liệu)"
+              >
+                {availableMethods.map((m) => (
+                  <MenuItem key={m} value={m}>
+                    {fPaymentMethod(m)}
+                  </MenuItem>
+                ))}
               </RHFSelect>
 
               {watchedMethod !== 'Cash' && (

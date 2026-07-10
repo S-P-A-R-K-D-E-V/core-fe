@@ -34,6 +34,7 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import { AppDatePicker } from 'src/components/date-time-picker';
 import { TableHeadCustom, TableNoData } from 'src/components/table';
 import { fCurrency, fPercent } from 'src/utils/format-number';
+import { fPaymentMethod } from 'src/utils/payment-method-label';
 
 import { ISettlementPreview } from 'src/types/corecms-api';
 import { getSettlementPreview, closeSettlement } from 'src/api/shareholders';
@@ -173,11 +174,20 @@ export default function SettlementPreviewView() {
                 <Stack spacing={0.5}>
                   {data.unmappedChannels.map((c, idx) => (
                     <Typography key={idx} variant="body2">
-                      • {c.paymentMethod}
+                      • {fPaymentMethod(c.paymentMethod)}
                       {c.bankAccountName ? ` (${c.bankAccountName})` : ''}: {fCurrency(c.amount)}
                     </Typography>
                   ))}
                 </Stack>
+                <Button
+                  component="a"
+                  href={paths.dashboard.pos.shareholder.list}
+                  size="small"
+                  sx={{ mt: 1.5 }}
+                  startIcon={<Iconify icon="mingcute:add-line" />}
+                >
+                  Đi tới Cổ đông & Kênh thu tiền để gán
+                </Button>
               </Alert>
             )}
 
