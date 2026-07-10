@@ -89,7 +89,7 @@ export default function ReportBreakEvenView() {
               <AppDatePicker label="Ngày mục tiêu" value={targetDate} onChange={setTargetDate} size="small" />
             </Stack>
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              %Giá vốn tự tính từ dữ liệu bán hàng (giá vốn KiotViet). Chi phí vận hành lấy từ tất cả danh mục chi phí (trừ khoản thu) đã nhập trong kỳ — không cần ước lượng tay.
+              Tỷ lệ COGS tự tính từ dữ liệu bán hàng KiotViet (trailing). Chi phí hoạt động lấy từ tất cả danh mục chi phí (trừ khoản thu) đã nhập trong kỳ, phân bổ theo ngày với chi phí định kỳ — không cần ước lượng tay.
             </Typography>
           </CardContent>
         </Card>
@@ -118,7 +118,7 @@ export default function ReportBreakEvenView() {
                   <Card>
                     <CardContent>
                       <Typography variant="subtitle2" color="text.secondary">
-                        Doanh thu cần đạt để hòa vốn
+                        Doanh thu hòa vốn
                       </Typography>
                       <Typography variant="h5">{fCurrency(data.breakEvenRevenue)}</Typography>
                     </CardContent>
@@ -140,7 +140,7 @@ export default function ReportBreakEvenView() {
                   <Card>
                     <CardContent>
                       <Typography variant="subtitle2" color="text.secondary">
-                        Chi phí vận hành (kỳ)
+                        Chi phí hoạt động (kỳ)
                       </Typography>
                       <Typography variant="h5">{fCurrency(data.fixedCosts)}</Typography>
                     </CardContent>
@@ -150,7 +150,7 @@ export default function ReportBreakEvenView() {
                   <Card>
                     <CardContent>
                       <Typography variant="subtitle2" color="text.secondary">
-                        %Giá vốn (tự tính, 90 ngày/12 tháng gần nhất)
+                        Tỷ lệ COGS (tự tính, trailing)
                       </Typography>
                       <Typography variant="h5">{fPercent(data.cogsRatio * 100)}</Typography>
                     </CardContent>
@@ -160,7 +160,7 @@ export default function ReportBreakEvenView() {
                   <Card>
                     <CardContent>
                       <Typography variant="subtitle2" color="text.secondary">
-                        Chênh lệch so với hòa vốn
+                        Biên độ an toàn (Margin of Safety)
                       </Typography>
                       <Typography variant="h5" color={data.gap >= 0 ? 'success.main' : 'error.main'}>
                         {data.gap >= 0 ? '+' : ''}
