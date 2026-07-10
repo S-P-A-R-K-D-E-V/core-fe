@@ -283,6 +283,11 @@ export const paths = {
         categories: `${ROOTS.DASHBOARD}/pos/expense/categories`,
         recurringTemplates: `${ROOTS.DASHBOARD}/pos/expense/recurring-templates`,
       },
+      shareholder: {
+        root: `${ROOTS.DASHBOARD}/pos/shareholder`,
+        list: `${ROOTS.DASHBOARD}/pos/shareholder/list`,
+        transactions: `${ROOTS.DASHBOARD}/pos/shareholder/transactions`,
+      },
     },
     general: {
       app: `${ROOTS.DASHBOARD}/app`,

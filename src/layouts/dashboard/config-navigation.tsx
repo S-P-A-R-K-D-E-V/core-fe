@@ -358,6 +358,16 @@ export function useNavData(userRole?: string) {
             ],
           },
           {
+            title: 'Hoạch toán cổ đông',
+            path: paths.dashboard.pos.shareholder.root,
+            icon: ICONS.banking,
+            roles: ['Admin'],
+            children: [
+              { title: 'Cổ đông & Kênh thu tiền', path: paths.dashboard.pos.shareholder.list },
+              { title: 'Sổ giao dịch vốn', path: paths.dashboard.pos.shareholder.transactions },
+            ],
+          },
+          {
             title: 'Báo cáo',
             path: paths.dashboard.pos.report.root,
             icon: ICONS.analytics,

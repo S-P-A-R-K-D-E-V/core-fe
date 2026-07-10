@@ -2640,3 +2640,90 @@ export interface IBreakEvenAnalysis {
   gap: number;
   operatingCost: IOperatingCostBreakdown;
 }
+
+// --- Shareholder Accounting (hoạch toán cổ đông) ---
+export type CapitalTransactionType =
+  | 'Contribution'
+  | 'ExpensePaidOnBehalf'
+  | 'RevenueCollected'
+  | 'Withdrawal'
+  | 'PeerTransfer';
+
+export interface IShareholder {
+  id: string;
+  name: string;
+  equityPercent: number;
+  userId: string | null;
+  userName: string | null;
+  isActive: boolean;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface IEquityHistoryItem {
+  equityPercent: number;
+  effectiveFrom: string;
+  note: string | null;
+}
+
+export interface IShareholderDetail extends IShareholder {
+  equityHistory: IEquityHistoryItem[];
+}
+
+export interface IRevenueChannel {
+  id: string;
+  paymentMethod: string;
+  bankAccountId: string | null;
+  bankAccountName: string | null;
+  shareholderId: string;
+  shareholderName: string;
+  effectiveFrom: string;
+  isActive: boolean;
+}
+
+export interface ICapitalTransaction {
+  id: string;
+  shareholderId: string;
+  shareholderName: string;
+  type: CapitalTransactionType;
+  amount: number;
+  transactionDate: string;
+  counterpartyShareholderId: string | null;
+  counterpartyShareholderName: string | null;
+  refExpenseId: string | null;
+  refPurchaseOrderId: string | null;
+  settlementPeriodId: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface IPagedCapitalTransactions {
+  items: ICapitalTransaction[];
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+}
+
+export interface IStatementLine {
+  transactionId: string;
+  transactionDate: string;
+  type: CapitalTransactionType;
+  signedAmount: number;
+  counterpartyName: string | null;
+  note: string | null;
+  settlementPeriodId: string | null;
+}
+
+export interface IShareholderStatement {
+  shareholderId: string;
+  shareholderName: string;
+  equityPercent: number;
+  fromDate: string;
+  toDate: string;
+  totalPutIn: number;
+  totalTakenOut: number;
+  netPosition: number;
+  totalPaidToPeers: number;
+  totalReceivedFromPeers: number;
+  lines: IStatementLine[];
+}
