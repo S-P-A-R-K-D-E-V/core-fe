@@ -62,6 +62,12 @@ export async function getRevenueChannels(isActive?: boolean): Promise<IRevenueCh
   return response.data;
 }
 
+/** Method thực tế đã ghi nhận trong thanh toán (KiotViet trả tự do, không phải enum cố định) */
+export async function getKnownPaymentMethods(): Promise<string[]> {
+  const response = await axios.get<string[]>(endpoints.shareholders.knownPaymentMethods);
+  return response.data;
+}
+
 export async function createRevenueChannel(data: {
   paymentMethod: string;
   bankAccountId?: string | null;
