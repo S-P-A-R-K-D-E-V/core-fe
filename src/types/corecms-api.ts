@@ -2623,6 +2623,10 @@ export interface IOperatingCostBreakdown {
   variableEstimated: number;
   total: number;
   hasEstimates: boolean;
+  fixedCost: number;
+  variableCost: number;
+  laborCost: number;
+  otherCost: number;
   lines: IOperatingCostLine[];
 }
 
