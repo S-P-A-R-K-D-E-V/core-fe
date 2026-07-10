@@ -388,6 +388,11 @@ export const endpoints = {
     updateTransaction: (id: string) => `/shareholders/transactions/${id}`,
     deleteTransaction: (id: string) => `/shareholders/transactions/${id}`,
     statement: (id: string) => `/shareholders/${id}/statement`,
+    settlementPreview: '/shareholders/settlements/preview',
+    settlements: '/shareholders/settlements',
+    settlementDetails: (id: string) => `/shareholders/settlements/${id}`,
+    markTransferPaid: (transferId: string) =>
+      `/shareholders/settlements/transfers/${transferId}/mark-paid`,
   },
   purchaseOrders: {
     list: '/purchase-orders',

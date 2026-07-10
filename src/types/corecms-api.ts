@@ -2727,3 +2727,77 @@ export interface IShareholderStatement {
   totalReceivedFromPeers: number;
   lines: IStatementLine[];
 }
+
+// --- Settlement (chốt sổ hoạch toán cổ đông) ---
+export type SettlementStatus = 'Open' | 'Closed';
+
+export interface ISettlementLine {
+  shareholderId: string;
+  shareholderName: string;
+  equityPercentSnapshot: number;
+  profitShare: number;
+  paidIn: number;
+  collectedOut: number;
+  netBalance: number;
+}
+
+export interface IUnmappedChannel {
+  paymentMethod: string;
+  bankAccountId: string | null;
+  bankAccountName: string | null;
+  amount: number;
+}
+
+export interface ISettlementTransfer {
+  id: string | null;
+  fromShareholderId: string;
+  fromShareholderName: string;
+  toShareholderId: string;
+  toShareholderName: string;
+  amount: number;
+  isPaid: boolean;
+}
+
+export interface ISettlementPreview {
+  fromDate: string;
+  toDate: string;
+  totalRevenue: number;
+  totalExpense: number;
+  profit: number;
+  reserveAmount: number;
+  distributedProfit: number;
+  lines: ISettlementLine[];
+  transfers: ISettlementTransfer[];
+  unmappedChannels: IUnmappedChannel[];
+  balanceCheck: number;
+  canClose: boolean;
+  isOverlapping: boolean;
+}
+
+export interface ISettlementListItem {
+  id: string;
+  name: string;
+  fromDate: string;
+  toDate: string;
+  status: SettlementStatus;
+  profit: number;
+  createdAt: string;
+  closedAt: string | null;
+}
+
+export interface ISettlementDetail {
+  id: string;
+  name: string;
+  fromDate: string;
+  toDate: string;
+  status: SettlementStatus;
+  totalRevenue: number;
+  totalExpense: number;
+  profit: number;
+  reserveAmount: number;
+  note: string | null;
+  closedByName: string | null;
+  closedAt: string | null;
+  lines: ISettlementLine[];
+  transfers: ISettlementTransfer[];
+}
