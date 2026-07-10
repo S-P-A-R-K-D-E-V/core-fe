@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
 import Grid from '@mui/material/Grid2';
+import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
 import TextField from '@mui/material/TextField';
@@ -175,6 +177,60 @@ export default function ReportBreakEvenView() {
                   </Card>
                 </Grid>
               </Grid>
+            </Grid>
+
+            <Grid size={{ xs: 12 }}>
+              <Card>
+                <CardContent>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                    <Typography variant="h6">Chi tiết chi phí hoạt động</Typography>
+                    {data.operatingCost?.hasEstimates && (
+                      <Chip size="small" color="warning" variant="soft" label="Có khoản ước tính" />
+                    )}
+                  </Stack>
+
+                  <Stack spacing={1.5}>
+                    {data.operatingCost?.lines?.map((line, idx) => (
+                      <Stack
+                        key={idx}
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                      >
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Typography variant="body2">{line.label}</Typography>
+                          {line.isEstimated && (
+                            <Chip size="small" color="warning" variant="outlined" label="ước tính" />
+                          )}
+                        </Stack>
+                        <Typography variant="subtitle2" color={line.isEstimated ? 'warning.main' : 'text.primary'}>
+                          {fCurrency(line.amount)}
+                        </Typography>
+                      </Stack>
+                    ))}
+
+                    {(!data.operatingCost?.lines || data.operatingCost.lines.length === 0) && (
+                      <Typography variant="body2" color="text.secondary">
+                        Chưa có chi phí nào trong kỳ.
+                      </Typography>
+                    )}
+
+                    <Divider />
+                    <Stack direction="row" alignItems="center" justifyContent="space-between">
+                      <Typography variant="subtitle1">Tổng chi phí hoạt động</Typography>
+                      <Typography variant="subtitle1">{fCurrency(data.operatingCost?.total ?? data.fixedCosts)}</Typography>
+                    </Stack>
+                  </Stack>
+
+                  {data.operatingCost?.hasEstimates && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
+                      Khoản &quot;ước tính&quot; gồm: chi phí định kỳ chưa được sinh, lương kỳ chưa chốt (suy từ
+                      kỳ lương gần nhất), và chi phí biến đổi chưa nhập (trung bình mùa vụ). Con số thực tế
+                      thay thế ước tính khi dữ liệu được nhập/chốt.
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
             </Grid>
           </Grid>
         )}
