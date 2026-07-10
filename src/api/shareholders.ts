@@ -7,6 +7,9 @@ import {
   IPagedCapitalTransactions,
   IShareholderStatement,
   CapitalTransactionType,
+  ISettlementPreview,
+  ISettlementListItem,
+  ISettlementDetail,
 } from 'src/types/corecms-api';
 
 // ========== Shareholder ==========
@@ -145,6 +148,45 @@ export async function getShareholderStatement(
     endpoints.shareholders.statement(id),
     { params }
   );
+  return response.data;
+}
+
+// ========== Settlement (chốt sổ) ==========
+
+export async function getSettlementPreview(params: {
+  fromDate: string;
+  toDate: string;
+  reserveAmount?: number;
+}): Promise<ISettlementPreview> {
+  const response = await axios.get<ISettlementPreview>(endpoints.shareholders.settlementPreview, {
+    params,
+  });
+  return response.data;
+}
+
+export async function getSettlements(): Promise<ISettlementListItem[]> {
+  const response = await axios.get<ISettlementListItem[]>(endpoints.shareholders.settlements);
+  return response.data;
+}
+
+export async function getSettlementById(id: string): Promise<ISettlementDetail> {
+  const response = await axios.get<ISettlementDetail>(endpoints.shareholders.settlementDetails(id));
+  return response.data;
+}
+
+export async function closeSettlement(data: {
+  name: string;
+  fromDate: string;
+  toDate: string;
+  reserveAmount: number;
+  note?: string | null;
+}): Promise<{ id: string }> {
+  const response = await axios.post(endpoints.shareholders.settlements, data);
+  return response.data;
+}
+
+export async function markTransferPaid(transferId: string): Promise<{ paidTransactionId: string }> {
+  const response = await axios.post(endpoints.shareholders.markTransferPaid(transferId));
   return response.data;
 }
 

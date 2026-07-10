@@ -365,6 +365,8 @@ export function useNavData(userRole?: string) {
             children: [
               { title: 'Cổ đông & Kênh thu tiền', path: paths.dashboard.pos.shareholder.list },
               { title: 'Sổ giao dịch vốn', path: paths.dashboard.pos.shareholder.transactions },
+              { title: 'Đối chiếu & Chốt sổ', path: paths.dashboard.pos.shareholder.settlement },
+              { title: 'Kỳ chốt sổ', path: paths.dashboard.pos.shareholder.settlements },
             ],
           },
           {
