@@ -98,6 +98,11 @@ export default function ReportDashboardView() {
         hollow: { size: '60%' },
         dataLabels: {
           value: { formatter: (val: number) => `${val.toFixed(0)}%`, fontSize: '28px' },
+          total: {
+            show: true,
+            label: 'Đạt hòa vốn',
+            formatter: () => `${Math.min(100, achievedPercent).toFixed(0)}%`,
+          },
         },
       },
     },
