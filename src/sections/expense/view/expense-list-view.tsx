@@ -49,6 +49,7 @@ const TABLE_HEAD = [
   { id: 'categoryName', label: 'Danh mục' },
   { id: 'amount', label: 'Số tiền', width: 150, align: 'right' as const },
   { id: 'note', label: 'Ghi chú' },
+  { id: 'paidBy', label: 'Ai chi hộ', width: 130 },
   { id: 'source', label: 'Nguồn', width: 130 },
   { id: '', width: 88 },
 ];
@@ -180,6 +181,7 @@ export default function ExpenseListView() {
                       <TableCell>{row.categoryName}</TableCell>
                       <TableCell align="right">{fCurrency(row.amount)}</TableCell>
                       <TableCell>{row.note || '—'}</TableCell>
+                      <TableCell>{row.paidByShareholderName || '—'}</TableCell>
                       <TableCell>
                         {row.sourceTemplateId ? (
                           <Label variant="soft" color="info">Định kỳ</Label>

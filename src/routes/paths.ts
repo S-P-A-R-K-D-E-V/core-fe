@@ -287,6 +287,7 @@ export const paths = {
         root: `${ROOTS.DASHBOARD}/pos/shareholder`,
         list: `${ROOTS.DASHBOARD}/pos/shareholder/list`,
         transactions: `${ROOTS.DASHBOARD}/pos/shareholder/transactions`,
+        statement: `${ROOTS.DASHBOARD}/pos/shareholder/statement`,
         settlement: `${ROOTS.DASHBOARD}/pos/shareholder/settlement`,
         settlements: `${ROOTS.DASHBOARD}/pos/shareholder/settlements`,
         settlementDetails: (id: string) => `${ROOTS.DASHBOARD}/pos/shareholder/settlements/${id}`,

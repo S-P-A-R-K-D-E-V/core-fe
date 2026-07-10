@@ -18,8 +18,9 @@ import { useSnackbar } from 'src/components/snackbar';
 import FormProvider, { RHFTextField, RHFSelect } from 'src/components/hook-form';
 import { RHFDatePicker } from 'src/components/hook-form/rhf-date-picker';
 
-import { IExpense, IExpenseCategory } from 'src/types/corecms-api';
+import { IExpense, IExpenseCategory, IShareholder } from 'src/types/corecms-api';
 import { createExpense, updateExpense, getExpenseCategories } from 'src/api/expenses';
+import { getShareholders } from 'src/api/shareholders';
 
 // ----------------------------------------------------------------------
 
@@ -31,9 +32,11 @@ export default function ExpenseNewEditForm({ currentExpense }: Props) {
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
   const [categories, setCategories] = useState<IExpenseCategory[]>([]);
+  const [shareholders, setShareholders] = useState<IShareholder[]>([]);
 
   useEffect(() => {
     getExpenseCategories(true).then(setCategories);
+    getShareholders(true).then(setShareholders);
   }, []);
 
   const isReadOnly = Boolean(currentExpense?.sourceTemplateId);
@@ -43,6 +46,7 @@ export default function ExpenseNewEditForm({ currentExpense }: Props) {
     amount: Yup.number().min(1, 'Số tiền phải lớn hơn 0').required('Số tiền là bắt buộc'),
     expenseDate: Yup.string().required('Ngày chi là bắt buộc'),
     note: Yup.string().default(''),
+    paidByShareholderId: Yup.string().nullable().default(null),
   });
 
   const defaultValues = useMemo(
@@ -51,6 +55,7 @@ export default function ExpenseNewEditForm({ currentExpense }: Props) {
       amount: currentExpense?.amount || 0,
       expenseDate: currentExpense?.expenseDate?.slice(0, 10) || new Date().toISOString().slice(0, 10),
       note: currentExpense?.note || '',
+      paidByShareholderId: currentExpense?.paidByShareholderId || null,
     }),
     [currentExpense]
   );
@@ -75,6 +80,7 @@ export default function ExpenseNewEditForm({ currentExpense }: Props) {
           amount: data.amount,
           expenseDate: data.expenseDate,
           note: data.note || undefined,
+          paidByShareholderId: data.paidByShareholderId || null,
         });
         enqueueSnackbar('Cập nhật thành công!');
       } else {
@@ -83,6 +89,7 @@ export default function ExpenseNewEditForm({ currentExpense }: Props) {
           amount: data.amount,
           expenseDate: data.expenseDate,
           note: data.note || undefined,
+          paidByShareholderId: data.paidByShareholderId || null,
         });
         enqueueSnackbar('Tạo thành công!');
       }
@@ -122,6 +129,20 @@ export default function ExpenseNewEditForm({ currentExpense }: Props) {
               <RHFTextField name="amount" label="Số tiền" type="number" disabled={isReadOnly} />
 
               <RHFDatePicker name="expenseDate" label="Ngày chi" />
+
+              <RHFSelect
+                name="paidByShareholderId"
+                label="Ai chi hộ (nếu có)"
+                disabled={isReadOnly}
+                helperText="Chọn cổ đông đã bỏ tiền túi chi khoản này — tự động ghi vào sổ giao dịch vốn"
+              >
+                <MenuItem value="">Không ai / cửa hàng tự trả</MenuItem>
+                {shareholders.map((s) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {s.name}
+                  </MenuItem>
+                ))}
+              </RHFSelect>
 
               <RHFTextField name="note" label="Ghi chú" multiline rows={3} />
             </Stack>

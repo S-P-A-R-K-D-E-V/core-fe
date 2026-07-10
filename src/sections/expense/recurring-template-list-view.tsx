@@ -39,7 +39,7 @@ import { RHFDatePicker } from 'src/components/hook-form/rhf-date-picker';
 import { TableHeadCustom, TableNoData } from 'src/components/table';
 import { fCurrency } from 'src/utils/format-number';
 
-import { IExpenseCategory, IRecurringExpenseTemplate } from 'src/types/corecms-api';
+import { IExpenseCategory, IRecurringExpenseTemplate, IShareholder } from 'src/types/corecms-api';
 import { getExpenseCategories } from 'src/api/expenses';
 import {
   getRecurringExpenseTemplates,
@@ -47,6 +47,7 @@ import {
   updateRecurringExpenseTemplate,
   deactivateRecurringExpenseTemplate,
 } from 'src/api/expenses';
+import { getShareholders } from 'src/api/shareholders';
 
 // ----------------------------------------------------------------------
 
@@ -68,6 +69,7 @@ const Schema = Yup.object().shape({
   recurrenceType: Yup.string().oneOf(['Monthly', 'Yearly']).required(),
   validFrom: Yup.string().required('Ngày bắt đầu là bắt buộc'),
   validTo: Yup.string().default(''),
+  paidByShareholderId: Yup.string().nullable().default(null),
 });
 
 type FormValuesProps = Yup.InferType<typeof Schema>;
@@ -79,17 +81,20 @@ export default function RecurringTemplateListView() {
 
   const [templates, setTemplates] = useState<IRecurringExpenseTemplate[]>([]);
   const [categories, setCategories] = useState<IExpenseCategory[]>([]);
+  const [shareholders, setShareholders] = useState<IShareholder[]>([]);
   const [editing, setEditing] = useState<IRecurringExpenseTemplate | null>(null);
   const [deactivateId, setDeactivateId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
-      const [templateResult, categoryResult] = await Promise.all([
+      const [templateResult, categoryResult, shareholderResult] = await Promise.all([
         getRecurringExpenseTemplates(),
         getExpenseCategories(true),
+        getShareholders(true),
       ]);
       setTemplates(templateResult);
       setCategories(categoryResult);
+      setShareholders(shareholderResult);
     } catch (error) {
       console.error(error);
       enqueueSnackbar('Không thể tải chi phí định kỳ', { variant: 'error' });
@@ -108,6 +113,7 @@ export default function RecurringTemplateListView() {
       recurrenceType: editing?.recurrenceType || 'Monthly',
       validFrom: editing?.validFrom?.slice(0, 10) || new Date().toISOString().slice(0, 10),
       validTo: editing?.validTo?.slice(0, 10) || '',
+      paidByShareholderId: editing?.paidByShareholderId || null,
     }),
     [editing]
   );
@@ -142,6 +148,7 @@ export default function RecurringTemplateListView() {
         recurrenceType: data.recurrenceType as 'Monthly' | 'Yearly',
         validFrom: data.validFrom,
         validTo: data.validTo || undefined,
+        paidByShareholderId: data.paidByShareholderId || null,
       };
       if (editing) {
         await updateRecurringExpenseTemplate(editing.id, { ...payload, isActive: editing.isActive });
@@ -260,6 +267,18 @@ export default function RecurringTemplateListView() {
                 <RHFDatePicker name="validFrom" label="Áp dụng từ ngày" />
                 <RHFDatePicker name="validTo" label="Áp dụng đến ngày (để trống = không giới hạn)" />
               </Stack>
+              <RHFSelect
+                name="paidByShareholderId"
+                label="Ai chi hộ (nếu có)"
+                helperText="Mỗi lần hệ thống tự sinh chi phí kỳ mới, sẽ tự ghi vào sổ giao dịch vốn cổ đông này"
+              >
+                <MenuItem value="">Không ai / cửa hàng tự trả</MenuItem>
+                {shareholders.map((s) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {s.name}
+                  </MenuItem>
+                ))}
+              </RHFSelect>
             </Stack>
           </DialogContent>
           <DialogActions>

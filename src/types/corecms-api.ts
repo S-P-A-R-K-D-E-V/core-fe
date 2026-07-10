@@ -2069,6 +2069,8 @@ export interface IExpense {
   expenseDate: string;
   note?: string;
   sourceTemplateId?: string;
+  paidByShareholderId?: string | null;
+  paidByShareholderName?: string | null;
   createdAt: string;
 }
 
@@ -2089,6 +2091,8 @@ export interface IRecurringExpenseTemplate {
   validTo?: string;
   isActive: boolean;
   lastGeneratedPeriod?: string;
+  paidByShareholderId?: string | null;
+  paidByShareholderName?: string | null;
 }
 
 export interface ICreateExpenseRequest {
@@ -2096,6 +2100,7 @@ export interface ICreateExpenseRequest {
   amount: number;
   expenseDate: string;
   note?: string;
+  paidByShareholderId?: string | null;
 }
 
 export interface IUpdateExpenseRequest {
@@ -2103,6 +2108,7 @@ export interface IUpdateExpenseRequest {
   amount: number;
   expenseDate: string;
   note?: string;
+  paidByShareholderId?: string | null;
 }
 
 export interface ICreateExpenseCategoryRequest {
@@ -2123,6 +2129,7 @@ export interface ICreateRecurringExpenseTemplateRequest {
   recurrenceType: ExpenseRecurrenceType;
   validFrom: string;
   validTo?: string;
+  paidByShareholderId?: string | null;
 }
 
 export interface IUpdateRecurringExpenseTemplateRequest {
@@ -2133,6 +2140,7 @@ export interface IUpdateRecurringExpenseTemplateRequest {
   validFrom: string;
   validTo?: string;
   isActive: boolean;
+  paidByShareholderId?: string | null;
 }
 
 // --- Purchase Order ---
@@ -2721,6 +2729,8 @@ export interface IShareholderStatement {
   fromDate: string;
   toDate: string;
   totalPutIn: number;
+  manualCollectedOut: number;
+  channelCollected: number;
   totalTakenOut: number;
   netPosition: number;
   totalPaidToPeers: number;
