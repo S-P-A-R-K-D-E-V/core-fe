@@ -13,7 +13,7 @@ import Button from '@mui/material/Button';
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 import { useSnackbar } from 'src/components/snackbar';
-import { fCurrency, fPercent } from 'src/utils/format-number';
+import { fCurrency, fPercent, fShortenNumber } from 'src/utils/format-number';
 import { AppDatePicker } from 'src/components/date-time-picker';
 import Chart, { useChart } from 'src/components/chart';
 import RoleBasedGuard from 'src/auth/guard/role-based-guard';
@@ -88,6 +88,7 @@ export default function ReportDashboardView() {
 
   const trendChartOptions = useChart({
     xaxis: { categories: chartData.categories },
+    yaxis: { labels: { formatter: (value: number) => (value ? fShortenNumber(value) : '0') } },
     tooltip: { y: { formatter: (value: number) => fCurrency(value) } },
   });
 

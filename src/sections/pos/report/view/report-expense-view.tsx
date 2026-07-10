@@ -18,7 +18,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 
 import { useSnackbar } from 'src/components/snackbar';
-import { fCurrency } from 'src/utils/format-number';
+import { fCurrency, fShortenNumber } from 'src/utils/format-number';
 import { AppDatePicker } from 'src/components/date-time-picker';
 import Chart, { useChart } from 'src/components/chart';
 import RoleBasedGuard from 'src/auth/guard/role-based-guard';
@@ -62,6 +62,7 @@ export default function ReportExpenseView() {
 
   const periodChartOptions = useChart({
     xaxis: { categories: data?.periods.map((p) => p.period) || [] },
+    yaxis: { labels: { formatter: (value: number) => (value ? fShortenNumber(value) : '0') } },
     tooltip: { y: { formatter: (value: number) => fCurrency(value) } },
   });
 
@@ -69,6 +70,19 @@ export default function ReportExpenseView() {
     labels: data?.byCategory.map((c) => c.categoryName) || [],
     legend: { position: 'bottom' },
     tooltip: { y: { formatter: (value: number) => fCurrency(value) } },
+    plotOptions: {
+      pie: {
+        donut: {
+          labels: {
+            value: { formatter: (value: string | number) => fCurrency(Number(value)) },
+            total: {
+              formatter: (w: { globals: { seriesTotals: number[] } }) =>
+                fCurrency(w.globals.seriesTotals.reduce((a, b) => a + b, 0)),
+            },
+          },
+        },
+      },
+    },
   });
 
   return (
