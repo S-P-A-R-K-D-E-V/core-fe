@@ -37,13 +37,19 @@ import Scrollbar from 'src/components/scrollbar';
 import { useSnackbar } from 'src/components/snackbar';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
-import FormProvider, { RHFTextField, RHFSelect } from 'src/components/hook-form';
+import FormProvider, { RHFTextField, RHFSelect, RHFSwitch } from 'src/components/hook-form';
 import { AppDatePicker } from 'src/components/date-time-picker';
 import { useTable, TableHeadCustom, TableNoData, TablePaginationCustom } from 'src/components/table';
 import { fCurrency } from 'src/utils/format-number';
 import { fDate } from 'src/utils/format-time';
 
-import { IShareholder, ICapitalTransaction, CapitalTransactionType } from 'src/types/corecms-api';
+import {
+  IShareholder,
+  ICapitalTransaction,
+  CapitalTransactionType,
+  IExpense,
+  IPurchaseOrder,
+} from 'src/types/corecms-api';
 import {
   getShareholders,
   getCapitalTransactions,
@@ -51,6 +57,8 @@ import {
   updateCapitalTransaction,
   deleteCapitalTransaction,
 } from 'src/api/shareholders';
+import { getExpenses } from 'src/api/expenses';
+import { getAllPurchaseOrders } from 'src/api/purchase-orders';
 
 // ----------------------------------------------------------------------
 
@@ -89,6 +97,9 @@ const Schema = Yup.object().shape({
   amount: Yup.number().typeError('Số tiền phải là số').positive('Số tiền phải lớn hơn 0').required(),
   transactionDate: Yup.string().required('Chọn ngày'),
   counterpartyShareholderId: Yup.string().nullable().default(null),
+  isGoodsPurchase: Yup.boolean().default(false),
+  refExpenseId: Yup.string().nullable().default(null),
+  refPurchaseOrderId: Yup.string().nullable().default(null),
   note: Yup.string().nullable().default(null),
 });
 
@@ -113,6 +124,8 @@ export default function CapitalTransactionListView() {
   const [tableData, setTableData] = useState<ICapitalTransaction[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [shareholders, setShareholders] = useState<IShareholder[]>([]);
+  const [recentExpenses, setRecentExpenses] = useState<IExpense[]>([]);
+  const [recentPurchaseOrders, setRecentPurchaseOrders] = useState<IPurchaseOrder[]>([]);
   const [fromDate, setFromDate] = useState(defaults.fromDate);
   const [toDate, setToDate] = useState(defaults.toDate);
   const [filterShareholder, setFilterShareholder] = useState('');
@@ -123,6 +136,22 @@ export default function CapitalTransactionListView() {
   const fetchShareholders = useCallback(async () => {
     try {
       setShareholders(await getShareholders());
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
+
+  // Picker "Chi phi cua hang" / "Don nhap KiotViet": 90 ngay gan nhat la du cho nhap lieu ky hien tai
+  const fetchPickerSources = useCallback(async () => {
+    const from = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+    const to = new Date().toISOString().slice(0, 10);
+    try {
+      const [expensesResult, poResult] = await Promise.all([
+        getExpenses({ fromDate: from, toDate: to, pageNumber: 1, pageSize: 100 }),
+        getAllPurchaseOrders({ fromDate: from, toDate: to, pageNumber: 1, pageSize: 100 }),
+      ]);
+      setRecentExpenses(expensesResult.items);
+      setRecentPurchaseOrders(poResult.items ?? []);
     } catch (error) {
       console.error(error);
     }
@@ -148,7 +177,8 @@ export default function CapitalTransactionListView() {
 
   useEffect(() => {
     fetchShareholders();
-  }, [fetchShareholders]);
+    fetchPickerSources();
+  }, [fetchShareholders, fetchPickerSources]);
 
   useEffect(() => {
     fetchData();
@@ -161,6 +191,9 @@ export default function CapitalTransactionListView() {
       amount: editing?.amount ?? 0,
       transactionDate: editing?.transactionDate?.slice(0, 10) || new Date().toISOString().slice(0, 10),
       counterpartyShareholderId: editing?.counterpartyShareholderId || null,
+      isGoodsPurchase: editing?.isGoodsPurchase ?? false,
+      refExpenseId: editing?.refExpenseId || null,
+      refPurchaseOrderId: editing?.refPurchaseOrderId || null,
       note: editing?.note || null,
     }),
     [editing]
@@ -171,12 +204,15 @@ export default function CapitalTransactionListView() {
     reset,
     watch,
     control,
+    setValue,
     handleSubmit,
     formState: { isSubmitting },
   } = methods;
 
   const watchedType = watch('type');
   const watchedShareholderId = watch('shareholderId');
+  const watchedIsGoods = watch('isGoodsPurchase');
+  const watchedRefExpenseId = watch('refExpenseId');
 
   useEffect(() => {
     reset(defaultValues);
@@ -198,6 +234,7 @@ export default function CapitalTransactionListView() {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
+      const isSpending = data.type === 'ExpensePaidOnBehalf' || data.type === 'Contribution';
       const payload = {
         shareholderId: data.shareholderId,
         type: data.type as CapitalTransactionType,
@@ -205,6 +242,10 @@ export default function CapitalTransactionListView() {
         transactionDate: data.transactionDate,
         counterpartyShareholderId:
           data.type === 'PeerTransfer' ? data.counterpartyShareholderId : null,
+        isGoodsPurchase: isSpending ? data.isGoodsPurchase : false,
+        refExpenseId: data.type === 'ExpensePaidOnBehalf' ? data.refExpenseId || null : null,
+        refPurchaseOrderId:
+          isSpending && data.isGoodsPurchase ? data.refPurchaseOrderId || null : null,
         note: data.note,
       };
       if (editing) {
@@ -422,6 +463,50 @@ export default function CapitalTransactionListView() {
                     ))}
                 </RHFSelect>
               )}
+
+              {(watchedType === 'ExpensePaidOnBehalf' || watchedType === 'Contribution') && (
+                <RHFSwitch
+                  name="isGoodsPurchase"
+                  label="Nhập hàng (tách khỏi Chi khác — dùng cho khối Chi phí hàng hóa khi chốt sổ)"
+                />
+              )}
+
+              {watchedType === 'ExpensePaidOnBehalf' && (
+                <RHFSelect
+                  name="refExpenseId"
+                  label="Gắn với chi phí cửa hàng (tùy chọn)"
+                  helperText="Chọn khoản chi đã nhập ở mục Chi phí — số tiền có thể nhỏ hơn (chia nhiều cổ đông), tổng các giao dịch gắn không vượt quá chi phí"
+                  onChange={(e) => {
+                    const expenseId = e.target.value;
+                    setValue('refExpenseId', expenseId || null);
+                    const expense = recentExpenses.find((x) => x.id === expenseId);
+                    if (expense) setValue('amount', expense.amount);
+                  }}
+                >
+                  <MenuItem value="">Không gắn / nhập tay</MenuItem>
+                  {recentExpenses.map((x) => (
+                    <MenuItem key={x.id} value={x.id}>
+                      {new Date(x.expenseDate).toLocaleDateString('vi-VN')} — {x.categoryName} —{' '}
+                      {fCurrency(x.amount)}
+                    </MenuItem>
+                  ))}
+                </RHFSelect>
+              )}
+
+              {watchedIsGoods &&
+                (watchedType === 'ExpensePaidOnBehalf' || watchedType === 'Contribution') && (
+                  <RHFSelect
+                    name="refPurchaseOrderId"
+                    label="Gắn với đơn nhập KiotViet (tùy chọn)"
+                  >
+                    <MenuItem value="">Không gắn / nhập tay</MenuItem>
+                    {recentPurchaseOrders.map((po) => (
+                      <MenuItem key={po.id} value={po.id}>
+                        {po.orderNumber} — {po.supplierName} — {fCurrency(po.totalAmount)}
+                      </MenuItem>
+                    ))}
+                  </RHFSelect>
+                )}
 
               <RHFTextField name="amount" label="Số tiền (đ)" type="number" />
 

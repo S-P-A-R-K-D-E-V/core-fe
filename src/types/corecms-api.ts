@@ -2462,6 +2462,7 @@ export interface IRecentOrder {
 
 export interface IRevenueReport {
   totalRevenue: number;
+  totalReturns: number;
   totalCost: number;
   grossProfit: number;
   totalOrders: number;
@@ -2664,6 +2665,7 @@ export interface IShareholder {
   userId: string | null;
   userName: string | null;
   isActive: boolean;
+  openingBalance: number;
   note: string | null;
   createdAt: string;
 }
@@ -2700,6 +2702,7 @@ export interface ICapitalTransaction {
   counterpartyShareholderName: string | null;
   refExpenseId: string | null;
   refPurchaseOrderId: string | null;
+  isGoodsPurchase: boolean;
   settlementPeriodId: string | null;
   note: string | null;
   createdAt: string;
@@ -2747,8 +2750,13 @@ export interface ISettlementLine {
   equityPercentSnapshot: number;
   profitShare: number;
   paidIn: number;
+  goodsPaid: number;
   collectedOut: number;
+  peerPaid: number;
+  peerReceived: number;
   netBalance: number;
+  priorBalance: number;
+  cumulativeBalance: number;
 }
 
 export interface IUnmappedChannel {
@@ -2772,10 +2780,14 @@ export interface ISettlementPreview {
   fromDate: string;
   toDate: string;
   totalRevenue: number;
+  totalReturns: number;
   totalExpense: number;
   profit: number;
   reserveAmount: number;
   distributedProfit: number;
+  goodsPaidTotal: number;
+  goodsInvoiceTotal: number;
+  goodsDiscount: number;
   lines: ISettlementLine[];
   transfers: ISettlementTransfer[];
   unmappedChannels: IUnmappedChannel[];
@@ -2802,9 +2814,13 @@ export interface ISettlementDetail {
   toDate: string;
   status: SettlementStatus;
   totalRevenue: number;
+  totalReturns: number;
   totalExpense: number;
   profit: number;
   reserveAmount: number;
+  goodsInvoiceTotal: number;
+  goodsPaidTotal: number;
+  goodsDiscount: number;
   note: string | null;
   closedByName: string | null;
   closedAt: string | null;

@@ -30,6 +30,7 @@ export async function createShareholder(data: {
   name: string;
   equityPercent: number;
   userId?: string | null;
+  openingBalance?: number;
   note?: string | null;
 }): Promise<{ id: string }> {
   const response = await axios.post(endpoints.shareholders.create, data);
@@ -43,6 +44,7 @@ export async function updateShareholder(
     equityPercent: number;
     userId?: string | null;
     isActive: boolean;
+    openingBalance?: number;
     note?: string | null;
   }
 ): Promise<void> {
@@ -120,6 +122,7 @@ export async function createCapitalTransaction(data: {
   counterpartyShareholderId?: string | null;
   refExpenseId?: string | null;
   refPurchaseOrderId?: string | null;
+  isGoodsPurchase?: boolean;
   note?: string | null;
 }): Promise<{ id: string }> {
   const response = await axios.post(endpoints.shareholders.createTransaction, data);
@@ -134,6 +137,9 @@ export async function updateCapitalTransaction(
     amount: number;
     transactionDate: string;
     counterpartyShareholderId?: string | null;
+    refExpenseId?: string | null;
+    refPurchaseOrderId?: string | null;
+    isGoodsPurchase?: boolean;
     note?: string | null;
   }
 ): Promise<void> {
