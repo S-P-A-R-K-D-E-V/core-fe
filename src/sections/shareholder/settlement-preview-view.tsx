@@ -43,11 +43,14 @@ import { getSettlementPreview, closeSettlement } from 'src/api/shareholders';
 
 const LINE_HEAD = [
   { id: 'shareholder', label: 'Cổ đông' },
-  { id: 'equity', label: '% Sở hữu', align: 'right' as const, width: 100 },
-  { id: 'profitShare', label: 'Chia lợi nhuận', align: 'right' as const, width: 150 },
-  { id: 'paidIn', label: 'Đã đưa vào', align: 'right' as const, width: 150 },
-  { id: 'collectedOut', label: 'Đã lấy ra', align: 'right' as const, width: 150 },
-  { id: 'netBalance', label: 'Vị thế ròng', align: 'right' as const, width: 160 },
+  { id: 'equity', label: '%', align: 'right' as const, width: 70 },
+  { id: 'profitShare', label: 'Chia LN', align: 'right' as const, width: 120 },
+  { id: 'paidIn', label: 'Đã đưa vào', align: 'right' as const, width: 130 },
+  { id: 'collectedOut', label: 'Đã lấy ra', align: 'right' as const, width: 130 },
+  { id: 'peer', label: 'Chuyển/Nhận', align: 'right' as const, width: 130 },
+  { id: 'priorBalance', label: 'Nợ cũ', align: 'right' as const, width: 120 },
+  { id: 'netBalance', label: 'Kỳ này', align: 'right' as const, width: 120 },
+  { id: 'cumulative', label: 'Lũy kế', align: 'right' as const, width: 130 },
 ];
 
 function getDefaultDates() {
@@ -208,8 +211,13 @@ export default function SettlementPreviewView() {
               <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
                 <Card>
                   <CardContent>
-                    <Typography variant="subtitle2" color="text.secondary">Doanh thu</Typography>
+                    <Typography variant="subtitle2" color="text.secondary">Doanh thu thuần</Typography>
                     <Typography variant="h5" color="primary.main">{fCurrency(data.totalRevenue)}</Typography>
+                    {data.totalReturns > 0 && (
+                      <Typography variant="caption" color="text.secondary">
+                        Đã trừ trả hàng {fCurrency(data.totalReturns)}
+                      </Typography>
+                    )}
                   </CardContent>
                 </Card>
               </Grid>
@@ -251,10 +259,43 @@ export default function SettlementPreviewView() {
 
             <Card sx={{ mb: 3 }}>
               <CardContent>
+                <Typography variant="h6" sx={{ mb: 2 }}>Chi phí hàng hóa (đối chiếu)</Typography>
+                <Stack spacing={1.5}>
+                  {data.lines
+                    .filter((l) => l.goodsPaid > 0)
+                    .map((l) => (
+                      <Stack key={l.shareholderId} direction="row" justifyContent="space-between">
+                        <Typography variant="body2" color="text.secondary">
+                          Tiền hàng {l.shareholderName} nhập
+                        </Typography>
+                        <Typography variant="subtitle2">{fCurrency(l.goodsPaid)}</Typography>
+                      </Stack>
+                    ))}
+                  <Divider />
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color="text.secondary">Tổng tiền hàng thực trả</Typography>
+                    <Typography variant="subtitle2">{fCurrency(data.goodsPaidTotal)}</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color="text.secondary">Tổng tiền hàng trên hóa đơn (KiotViet)</Typography>
+                    <Typography variant="subtitle2">{fCurrency(data.goodsInvoiceTotal)}</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color="text.secondary">Giảm giá hóa đơn</Typography>
+                    <Typography variant="subtitle2" color={data.goodsDiscount >= 0 ? 'success.main' : 'error.main'}>
+                      {fCurrency(data.goodsDiscount)}
+                    </Typography>
+                  </Stack>
+                </Stack>
+              </CardContent>
+            </Card>
+
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
                 <Typography variant="h6" sx={{ mb: 2 }}>Vị thế từng cổ đông</Typography>
                 <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
                   <Scrollbar>
-                    <Table sx={{ minWidth: 800 }}>
+                    <Table sx={{ minWidth: 1100 }}>
                       <TableHeadCustom headLabel={LINE_HEAD} rowCount={data.lines.length} />
                       <TableBody>
                         {data.lines.map((line) => (
@@ -265,12 +306,28 @@ export default function SettlementPreviewView() {
                             <TableCell align="right">{fCurrency(line.paidIn)}</TableCell>
                             <TableCell align="right">{fCurrency(line.collectedOut)}</TableCell>
                             <TableCell align="right">
+                              {line.peerPaid > 0 && `+${fCurrency(line.peerPaid)}`}
+                              {line.peerPaid > 0 && line.peerReceived > 0 && ' / '}
+                              {line.peerReceived > 0 && `−${fCurrency(line.peerReceived)}`}
+                              {line.peerPaid === 0 && line.peerReceived === 0 && '—'}
+                            </TableCell>
+                            <TableCell align="right">{fCurrency(line.priorBalance)}</TableCell>
+                            <TableCell align="right">
                               <Typography
-                                variant="subtitle2"
+                                variant="body2"
                                 color={line.netBalance >= 0 ? 'success.main' : 'error.main'}
                               >
                                 {line.netBalance >= 0 ? '+' : ''}
                                 {fCurrency(line.netBalance)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography
+                                variant="subtitle2"
+                                color={line.cumulativeBalance >= 0 ? 'success.main' : 'error.main'}
+                              >
+                                {line.cumulativeBalance >= 0 ? '+' : ''}
+                                {fCurrency(line.cumulativeBalance)}
                               </Typography>
                             </TableCell>
                           </TableRow>

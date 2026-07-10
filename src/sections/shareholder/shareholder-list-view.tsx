@@ -68,6 +68,7 @@ const Schema = Yup.object().shape({
     .max(100, 'Tối đa 100%')
     .required('Tỷ lệ sở hữu là bắt buộc'),
   isActive: Yup.boolean().default(true),
+  openingBalance: Yup.number().typeError('Số dư phải là số').default(0),
   note: Yup.string().nullable().default(null),
 });
 
@@ -106,6 +107,7 @@ export default function ShareholderListView() {
       name: editing?.name || '',
       equityPercent: editing?.equityPercent ?? 0,
       isActive: editing?.isActive ?? true,
+      openingBalance: editing?.openingBalance ?? 0,
       note: editing?.note || null,
     }),
     [editing]
@@ -140,6 +142,7 @@ export default function ShareholderListView() {
           equityPercent: data.equityPercent,
           userId: editing.userId,
           isActive: data.isActive,
+          openingBalance: data.openingBalance,
           note: data.note,
         });
         enqueueSnackbar('Cập nhật thành công!');
@@ -147,6 +150,7 @@ export default function ShareholderListView() {
         await createShareholder({
           name: data.name,
           equityPercent: data.equityPercent,
+          openingBalance: data.openingBalance,
           note: data.note,
         });
         enqueueSnackbar('Tạo thành công!');
@@ -273,6 +277,12 @@ export default function ShareholderListView() {
                 label="Tỷ lệ sở hữu (%)"
                 type="number"
                 helperText="Đổi tỷ lệ chỉ áp dụng cho kỳ chốt sổ sau — kỳ đã chốt giữ nguyên"
+              />
+              <RHFTextField
+                name="openingBalance"
+                label="Số dư đầu kỳ (đ)"
+                type="number"
+                helperText="Dương = đang được cổ đông khác nợ (sẽ nhận), âm = đang nợ. Dùng khi chuyển từ sổ cũ sang — tính vào nợ lũy kế ('Nợ cũ')."
               />
               <RHFTextField name="note" label="Ghi chú" multiline rows={2} />
               {editing && <RHFSwitch name="isActive" label="Đang hoạt động" />}
