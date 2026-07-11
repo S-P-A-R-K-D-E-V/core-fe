@@ -2169,6 +2169,8 @@ export interface IPurchaseOrder {
   receivedDate?: string;
   createdByName: string;
   approvedByName?: string;
+  paidByShareholderId?: string | null;
+  paidByShareholderName?: string | null;
   createdAt: string;
   updatedAt?: string;
   items: IPurchaseOrderItem[];
@@ -2197,6 +2199,7 @@ export interface ICreatePurchaseOrderRequest {
   expectedDate?: string;
   discountAmount: number;
   items: ICreatePurchaseOrderItemRequest[];
+  paidByShareholderId?: string | null;
 }
 
 export interface ICreatePurchaseOrderItemRequest {
@@ -2216,6 +2219,7 @@ export interface IUpdatePurchaseOrderRequest {
   expectedDate?: string;
   discountAmount: number;
   items: ICreatePurchaseOrderItemRequest[];
+  paidByShareholderId?: string | null;
 }
 
 export interface IReceivePurchaseOrderRequest {
