@@ -49,6 +49,7 @@ const TABLE_HEAD = [
   { id: 'supplier', label: 'Nhà cung cấp', width: 180 },
   { id: 'warehouse', label: 'Kho', width: 140 },
   { id: 'totalAmount', label: 'Tổng tiền', width: 140, align: 'right' as const },
+  { id: 'paidByShareholder', label: 'Ai chi hộ', width: 120 },
   { id: 'status', label: 'Trạng thái', width: 150 },
   { id: 'createdAt', label: 'Ngày tạo', width: 120 },
   { id: 'createdBy', label: 'Người tạo', width: 130 },
@@ -209,6 +210,15 @@ export default function PurchaseOrderListView() {
                       <TableCell>{row.supplierName}</TableCell>
                       <TableCell>{row.warehouseName}</TableCell>
                       <TableCell align="right">{fCurrency(row.totalAmount)}</TableCell>
+                      <TableCell>
+                        {row.paidByShareholderName ? (
+                          <Label variant="soft" color="warning">
+                            {row.paidByShareholderName}
+                          </Label>
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Label variant="soft" color={STATUS_COLOR_MAP[row.status] || 'default'}>
                           {STATUS_LABEL_MAP[row.status] || row.status}

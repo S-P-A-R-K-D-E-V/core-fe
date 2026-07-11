@@ -46,7 +46,7 @@ import FormProvider, { RHFTextField, RHFSelect, RHFDateTimePicker } from 'src/co
 
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { ISupplier, IWarehouse, IProduct, IProductListItem, IProductVariant, IPurchaseOrder } from 'src/types/corecms-api';
+import { ISupplier, IWarehouse, IProduct, IProductListItem, IProductVariant, IPurchaseOrder, IShareholder } from 'src/types/corecms-api';
 import {
   createPurchaseOrder,
   updatePurchaseOrder,
@@ -57,6 +57,7 @@ import {
 import { getAllSuppliers } from 'src/api/suppliers';
 import { getAllWarehouses } from 'src/api/warehouses';
 import { getAllProducts } from 'src/api/products';
+import { getShareholders } from 'src/api/shareholders';
 
 import PurchaseOrderQuickCreateProduct from './purchase-order-quick-create-product';
 import PurchaseOrderQuickCreateSupplier from './purchase-order-quick-create-supplier';
@@ -104,6 +105,7 @@ const Schema = Yup.object().shape({
   discountType: Yup.string().oneOf(['amount', 'percent']).default('amount'),
   discountAmount: Yup.number().min(0).default(0),
   items: Yup.array().of(ItemSchema).min(1, 'Phải có ít nhất 1 sản phẩm'),
+  paidByShareholderId: Yup.string().nullable().default(null),
 });
 
 const EMPTY_ITEM = {
@@ -136,6 +138,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
   const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
   const [warehouses, setWarehouses] = useState<IWarehouse[]>([]);
   const [products, setProducts] = useState<IProductListItem[]>([]);
+  const [shareholders, setShareholders] = useState<IShareholder[]>([]);
 
   // Lazy search state
   const [searchOptions, setSearchOptions] = useState<ProductOption[]>([]);
@@ -174,6 +177,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
         }
       })
       .catch(console.error);
+    getShareholders(true).then(setShareholders).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -275,6 +279,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
           : '',
         discountType: 'amount' as 'amount' | 'percent',
         discountAmount: currentPurchaseOrder.discountAmount || 0,
+        paidByShareholderId: currentPurchaseOrder.paidByShareholderId || null,
         items: (currentPurchaseOrder.items || []).map((item) => ({
           productId: item.productId,
           productVariantId: item.productVariantId || '',
@@ -299,6 +304,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
       expectedDate: '',
       discountType: 'amount' as 'amount' | 'percent',
       discountAmount: 0,
+      paidByShareholderId: null,
       items: [],
     };
   }, [currentPurchaseOrder]);
@@ -388,6 +394,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
       note: data.note || undefined,
       expectedDate: data.expectedDate || undefined,
       discountAmount: Math.round(orderDiscAmt * 100) / 100,
+      paidByShareholderId: data.paidByShareholderId || null,
       items: (data.items || []).map((item: any) => {
         const gross = (item.quantity || 0) * (item.unitPrice || 0);
         const discAmt = item.discountType === 'percent'
@@ -914,7 +921,20 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
                     ))}
                 </RHFSelect>
 
-                <RHFDateTimePicker name="expectedDate" label="Ngày nhập hàng" />
+                <RHFDateTimePicker name="expectedDate" label="Ngày nhập hàng" sx={{ mb: 2 }} />
+
+                <RHFSelect
+                  name="paidByShareholderId"
+                  label="Ai chi hộ (nếu có)"
+                  helperText="Chọn cổ đông đã bỏ tiền túi trả đơn nhập này — tự động ghi vào sổ giao dịch vốn"
+                >
+                  <MenuItem value="">Không ai / cửa hàng tự trả</MenuItem>
+                  {shareholders.map((s) => (
+                    <MenuItem key={s.id} value={s.id}>
+                      {s.name}
+                    </MenuItem>
+                  ))}
+                </RHFSelect>
               </Card>
 
               {/* Summary */}

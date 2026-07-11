@@ -214,6 +214,10 @@ export default function PurchaseOrderDetailView({ id }: Props) {
               <Typography variant="caption" color="text.secondary">Người duyệt</Typography>
               <Typography variant="body2">{order.approvedByName || '—'}</Typography>
             </Stack>
+            <Stack spacing={0.5}>
+              <Typography variant="caption" color="text.secondary">Ai chi hộ</Typography>
+              <Typography variant="body2">{order.paidByShareholderName || '—'}</Typography>
+            </Stack>
           </Box>
           {order.note && (
             <Stack spacing={0.5} sx={{ mt: 2 }}>
