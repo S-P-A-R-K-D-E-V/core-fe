@@ -292,7 +292,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
           _productName: item.variantName
             ? `${item.productName} — ${item.variantName}`
             : item.productName,
-          _productCode: item.productSKU || '',
+          _productCode: item.productCode || '',
           _attributes: '',
         })),
       };
