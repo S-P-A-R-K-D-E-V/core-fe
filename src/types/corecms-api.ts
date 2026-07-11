@@ -2180,7 +2180,7 @@ export interface IPurchaseOrderItem {
   id: string;
   productId: string;
   productName: string;
-  productSKU: string;
+  productCode: string;
   productVariantId?: string;
   variantName?: string;
   quantity: number;

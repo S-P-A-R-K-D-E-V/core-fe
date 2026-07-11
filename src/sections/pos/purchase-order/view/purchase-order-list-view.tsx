@@ -63,6 +63,7 @@ const STATUS_OPTIONS = [
   { value: 'PartiallyReceived', label: 'Nhận một phần' },
   { value: 'Completed', label: 'Hoàn thành' },
   { value: 'Cancelled', label: 'Đã hủy' },
+  { value: 'Returned', label: 'Đã trả' },
 ];
 
 const STATUS_COLOR_MAP: Record<string, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
@@ -71,6 +72,7 @@ const STATUS_COLOR_MAP: Record<string, 'default' | 'info' | 'warning' | 'success
   PartiallyReceived: 'warning',
   Completed: 'success',
   Cancelled: 'error',
+  Returned: 'error',
 };
 
 const STATUS_LABEL_MAP: Record<string, string> = {
@@ -79,6 +81,7 @@ const STATUS_LABEL_MAP: Record<string, string> = {
   PartiallyReceived: 'Nhận một phần',
   Completed: 'Hoàn thành',
   Cancelled: 'Đã hủy',
+  Returned: 'Đã trả',
 };
 
 // ----------------------------------------------------------------------

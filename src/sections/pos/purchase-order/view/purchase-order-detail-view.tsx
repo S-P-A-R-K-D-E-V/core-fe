@@ -284,7 +284,7 @@ export default function PurchaseOrderDetailView({ id }: Props) {
                       {item.productName}
                       {item.variantName && <Typography variant="caption" color="text.secondary"> ({item.variantName})</Typography>}
                     </TableCell>
-                    <TableCell>{item.productSKU}</TableCell>
+                    <TableCell>{item.productCode}</TableCell>
                     <TableCell align="right">{item.quantity}</TableCell>
                     <TableCell align="right">
                       {item.receivedQuantity}
