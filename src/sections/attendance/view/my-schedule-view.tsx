@@ -43,10 +43,11 @@ import { useSnackbar } from 'src/components/snackbar';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Label from 'src/components/label';
 
-import { IShiftSchedule, IShiftAssignment, IAttendanceLog, IShiftPoolPost, PoolNeedType } from 'src/types/corecms-api';
+import { IShiftSchedule, IShiftAssignment, IAttendanceLog, IShiftPoolPost, PoolNeedType, IShiftRegistration } from 'src/types/corecms-api';
 import { ICalendarEvent, ICalendarView } from 'src/types/calendar';
 import { getMySchedule, getMyAttendanceLogs, getShiftSchedulesByDateRange } from 'src/api/attendance';
 import { cancelShiftPoolPost, claimShiftPoolPost, createShiftPoolPost, getMyShiftPoolClaims, getMyShiftPoolPosts, getOpenShiftPoolPosts, reviewShiftPoolPost } from 'src/api/shiftPool';
+import { getMyShiftRegistrations } from 'src/api/shiftRegistration';
 import { useShiftNotificationRefresh } from 'src/hooks/use-shift-notification-refresh';
 import { fmtDate, needTypeHex, needTypeLabel, partialCoverSubTypeLabel, partialSideLabel, poolStatusColor, poolStatusLabel, statusHex } from 'src/sections/shift-pool/view/pool-helpers';
 import LegendDot from 'src/sections/shift-pool/view/pool-legend';
@@ -106,6 +107,12 @@ function getStatusColor(status: string): 'success' | 'error' | 'warning' {
 }
 
 const POOL_POSTED_COLOR = '#FF6F00'; // amber — ca cá nhân đang đăng pool
+const REGISTRATION_COLOR = '#26A69A'; // teal — ca đã đăng ký theo tuần, chưa được duyệt/phân chính thức
+
+// Hai khoảng giờ "HH:mm[:ss]" có giao nhau không (so sánh chuỗi đủ dùng trong ngày)
+function timeOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
+  return aStart < bEnd && bStart < aEnd;
+}
 
 function transformAssignmentToEvent(assignment: IAssignmentWithDetails): ICalendarEvent {
   const dateStr = assignment.date.split('T')[0];
@@ -170,8 +177,11 @@ export default function MyScheduleView() {
   const [openPoolPosts, setOpenPoolPosts] = useState<IShiftPoolPost[]>([]);
   const [myPoolPosts, setMyPoolPosts] = useState<IShiftPoolPost[]>([]);
   const [myClaims, setMyClaims] = useState<IShiftPoolPost[]>([]);
-  const [visibleLayers, setVisibleLayers] = useState<Set<'personal' | 'open-pool' | 'my-claim'>>(
-    new Set(['personal', 'my-claim'])  // open-pool mặc định ẩn
+  const [registrations, setRegistrations] = useState<IShiftRegistration[]>([]);
+  const [visibleLayers, setVisibleLayers] = useState<
+    Set<'personal' | 'open-pool' | 'my-claim' | 'registration'>
+  >(
+    new Set(['personal'])  // mục tiêu chính là lịch được phân công — các lớp phụ mặc định ẩn
   );
   const [claimTarget, setClaimTarget] = useState<IShiftPoolPost | null>(null);
   const [claimOfferedId, setClaimOfferedId] = useState('');
@@ -197,12 +207,13 @@ export default function MyScheduleView() {
   const fetchSchedule = useCallback(async () => {
     setLoading(true);
     try {
-      const [scheduleData, attendanceData, openPosts, myPosts, claims] = await Promise.all([
+      const [scheduleData, attendanceData, openPosts, myPosts, claims, myRegistrations] = await Promise.all([
         getMySchedule(visibleRange.from, visibleRange.to),
         getMyAttendanceLogs(visibleRange.from, visibleRange.to),
         getOpenShiftPoolPosts().catch(() => [] as IShiftPoolPost[]),
         getMyShiftPoolPosts().catch(() => [] as IShiftPoolPost[]),
         getMyShiftPoolClaims().catch(() => [] as IShiftPoolPost[]),
+        getMyShiftRegistrations(visibleRange.from, visibleRange.to).catch(() => [] as IShiftRegistration[]),
       ]);
 
       // Merge attendance data with shift assignments
@@ -219,6 +230,7 @@ export default function MyScheduleView() {
       setOpenPoolPosts(openPosts);
       setMyPoolPosts(myPosts);
       setMyClaims(claims);
+      setRegistrations(myRegistrations);
     } catch (error) {
       console.error('Failed to fetch schedule:', error);
     } finally {
@@ -275,6 +287,25 @@ export default function MyScheduleView() {
           p.status === 'WaitingApproval'
       ),
     [myClaims, visibleRange.from, visibleRange.to]
+  );
+
+  // Lịch đăng ký (theo tuần, chưa được duyệt/phân chính thức) — bỏ những đăng ký đã
+  // trùng với 1 ca được phân (cùng shiftSchedule hoặc time-overlap cùng ngày), vì
+  // ca được phân đã đại diện cho nó ở Layer A.
+  const filteredRegistrations = useMemo(
+    () =>
+      registrations
+        .filter((r) => r.date >= visibleRange.from && r.date <= visibleRange.to)
+        .filter(
+          (r) =>
+            !assignments.some(
+              (a) =>
+                a.date.split('T')[0] === r.date &&
+                (a.shiftScheduleId === r.shiftScheduleId ||
+                  timeOverlap(a.startTime, a.endTime, r.startTime, r.endTime))
+            )
+        ),
+    [registrations, assignments, visibleRange.from, visibleRange.to]
   );
 
   // PartialCover Approved (tôi là poster): badge "đang được làm hộ X giờ" trên Layer A
@@ -347,8 +378,24 @@ export default function MyScheduleView() {
         }))
       : [];
 
-    return [...layerA, ...layerB, ...layerC];
-  }, [assignments, visibleLayers, postedMap, approvedPartialCoverMap, filteredOpenPosts, filteredMyClaims]);
+    // Layer D: lịch đăng ký (chưa được duyệt/phân chính thức) — chỉ thông tin, không click được
+    const layerD = visibleLayers.has('registration')
+      ? filteredRegistrations.map((r) => ({
+          id: `reg-${r.id}`,
+          title: `📋 Đã đăng ký · ${r.shiftName}`,
+          start: new Date(`${r.date}T${r.startTime}:00`).getTime(),
+          end: new Date(`${r.date}T${r.endTime}:00`).getTime(),
+          allDay: false,
+          backgroundColor: `${REGISTRATION_COLOR}33`,
+          borderColor: REGISTRATION_COLOR,
+          textColor: REGISTRATION_COLOR,
+          description: r.note || '',
+          extendedProps: { layerType: 'registration' as const, registration: r },
+        }))
+      : [];
+
+    return [...layerA, ...layerB, ...layerC, ...layerD];
+  }, [assignments, visibleLayers, postedMap, approvedPartialCoverMap, filteredOpenPosts, filteredMyClaims, filteredRegistrations]);
 
   const handleChangeView = useCallback((newView: ICalendarView) => {
       const calendarApi = calendarRef.current.getApi();
@@ -402,6 +449,8 @@ export default function MyScheduleView() {
         setClaimMyAssignments([]);
       } else if (layerType === 'my-claim') {
         setClaimDetailTarget(post);
+      } else if (layerType === 'registration') {
+        // Chỉ mang tính thông tin — không có hành động khi click
       } else {
         // fallback cho events chưa có extendedProps
         const assignment = assignments.find((a) => a.assignmentId === arg.event.id);
@@ -649,7 +698,7 @@ export default function MyScheduleView() {
             popover: {
               title: '🔄 Đổi ca & Làm hộ ngay trên lịch',
               description:
-                'Ngay tại lịch cá nhân, bạn có thể đăng ca cần đổi/nhờ làm hộ và nhận ca của người khác. 3 lớp hiển thị:\n\n🟦 Lịch của tôi — ca được phân của bạn\n🔵 Chợ ca — ca người khác đang cần đổi/làm hộ (mặc định ẩn, bật để xem)\n🟣 Ca chờ nhận — ca bạn đã nhận, đang chờ duyệt\n\nNhấn vào từng chip để bật/tắt lớp tương ứng.',
+                'Mục tiêu chính của lịch này là hiển thị ca được phân công, nên khi vào chỉ "Lịch của tôi" bật sẵn. 4 lớp có thể bật/tắt:\n\n🟦 Lịch của tôi — ca được phân của bạn (mặc định bật)\n🔵 Chợ ca — ca người khác đang cần đổi/làm hộ (mặc định ẩn)\n🟣 Ca chờ duyệt — ca bạn đã nhận, đang chờ Admin/Manager duyệt (mặc định ẩn)\n🟩 Lịch đăng ký — ca bạn đã đăng ký theo tuần, chưa được duyệt/phân chính thức (mặc định ẩn)\n\nNhấn vào từng chip để bật/tắt lớp tương ứng.',
               side: 'bottom' as const,
               align: 'start' as const,
             },
@@ -802,7 +851,8 @@ export default function MyScheduleView() {
                   [
                     { key: 'personal', label: 'Lịch của tôi', color: '#42A5F5' },
                     { key: 'open-pool', label: 'Chợ ca', color: '#1976d2' },
-                    { key: 'my-claim', label: 'Ca chờ nhận', color: '#7986cb' },
+                    { key: 'my-claim', label: 'Ca chờ duyệt', color: '#7986cb' },
+                    { key: 'registration', label: 'Lịch đăng ký', color: REGISTRATION_COLOR },
                   ] as const
                 ).map(({ key, label, color }) => {
                   const active = visibleLayers.has(key);
@@ -997,7 +1047,8 @@ export default function MyScheduleView() {
                 <LegendDot color="#1976d2" label="Chợ ca – Đổi ca (khi bật)" />
                 <LegendDot color="#7b1fa2" label="Chợ ca – Làm hộ cả ca (khi bật)" />
                 <LegendDot color="#ed6c02" label="Chợ ca – Làm hộ 1 phần (khi bật)" />
-                <LegendDot color="#7986cb" label="Ca đang chờ nhận (nét đứt)" />
+                <LegendDot color="#7986cb" label="Ca chờ duyệt (nét đứt, khi bật)" />
+                <LegendDot color={REGISTRATION_COLOR} label="Lịch đăng ký (khi bật)" />
               </Stack>
             </Card>
           )}
