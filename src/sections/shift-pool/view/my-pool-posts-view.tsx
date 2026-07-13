@@ -40,7 +40,7 @@ import { TableHeadCustom, TableNoData } from 'src/components/table';
 
 import type { IShiftPoolPost } from 'src/types/corecms-api';
 
-import { cancelShiftPoolPost, getMyShiftPoolPosts, reviewShiftPoolPost } from 'src/api/shiftPool';
+import { cancelShiftPoolPost, getMyShiftPoolPosts } from 'src/api/shiftPool';
 import { useShiftNotificationRefresh } from 'src/hooks/use-shift-notification-refresh';
 
 import PoolCalendar from './pool-calendar';
@@ -73,7 +73,6 @@ export default function MyPoolPostsView() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
   const [selected, setSelected] = useState<IShiftPoolPost | null>(null);
-  const [acting, setActing] = useState(false);
   const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
 
   // ── Tour definitions ──
@@ -88,7 +87,7 @@ export default function MyPoolPostsView() {
             popover: {
               title: '📌 Bài đăng của bạn',
               description:
-                'Liệt kê tất cả bài đăng bạn đã tạo, kèm trạng thái hiện tại.\n\n🔵 Đang mở (Open) — Chưa có ai nhận\n🟠 Chờ duyệt — Đã có người nhận, đang chờ bạn hoặc Admin xác nhận\n🟢 Đã duyệt — Hoàn tất\n⚫ Đã huỷ — Bạn đã huỷ bài đăng',
+                'Liệt kê tất cả bài đăng bạn đã tạo, kèm trạng thái hiện tại.\n\n🔵 Đang mở (Open) — Chưa có ai nhận\n🟠 Chờ duyệt — Đã có người nhận, đang chờ Admin/Manager duyệt\n🟢 Đã duyệt — Hoàn tất\n⚫ Đã huỷ — Bạn đã huỷ bài đăng',
               side: 'top' as const,
               align: 'center' as const,
             },
@@ -107,7 +106,7 @@ export default function MyPoolPostsView() {
             popover: {
               title: '⚙️ Thao tác với bài đăng',
               description:
-                '• Nhấn vào ca trên lịch để xem chi tiết\n• Khi có người nhận (Chờ duyệt): bạn có thể Xác nhận hoặc Từ chối người nhận đó\n• Khi đang Mở: bạn có thể Huỷ bài đăng\n\nLưu ý: Khi từ chối, bài đăng sẽ tự động mở lại để người khác nhận.',
+                '• Nhấn vào ca trên lịch để xem chi tiết\n• Khi có người nhận (Chờ duyệt): Admin/Manager sẽ xem xét và duyệt, bạn sẽ được thông báo kết quả\n• Khi đang Mở: bạn có thể Huỷ bài đăng\n\nLưu ý: Nếu Admin/Manager từ chối người nhận, bài đăng sẽ tự động mở lại để người khác nhận.',
             },
           },
           {
@@ -152,23 +151,6 @@ export default function MyPoolPostsView() {
       fetchData();
     } catch (error: any) {
       enqueueSnackbar(error?.title || error?.message || 'Huỷ thất bại!', { variant: 'error' });
-    }
-  };
-
-  // Người đăng (staff 1) xác nhận người nhận → thực hiện đổi ca / làm hộ
-  const handleConfirm = async (id: string, accept: boolean) => {
-    setActing(true);
-    try {
-      await reviewShiftPoolPost(id, { action: accept ? 'Approve' : 'RejectClaim' });
-      enqueueSnackbar(accept ? 'Đã xác nhận đổi ca / làm hộ!' : 'Đã từ chối người nhận.', {
-        variant: 'success',
-      });
-      setSelected(null);
-      fetchData();
-    } catch (error: any) {
-      enqueueSnackbar(error?.title || error?.message || 'Thao tác thất bại!', { variant: 'error' });
-    } finally {
-      setActing(false);
     }
   };
 
@@ -286,8 +268,8 @@ export default function MyPoolPostsView() {
                       <td style={{ padding: '16px' }}>
                         <Stack direction="row" spacing={1}>
                           {row.status === 'WaitingApproval' && (
-                            <Button size="small" variant="contained" onClick={() => setSelected(row)}>
-                              Xác nhận
+                            <Button size="small" onClick={() => setSelected(row)}>
+                              Xem
                             </Button>
                           )}
                           {isCancellable(row.status) && (
@@ -356,7 +338,7 @@ export default function MyPoolPostsView() {
               )}
               {selected.status === 'WaitingApproval' && (
                 <Typography variant="caption" color="text.secondary">
-                  Xác nhận để hoàn tất đổi ca / làm hộ với người nhận.
+                  Đang chờ Admin/Manager duyệt.
                 </Typography>
               )}
             </Stack>
@@ -366,25 +348,6 @@ export default function MyPoolPostsView() {
           <Button color="inherit" onClick={() => setSelected(null)}>
             Đóng
           </Button>
-          {selected && selected.status === 'WaitingApproval' && (
-            <>
-              <Button
-                color="error"
-                onClick={() => handleConfirm(selected.id, false)}
-                disabled={acting}
-              >
-                Từ chối
-              </Button>
-              <Button
-                variant="contained"
-                color="success"
-                onClick={() => handleConfirm(selected.id, true)}
-                disabled={acting}
-              >
-                Xác nhận
-              </Button>
-            </>
-          )}
           {selected && selected.status === 'Open' && (
             <Button color="error" variant="contained" onClick={() => handleCancel(selected.id)}>
               Huỷ bài đăng
