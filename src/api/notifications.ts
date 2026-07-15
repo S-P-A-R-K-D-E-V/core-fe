@@ -32,7 +32,8 @@ export async function deleteNotification(notificationId: string): Promise<void> 
 }
 
 export async function sendManualNotification(data: {
-  userId: string;
+  userIds?: string[];
+  roleNames?: string[];
   title: string;
   content: string;
 }): Promise<void> {
