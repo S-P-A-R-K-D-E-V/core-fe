@@ -4,11 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Switch from '@mui/material/Switch';
 import Dialog from '@mui/material/Dialog';
+import Checkbox from '@mui/material/Checkbox';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import Container from '@mui/material/Container';
@@ -34,13 +36,14 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
 
-import { INotificationConfig, IUser } from 'src/types/corecms-api';
+import { INotificationConfig, IUser, IRole } from 'src/types/corecms-api';
 import {
   getNotificationConfigs,
   createNotificationConfig,
   updateNotificationConfig,
 } from 'src/api/checkinFace';
 import { getAllUsers } from 'src/api/users';
+import { getAllRoles } from 'src/api/roles';
 import { sendManualNotification } from 'src/api/notifications';
 
 // ----------------------------------------------------------------------
@@ -64,7 +67,9 @@ export default function NotificationConfigView() {
 
   // Gửi thông báo thủ công — test luồng OpsBridge notification bridge
   const [users, setUsers] = useState<IUser[]>([]);
-  const [manualTargetUser, setManualTargetUser] = useState<IUser | null>(null);
+  const [roles, setRoles] = useState<IRole[]>([]);
+  const [manualTargetUsers, setManualTargetUsers] = useState<IUser[]>([]);
+  const [manualTargetRoles, setManualTargetRoles] = useState<string[]>([]);
   const [manualTitle, setManualTitle] = useState('');
   const [manualContent, setManualContent] = useState('');
   const [manualSending, setManualSending] = useState(false);
@@ -86,21 +91,32 @@ export default function NotificationConfigView() {
     getAllUsers()
       .then(setUsers)
       .catch(() => enqueueSnackbar('Không thể tải danh sách người dùng', { variant: 'error' }));
+    getAllRoles()
+      .then(setRoles)
+      .catch(() => enqueueSnackbar('Không thể tải danh sách vai trò', { variant: 'error' }));
   }, [fetchConfigs, enqueueSnackbar]);
 
   const handleSendManual = async () => {
-    if (!manualTargetUser || !manualTitle.trim() || !manualContent.trim()) {
-      enqueueSnackbar('Vui lòng chọn người nhận, nhập tiêu đề và nội dung', { variant: 'warning' });
+    const hasTargets = manualTargetUsers.length > 0 || manualTargetRoles.length > 0;
+    if (!hasTargets || !manualTitle.trim() || !manualContent.trim()) {
+      enqueueSnackbar('Vui lòng chọn người nhận hoặc vai trò, nhập tiêu đề và nội dung', {
+        variant: 'warning',
+      });
       return;
     }
     setManualSending(true);
     try {
       await sendManualNotification({
-        userId: manualTargetUser.id,
+        userIds: manualTargetUsers.map((user) => user.id),
+        roleNames: manualTargetRoles,
         title: manualTitle.trim(),
         content: manualContent.trim(),
       });
-      enqueueSnackbar('Đã gửi thông báo tới ' + manualTargetUser.fullName);
+      const targetDescriptions = [
+        manualTargetUsers.length > 0 ? `${manualTargetUsers.length} người dùng` : null,
+        manualTargetRoles.length > 0 ? `vai trò ${manualTargetRoles.join(', ')}` : null,
+      ].filter(Boolean);
+      enqueueSnackbar(`Đã gửi thông báo tới ${targetDescriptions.join(' và ')}`);
       setManualTitle('');
       setManualContent('');
     } catch (error) {
@@ -252,13 +268,51 @@ export default function NotificationConfigView() {
         />
         <Stack spacing={2.5} sx={{ p: 3 }}>
           <Autocomplete
+            multiple
             fullWidth
+            disableCloseOnSelect
             options={users}
             getOptionLabel={(option) => `${option.fullName} - ${option.email}`}
-            value={manualTargetUser}
-            onChange={(_, value) => setManualTargetUser(value)}
+            value={manualTargetUsers}
+            onChange={(_, value) => setManualTargetUsers(value)}
             isOptionEqualToValue={(option, value) => option.id === value.id}
-            renderInput={(params) => <TextField {...params} label="Người nhận *" />}
+            renderOption={(props, option, { selected }) => (
+              <li {...props} key={option.id}>
+                <Checkbox size="small" checked={selected} sx={{ mr: 1 }} />
+                {option.fullName} - {option.email}
+              </li>
+            )}
+            renderTags={(selected, getTagProps) =>
+              selected.map((option, index) => (
+                <Chip
+                  {...getTagProps({ index })}
+                  key={option.id}
+                  size="small"
+                  label={option.fullName}
+                />
+              ))
+            }
+            renderInput={(params) => <TextField {...params} label="Người nhận (theo user)" />}
+          />
+          <Autocomplete
+            multiple
+            fullWidth
+            disableCloseOnSelect
+            options={roles.map((role) => role.name)}
+            value={manualTargetRoles}
+            onChange={(_, value) => setManualTargetRoles(value)}
+            renderOption={(props, option, { selected }) => (
+              <li {...props} key={option}>
+                <Checkbox size="small" checked={selected} sx={{ mr: 1 }} />
+                {option}
+              </li>
+            )}
+            renderTags={(selected, getTagProps) =>
+              selected.map((option, index) => (
+                <Chip {...getTagProps({ index })} key={option} size="small" label={option} />
+              ))
+            }
+            renderInput={(params) => <TextField {...params} label="Người nhận (theo vai trò)" />}
           />
           <TextField
             label="Tiêu đề *"
