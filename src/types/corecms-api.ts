@@ -2810,6 +2810,16 @@ export interface ISettlementPreview {
   balanceCheck: number;
   canClose: boolean;
   isOverlapping: boolean;
+  sheetStyle?: ISheetStyleComparison | null;
+}
+
+// Đối chiếu theo cách tính CŨ (gộp tiền hàng vào chi phí trước khi chia lời) — chỉ để xem so
+// sánh với sheet Google gốc, không dùng để chốt sổ.
+export interface ISheetStyleComparison {
+  profit: number;
+  distributedProfit: number;
+  lines: ISettlementLine[];
+  transfers: ISettlementTransfer[];
 }
 
 export interface ISettlementListItem {
