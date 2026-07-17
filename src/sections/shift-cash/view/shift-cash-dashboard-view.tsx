@@ -36,6 +36,7 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import { useTheme, alpha } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
@@ -638,6 +639,15 @@ export default function ShiftCashDashboardView() {
           ]}
           action={
             <>
+              <Button
+                component={RouterLink}
+                href={paths.dashboard.shiftCash.monthly}
+                variant="outlined"
+                startIcon={<Iconify icon="solar:calendar-bold" />}
+                sx={{ mr: 1 }}
+              >
+                Xem theo tháng
+              </Button>
               <Tooltip title="Hướng dẫn sử dụng">
                 <IconButton onClick={(e) => setTourMenuAnchor(e.currentTarget)}>
                   <Iconify icon="solar:question-circle-bold" width={24} />

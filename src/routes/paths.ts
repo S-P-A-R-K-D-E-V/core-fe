@@ -189,6 +189,7 @@ export const paths = {
     shiftCash: {
       root: `${ROOTS.DASHBOARD}/shift-cash`,
       dashboard: `${ROOTS.DASHBOARD}/shift-cash`,
+      monthly: `${ROOTS.DASHBOARD}/shift-cash/monthly`,
     },
     checkinFace: {
       root: `${ROOTS.DASHBOARD}/checkin-face`,

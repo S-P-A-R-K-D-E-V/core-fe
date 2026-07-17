@@ -28,8 +28,11 @@ export async function getShiftCashSummary(date: string): Promise<IShiftCashSumma
 // Transactions (Thu/Chi)
 // ======================================================================
 
-export async function getShiftCashTransactions(date: string): Promise<IShiftCashTransaction[]> {
-  const res = await axios.get(endpoints.shiftCash.transactions, { params: { date } });
+export async function getShiftCashTransactions(
+  date: string,
+  toDate?: string
+): Promise<IShiftCashTransaction[]> {
+  const res = await axios.get(endpoints.shiftCash.transactions, { params: { date, toDate } });
   return res.data;
 }
 
