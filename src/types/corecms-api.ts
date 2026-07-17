@@ -2752,6 +2752,12 @@ export interface IShareholderStatement {
 // --- Settlement (chốt sổ hoạch toán cổ đông) ---
 export type SettlementStatus = 'Open' | 'Closed';
 
+export interface ICollectedOutBreakdown {
+  byChannelMethod: Record<string, number>;
+  manualCollected: number;
+  cashCounter: number;
+}
+
 export interface ISettlementLine {
   shareholderId: string;
   shareholderName: string;
@@ -2765,6 +2771,8 @@ export interface ISettlementLine {
   netBalance: number;
   priorBalance: number;
   cumulativeBalance: number;
+  isFundHolder?: boolean;
+  collectedOutSource?: ICollectedOutBreakdown | null;
 }
 
 export interface IUnmappedChannel {

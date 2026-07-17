@@ -21,6 +21,7 @@ import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
 import LoadingButton from '@mui/lab/LoadingButton';
 
 import { paths } from 'src/routes/paths';
@@ -36,10 +37,54 @@ import { TableHeadCustom, TableNoData } from 'src/components/table';
 import { fCurrency, fPercent } from 'src/utils/format-number';
 import { fPaymentMethod } from 'src/utils/payment-method-label';
 
-import { ISettlementPreview } from 'src/types/corecms-api';
+import { ISettlementPreview, ICollectedOutBreakdown } from 'src/types/corecms-api';
 import { getSettlementPreview, closeSettlement } from 'src/api/shareholders';
 
 // ----------------------------------------------------------------------
+
+// "Đã lấy ra" hiện chi tiết nguồn khi hover: từng kênh thu tiền (CK/Thẻ/Wallet theo cấu hình
+// Kênh thu tiền) + thu tay/rút vốn + rút quầy tiền mặt (Kiểm tiền quầy) — chỉ có ở bản xem trước
+// (tính live), kỳ đã chốt không lưu lại chi tiết này nên hiện số thường không có gạch chân.
+function CollectedOutCell({
+  amount,
+  source,
+}: {
+  amount: number;
+  source?: ICollectedOutBreakdown | null;
+}) {
+  const parts: { label: string; value: number }[] = [];
+  if (source) {
+    Object.entries(source.byChannelMethod || {}).forEach(([method, value]) => {
+      if (value) parts.push({ label: fPaymentMethod(method), value });
+    });
+    if (source.manualCollected) parts.push({ label: 'Thu tay / rút vốn', value: source.manualCollected });
+    if (source.cashCounter) parts.push({ label: 'Rút quầy tiền mặt', value: source.cashCounter });
+  }
+
+  if (parts.length === 0) {
+    return <>{fCurrency(amount)}</>;
+  }
+
+  return (
+    <Tooltip
+      arrow
+      title={
+        <Stack spacing={0.5} sx={{ py: 0.5 }}>
+          {parts.map((p) => (
+            <Stack key={p.label} direction="row" justifyContent="space-between" spacing={2}>
+              <Typography variant="caption">{p.label}</Typography>
+              <Typography variant="caption" fontWeight={600}>
+                {fCurrency(p.value)}
+              </Typography>
+            </Stack>
+          ))}
+        </Stack>
+      }
+    >
+      <span style={{ textDecoration: 'underline dotted', cursor: 'help' }}>{fCurrency(amount)}</span>
+    </Tooltip>
+  );
+}
 
 const LINE_HEAD = [
   { id: 'shareholder', label: 'Cổ đông' },
@@ -304,7 +349,9 @@ export default function SettlementPreviewView() {
                             <TableCell align="right">{fPercent(line.equityPercentSnapshot)}</TableCell>
                             <TableCell align="right">{fCurrency(line.profitShare)}</TableCell>
                             <TableCell align="right">{fCurrency(line.paidIn)}</TableCell>
-                            <TableCell align="right">{fCurrency(line.collectedOut)}</TableCell>
+                            <TableCell align="right">
+                              <CollectedOutCell amount={line.collectedOut} source={line.collectedOutSource} />
+                            </TableCell>
                             <TableCell align="right">
                               {line.peerPaid > 0 && `+${fCurrency(line.peerPaid)}`}
                               {line.peerPaid > 0 && line.peerReceived > 0 && ' / '}
