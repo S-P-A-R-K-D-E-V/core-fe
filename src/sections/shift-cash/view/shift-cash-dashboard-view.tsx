@@ -63,6 +63,7 @@ import {
   IKiotVietInvoiceDetailResponse,
   IVietQRBank,
   IKiotVietBankAccount,
+  IShareholder,
 } from 'src/types/corecms-api';
 import {
   getShiftCashSummary,
@@ -80,6 +81,7 @@ import {
   getVietQRBanks,
   exportKiotVietExcel,
 } from 'src/api/shiftCash';
+import { getShareholders } from 'src/api/shareholders';
 
 // ======================================================================
 
@@ -265,6 +267,7 @@ export default function ShiftCashDashboardView() {
   // Bank data (VietQR + KiotViet bank accounts)
   const [vietQRBanks, setVietQRBanks] = useState<IVietQRBank[]>([]);
   const [kiotBankAccounts, setKiotBankAccounts] = useState<IKiotVietBankAccount[]>([]);
+  const [shareholders, setShareholders] = useState<IShareholder[]>([]);
 
   // Transaction form
   const [txMode, setTxMode] = useState<'add' | 'edit'>('add');
@@ -272,6 +275,7 @@ export default function ShiftCashDashboardView() {
   const [txType, setTxType] = useState<'Thu' | 'Chi'>('Thu');
   const [txAmount, setTxAmount] = useState('');
   const [txNote, setTxNote] = useState('');
+  const [txShareholderId, setTxShareholderId] = useState('');
   const [txSaving, setTxSaving] = useState(false);
 
   // Delete
@@ -343,11 +347,12 @@ export default function ShiftCashDashboardView() {
     batchAbortRef.current = true;
   }, [fetchData]);
 
-  // Load VietQR banks + KiotViet bank accounts once on mount
+  // Load VietQR banks + KiotViet bank accounts + cổ đông once on mount
   useEffect(() => {
     Promise.allSettled([
       // getVietQRBanks().then((banks) => setVietQRBanks(banks)),
       getKiotVietBankAccounts().then((accounts) => setKiotBankAccounts(accounts)),
+      getShareholders(true).then((list) => setShareholders(list)),
     ]);
   }, []);
 
@@ -506,6 +511,7 @@ export default function ShiftCashDashboardView() {
     setTxType(type);
     setTxAmount('');
     setTxNote('');
+    setTxShareholderId('');
     txDialog.onTrue();
   };
 
@@ -515,6 +521,7 @@ export default function ShiftCashDashboardView() {
     setTxType(tx.type);
     setTxAmount(tx.amount.toString());
     setTxNote(tx.note || '');
+    setTxShareholderId(tx.shareholderId || '');
     txDialog.onTrue();
   };
 
@@ -527,12 +534,14 @@ export default function ShiftCashDashboardView() {
           type: txType,
           amount: parseFloat(txAmount),
           note: txNote || undefined,
+          shareholderId: txShareholderId || null,
         });
         enqueueSnackbar('Đã thêm!');
       } else if (txEditId) {
         await updateShiftCashTransaction(txEditId, {
           amount: parseFloat(txAmount),
           note: txNote || undefined,
+          shareholderId: txShareholderId || null,
         });
         enqueueSnackbar('Đã cập nhật!');
       }
@@ -1145,6 +1154,7 @@ export default function ShiftCashDashboardView() {
                               <TableCell>Loại</TableCell>
                               <TableCell align="right">Số tiền</TableCell>
                               <TableCell>Ghi chú</TableCell>
+                              <TableCell>Cổ đông</TableCell>
                               <TableCell>Người tạo</TableCell>
                               <TableCell>Thời gian</TableCell>
                               <TableCell align="right" />
@@ -1153,7 +1163,7 @@ export default function ShiftCashDashboardView() {
                           <TableBody>
                             {(!summary?.transactions || summary.transactions.length === 0) && (
                               <TableRow>
-                                <TableCell colSpan={6} align="center">
+                                <TableCell colSpan={7} align="center">
                                   <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
                                     Chưa có thu chi nào
                                   </Typography>
@@ -1181,6 +1191,15 @@ export default function ShiftCashDashboardView() {
                                   </Typography>
                                 </TableCell>
                                 <TableCell>{tx.note || '—'}</TableCell>
+                                <TableCell>
+                                  {tx.shareholderName ? (
+                                    <Label variant="soft" color="warning">
+                                      {tx.shareholderName}
+                                    </Label>
+                                  ) : (
+                                    '—'
+                                  )}
+                                </TableCell>
                                 <TableCell>
                                   <Typography variant="caption">{tx.createdByName}</Typography>
                                 </TableCell>
@@ -1818,6 +1837,21 @@ export default function ShiftCashDashboardView() {
               multiline
               rows={2}
             />
+            <TextField
+              select
+              fullWidth
+              label={txType === 'Thu' ? 'Thu từ cổ đông (nếu có)' : 'Chi cho cổ đông (nếu có)'}
+              value={txShareholderId}
+              onChange={(e) => setTxShareholderId(e.target.value)}
+              helperText="Chỉ để đối chiếu với hoạch toán cổ đông, không tự động ghi sổ"
+            >
+              <MenuItem value="">— Không —</MenuItem>
+              {shareholders.map((s) => (
+                <MenuItem key={s.id} value={s.id}>
+                  {s.name}
+                </MenuItem>
+              ))}
+            </TextField>
           </Stack>
         </DialogContent>
         <DialogActions>

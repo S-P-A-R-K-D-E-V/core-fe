@@ -1130,6 +1130,8 @@ export interface IShiftCashTransaction {
   createdAt: string;
   updatedByName?: string;
   updatedAt?: string;
+  shareholderId?: string | null;
+  shareholderName?: string | null;
 }
 
 export interface IShiftCashDenomination {
@@ -1207,11 +1209,13 @@ export interface IAddShiftCashTransactionRequest {
   type: 'Thu' | 'Chi';
   amount: number;
   note?: string;
+  shareholderId?: string | null;
 }
 
 export interface IUpdateShiftCashTransactionRequest {
   amount: number;
   note?: string;
+  shareholderId?: string | null;
 }
 
 export interface IUpdateDenominationRequest {
