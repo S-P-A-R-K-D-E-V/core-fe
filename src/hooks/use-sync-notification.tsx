@@ -53,6 +53,11 @@ type SyncNotificationContextType = {
     type?: 'all' | 'invoices' | 'purchase-orders' | 'transform' | 'sync-and-transform',
     options?: SyncDateRange
   ) => Promise<string | null>;
+  /** entities rỗng (hoặc chứa 'All') → đồng bộ toàn bộ, giống startSync('all'). */
+  startSyncSelected: (
+    entities: string[],
+    options?: SyncDateRange & { resume?: boolean }
+  ) => Promise<string | null>;
   markAllAsRead: () => void;
   removeNotification: (id: string) => void;
   // Real-time job status via SignalR
@@ -71,6 +76,7 @@ export const SyncNotificationContext = createContext<SyncNotificationContextType
   notifications: [],
   totalUnRead: 0,
   startSync: async () => null,
+  startSyncSelected: async () => null,
   markAllAsRead: () => {},
   removeNotification: () => {},
   subscribeToJob: () => {},
@@ -364,6 +370,42 @@ export function SyncNotificationProvider({ children }: Props) {
     [subscribeToJob]
   );
 
+  const startSyncSelected = useCallback(
+    async (
+      entities: string[],
+      options?: SyncDateRange & { resume?: boolean }
+    ): Promise<string | null> => {
+      const { data } = await axios.post<ISyncJobResponse>(endpoints.kiotViet.syncSelected, {
+        entities,
+        resume: options?.resume ?? true,
+        fromDate: options?.fromDate || undefined,
+        toDate: options?.toDate || undefined,
+      });
+      const { jobId } = data;
+
+      const isAll = entities.length === 0 || entities.some((e) => e.toLowerCase() === 'all');
+      const title = isAll
+        ? 'Đồng bộ toàn bộ KiotViet'
+        : `Đồng bộ KiotViet (${entities.length} mục)`;
+
+      const notification: SyncNotification = {
+        id: jobId,
+        jobId,
+        title,
+        message: 'Đang chờ xử lý...',
+        status: 'Pending',
+        createdAt: new Date(),
+        isUnRead: true,
+      };
+
+      setNotifications((prev) => [notification, ...prev]);
+      subscribeToJob(jobId);
+
+      return jobId;
+    },
+    [subscribeToJob]
+  );
+
   // --- Sync notification actions ---
   const markAllAsRead = useCallback(() => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isUnRead: false })));
@@ -430,6 +472,7 @@ export function SyncNotificationProvider({ children }: Props) {
       notifications,
       totalUnRead,
       startSync,
+      startSyncSelected,
       markAllAsRead,
       removeNotification,
       subscribeToJob,
@@ -446,6 +489,7 @@ export function SyncNotificationProvider({ children }: Props) {
       notifications,
       totalUnRead,
       startSync,
+      startSyncSelected,
       markAllAsRead,
       removeNotification,
       subscribeToJob,

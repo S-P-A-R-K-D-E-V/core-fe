@@ -47,6 +47,10 @@ export async function cancelPurchaseOrder(id: string): Promise<void> {
   await axios.post(endpoints.purchaseOrders.cancel(id));
 }
 
+export async function setPurchaseOrderPaidBy(id: string, paidByShareholderId: string | null): Promise<void> {
+  await axios.patch(endpoints.purchaseOrders.paidBy(id), { paidByShareholderId });
+}
+
 // ---- Draft (Redis cache) ----
 
 export async function savePurchaseOrderDraft(data: unknown): Promise<void> {

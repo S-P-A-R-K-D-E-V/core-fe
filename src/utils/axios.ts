@@ -270,6 +270,7 @@ export const endpoints = {
     sync: '/kiotviet/sync',
     syncInvoices: '/kiotviet/sync/invoices',
     syncPurchaseOrders: '/kiotviet/sync/purchase-orders',
+    syncSelected: '/kiotviet/sync/selected',
     syncJobStatus: (jobId: string) => `/kiotviet/sync/jobs/${jobId}`,
     syncRunning: '/kiotviet/sync/running',
     transform: '/kiotviet/transform',
@@ -403,6 +404,7 @@ export const endpoints = {
     confirm: (id: string) => `/purchase-orders/${id}/confirm`,
     receive: (id: string) => `/purchase-orders/${id}/receive`,
     cancel: (id: string) => `/purchase-orders/${id}/cancel`,
+    paidBy: (id: string) => `/purchase-orders/${id}/paid-by`,
     draft: '/purchase-orders/draft',
   },
   customers: {

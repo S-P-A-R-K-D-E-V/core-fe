@@ -7,6 +7,8 @@ import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
+import MenuItem from '@mui/material/MenuItem';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid2';
 import Table from '@mui/material/Table';
@@ -28,13 +30,15 @@ import { fDateTime } from 'src/utils/format-time';
 import { useSnackbar } from 'src/components/snackbar';
 import Iconify from 'src/components/iconify';
 
-import { IPurchaseOrder, IPurchaseOrderItem } from 'src/types/corecms-api';
+import { IPurchaseOrder, IPurchaseOrderItem, IShareholder } from 'src/types/corecms-api';
 import {
   getPurchaseOrderById,
   confirmPurchaseOrder,
   cancelPurchaseOrder,
   receivePurchaseOrder,
+  setPurchaseOrderPaidBy,
 } from 'src/api/purchase-orders';
+import { getShareholders } from 'src/api/shareholders';
 
 // ----------------------------------------------------------------------
 
@@ -44,6 +48,7 @@ const STATUS_COLOR_MAP: Record<string, 'default' | 'info' | 'warning' | 'success
   PartiallyReceived: 'warning',
   Completed: 'success',
   Cancelled: 'error',
+  Returned: 'error',
 };
 
 const STATUS_LABEL_MAP: Record<string, string> = {
@@ -52,6 +57,7 @@ const STATUS_LABEL_MAP: Record<string, string> = {
   PartiallyReceived: 'Nhận một phần',
   Completed: 'Hoàn thành',
   Cancelled: 'Đã hủy',
+  Returned: 'Đã trả',
 };
 
 type Props = { id: string };
@@ -65,6 +71,12 @@ export default function PurchaseOrderDetailView({ id }: Props) {
   const [actionLoading, setActionLoading] = useState(false);
   const [receiveMode, setReceiveMode] = useState(false);
   const [receiveQuantities, setReceiveQuantities] = useState<Record<string, number>>({});
+
+  // Sửa "Ai chi hộ" — chỉ cho phép khi đơn đã "Đã trả" (Returned), khớp gate hoạch toán cổ đông ở BE.
+  const [shareholders, setShareholders] = useState<IShareholder[]>([]);
+  const [editingPaidBy, setEditingPaidBy] = useState(false);
+  const [paidByValue, setPaidByValue] = useState('');
+  const [savingPaidBy, setSavingPaidBy] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -86,6 +98,38 @@ export default function PurchaseOrderDetailView({ id }: Props) {
   }, [id, enqueueSnackbar]);
 
   useEffect(() => { fetchOrder(); }, [fetchOrder]);
+
+  const canEditPaidBy = order?.status === 'Returned';
+
+  useEffect(() => {
+    if (!canEditPaidBy) return;
+    getShareholders(true).then(setShareholders).catch(() => {});
+  }, [canEditPaidBy]);
+
+  const handleStartEditPaidBy = () => {
+    setPaidByValue(order?.paidByShareholderId || '');
+    setEditingPaidBy(true);
+  };
+
+  const handleCancelEditPaidBy = () => {
+    setEditingPaidBy(false);
+  };
+
+  const handleSavePaidBy = async () => {
+    if (!order) return;
+    try {
+      setSavingPaidBy(true);
+      await setPurchaseOrderPaidBy(order.id, paidByValue || null);
+      enqueueSnackbar('Đã cập nhật người chi hộ');
+      setEditingPaidBy(false);
+      fetchOrder();
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar('Không thể cập nhật người chi hộ', { variant: 'error' });
+    } finally {
+      setSavingPaidBy(false);
+    }
+  };
 
   const handleConfirm = async () => {
     try {
@@ -216,7 +260,43 @@ export default function PurchaseOrderDetailView({ id }: Props) {
             </Stack>
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">Ai chi hộ</Typography>
-              <Typography variant="body2">{order.paidByShareholderName || '—'}</Typography>
+              {editingPaidBy ? (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <TextField
+                    select
+                    size="small"
+                    value={paidByValue}
+                    onChange={(e) => setPaidByValue(e.target.value)}
+                    sx={{ minWidth: 160 }}
+                    disabled={savingPaidBy}
+                  >
+                    <MenuItem value="">— Chưa chọn —</MenuItem>
+                    {shareholders.map((s) => (
+                      <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
+                    ))}
+                  </TextField>
+                  <LoadingButton
+                    size="small"
+                    variant="contained"
+                    loading={savingPaidBy}
+                    onClick={handleSavePaidBy}
+                  >
+                    Lưu
+                  </LoadingButton>
+                  <Button size="small" color="inherit" onClick={handleCancelEditPaidBy} disabled={savingPaidBy}>
+                    Hủy
+                  </Button>
+                </Stack>
+              ) : (
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <Typography variant="body2">{order.paidByShareholderName || '—'}</Typography>
+                  {canEditPaidBy && (
+                    <IconButton size="small" color="primary" onClick={handleStartEditPaidBy}>
+                      <Iconify icon="solar:pen-bold" width={16} />
+                    </IconButton>
+                  )}
+                </Stack>
+              )}
             </Stack>
           </Box>
           {order.note && (

@@ -8,6 +8,10 @@ import Tabs from '@mui/material/Tabs';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
+import Divider from '@mui/material/Divider';
+import Checkbox from '@mui/material/Checkbox';
+import FormGroup from '@mui/material/FormGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
@@ -35,7 +39,26 @@ import type { ISyncJobStatus } from 'src/types/sync-job';
 import axios, { endpoints } from 'src/utils/axios';
 
 // Job types that belong to the "sync" card
-const SYNC_TYPES = new Set(['SyncAll', 'SyncInvoices', 'SyncPurchaseOrders', 'SyncAndTransform']);
+const SYNC_TYPES = new Set(['SyncAll', 'SyncInvoices', 'SyncPurchaseOrders', 'SyncAndTransform', 'SyncSelected']);
+
+// Phạm vi đồng bộ chọn được — khớp SyncJobTypes.SelectableEntities ở backend.
+const SYNC_ENTITY_OPTIONS = [
+  { key: 'Branches', label: 'Chi nhánh' },
+  { key: 'Categories', label: 'Danh mục' },
+  { key: 'Suppliers', label: 'Nhà cung cấp' },
+  { key: 'Customers', label: 'Khách hàng' },
+  { key: 'BankAccounts', label: 'Tài khoản NH' },
+  { key: 'SaleChannels', label: 'Kênh bán hàng' },
+  { key: 'Products', label: 'Sản phẩm' },
+  { key: 'PriceBooks', label: 'Bảng giá' },
+  { key: 'Orders', label: 'Đơn hàng' },
+  { key: 'Returns', label: 'Trả hàng' },
+  { key: 'VoucherCampaigns', label: 'Đợt voucher' },
+  { key: 'Vouchers', label: 'Voucher' },
+  { key: 'Invoices', label: 'Hóa đơn' },
+  { key: 'PurchaseOrders', label: 'Đơn nhập hàng' },
+];
+const ALL_ENTITY_KEYS = SYNC_ENTITY_OPTIONS.map((o) => o.key);
 
 const TABS = [
   { value: 'sync', label: 'Đồng bộ', icon: 'mdi:cloud-sync' },
@@ -49,7 +72,7 @@ const TABS = [
 export default function KiotVietSyncView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
-  const { startSync, subscribeToJob, onJobUpdate } = useContext(SyncNotificationContext);
+  const { startSyncSelected, subscribeToJob, onJobUpdate } = useContext(SyncNotificationContext);
 
   const [currentTab, setCurrentTab] = useState('sync');
   const [syncLoading, setSyncLoading] = useState(false);
@@ -57,6 +80,21 @@ export default function KiotVietSyncView() {
   // Khoảng thời gian lấy dữ liệu giao dịch (Order/Return/SalesOrder). Mặc định 01/01/2026 → hiện tại.
   const [fromDate, setFromDate] = useState('2026-01-01');
   const [toDate, setToDate] = useState('');
+
+  // Phạm vi đồng bộ — mặc định chọn tất cả (giữ hành vi cũ: nút "Đồng bộ KiotViet" = đồng bộ toàn bộ).
+  const [selectedEntities, setSelectedEntities] = useState<string[]>(ALL_ENTITY_KEYS);
+  const allSelected = selectedEntities.length === ALL_ENTITY_KEYS.length;
+  const noneSelected = selectedEntities.length === 0;
+
+  const toggleAll = useCallback(() => {
+    setSelectedEntities(allSelected ? [] : ALL_ENTITY_KEYS);
+  }, [allSelected]);
+
+  const toggleEntity = useCallback((key: string) => {
+    setSelectedEntities((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  }, []);
 
   const [syncJob, setSyncJob] = useState<ISyncJobStatus | null>(null);
 
@@ -105,10 +143,15 @@ export default function KiotVietSyncView() {
       enqueueSnackbar('"Từ ngày" không được lớn hơn "Đến ngày"', { variant: 'warning' });
       return;
     }
+    if (noneSelected) {
+      enqueueSnackbar('Chọn ít nhất 1 phạm vi để đồng bộ', { variant: 'warning' });
+      return;
+    }
     setSyncLoading(true);
     setSyncJob(null);
     try {
-      const jobId = await startSync('all', {
+      // allSelected → gửi mảng rỗng, BE hiểu là đồng bộ toàn bộ (tương đương SyncAll trước đây).
+      const jobId = await startSyncSelected(allSelected ? [] : selectedEntities, {
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
       });
@@ -126,7 +169,7 @@ export default function KiotVietSyncView() {
     } finally {
       setSyncLoading(false);
     }
-  }, [startSync, enqueueSnackbar, fromDate, toDate]);
+  }, [startSyncSelected, enqueueSnackbar, fromDate, toDate, allSelected, selectedEntities, noneSelected]);
 
   const renderJobStatus = (job: ISyncJobStatus | null, label: string) => {
     if (!job) return null;
@@ -311,17 +354,62 @@ export default function KiotVietSyncView() {
                 cung cấp...) luôn lấy đầy đủ lịch sử.
               </Typography>
 
+              <Divider sx={{ my: 2 }} />
+
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Phạm vi đồng bộ
+              </Typography>
+              <FormControlLabel
+                sx={{ mb: 0.5 }}
+                control={
+                  <Checkbox
+                    checked={allSelected}
+                    indeterminate={!allSelected && !noneSelected}
+                    onChange={toggleAll}
+                    disabled={syncJob?.status === 'Running'}
+                  />
+                }
+                label={<strong>Chọn tất cả</strong>}
+              />
+              <FormGroup
+                row
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr 1fr', sm: '1fr 1fr 1fr', md: 'repeat(4, 1fr)' },
+                  columnGap: 1,
+                }}
+              >
+                {SYNC_ENTITY_OPTIONS.map((opt) => (
+                  <FormControlLabel
+                    key={opt.key}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={selectedEntities.includes(opt.key)}
+                        onChange={() => toggleEntity(opt.key)}
+                        disabled={syncJob?.status === 'Running'}
+                      />
+                    }
+                    label={opt.label}
+                  />
+                ))}
+              </FormGroup>
+
               <LoadingButton
                 variant="contained"
                 color="primary"
                 size="large"
                 loading={syncLoading}
-                disabled={syncJob?.status === 'Running'}
+                disabled={syncJob?.status === 'Running' || noneSelected}
                 startIcon={<Iconify icon="mdi:cloud-download" />}
                 onClick={handleSync}
-                sx={{ minWidth: 200 }}
+                sx={{ minWidth: 200, mt: 2 }}
               >
-                {syncJob?.status === 'Running' ? 'Đang đồng bộ...' : 'Đồng bộ KiotViet'}
+                {syncJob?.status === 'Running'
+                  ? 'Đang đồng bộ...'
+                  : allSelected
+                    ? 'Đồng bộ toàn bộ'
+                    : `Đồng bộ ${selectedEntities.length} mục đã chọn`}
               </LoadingButton>
 
               {renderJobStatus(syncJob, 'Đồng bộ KiotViet')}
