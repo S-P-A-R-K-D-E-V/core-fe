@@ -38,9 +38,10 @@ import {
   TablePaginationCustom,
 } from 'src/components/table';
 
-import { IPurchaseOrder, ISupplier } from 'src/types/corecms-api';
-import { getAllPurchaseOrders, cancelPurchaseOrder, confirmPurchaseOrder } from 'src/api/purchase-orders';
+import { IPurchaseOrder, ISupplier, IShareholder } from 'src/types/corecms-api';
+import { getAllPurchaseOrders, cancelPurchaseOrder, confirmPurchaseOrder, setPurchaseOrderPaidBy } from 'src/api/purchase-orders';
 import { getAllSuppliers } from 'src/api/suppliers';
+import { getShareholders } from 'src/api/shareholders';
 
 // ----------------------------------------------------------------------
 
@@ -94,6 +95,8 @@ export default function PurchaseOrderListView() {
 
   const [tableData, setTableData] = useState<IPurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
+  const [shareholders, setShareholders] = useState<IShareholder[]>([]);
+  const [savingPaidById, setSavingPaidById] = useState<string | null>(null);
   const [filterSupplier, setFilterSupplier] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [totalCount, setTotalCount] = useState(0);
@@ -102,7 +105,7 @@ export default function PurchaseOrderListView() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [pagedResult, sups] = await Promise.all([
+      const [pagedResult, sups, shs] = await Promise.all([
         getAllPurchaseOrders({
           supplierId: filterSupplier || undefined,
           status: filterStatus || undefined,
@@ -110,10 +113,12 @@ export default function PurchaseOrderListView() {
           pageSize,
         }),
         getAllSuppliers(),
+        getShareholders(true),
       ]);
       setTableData(pagedResult.items);
       setTotalCount(pagedResult.totalCount);
       setSuppliers(sups);
+      setShareholders(shs);
     } catch (error) {
       console.error(error);
       enqueueSnackbar('Không thể tải đơn nhập hàng', { variant: 'error' });
@@ -143,6 +148,30 @@ export default function PurchaseOrderListView() {
       enqueueSnackbar('Hủy thất bại', { variant: 'error' });
     }
   }, [enqueueSnackbar, fetchData]);
+
+  const handleSetPaidBy = useCallback(async (id: string, shareholderId: string) => {
+    setSavingPaidById(id);
+    try {
+      await setPurchaseOrderPaidBy(id, shareholderId || null);
+      setTableData((prev) =>
+        prev.map((row) =>
+          row.id === id
+            ? {
+                ...row,
+                paidByShareholderId: shareholderId || null,
+                paidByShareholderName: shareholders.find((s) => s.id === shareholderId)?.name || null,
+              }
+            : row
+        )
+      );
+      enqueueSnackbar('Đã cập nhật người chi hộ');
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar('Không thể cập nhật người chi hộ', { variant: 'error' });
+    } finally {
+      setSavingPaidById(null);
+    }
+  }, [enqueueSnackbar, shareholders]);
 
   const handleViewRow = useCallback((id: string) => {
     router.push(paths.dashboard.pos.purchaseOrder.details(id));
@@ -213,8 +242,24 @@ export default function PurchaseOrderListView() {
                       <TableCell>{row.supplierName}</TableCell>
                       <TableCell>{row.warehouseName}</TableCell>
                       <TableCell align="right">{fCurrency(row.totalAmount)}</TableCell>
-                      <TableCell>
-                        {row.paidByShareholderName ? (
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {row.status === 'Returned' ? (
+                          <TextField
+                            select
+                            size="small"
+                            value={row.paidByShareholderId || ''}
+                            onChange={(e) => handleSetPaidBy(row.id, e.target.value)}
+                            disabled={savingPaidById === row.id}
+                            sx={{ minWidth: 130 }}
+                          >
+                            <MenuItem value="">— Chưa chọn —</MenuItem>
+                            {shareholders.map((s) => (
+                              <MenuItem key={s.id} value={s.id}>
+                                {s.name}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                        ) : row.paidByShareholderName ? (
                           <Label variant="soft" color="warning">
                             {row.paidByShareholderName}
                           </Label>
