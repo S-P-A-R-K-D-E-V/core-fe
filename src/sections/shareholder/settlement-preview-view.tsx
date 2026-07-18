@@ -21,7 +21,6 @@ import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
-import Tooltip from '@mui/material/Tooltip';
 import Collapse from '@mui/material/Collapse';
 import LoadingButton from '@mui/lab/LoadingButton';
 
@@ -38,52 +37,36 @@ import { TableHeadCustom, TableNoData } from 'src/components/table';
 import { fCurrency, fPercent } from 'src/utils/format-number';
 import { fPaymentMethod } from 'src/utils/payment-method-label';
 
-import { ISettlementPreview, ICollectedOutBreakdown } from 'src/types/corecms-api';
-import { getSettlementPreview, closeSettlement } from 'src/api/shareholders';
+import { ISettlementPreview, ISettlementItemDetail } from 'src/types/corecms-api';
+import { getSettlementPreview, closeSettlement, getShareholderSettlementDetail } from 'src/api/shareholders';
 
 // ----------------------------------------------------------------------
 
-// "Đã lấy ra" hiện chi tiết nguồn khi hover: từng kênh thu tiền (CK/Thẻ/Wallet theo cấu hình
-// Kênh thu tiền) + thu tay/rút vốn + rút quầy tiền mặt (Kiểm tiền quầy) — chỉ có ở bản xem trước
-// (tính live), kỳ đã chốt không lưu lại chi tiết này nên hiện số thường không có gạch chân.
-function CollectedOutCell({
+// "Đã đưa vào"/"Đã lấy ra" click để xem popup chi tiết từng khoản (nguồn, ngày, ghi chú) — chỉ
+// có ở bản xem trước (tính live), kỳ đã chốt không tra cứu lại được nên hiện số thường, không click được.
+function AmountDetailButton({
   amount,
-  source,
+  onClick,
 }: {
   amount: number;
-  source?: ICollectedOutBreakdown | null;
+  onClick?: () => void;
 }) {
-  const parts: { label: string; value: number }[] = [];
-  if (source) {
-    Object.entries(source.byChannelMethod || {}).forEach(([method, value]) => {
-      if (value) parts.push({ label: fPaymentMethod(method), value });
-    });
-    if (source.manualCollected) parts.push({ label: 'Thu tay / rút vốn', value: source.manualCollected });
-    if (source.cashCounter) parts.push({ label: 'Rút quầy tiền mặt', value: source.cashCounter });
-  }
-
-  if (parts.length === 0) {
-    return <>{fCurrency(amount)}</>;
-  }
+  if (!onClick) return <>{fCurrency(amount)}</>;
 
   return (
-    <Tooltip
-      arrow
-      title={
-        <Stack spacing={0.5} sx={{ py: 0.5 }}>
-          {parts.map((p) => (
-            <Stack key={p.label} direction="row" justifyContent="space-between" spacing={2}>
-              <Typography variant="caption">{p.label}</Typography>
-              <Typography variant="caption" fontWeight={600}>
-                {fCurrency(p.value)}
-              </Typography>
-            </Stack>
-          ))}
-        </Stack>
-      }
+    <Typography
+      component="span"
+      variant="body2"
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onClick();
+      }}
+      sx={{ textDecoration: 'underline dotted', cursor: 'pointer' }}
     >
-      <span style={{ textDecoration: 'underline dotted', cursor: 'help' }}>{fCurrency(amount)}</span>
-    </Tooltip>
+      {fCurrency(amount)}
+    </Typography>
   );
 }
 
@@ -101,7 +84,7 @@ const LINE_HEAD = [
 
 const SHEET_STYLE_HEAD = [
   { id: 'shareholder', label: 'Cổ đông' },
-  { id: 'profitShare', label: 'Chia LN', align: 'right' as const, width: 120 },
+  { id: 'revenueShare', label: 'Chia doanh thu', align: 'right' as const, width: 130 },
   { id: 'netBalance', label: 'Kỳ này', align: 'right' as const, width: 120 },
   { id: 'cumulative', label: 'Lũy kế', align: 'right' as const, width: 130 },
 ];
@@ -132,6 +115,11 @@ export default function SettlementPreviewView() {
   const [note, setNote] = useState('');
   const [closing, setClosing] = useState(false);
 
+  const detailDialog = useBoolean();
+  const [detailTitle, setDetailTitle] = useState('');
+  const [detailItems, setDetailItems] = useState<ISettlementItemDetail[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+
   const fetchPreview = useCallback(async () => {
     setLoading(true);
     try {
@@ -148,6 +136,25 @@ export default function SettlementPreviewView() {
   useEffect(() => {
     fetchPreview();
   }, [fetchPreview]);
+
+  const handleOpenDetail = useCallback(
+    async (shareholderId: string, shareholderName: string, kind: 'paidIn' | 'collectedOut') => {
+      setDetailTitle(`${kind === 'paidIn' ? 'Đã đưa vào' : 'Đã lấy ra'} — ${shareholderName}`);
+      setDetailItems([]);
+      detailDialog.onTrue();
+      setDetailLoading(true);
+      try {
+        const detail = await getShareholderSettlementDetail(shareholderId, { fromDate, toDate });
+        setDetailItems(kind === 'paidIn' ? detail.paidInItems : detail.collectedOutItems);
+      } catch (error) {
+        console.error(error);
+        enqueueSnackbar('Không thể tải chi tiết', { variant: 'error' });
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [fromDate, toDate, enqueueSnackbar, detailDialog]
+  );
 
   const handleOpenClose = () => {
     setPeriodName(`Kỳ ${fromDate} - ${toDate}`);
@@ -357,9 +364,17 @@ export default function SettlementPreviewView() {
                             <TableCell>{line.shareholderName}</TableCell>
                             <TableCell align="right">{fPercent(line.equityPercentSnapshot)}</TableCell>
                             <TableCell align="right">{fCurrency(line.profitShare)}</TableCell>
-                            <TableCell align="right">{fCurrency(line.paidIn)}</TableCell>
                             <TableCell align="right">
-                              <CollectedOutCell amount={line.collectedOut} source={line.collectedOutSource} />
+                              <AmountDetailButton
+                                amount={line.paidIn}
+                                onClick={() => handleOpenDetail(line.shareholderId, line.shareholderName, 'paidIn')}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <AmountDetailButton
+                                amount={line.collectedOut}
+                                onClick={() => handleOpenDetail(line.shareholderId, line.shareholderName, 'collectedOut')}
+                              />
                             </TableCell>
                             <TableCell align="right">
                               {line.peerPaid > 0 && `+${fCurrency(line.peerPaid)}`}
@@ -473,7 +488,7 @@ export default function SettlementPreviewView() {
                               {data.sheetStyle.lines.map((line) => (
                                 <TableRow key={line.shareholderId}>
                                   <TableCell>{line.shareholderName}</TableCell>
-                                  <TableCell align="right">{fCurrency(line.profitShare)}</TableCell>
+                                  <TableCell align="right">{fCurrency(line.revenueShare)}</TableCell>
                                   <TableCell align="right">
                                     <Typography
                                       variant="body2"
@@ -544,6 +559,59 @@ export default function SettlementPreviewView() {
           </>
         )}
       </Container>
+
+      <Dialog open={detailDialog.value} onClose={detailDialog.onFalse} maxWidth="sm" fullWidth>
+        <DialogTitle>{detailTitle}</DialogTitle>
+        <DialogContent>
+          {detailLoading ? (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
+              Đang tải...
+            </Typography>
+          ) : detailItems.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
+              Không có khoản nào trong kỳ này.
+            </Typography>
+          ) : (
+            <TableContainer sx={{ mt: 1 }}>
+              <Scrollbar>
+                <Table size="small">
+                  <TableHeadCustom
+                    headLabel={[
+                      { id: 'source', label: 'Nguồn' },
+                      { id: 'date', label: 'Ngày' },
+                      { id: 'note', label: 'Ghi chú' },
+                      { id: 'amount', label: 'Số tiền', align: 'right' as const },
+                    ]}
+                  />
+                  <TableBody>
+                    {detailItems.map((item, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>{fPaymentMethod(item.source)}</TableCell>
+                        <TableCell>{new Date(item.date).toLocaleDateString('vi-VN')}</TableCell>
+                        <TableCell>{item.note || '—'}</TableCell>
+                        <TableCell align="right">{fCurrency(item.amount)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow>
+                      <TableCell colSpan={3}>
+                        <Typography variant="subtitle2">Tổng</Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="subtitle2">
+                          {fCurrency(detailItems.reduce((sum, i) => sum + i.amount, 0))}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </Scrollbar>
+            </TableContainer>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={detailDialog.onFalse}>Đóng</Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={dialog.value} onClose={dialog.onFalse} maxWidth="xs" fullWidth>
         <DialogTitle>Xác nhận chốt sổ</DialogTitle>

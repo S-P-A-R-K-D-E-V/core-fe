@@ -2818,8 +2818,40 @@ export interface ISettlementPreview {
 export interface ISheetStyleComparison {
   profit: number;
   distributedProfit: number;
-  lines: ISettlementLine[];
+  lines: ISheetStyleLineItem[];
   transfers: ISettlementTransfer[];
+}
+
+// Khớp đúng cấu trúc hiển thị của sheet gốc: "Chia doanh thu" (%×DT), "Cần chi" (%×TổngChi gồm
+// tiền hàng), "Còn thiếu" (Cần chi − Đã đưa vào) — Tổng phải trả = netBalance (tương đương đại
+// số với công thức chính, chỉ khác cách chia nhỏ để hiển thị).
+export interface ISheetStyleLineItem {
+  shareholderId: string;
+  shareholderName: string;
+  equityPercentSnapshot: number;
+  revenueShare: number;
+  requiredShare: number;
+  paidIn: number;
+  shortfall: number;
+  collectedOut: number;
+  peerPaid: number;
+  peerReceived: number;
+  netBalance: number;
+  priorBalance: number;
+  cumulativeBalance: number;
+  isFundHolder?: boolean;
+}
+
+export interface ISettlementItemDetail {
+  source: string;
+  date: string;
+  amount: number;
+  note: string | null;
+}
+
+export interface IShareholderSettlementDetail {
+  paidInItems: ISettlementItemDetail[];
+  collectedOutItems: ISettlementItemDetail[];
 }
 
 export interface ISettlementListItem {

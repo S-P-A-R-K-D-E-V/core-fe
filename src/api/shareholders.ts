@@ -10,6 +10,7 @@ import {
   ISettlementPreview,
   ISettlementListItem,
   ISettlementDetail,
+  IShareholderSettlementDetail,
 } from 'src/types/corecms-api';
 
 // ========== Shareholder ==========
@@ -158,6 +159,18 @@ export async function getShareholderStatement(
 ): Promise<IShareholderStatement> {
   const response = await axios.get<IShareholderStatement>(
     endpoints.shareholders.statement(id),
+    { params }
+  );
+  return response.data;
+}
+
+// Chi tiết từng khoản cấu thành "Đã đưa vào"/"Đã lấy ra" — dùng cho popup khi click ở màn Đối chiếu & Chốt sổ
+export async function getShareholderSettlementDetail(
+  id: string,
+  params: { fromDate: string; toDate: string }
+): Promise<IShareholderSettlementDetail> {
+  const response = await axios.get<IShareholderSettlementDetail>(
+    endpoints.shareholders.shareholderSettlementDetail(id),
     { params }
   );
   return response.data;

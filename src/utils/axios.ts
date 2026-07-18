@@ -390,6 +390,7 @@ export const endpoints = {
     updateTransaction: (id: string) => `/shareholders/transactions/${id}`,
     deleteTransaction: (id: string) => `/shareholders/transactions/${id}`,
     statement: (id: string) => `/shareholders/${id}/statement`,
+    shareholderSettlementDetail: (id: string) => `/shareholders/${id}/settlement-detail`,
     settlementPreview: '/shareholders/settlements/preview',
     settlements: '/shareholders/settlements',
     settlementDetails: (id: string) => `/shareholders/settlements/${id}`,
