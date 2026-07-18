@@ -2752,6 +2752,12 @@ export interface IShareholderStatement {
 // --- Settlement (chốt sổ hoạch toán cổ đông) ---
 export type SettlementStatus = 'Open' | 'Closed';
 
+export interface ICollectedOutBreakdown {
+  byChannelMethod: Record<string, number>;
+  manualCollected: number;
+  cashCounter: number;
+}
+
 export interface ISettlementLine {
   shareholderId: string;
   shareholderName: string;
@@ -2765,6 +2771,8 @@ export interface ISettlementLine {
   netBalance: number;
   priorBalance: number;
   cumulativeBalance: number;
+  isFundHolder?: boolean;
+  collectedOutSource?: ICollectedOutBreakdown | null;
 }
 
 export interface IUnmappedChannel {
@@ -2802,6 +2810,16 @@ export interface ISettlementPreview {
   balanceCheck: number;
   canClose: boolean;
   isOverlapping: boolean;
+  sheetStyle?: ISheetStyleComparison | null;
+}
+
+// Đối chiếu theo cách tính CŨ (gộp tiền hàng vào chi phí trước khi chia lời) — chỉ để xem so
+// sánh với sheet Google gốc, không dùng để chốt sổ.
+export interface ISheetStyleComparison {
+  profit: number;
+  distributedProfit: number;
+  lines: ISettlementLine[];
+  transfers: ISettlementTransfer[];
 }
 
 export interface ISettlementListItem {

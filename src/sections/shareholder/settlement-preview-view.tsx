@@ -21,6 +21,8 @@ import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
+import Collapse from '@mui/material/Collapse';
 import LoadingButton from '@mui/lab/LoadingButton';
 
 import { paths } from 'src/routes/paths';
@@ -36,10 +38,54 @@ import { TableHeadCustom, TableNoData } from 'src/components/table';
 import { fCurrency, fPercent } from 'src/utils/format-number';
 import { fPaymentMethod } from 'src/utils/payment-method-label';
 
-import { ISettlementPreview } from 'src/types/corecms-api';
+import { ISettlementPreview, ICollectedOutBreakdown } from 'src/types/corecms-api';
 import { getSettlementPreview, closeSettlement } from 'src/api/shareholders';
 
 // ----------------------------------------------------------------------
+
+// "Đã lấy ra" hiện chi tiết nguồn khi hover: từng kênh thu tiền (CK/Thẻ/Wallet theo cấu hình
+// Kênh thu tiền) + thu tay/rút vốn + rút quầy tiền mặt (Kiểm tiền quầy) — chỉ có ở bản xem trước
+// (tính live), kỳ đã chốt không lưu lại chi tiết này nên hiện số thường không có gạch chân.
+function CollectedOutCell({
+  amount,
+  source,
+}: {
+  amount: number;
+  source?: ICollectedOutBreakdown | null;
+}) {
+  const parts: { label: string; value: number }[] = [];
+  if (source) {
+    Object.entries(source.byChannelMethod || {}).forEach(([method, value]) => {
+      if (value) parts.push({ label: fPaymentMethod(method), value });
+    });
+    if (source.manualCollected) parts.push({ label: 'Thu tay / rút vốn', value: source.manualCollected });
+    if (source.cashCounter) parts.push({ label: 'Rút quầy tiền mặt', value: source.cashCounter });
+  }
+
+  if (parts.length === 0) {
+    return <>{fCurrency(amount)}</>;
+  }
+
+  return (
+    <Tooltip
+      arrow
+      title={
+        <Stack spacing={0.5} sx={{ py: 0.5 }}>
+          {parts.map((p) => (
+            <Stack key={p.label} direction="row" justifyContent="space-between" spacing={2}>
+              <Typography variant="caption">{p.label}</Typography>
+              <Typography variant="caption" fontWeight={600}>
+                {fCurrency(p.value)}
+              </Typography>
+            </Stack>
+          ))}
+        </Stack>
+      }
+    >
+      <span style={{ textDecoration: 'underline dotted', cursor: 'help' }}>{fCurrency(amount)}</span>
+    </Tooltip>
+  );
+}
 
 const LINE_HEAD = [
   { id: 'shareholder', label: 'Cổ đông' },
@@ -49,6 +95,13 @@ const LINE_HEAD = [
   { id: 'collectedOut', label: 'Đã lấy ra', align: 'right' as const, width: 130 },
   { id: 'peer', label: 'Chuyển/Nhận', align: 'right' as const, width: 130 },
   { id: 'priorBalance', label: 'Nợ cũ', align: 'right' as const, width: 120 },
+  { id: 'netBalance', label: 'Kỳ này', align: 'right' as const, width: 120 },
+  { id: 'cumulative', label: 'Lũy kế', align: 'right' as const, width: 130 },
+];
+
+const SHEET_STYLE_HEAD = [
+  { id: 'shareholder', label: 'Cổ đông' },
+  { id: 'profitShare', label: 'Chia LN', align: 'right' as const, width: 120 },
   { id: 'netBalance', label: 'Kỳ này', align: 'right' as const, width: 120 },
   { id: 'cumulative', label: 'Lũy kế', align: 'right' as const, width: 130 },
 ];
@@ -66,6 +119,7 @@ export default function SettlementPreviewView() {
   const { enqueueSnackbar } = useSnackbar();
   const router = useRouter();
   const dialog = useBoolean();
+  const sheetStyleOpen = useBoolean();
   const defaults = getDefaultDates();
 
   const [fromDate, setFromDate] = useState(defaults.fromDate);
@@ -304,7 +358,9 @@ export default function SettlementPreviewView() {
                             <TableCell align="right">{fPercent(line.equityPercentSnapshot)}</TableCell>
                             <TableCell align="right">{fCurrency(line.profitShare)}</TableCell>
                             <TableCell align="right">{fCurrency(line.paidIn)}</TableCell>
-                            <TableCell align="right">{fCurrency(line.collectedOut)}</TableCell>
+                            <TableCell align="right">
+                              <CollectedOutCell amount={line.collectedOut} source={line.collectedOutSource} />
+                            </TableCell>
                             <TableCell align="right">
                               {line.peerPaid > 0 && `+${fCurrency(line.peerPaid)}`}
                               {line.peerPaid > 0 && line.peerReceived > 0 && ' / '}
@@ -371,6 +427,108 @@ export default function SettlementPreviewView() {
                 )}
               </CardContent>
             </Card>
+
+            {data.sheetStyle && (
+              <Card sx={{ mb: 3 }}>
+                <CardContent>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    onClick={sheetStyleOpen.onToggle}
+                    sx={{ cursor: 'pointer' }}
+                  >
+                    <Typography variant="h6">Đối chiếu cách tính cũ (gộp tiền hàng vào chi phí)</Typography>
+                    <Iconify
+                      icon={sheetStyleOpen.value ? 'eva:chevron-up-fill' : 'eva:chevron-down-fill'}
+                      width={22}
+                    />
+                  </Stack>
+                  <Collapse in={sheetStyleOpen.value}>
+                    <Stack spacing={2} sx={{ mt: 2 }}>
+                      <Alert severity="info">
+                        Chỉ để xem so sánh với sổ Google Sheet gốc — sổ này gộp tiền hàng nhập vào
+                        chi phí trước khi chia lời, khác với công thức chính thức (tách riêng, xem
+                        khối &quot;Chi phí hàng hóa&quot;). Không dùng số này để chốt sổ.
+                      </Alert>
+
+                      <Stack direction="row" spacing={4}>
+                        <Typography variant="body2">
+                          Lợi nhuận (gộp tiền hàng):{' '}
+                          <Typography
+                            component="span"
+                            variant="subtitle2"
+                            color={data.sheetStyle.profit >= 0 ? 'success.main' : 'error.main'}
+                          >
+                            {fCurrency(data.sheetStyle.profit)}
+                          </Typography>
+                        </Typography>
+                      </Stack>
+
+                      <TableContainer>
+                        <Scrollbar>
+                          <Table size="small">
+                            <TableHeadCustom headLabel={SHEET_STYLE_HEAD} />
+                            <TableBody>
+                              {data.sheetStyle.lines.map((line) => (
+                                <TableRow key={line.shareholderId}>
+                                  <TableCell>{line.shareholderName}</TableCell>
+                                  <TableCell align="right">{fCurrency(line.profitShare)}</TableCell>
+                                  <TableCell align="right">
+                                    <Typography
+                                      variant="body2"
+                                      color={line.netBalance >= 0 ? 'success.main' : 'error.main'}
+                                    >
+                                      {line.netBalance >= 0 ? '+' : ''}
+                                      {fCurrency(line.netBalance)}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    <Typography
+                                      variant="subtitle2"
+                                      color={line.cumulativeBalance >= 0 ? 'success.main' : 'error.main'}
+                                    >
+                                      {line.cumulativeBalance >= 0 ? '+' : ''}
+                                      {fCurrency(line.cumulativeBalance)}
+                                    </Typography>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </Scrollbar>
+                      </TableContainer>
+
+                      <Stack spacing={1}>
+                        <Typography variant="subtitle2">Ai trả ai (theo cách tính cũ)</Typography>
+                        {data.sheetStyle.transfers.length === 0 ? (
+                          <Typography variant="body2" color="text.secondary">
+                            Không cần chuyển tiền theo cách tính này.
+                          </Typography>
+                        ) : (
+                          data.sheetStyle.transfers.map((t, idx) => (
+                            <Stack
+                              key={idx}
+                              direction="row"
+                              alignItems="center"
+                              justifyContent="space-between"
+                              sx={{ p: 1.5, borderRadius: 1, bgcolor: 'background.neutral' }}
+                            >
+                              <Stack direction="row" alignItems="center" spacing={1}>
+                                <Typography variant="body2">{t.fromShareholderName}</Typography>
+                                <Iconify icon="solar:arrow-right-bold" width={16} />
+                                <Typography variant="body2">{t.toShareholderName}</Typography>
+                              </Stack>
+                              <Typography variant="subtitle2">{fCurrency(t.amount)}</Typography>
+                            </Stack>
+                          ))
+                        )}
+                      </Stack>
+                    </Stack>
+                  </Collapse>
+                </CardContent>
+              </Card>
+            )}
 
             <Stack direction="row" justifyContent="flex-end">
               <Button
