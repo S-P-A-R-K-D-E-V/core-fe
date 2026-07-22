@@ -53,6 +53,10 @@ export default function CleaningWeekBuilderView() {
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const isPastDay = (day: Date) => format(day, 'yyyy-MM-dd') < todayStr;
+  // Tuần kế tiếp (WeekStart+7..+13) hoàn toàn nằm ở quá khứ - không còn gì để nhân bản.
+  const nextWeekEntirelyPast = format(addDays(weekStart, 13), 'yyyy-MM-dd') < todayStr;
 
   const fetchAll = useCallback(async () => {
     try {
@@ -89,6 +93,8 @@ export default function CleaningWeekBuilderView() {
     if (!definition) return;
 
     const day = new Date(`${dateStr}T00:00:00`);
+    if (isPastDay(day)) return; // an toàn thứ 2 - Droppable của ngày quá khứ đã bị vô hiệu hoá
+
     const existing = cellFor(day, block as CleaningShiftBlock);
     const nextSortOrder = existing ? existing.templates.length : 0;
 
@@ -149,6 +155,7 @@ export default function CleaningWeekBuilderView() {
             variant="outlined"
             startIcon={<Iconify icon="eva:copy-outline" />}
             loading={duplicating}
+            disabled={nextWeekEntirelyPast}
             onClick={handleDuplicate}
           >
             Nhân bản sang tuần sau
@@ -234,12 +241,13 @@ export default function CleaningWeekBuilderView() {
                 <Box sx={{ display: 'grid', gridTemplateColumns: '70px repeat(7, minmax(140px, 1fr))', gap: 1, minWidth: 1000 }}>
                   <Box />
                   {days.map((day) => (
-                    <Box key={day.toISOString()} sx={{ textAlign: 'center' }}>
+                    <Box key={day.toISOString()} sx={{ textAlign: 'center', opacity: isPastDay(day) ? 0.5 : 1 }}>
                       <Typography variant="caption" fontWeight={600} className="capitalize" sx={{ display: 'block' }}>
                         {format(day, 'EEEE', { locale: viLocale })}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {format(day, 'dd/MM')}
+                        {isPastDay(day) ? ' (đã qua)' : ''}
                       </Typography>
                     </Box>
                   ))}
@@ -252,8 +260,14 @@ export default function CleaningWeekBuilderView() {
                       {days.map((day) => {
                         const dateStr = format(day, 'yyyy-MM-dd');
                         const cell = cellFor(day, block);
+                        const past = isPastDay(day);
                         return (
-                          <Droppable key={`${dateStr}-${block}`} droppableId={`cell:${dateStr}:${block}`} type="TASK">
+                          <Droppable
+                            key={`${dateStr}-${block}`}
+                            droppableId={`cell:${dateStr}:${block}`}
+                            type="TASK"
+                            isDropDisabled={past}
+                          >
                             {(provided, snapshot) => (
                               <Box
                                 ref={provided.innerRef}
@@ -264,7 +278,12 @@ export default function CleaningWeekBuilderView() {
                                   borderRadius: 1,
                                   border: '2px dashed',
                                   borderColor: snapshot.isDraggingOver ? 'primary.main' : 'divider',
-                                  bgcolor: snapshot.isDraggingOver ? alpha('#00A76F', 0.08) : 'transparent',
+                                  bgcolor: past
+                                    ? 'action.disabledBackground'
+                                    : snapshot.isDraggingOver
+                                      ? alpha('#00A76F', 0.08)
+                                      : 'transparent',
+                                  opacity: past ? 0.6 : 1,
                                   transition: 'all 0.15s',
                                 }}
                               >
@@ -274,7 +293,7 @@ export default function CleaningWeekBuilderView() {
                                       key={template.id}
                                       size="small"
                                       label={template.name}
-                                      onDelete={() => handleRemove(template.id)}
+                                      onDelete={past ? undefined : () => handleRemove(template.id)}
                                       sx={{ justifyContent: 'flex-start', '& .MuiChip-label': { whiteSpace: 'normal' } }}
                                     />
                                   ))}
