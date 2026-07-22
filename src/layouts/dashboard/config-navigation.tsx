@@ -184,6 +184,8 @@ export function useNavData(userRole?: string) {
             icon: ICONS.calendar,
             roles: ['Admin', 'Manager'],
             children: [
+              { title: t('cleaningTaskLibrary'), path: paths.dashboard.cleaning.taskLibrary },
+              { title: t('cleaningWeekBuilder'), path: paths.dashboard.cleaning.weekBuilder },
               { title: t('cleaningTemplates'), path: paths.dashboard.cleaning.templates },
               { title: t('cleaningReview'), path: paths.dashboard.cleaning.review },
               { title: t('cleaningWeekOverview'), path: paths.dashboard.cleaning.weekOverview },

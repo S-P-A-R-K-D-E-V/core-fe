@@ -248,6 +248,10 @@ export const endpoints = {
     createPenalty: (id: string) => `/cleaning/tasks/${id}/penalties`,
     voidPenalty: (id: string) => `/cleaning/penalties/${id}/void`,
     weekOverview: '/cleaning/week-overview',
+    taskDefinitions: '/cleaning/task-definitions',
+    taskDefinitionDetails: (id: string) => `/cleaning/task-definitions/${id}`,
+    templateWeek: '/cleaning/templates/week',
+    duplicateWeek: '/cleaning/templates/duplicate-week',
   },
   payrollCycle: {
     list: '/payroll-cycles',

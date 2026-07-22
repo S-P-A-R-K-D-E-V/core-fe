@@ -167,7 +167,9 @@ export const paths = {
     },
     cleaning: {
       root: `${ROOTS.DASHBOARD}/cleaning`,
+      taskLibrary: `${ROOTS.DASHBOARD}/cleaning/tasks`,
       templates: `${ROOTS.DASHBOARD}/cleaning/templates`,
+      weekBuilder: `${ROOTS.DASHBOARD}/cleaning/week-builder`,
       review: `${ROOTS.DASHBOARD}/cleaning/review`,
       weekOverview: `${ROOTS.DASHBOARD}/cleaning/week-overview`,
     },
