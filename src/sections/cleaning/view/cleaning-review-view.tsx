@@ -27,6 +27,7 @@ import Typography from '@mui/material/Typography';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 
 import { paths } from 'src/routes/paths';
+import { useSearchParams } from 'src/routes/hooks';
 
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
@@ -81,9 +82,10 @@ const formatCurrency = (amount: number) =>
 export default function CleaningReviewView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
+  const searchParams = useSearchParams();
 
-  const [date, setDate] = useState(toDateStr(new Date()));
-  const [block, setBlock] = useState('Morning');
+  const [date, setDate] = useState(searchParams.get('date') || toDateStr(new Date()));
+  const [block, setBlock] = useState(searchParams.get('block') || 'Morning');
   const [tasks, setTasks] = useState<ICleaningTaskInstance[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -380,7 +382,7 @@ export default function CleaningReviewView() {
                         onChange={() => toggleStaff(s.userId)}
                       />
                     }
-                    label={s.fullName}
+                    label={s.isPartialCover ? `${s.fullName} (làm hộ 1 phần ca)` : s.fullName}
                   />
                 ))}
               </Stack>

@@ -4,6 +4,7 @@ import type {
   ICleaningPenalty,
   ICleaningTaskInstance,
   ICleaningTaskTemplate,
+  ICleaningWeekCell,
   ICreateCleaningTaskTemplateRequest,
   IShiftStaffForPenalty,
   IUpdateCleaningTaskTemplateRequest,
@@ -72,4 +73,14 @@ export async function createCleaningPenalty(
 
 export async function voidCleaningPenalty(id: string): Promise<void> {
   await axios.post(endpoints.cleaning.voidPenalty(id));
+}
+
+// ----------------------------------------------------------------------
+// Week overview (Manager tracking calendar)
+
+export async function getCleaningWeekOverview(fromDate: string, toDate: string): Promise<ICleaningWeekCell[]> {
+  const response = await axios.get<ICleaningWeekCell[]>(endpoints.cleaning.weekOverview, {
+    params: { fromDate, toDate },
+  });
+  return response.data;
 }

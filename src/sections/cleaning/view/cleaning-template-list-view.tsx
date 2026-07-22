@@ -20,6 +20,7 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 
 import { paths } from 'src/routes/paths';
 
@@ -31,6 +32,8 @@ import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
 import { useSnackbar } from 'src/components/snackbar';
 import { TableHeadCustom, TableNoData } from 'src/components/table';
+
+import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
 import type { ICleaningTaskTemplate } from 'src/types/corecms-api';
 
@@ -44,11 +47,12 @@ import {
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
-  { id: 'dayOfWeek', label: 'Thứ', width: 120 },
-  { id: 'cleaningBlock', label: 'Ca', width: 100 },
-  { id: 'name', label: 'Đầu việc', width: 260 },
-  { id: 'area', label: 'Khu vực', width: 200 },
-  { id: 'sortOrder', label: 'Thứ tự', width: 80 },
+  { id: 'dayOfWeek', label: 'Thứ', width: 100 },
+  { id: 'cleaningBlock', label: 'Ca', width: 90 },
+  { id: 'name', label: 'Đầu việc', width: 220 },
+  { id: 'area', label: 'Khu vực', width: 160 },
+  { id: 'sortOrder', label: 'Thứ tự', width: 70 },
+  { id: 'appliedRange', label: 'Áp dụng', width: 180 },
   { id: 'status', label: 'Trạng thái', width: 110 },
   { id: 'actions', label: 'Hành động', width: 140 },
 ];
@@ -72,6 +76,11 @@ const CLEANING_BLOCKS = [
 const dayLabel = (value: string) => DAYS_OF_WEEK.find((d) => d.value === value)?.label ?? value;
 const blockLabel = (value: string) => CLEANING_BLOCKS.find((b) => b.value === value)?.label ?? value;
 
+function formatDateVi(value: string) {
+  const d = parseDateStr(value);
+  return d ? d.toLocaleDateString('vi-VN') : value;
+}
+
 // ----------------------------------------------------------------------
 
 export default function CleaningTemplateListView() {
@@ -92,6 +101,8 @@ export default function CleaningTemplateListView() {
     area: '',
     sortOrder: 0,
     isActive: true,
+    fromDate: toDateStr(new Date()),
+    toDate: '',
   });
 
   const fetchTemplates = useCallback(async () => {
@@ -121,6 +132,8 @@ export default function CleaningTemplateListView() {
         area: template.area || '',
         sortOrder: template.sortOrder,
         isActive: template.isActive,
+        fromDate: template.fromDate,
+        toDate: template.toDate || '',
       });
     } else {
       setEditingTemplate(null);
@@ -131,6 +144,8 @@ export default function CleaningTemplateListView() {
         area: '',
         sortOrder: 0,
         isActive: true,
+        fromDate: toDateStr(new Date()),
+        toDate: '',
       });
     }
     setOpenDialog(true);
@@ -146,9 +161,26 @@ export default function CleaningTemplateListView() {
       enqueueSnackbar('Tên đầu việc là bắt buộc', { variant: 'error' });
       return;
     }
+    if (!formData.fromDate) {
+      enqueueSnackbar('Ngày bắt đầu áp dụng là bắt buộc', { variant: 'error' });
+      return;
+    }
+    if (formData.toDate && formData.toDate < formData.fromDate) {
+      enqueueSnackbar('Ngày kết thúc phải sau ngày bắt đầu', { variant: 'error' });
+      return;
+    }
     try {
       if (editingTemplate) {
-        await updateCleaningTaskTemplate(editingTemplate.id, formData);
+        await updateCleaningTaskTemplate(editingTemplate.id, {
+          dayOfWeek: formData.dayOfWeek,
+          cleaningBlock: formData.cleaningBlock,
+          name: formData.name,
+          area: formData.area || undefined,
+          sortOrder: formData.sortOrder,
+          isActive: formData.isActive,
+          fromDate: formData.fromDate,
+          toDate: formData.toDate || undefined,
+        });
         enqueueSnackbar('Cập nhật đầu việc thành công');
       } else {
         await createCleaningTaskTemplate({
@@ -157,6 +189,8 @@ export default function CleaningTemplateListView() {
           name: formData.name,
           area: formData.area || undefined,
           sortOrder: formData.sortOrder,
+          fromDate: formData.fromDate,
+          toDate: formData.toDate || undefined,
         });
         enqueueSnackbar('Tạo đầu việc thành công');
       }
@@ -222,6 +256,10 @@ export default function CleaningTemplateListView() {
                       <TableCell>{template.name}</TableCell>
                       <TableCell>{template.area || '-'}</TableCell>
                       <TableCell>{template.sortOrder}</TableCell>
+                      <TableCell>
+                        Từ {formatDateVi(template.fromDate)}
+                        {template.toDate ? ` đến ${formatDateVi(template.toDate)}` : ''}
+                      </TableCell>
                       <TableCell>
                         <Label color={template.isActive ? 'success' : 'default'}>
                           {template.isActive ? 'Áp dụng' : 'Ngưng áp dụng'}
@@ -303,6 +341,25 @@ export default function CleaningTemplateListView() {
               onChange={(e) => setFormData({ ...formData, sortOrder: Number(e.target.value) })}
               fullWidth
             />
+
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <DatePicker
+                label="Áp dụng từ ngày"
+                value={parseDateStr(formData.fromDate)}
+                onChange={(val) => setFormData({ ...formData, fromDate: toDateStr(val) })}
+                format="dd/MM/yyyy"
+                sx={{ flex: 1 }}
+              />
+              <DatePicker
+                label="Đến ngày (để trống = vô thời hạn)"
+                value={parseDateStr(formData.toDate)}
+                onChange={(val) => setFormData({ ...formData, toDate: toDateStr(val) })}
+                format="dd/MM/yyyy"
+                minDate={parseDateStr(formData.fromDate) ?? undefined}
+                slotProps={{ field: { clearable: true } }}
+                sx={{ flex: 1 }}
+              />
+            </Stack>
 
             {editingTemplate && (
               <FormControlLabel

@@ -186,6 +186,7 @@ export function useNavData(userRole?: string) {
             children: [
               { title: t('cleaningTemplates'), path: paths.dashboard.cleaning.templates },
               { title: t('cleaningReview'), path: paths.dashboard.cleaning.review },
+              { title: t('cleaningWeekOverview'), path: paths.dashboard.cleaning.weekOverview },
             ],
           },
 
