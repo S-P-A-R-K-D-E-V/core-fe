@@ -169,6 +169,7 @@ export const paths = {
       root: `${ROOTS.DASHBOARD}/cleaning`,
       templates: `${ROOTS.DASHBOARD}/cleaning/templates`,
       review: `${ROOTS.DASHBOARD}/cleaning/review`,
+      weekOverview: `${ROOTS.DASHBOARD}/cleaning/week-overview`,
     },
     shiftSwap: {
       root: `${ROOTS.DASHBOARD}/shift-swap`,

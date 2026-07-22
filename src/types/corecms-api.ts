@@ -2866,6 +2866,8 @@ export interface ICleaningTaskTemplate {
   area?: string | null;
   sortOrder: number;
   isActive: boolean;
+  fromDate: string; // "yyyy-MM-dd"
+  toDate?: string | null;
 }
 
 export interface ICreateCleaningTaskTemplateRequest {
@@ -2874,6 +2876,8 @@ export interface ICreateCleaningTaskTemplateRequest {
   name: string;
   area?: string;
   sortOrder: number;
+  fromDate: string;
+  toDate?: string;
 }
 
 export interface IUpdateCleaningTaskTemplateRequest {
@@ -2883,6 +2887,8 @@ export interface IUpdateCleaningTaskTemplateRequest {
   area?: string;
   sortOrder: number;
   isActive: boolean;
+  fromDate: string;
+  toDate?: string;
 }
 
 export interface ICleaningPenalty {
@@ -2917,4 +2923,15 @@ export interface ICleaningTaskInstance {
 export interface IShiftStaffForPenalty {
   userId: string;
   fullName: string;
+  isPartialCover: boolean;
+}
+
+export interface ICleaningWeekCell {
+  date: string; // "yyyy-MM-dd"
+  cleaningBlock: CleaningShiftBlock;
+  staffNames: string[];
+  pendingCount: number;
+  doneCount: number;
+  passedCount: number;
+  failedCount: number;
 }

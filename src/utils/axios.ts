@@ -247,6 +247,7 @@ export const endpoints = {
     shiftStaff: (id: string) => `/cleaning/tasks/${id}/shift-staff`,
     createPenalty: (id: string) => `/cleaning/tasks/${id}/penalties`,
     voidPenalty: (id: string) => `/cleaning/penalties/${id}/void`,
+    weekOverview: '/cleaning/week-overview',
   },
   payrollCycle: {
     list: '/payroll-cycles',
