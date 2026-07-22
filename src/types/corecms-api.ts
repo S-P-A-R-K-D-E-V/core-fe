@@ -2853,3 +2853,68 @@ export interface ISettlementDetail {
   lines: ISettlementLine[];
   transfers: ISettlementTransfer[];
 }
+
+// --- Cleaning Schedule ---
+export type CleaningShiftBlock = 'Morning' | 'Afternoon' | 'Evening';
+export type CleaningTaskStatus = 'Pending' | 'Done' | 'Passed' | 'Failed';
+
+export interface ICleaningTaskTemplate {
+  id: string;
+  dayOfWeek: string; // "Monday" .. "Sunday" (.NET DayOfWeek name)
+  cleaningBlock: CleaningShiftBlock;
+  name: string;
+  area?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface ICreateCleaningTaskTemplateRequest {
+  dayOfWeek: string; // "Monday" .. "Sunday" (.NET DayOfWeek name)
+  cleaningBlock: string;
+  name: string;
+  area?: string;
+  sortOrder: number;
+}
+
+export interface IUpdateCleaningTaskTemplateRequest {
+  dayOfWeek: string;
+  cleaningBlock: string;
+  name: string;
+  area?: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface ICleaningPenalty {
+  id: string;
+  userId: string;
+  userName?: string | null;
+  amount: number;
+  reason?: string | null;
+  createdByUserId: string;
+  createdAt: string;
+  voidedAt?: string | null;
+}
+
+export interface ICleaningTaskInstance {
+  id: string;
+  templateId: string;
+  name: string;
+  area?: string | null;
+  date: string; // "yyyy-MM-dd"
+  cleaningBlock: CleaningShiftBlock;
+  status: CleaningTaskStatus;
+  completedByUserId?: string | null;
+  completedByUserName?: string | null;
+  completedAt?: string | null;
+  photoObjectKey?: string | null;
+  reviewedByUserId?: string | null;
+  reviewedAt?: string | null;
+  reviewNote?: string | null;
+  penalties: ICleaningPenalty[];
+}
+
+export interface IShiftStaffForPenalty {
+  userId: string;
+  fullName: string;
+}

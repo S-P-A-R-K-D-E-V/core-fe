@@ -237,6 +237,17 @@ export const endpoints = {
     update: (id: string) => `/penalty-policies/${id}`,
     delete: (id: string) => `/penalty-policies/${id}`,
   },
+  cleaning: {
+    templates: '/cleaning/templates',
+    templateDetails: (id: string) => `/cleaning/templates/${id}`,
+    checklist: '/cleaning/checklist',
+    myChecklist: '/cleaning/my-checklist',
+    completeTask: (id: string) => `/cleaning/tasks/${id}/complete`,
+    reviewTask: (id: string) => `/cleaning/tasks/${id}/review`,
+    shiftStaff: (id: string) => `/cleaning/tasks/${id}/shift-staff`,
+    createPenalty: (id: string) => `/cleaning/tasks/${id}/penalties`,
+    voidPenalty: (id: string) => `/cleaning/penalties/${id}/void`,
+  },
   payrollCycle: {
     list: '/payroll-cycles',
     details: (id: string) => `/payroll-cycles/${id}`,
