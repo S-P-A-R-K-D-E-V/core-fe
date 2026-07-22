@@ -165,6 +165,11 @@ export const paths = {
       root: `${ROOTS.DASHBOARD}/penalty-policy`,
       list: `${ROOTS.DASHBOARD}/penalty-policy/list`,
     },
+    cleaning: {
+      root: `${ROOTS.DASHBOARD}/cleaning`,
+      templates: `${ROOTS.DASHBOARD}/cleaning/templates`,
+      review: `${ROOTS.DASHBOARD}/cleaning/review`,
+    },
     shiftSwap: {
       root: `${ROOTS.DASHBOARD}/shift-swap`,
       myRequests: `${ROOTS.DASHBOARD}/shift-swap/my-requests`,

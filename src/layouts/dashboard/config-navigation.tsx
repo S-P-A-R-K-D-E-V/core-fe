@@ -177,6 +177,18 @@ export function useNavData(userRole?: string) {
             ],
           },
 
+          // CLEANING SCHEDULE (Admin/Manager)
+          {
+            title: t('cleaning'),
+            path: paths.dashboard.cleaning.root,
+            icon: ICONS.calendar,
+            roles: ['Admin', 'Manager'],
+            children: [
+              { title: t('cleaningTemplates'), path: paths.dashboard.cleaning.templates },
+              { title: t('cleaningReview'), path: paths.dashboard.cleaning.review },
+            ],
+          },
+
           // ATTENDANCE MANAGEMENT (Admin/Manager)
           {
             title: t('attendance'),
