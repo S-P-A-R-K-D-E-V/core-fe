@@ -2935,3 +2935,28 @@ export interface ICleaningWeekCell {
   passedCount: number;
   failedCount: number;
 }
+
+// --- Cleaning Task Library (thư viện đầu việc tái sử dụng) ---
+export interface ICleaningTaskDefinition {
+  id: string;
+  name: string;
+  area?: string | null;
+  isActive: boolean;
+}
+
+export interface ICreateCleaningTaskDefinitionRequest {
+  name: string;
+  area?: string;
+}
+
+export interface IUpdateCleaningTaskDefinitionRequest {
+  name: string;
+  area?: string;
+  isActive: boolean;
+}
+
+export interface ICleaningTemplateWeekCell {
+  date: string; // "yyyy-MM-dd"
+  cleaningBlock: CleaningShiftBlock;
+  templates: ICleaningTaskTemplate[];
+}
