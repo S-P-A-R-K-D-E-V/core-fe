@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import Checkbox from '@mui/material/Checkbox';
@@ -32,6 +33,7 @@ import { useSearchParams } from 'src/routes/hooks';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
+import Lightbox, { useLightBox } from 'src/components/lightbox';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
 import { useSnackbar } from 'src/components/snackbar';
@@ -76,6 +78,40 @@ const STATUS_LABEL: Record<string, { label: string; color: 'default' | 'info' | 
 
 const formatCurrency = (amount: number) =>
   amount.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+
+// ----------------------------------------------------------------------
+
+function TaskPhotos({ objectKeys }: { objectKeys: string[] }) {
+  const slides = objectKeys.map((key) => ({ src: getStorageUrl(key) }));
+  const lightbox = useLightBox(slides);
+
+  if (objectKeys.length === 0) return <>-</>;
+
+  return (
+    <>
+      <Stack direction="row" spacing={0.5} flexWrap="wrap">
+        {objectKeys.map((key) => (
+          <Box
+            key={key}
+            component="img"
+            src={getStorageUrl(key)}
+            onClick={() => lightbox.onOpen(getStorageUrl(key))}
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: 1,
+              objectFit: 'cover',
+              cursor: 'pointer',
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          />
+        ))}
+      </Stack>
+      <Lightbox index={lightbox.selected} slides={slides} open={lightbox.open} close={lightbox.onClose} />
+    </>
+  );
+}
 
 // ----------------------------------------------------------------------
 
@@ -268,20 +304,7 @@ export default function CleaningReviewView() {
                         <TableCell>{task.area || '-'}</TableCell>
                         <TableCell>{task.completedByUserName || '-'}</TableCell>
                         <TableCell>
-                          {task.photoObjectKey ? (
-                            <Tooltip title="Xem ảnh minh chứng">
-                              <IconButton
-                                component="a"
-                                href={getStorageUrl(task.photoObjectKey)}
-                                target="_blank"
-                                rel="noopener"
-                              >
-                                <Iconify icon="solar:gallery-wide-bold" />
-                              </IconButton>
-                            </Tooltip>
-                          ) : (
-                            '-'
-                          )}
+                          <TaskPhotos objectKeys={task.photoObjectKeys} />
                         </TableCell>
                         <TableCell>
                           <Label color={STATUS_LABEL[task.status]?.color || 'default'}>

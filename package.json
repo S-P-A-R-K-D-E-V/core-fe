@@ -73,6 +73,7 @@
     "autosuggest-highlight": "^3.3.4",
     "aws-amplify": "^6.11.0",
     "axios": "^1.7.9",
+    "browser-image-compression": "^2.0.2",
     "date-fns": "^2.30.0",
     "dayjs": "^1.11.13",
     "driver.js": "^1.4.0",

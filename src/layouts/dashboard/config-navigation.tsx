@@ -177,18 +177,19 @@ export function useNavData(userRole?: string) {
             ],
           },
 
-          // CLEANING SCHEDULE (Admin/Manager)
+          // CLEANING SCHEDULE (checklist của tôi: mọi nhân viên - còn lại: Admin/Manager)
           {
             title: t('cleaning'),
             path: paths.dashboard.cleaning.root,
             icon: ICONS.calendar,
-            roles: ['Admin', 'Manager'],
+            roles: ['Admin', 'Manager', 'Staff'],
             children: [
-              { title: t('cleaningTaskLibrary'), path: paths.dashboard.cleaning.taskLibrary },
-              { title: t('cleaningWeekBuilder'), path: paths.dashboard.cleaning.weekBuilder },
-              { title: t('cleaningTemplates'), path: paths.dashboard.cleaning.templates },
-              { title: t('cleaningReview'), path: paths.dashboard.cleaning.review },
-              { title: t('cleaningWeekOverview'), path: paths.dashboard.cleaning.weekOverview },
+              { title: t('cleaningMyChecklist'), path: paths.dashboard.cleaning.myChecklist },
+              { title: t('cleaningTaskLibrary'), path: paths.dashboard.cleaning.taskLibrary, roles: ['Admin', 'Manager'] },
+              { title: t('cleaningWeekBuilder'), path: paths.dashboard.cleaning.weekBuilder, roles: ['Admin', 'Manager'] },
+              { title: t('cleaningTemplates'), path: paths.dashboard.cleaning.templates, roles: ['Admin', 'Manager'] },
+              { title: t('cleaningReview'), path: paths.dashboard.cleaning.review, roles: ['Admin', 'Manager'] },
+              { title: t('cleaningWeekOverview'), path: paths.dashboard.cleaning.weekOverview, roles: ['Admin', 'Manager'] },
             ],
           },
 
