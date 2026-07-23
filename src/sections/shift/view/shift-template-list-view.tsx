@@ -43,6 +43,7 @@ const TABLE_HEAD = [
   { id: 'name', label: 'Template Name' },
   { id: 'shiftType', label: 'Type', width: 120 },
   { id: 'color', label: 'Color', width: 80 },
+  { id: 'cleaningBlock', label: 'Khung ca vệ sinh', width: 130 },
   { id: 'isActive', label: 'Status', width: 100 },
   { id: 'createdAt', label: 'Created', width: 150 },
   { id: '', width: 88 },
