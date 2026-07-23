@@ -31,10 +31,16 @@ export default function ShiftTemplateTableRow({
   onDeleteRow,
   onViewSchedules,
 }: Props) {
-  const { name, shiftType, color, isActive, createdAt } = row;
+  const { name, shiftType, color, cleaningBlock, isActive, createdAt } = row;
 
   const confirm = useBoolean();
   const popover = usePopover();
+
+  const CLEANING_BLOCK_LABEL: Record<string, string> = {
+    Morning: 'Sáng',
+    Afternoon: 'Chiều',
+    Evening: 'Tối',
+  };
 
   return (
     <>
@@ -66,6 +72,16 @@ export default function ShiftTemplateTableRow({
                 borderColor: 'divider',
               }}
             />
+          )}
+        </TableCell>
+
+        <TableCell>
+          {cleaningBlock ? (
+            <Label variant="soft" color="info">
+              {CLEANING_BLOCK_LABEL[cleaningBlock] || cleaningBlock}
+            </Label>
+          ) : (
+            '-'
           )}
         </TableCell>
 

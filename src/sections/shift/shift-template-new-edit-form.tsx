@@ -36,6 +36,7 @@ export default function ShiftTemplateNewEditForm({ currentTemplate }: Props) {
     description: Yup.string().nullable(),
     shiftType: Yup.string().required('Shift type is required'),
     color: Yup.string().nullable(),
+    cleaningBlock: Yup.string().nullable(),
     isActive: Yup.boolean(),
   });
 
@@ -45,6 +46,7 @@ export default function ShiftTemplateNewEditForm({ currentTemplate }: Props) {
       description: currentTemplate?.description || '',
       shiftType: currentTemplate?.shiftType || 'Main',
       color: currentTemplate?.color || '#1976d2',
+      cleaningBlock: currentTemplate?.cleaningBlock || '',
       isActive: currentTemplate?.isActive ?? true,
     }),
     [currentTemplate]
@@ -67,6 +69,7 @@ export default function ShiftTemplateNewEditForm({ currentTemplate }: Props) {
         description: data.description || undefined,
         shiftType: data.shiftType,
         color: data.color || undefined,
+        cleaningBlock: data.cleaningBlock || null,
         isActive: data.isActive ?? true,
       };
 
@@ -109,7 +112,12 @@ export default function ShiftTemplateNewEditForm({ currentTemplate }: Props) {
                 InputLabelProps={{ shrink: true }}
               />
 
-              <Box />
+              <RHFSelect name="cleaningBlock" label="Khung ca vệ sinh">
+                <MenuItem value="">Không áp dụng</MenuItem>
+                <MenuItem value="Morning">Sáng</MenuItem>
+                <MenuItem value="Afternoon">Chiều</MenuItem>
+                <MenuItem value="Evening">Tối</MenuItem>
+              </RHFSelect>
             </Box>
 
             <Stack spacing={2} sx={{ mt: 3 }}>

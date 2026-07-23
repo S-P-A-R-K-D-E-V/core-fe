@@ -179,6 +179,8 @@ export interface IShiftTemplate {
   description?: string;
   shiftType: ShiftType;
   color?: string;
+  /** Khung ca vệ sinh tương ứng (Morning/Afternoon/Evening) - null nếu ca này không áp dụng checklist vệ sinh */
+  cleaningBlock?: CleaningShiftBlock | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -188,6 +190,7 @@ export interface ICreateShiftTemplateRequest {
   description?: string;
   shiftType: string;
   color?: string;
+  cleaningBlock?: string | null;
 }
 
 export interface IUpdateShiftTemplateRequest {
@@ -195,6 +198,7 @@ export interface IUpdateShiftTemplateRequest {
   description?: string;
   shiftType: string;
   color?: string;
+  cleaningBlock?: string | null;
   isActive: boolean;
 }
 
