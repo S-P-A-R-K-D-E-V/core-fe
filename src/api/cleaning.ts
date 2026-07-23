@@ -9,6 +9,7 @@ import type {
   ICleaningWeekCell,
   ICreateCleaningTaskDefinitionRequest,
   ICreateCleaningTaskTemplateRequest,
+  IMyCleaningChecklist,
   IShiftStaffForPenalty,
   IUpdateCleaningTaskDefinitionRequest,
   IUpdateCleaningTaskTemplateRequest,
@@ -128,5 +129,24 @@ export async function getCleaningTemplateWeek(weekStart: string): Promise<IClean
 
 export async function duplicateCleaningWeek(weekStart: string): Promise<{ createdCount: number }> {
   const response = await axios.post<{ createdCount: number }>(endpoints.cleaning.duplicateWeek, { weekStart });
+  return response.data;
+}
+
+// ----------------------------------------------------------------------
+// My checklist (Staff)
+
+export async function getMyCleaningChecklist(date: string): Promise<IMyCleaningChecklist[]> {
+  const response = await axios.get<IMyCleaningChecklist[]>(endpoints.cleaning.myChecklist, {
+    params: { date },
+  });
+  return response.data;
+}
+
+export async function completeCleaningTask(id: string, photos: File[]): Promise<ICleaningTaskInstance> {
+  const formData = new FormData();
+  photos.forEach((file) => formData.append('photos', file));
+  const response = await axios.post<ICleaningTaskInstance>(endpoints.cleaning.completeTask(id), formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return response.data;
 }
