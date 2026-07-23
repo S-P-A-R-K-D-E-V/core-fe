@@ -174,6 +174,9 @@ export const paths = {
       review: `${ROOTS.DASHBOARD}/cleaning/review`,
       weekOverview: `${ROOTS.DASHBOARD}/cleaning/week-overview`,
     },
+    mediaLibrary: {
+      root: `${ROOTS.DASHBOARD}/media-library`,
+    },
     shiftSwap: {
       root: `${ROOTS.DASHBOARD}/shift-swap`,
       myRequests: `${ROOTS.DASHBOARD}/shift-swap/my-requests`,

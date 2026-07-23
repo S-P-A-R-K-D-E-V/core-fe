@@ -253,6 +253,16 @@ export const endpoints = {
     templateWeek: '/cleaning/templates/week',
     duplicateWeek: '/cleaning/templates/duplicate-week',
   },
+  mediaLibrary: {
+    cleaningPhotos: '/media-library/cleaning-photos',
+    deleteCleaningPhoto: (id: string) => `/media-library/cleaning-photos/${id}`,
+    chatAttachments: '/media-library/chat-attachments',
+    deleteChatAttachment: '/media-library/chat-attachments/delete',
+    userAvatars: '/media-library/user-avatars',
+    deleteUserAvatar: (userId: string) => `/media-library/user-avatars/${userId}`,
+    userIdCards: '/media-library/user-id-cards',
+    deleteUserIdCard: (userId: string) => `/media-library/user-id-cards/${userId}`,
+  },
   payrollCycle: {
     list: '/payroll-cycles',
     details: (id: string) => `/payroll-cycles/${id}`,
