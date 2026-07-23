@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-pangea/dnd';
 import { addDays, format, startOfWeek } from 'date-fns';
 import { vi as viLocale } from 'date-fns/locale';
@@ -8,12 +9,12 @@ import { vi as viLocale } from 'date-fns/locale';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
-import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
 import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
 import { alpha } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 
@@ -21,7 +22,6 @@ import { paths } from 'src/routes/paths';
 
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
-import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
 import { useSnackbar } from 'src/components/snackbar';
 
@@ -198,30 +198,42 @@ export default function CleaningWeekBuilderView() {
                     <Stack ref={provided.innerRef} {...provided.droppableProps} spacing={1}>
                       {definitions.map((definition, index) => (
                         <Draggable key={definition.id} draggableId={definition.id} index={index}>
-                          {(dragProvided, snapshot) => (
-                            <Box
-                              ref={dragProvided.innerRef}
-                              {...dragProvided.draggableProps}
-                              {...dragProvided.dragHandleProps}
-                              sx={{
-                                p: 1,
-                                borderRadius: 1,
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                bgcolor: snapshot.isDragging ? 'action.selected' : 'background.paper',
-                                cursor: 'grab',
-                              }}
-                            >
-                              <Typography variant="body2" fontWeight={600} noWrap>
-                                {definition.name}
-                              </Typography>
-                              {definition.area && (
-                                <Typography variant="caption" color="text.secondary" noWrap>
-                                  {definition.area}
-                                </Typography>
-                              )}
-                            </Box>
-                          )}
+                          {(dragProvided, snapshot) => {
+                            const content = (
+                              <Box
+                                ref={dragProvided.innerRef}
+                                {...dragProvided.draggableProps}
+                                {...dragProvided.dragHandleProps}
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 1,
+                                  p: 1,
+                                  borderRadius: 1,
+                                  border: '1px solid',
+                                  borderColor: snapshot.isDragging ? 'primary.main' : 'divider',
+                                  bgcolor: 'background.paper',
+                                  boxShadow: snapshot.isDragging ? '0 12px 24px rgba(0,0,0,0.2)' : 'none',
+                                  cursor: 'grab',
+                                }}
+                              >
+                                <Iconify icon="mdi:drag" width={16} sx={{ color: 'text.disabled', flexShrink: 0 }} />
+                                <Box sx={{ minWidth: 0 }}>
+                                  <Typography variant="body2" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
+                                    {definition.name}
+                                  </Typography>
+                                  {definition.area && (
+                                    <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
+                                      {definition.area}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </Box>
+                            );
+                            // Kéo qua Card có overflow:auto (lưới bên phải) sẽ bị clip nếu render tại chỗ -
+                            // thoát ra document.body trong lúc đang kéo để preview luôn hiển thị đúng.
+                            return snapshot.isDragging ? createPortal(content, document.body) : content;
+                          }}
                         </Draggable>
                       ))}
                       {provided.placeholder}
@@ -238,7 +250,7 @@ export default function CleaningWeekBuilderView() {
 
             <Grid size={{ xs: 12, md: 9 }}>
               <Card sx={{ p: 2, overflow: 'auto' }}>
-                <Box sx={{ display: 'grid', gridTemplateColumns: '70px repeat(7, minmax(140px, 1fr))', gap: 1, minWidth: 1000 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: '70px repeat(7, minmax(170px, 1fr))', gap: 1, minWidth: 1300 }}>
                   <Box />
                   {days.map((day) => (
                     <Box key={day.toISOString()} sx={{ textAlign: 'center', opacity: isPastDay(day) ? 0.5 : 1 }}>
@@ -273,8 +285,8 @@ export default function CleaningWeekBuilderView() {
                                 ref={provided.innerRef}
                                 {...provided.droppableProps}
                                 sx={{
-                                  minHeight: 90,
-                                  p: 1,
+                                  minHeight: 96,
+                                  p: 0.75,
                                   borderRadius: 1,
                                   border: '2px dashed',
                                   borderColor: snapshot.isDraggingOver ? 'primary.main' : 'divider',
@@ -289,14 +301,46 @@ export default function CleaningWeekBuilderView() {
                               >
                                 <Stack spacing={0.5}>
                                   {(cell?.templates || []).map((template) => (
-                                    <Chip
+                                    <Box
                                       key={template.id}
-                                      size="small"
-                                      label={template.name}
-                                      onDelete={past ? undefined : () => handleRemove(template.id)}
-                                      sx={{ justifyContent: 'flex-start', '& .MuiChip-label': { whiteSpace: 'normal' } }}
-                                    />
+                                      sx={{
+                                        display: 'flex',
+                                        alignItems: 'flex-start',
+                                        gap: 0.5,
+                                        p: 0.75,
+                                        borderRadius: 1,
+                                        bgcolor: 'grey.800',
+                                        color: 'common.white',
+                                      }}
+                                    >
+                                      <Typography
+                                        variant="caption"
+                                        sx={{ flex: 1, wordBreak: 'break-word', lineHeight: 1.3 }}
+                                      >
+                                        {template.name}
+                                      </Typography>
+                                      {!past && (
+                                        <Tooltip title="Bỏ khỏi ca này">
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => handleRemove(template.id)}
+                                            sx={{ p: 0.25, color: 'inherit', flexShrink: 0 }}
+                                          >
+                                            <Iconify icon="eva:close-fill" width={14} />
+                                          </IconButton>
+                                        </Tooltip>
+                                      )}
+                                    </Box>
                                   ))}
+                                  {(cell?.templates || []).length === 0 && !past && (
+                                    <Typography
+                                      variant="caption"
+                                      color="text.disabled"
+                                      sx={{ textAlign: 'center', py: 1.5 }}
+                                    >
+                                      Kéo đầu việc vào đây
+                                    </Typography>
+                                  )}
                                 </Stack>
                                 {provided.placeholder}
                               </Box>
