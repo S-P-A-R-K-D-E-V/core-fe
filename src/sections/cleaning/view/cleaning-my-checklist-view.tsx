@@ -10,6 +10,7 @@ import Container from '@mui/material/Container';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import imageCompression from 'browser-image-compression';
 
 import { paths } from 'src/routes/paths';
 
@@ -30,6 +31,7 @@ import { completeCleaningTask, getMyCleaningChecklist } from 'src/api/cleaning';
 // ----------------------------------------------------------------------
 
 const MAX_PHOTOS = 5;
+const MAX_PHOTO_SIZE_MB = 3.5; // dưới giới hạn 4MB/ảnh của backend, chừa dư cho overhead nén
 
 const BLOCK_LABEL: Record<string, string> = { Morning: 'Sáng', Afternoon: 'Chiều', Evening: 'Tối' };
 
@@ -84,12 +86,13 @@ function TaskRow({
   busy: boolean;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [compressing, setCompressing] = useState(false);
   const canComplete = task.status === 'Pending' || task.status === 'Done';
   const myPenalties = task.penalties.filter((p) => !p.voidedAt && p.userId === currentUserId);
 
   const handlePick = () => fileInputRef.current?.click();
 
-  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     e.target.value = '';
     if (files.length === 0) return;
@@ -98,7 +101,26 @@ function TaskRow({
       alert(`Chỉ chọn tối đa ${MAX_PHOTOS} ảnh`);
       return;
     }
-    onComplete(task.id, files);
+    setCompressing(true);
+    try {
+      const compressed = await Promise.all(
+        files.map(async (file) => {
+          if (file.size <= MAX_PHOTO_SIZE_MB * 1024 * 1024) return file;
+          try {
+            return await imageCompression(file, {
+              maxSizeMB: MAX_PHOTO_SIZE_MB,
+              maxWidthOrHeight: 1920,
+              useWebWorker: true,
+            });
+          } catch {
+            return file;
+          }
+        })
+      );
+      onComplete(task.id, compressed);
+    } finally {
+      setCompressing(false);
+    }
   };
 
   return (
@@ -149,10 +171,15 @@ function TaskRow({
             size="small"
             variant={task.status === 'Done' ? 'outlined' : 'contained'}
             startIcon={<Iconify icon="solar:camera-bold" />}
-            loading={busy}
+            loading={busy || compressing}
+            disabled={busy || compressing}
             onClick={handlePick}
           >
-            {task.status === 'Done' ? 'Chụp lại ảnh' : `Chọn ảnh & hoàn thành (tối đa ${MAX_PHOTOS})`}
+            {compressing
+              ? 'Đang xử lý ảnh...'
+              : task.status === 'Done'
+                ? 'Chụp lại ảnh'
+                : `Chọn ảnh & hoàn thành (tối đa ${MAX_PHOTOS})`}
           </Button>
         </Box>
       )}
