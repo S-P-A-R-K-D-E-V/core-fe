@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { toPng } from 'html-to-image';
 import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-pangea/dnd';
 import { addDays, format, startOfWeek } from 'date-fns';
 import { vi as viLocale } from 'date-fns/locale';
@@ -15,7 +16,7 @@ import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/paths';
@@ -44,12 +45,15 @@ const BLOCK_LABEL: Record<CleaningShiftBlock, string> = { Morning: 'Sáng', Afte
 export default function CleaningWeekBuilderView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
+  const theme = useTheme();
 
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [definitions, setDefinitions] = useState<ICleaningTaskDefinition[]>([]);
   const [cells, setCells] = useState<ICleaningTemplateWeekCell[]>([]);
   const [loading, setLoading] = useState(true);
   const [duplicating, setDuplicating] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const weekStartStr = format(weekStart, 'yyyy-MM-dd');
@@ -141,6 +145,29 @@ export default function CleaningWeekBuilderView() {
     }
   };
 
+  const handleCapture = async () => {
+    if (!gridRef.current) return;
+    setCapturing(true);
+    try {
+      // Chụp thẳng node lưới (không phải Card bọc overflow:auto) để luôn ra đủ Thứ Hai → Chủ nhật
+      // và đủ 3 ca dù đang cuộn ngang tới đâu trên màn hình.
+      const dataUrl = await toPng(gridRef.current, {
+        backgroundColor: theme.palette.background.paper,
+        pixelRatio: 2,
+        cacheBust: true,
+      });
+      const link = document.createElement('a');
+      link.download = `checklist-ve-sinh-${weekStartStr}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error('Error capturing week checklist:', error);
+      enqueueSnackbar('Không thể chụp lịch tuần', { variant: 'error' });
+    } finally {
+      setCapturing(false);
+    }
+  };
+
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
       <CustomBreadcrumbs
@@ -151,15 +178,25 @@ export default function CleaningWeekBuilderView() {
           { name: 'Xây dựng checklist' },
         ]}
         action={
-          <Button
-            variant="outlined"
-            startIcon={<Iconify icon="eva:copy-outline" />}
-            loading={duplicating}
-            disabled={nextWeekEntirelyPast}
-            onClick={handleDuplicate}
-          >
-            Nhân bản sang tuần sau
-          </Button>
+          <Stack direction="row" spacing={1.5}>
+            <Button
+              variant="outlined"
+              startIcon={<Iconify icon="solar:camera-bold" />}
+              loading={capturing}
+              onClick={handleCapture}
+            >
+              Chụp lịch tuần
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<Iconify icon="eva:copy-outline" />}
+              loading={duplicating}
+              disabled={nextWeekEntirelyPast}
+              onClick={handleDuplicate}
+            >
+              Nhân bản sang tuần sau
+            </Button>
+          </Stack>
         }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
@@ -195,7 +232,12 @@ export default function CleaningWeekBuilderView() {
                 </Typography>
                 <Droppable droppableId="library" type="TASK" isDropDisabled>
                   {(provided) => (
-                    <Stack ref={provided.innerRef} {...provided.droppableProps} spacing={1}>
+                    <Stack
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      spacing={1}
+                      sx={{ maxHeight: { xs: 400, md: 'calc(100vh - 320px)' }, overflowY: 'auto', pr: 0.5 }}
+                    >
                       {definitions.map((definition, index) => (
                         <Draggable key={definition.id} draggableId={definition.id} index={index}>
                           {(dragProvided, snapshot) => {
@@ -250,7 +292,23 @@ export default function CleaningWeekBuilderView() {
 
             <Grid size={{ xs: 12, md: 9 }}>
               <Card sx={{ p: 2, overflow: 'auto' }}>
-                <Box sx={{ display: 'grid', gridTemplateColumns: '70px repeat(7, minmax(170px, 1fr))', gap: 1, minWidth: 1300 }}>
+                <Box
+                  ref={gridRef}
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '70px repeat(7, minmax(170px, 1fr))',
+                    gap: 1,
+                    minWidth: 1300,
+                    bgcolor: 'background.paper',
+                    p: 1,
+                  }}
+                >
+                  <Typography
+                    variant="subtitle1"
+                    sx={{ gridColumn: '1 / -1', textAlign: 'center', mb: 1 }}
+                  >
+                    Checklist vệ sinh: {format(weekStart, 'dd/MM/yyyy')} – {format(addDays(weekStart, 6), 'dd/MM/yyyy')}
+                  </Typography>
                   <Box />
                   {days.map((day) => (
                     <Box key={day.toISOString()} sx={{ textAlign: 'center', opacity: isPastDay(day) ? 0.5 : 1 }}>
@@ -309,13 +367,14 @@ export default function CleaningWeekBuilderView() {
                                         gap: 0.5,
                                         p: 0.75,
                                         borderRadius: 1,
-                                        bgcolor: 'grey.800',
-                                        color: 'common.white',
+                                        bgcolor: (theme) => alpha(theme.palette.info.main, 0.12),
+                                        border: '1px solid',
+                                        borderColor: (theme) => alpha(theme.palette.info.main, 0.24),
                                       }}
                                     >
                                       <Typography
                                         variant="caption"
-                                        sx={{ flex: 1, wordBreak: 'break-word', lineHeight: 1.3 }}
+                                        sx={{ flex: 1, wordBreak: 'break-word', lineHeight: 1.3, color: 'info.darker' }}
                                       >
                                         {template.name}
                                       </Typography>
@@ -324,7 +383,7 @@ export default function CleaningWeekBuilderView() {
                                           <IconButton
                                             size="small"
                                             onClick={() => handleRemove(template.id)}
-                                            sx={{ p: 0.25, color: 'inherit', flexShrink: 0 }}
+                                            sx={{ p: 0.25, color: 'info.dark', flexShrink: 0 }}
                                           >
                                             <Iconify icon="eva:close-fill" width={14} />
                                           </IconButton>
