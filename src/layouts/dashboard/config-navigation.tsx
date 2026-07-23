@@ -193,6 +193,14 @@ export function useNavData(userRole?: string) {
             ],
           },
 
+          // MEDIA LIBRARY (Admin - xem/xoá media cũ trên R2)
+          {
+            title: t('mediaLibrary'),
+            path: paths.dashboard.mediaLibrary.root,
+            icon: ICONS.folder,
+            roles: ['Admin'],
+          },
+
           // ATTENDANCE MANAGEMENT (Admin/Manager)
           {
             title: t('attendance'),

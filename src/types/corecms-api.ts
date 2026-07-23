@@ -2943,6 +2943,66 @@ export interface ICleaningWeekCell {
   failedCount: number;
 }
 
+// ----------------------------------------------------------------------
+// Media Library (Admin - xem/xoá media cũ trên R2)
+
+export interface ICleaningPhotoMedia {
+  id: string;
+  cleaningTaskInstanceId: string;
+  objectKey: string;
+  uploadedAt: string;
+  taskName: string;
+  area?: string | null;
+  taskDate: string; // "yyyy-MM-dd"
+  cleaningBlock: CleaningShiftBlock;
+}
+
+export interface IPagedCleaningPhotoMedia {
+  items: ICleaningPhotoMedia[];
+  totalCount: number;
+}
+
+export interface IChatAttachmentMedia {
+  messageId: string;
+  conversationId: string;
+  objectKey: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  kind: 'image' | 'file';
+  createdAt: string;
+  senderId: string;
+  senderName?: string | null;
+}
+
+export interface IPagedChatAttachmentMedia {
+  items: IChatAttachmentMedia[];
+  totalCount: number;
+}
+
+export interface IUserAvatarMedia {
+  userId: string;
+  fullName: string;
+  objectKey: string;
+}
+
+export interface IPagedUserAvatarMedia {
+  items: IUserAvatarMedia[];
+  totalCount: number;
+}
+
+export interface IUserIdCardMedia {
+  userId: string;
+  fullName: string;
+  frontObjectKey?: string | null;
+  backObjectKey?: string | null;
+}
+
+export interface IPagedUserIdCardMedia {
+  items: IUserIdCardMedia[];
+  totalCount: number;
+}
+
 // --- Cleaning Task Library (thư viện đầu việc tái sử dụng) ---
 export interface ICleaningTaskDefinition {
   id: string;
