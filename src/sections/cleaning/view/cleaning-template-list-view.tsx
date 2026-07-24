@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -10,17 +12,14 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import FormControlLabel from '@mui/material/FormControlLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
-import Switch from '@mui/material/Switch';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableRow from '@mui/material/TableRow';
-import TextField from '@mui/material/TextField';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import LoadingButton from '@mui/lab/LoadingButton';
 
 import { paths } from 'src/routes/paths';
 
@@ -32,17 +31,32 @@ import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
 import { useSnackbar } from 'src/components/snackbar';
 import { TableHeadCustom, TableNoData } from 'src/components/table';
+import FormProvider, {
+  RHFSelect,
+  RHFSwitch,
+  RHFTextField,
+  RHFDatePicker,
+  RHFMultiSelect,
+} from 'src/components/hook-form';
 
-import { parseDateStr, toDateStr } from 'src/utils/format-time';
+import { parseDateStr } from 'src/utils/format-time';
 
-import type { ICleaningTaskTemplate } from 'src/types/corecms-api';
+import type { ICleaningTaskTemplate, IShiftTemplate } from 'src/types/corecms-api';
 
+import { getAllShiftTemplates } from 'src/api/attendance';
 import {
   createCleaningTaskTemplate,
   deleteCleaningTaskTemplate,
   getCleaningTaskTemplates,
   updateCleaningTaskTemplate,
 } from 'src/api/cleaning';
+
+import {
+  CleaningTemplateSchema,
+  DEFAULT_CLEANING_TEMPLATE_VALUES,
+  templateToFormValues,
+  type CleaningTemplateSchemaType,
+} from '../cleaning-template-schema';
 
 // ----------------------------------------------------------------------
 
@@ -53,6 +67,7 @@ const TABLE_HEAD = [
   { id: 'area', label: 'Khu vực', width: 160 },
   { id: 'sortOrder', label: 'Thứ tự', width: 70 },
   { id: 'appliedRange', label: 'Áp dụng', width: 180 },
+  { id: 'shiftTemplates', label: 'Áp dụng cho ca', width: 200 },
   { id: 'status', label: 'Trạng thái', width: 110 },
   { id: 'actions', label: 'Hành động', width: 140 },
 ];
@@ -90,20 +105,24 @@ export default function CleaningTemplateListView() {
   const isAdminUser = authUser?.role === 'Admin' || (authUser?.roles || []).includes('Admin');
 
   const [templates, setTemplates] = useState<ICleaningTaskTemplate[]>([]);
+  const [shiftTemplates, setShiftTemplates] = useState<IShiftTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ICleaningTaskTemplate | null>(null);
 
-  const [formData, setFormData] = useState({
-    dayOfWeek: 'Monday',
-    cleaningBlock: 'Morning',
-    name: '',
-    area: '',
-    sortOrder: 0,
-    isActive: true,
-    fromDate: toDateStr(new Date()),
-    toDate: '',
+  const methods = useForm<CleaningTemplateSchemaType>({
+    resolver: zodResolver(CleaningTemplateSchema),
+    defaultValues: DEFAULT_CLEANING_TEMPLATE_VALUES,
   });
+
+  const {
+    handleSubmit,
+    reset,
+    watch,
+    formState: { isSubmitting },
+  } = methods;
+
+  const fromDateValue = watch('fromDate');
 
   const fetchTemplates = useCallback(async () => {
     try {
@@ -118,35 +137,34 @@ export default function CleaningTemplateListView() {
     }
   }, [enqueueSnackbar]);
 
+  const fetchShiftTemplates = useCallback(async () => {
+    try {
+      const data = await getAllShiftTemplates();
+      setShiftTemplates(data);
+    } catch (error) {
+      console.error('Error fetching shift templates:', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchTemplates();
-  }, [fetchTemplates]);
+    fetchShiftTemplates();
+  }, [fetchTemplates, fetchShiftTemplates]);
+
+  const shiftTemplateOptions = shiftTemplates.map((s) => ({ label: s.name, value: s.id }));
+
+  const shiftTemplateNames = (ids: string[]) =>
+    ids
+      .map((id) => shiftTemplates.find((s) => s.id === id)?.name || id)
+      .join(', ') || '-';
 
   const handleOpenDialog = (template?: ICleaningTaskTemplate) => {
     if (template) {
       setEditingTemplate(template);
-      setFormData({
-        dayOfWeek: template.dayOfWeek,
-        cleaningBlock: template.cleaningBlock,
-        name: template.name,
-        area: template.area || '',
-        sortOrder: template.sortOrder,
-        isActive: template.isActive,
-        fromDate: template.fromDate,
-        toDate: template.toDate || '',
-      });
+      reset(templateToFormValues(template));
     } else {
       setEditingTemplate(null);
-      setFormData({
-        dayOfWeek: 'Monday',
-        cleaningBlock: 'Morning',
-        name: '',
-        area: '',
-        sortOrder: 0,
-        isActive: true,
-        fromDate: toDateStr(new Date()),
-        toDate: '',
-      });
+      reset(DEFAULT_CLEANING_TEMPLATE_VALUES);
     }
     setOpenDialog(true);
   };
@@ -156,42 +174,27 @@ export default function CleaningTemplateListView() {
     setEditingTemplate(null);
   };
 
-  const handleSubmit = async () => {
-    if (!formData.name.trim()) {
-      enqueueSnackbar('Tên đầu việc là bắt buộc', { variant: 'error' });
-      return;
-    }
-    if (!formData.fromDate) {
-      enqueueSnackbar('Ngày bắt đầu áp dụng là bắt buộc', { variant: 'error' });
-      return;
-    }
-    if (formData.toDate && formData.toDate < formData.fromDate) {
-      enqueueSnackbar('Ngày kết thúc phải sau ngày bắt đầu', { variant: 'error' });
-      return;
-    }
+  const onSubmit = handleSubmit(async (data) => {
     try {
+      const payload = {
+        dayOfWeek: data.dayOfWeek,
+        cleaningBlock: data.cleaningBlock,
+        name: data.name,
+        area: data.area || undefined,
+        sortOrder: data.sortOrder,
+        fromDate: data.fromDate,
+        toDate: data.toDate || undefined,
+        shiftTemplateIds: data.shiftTemplateIds,
+      };
+
       if (editingTemplate) {
         await updateCleaningTaskTemplate(editingTemplate.id, {
-          dayOfWeek: formData.dayOfWeek,
-          cleaningBlock: formData.cleaningBlock,
-          name: formData.name,
-          area: formData.area || undefined,
-          sortOrder: formData.sortOrder,
-          isActive: formData.isActive,
-          fromDate: formData.fromDate,
-          toDate: formData.toDate || undefined,
+          ...payload,
+          isActive: data.isActive,
         });
         enqueueSnackbar('Cập nhật đầu việc thành công');
       } else {
-        await createCleaningTaskTemplate({
-          dayOfWeek: formData.dayOfWeek,
-          cleaningBlock: formData.cleaningBlock,
-          name: formData.name,
-          area: formData.area || undefined,
-          sortOrder: formData.sortOrder,
-          fromDate: formData.fromDate,
-          toDate: formData.toDate || undefined,
-        });
+        await createCleaningTaskTemplate(payload);
         enqueueSnackbar('Tạo đầu việc thành công');
       }
       handleCloseDialog();
@@ -199,7 +202,7 @@ export default function CleaningTemplateListView() {
     } catch (error: any) {
       enqueueSnackbar(error?.title || 'Có lỗi xảy ra', { variant: 'error' });
     }
-  };
+  });
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Xoá đầu việc này? Không thể xoá nếu đã có lịch sử phát sinh.')) return;
@@ -260,6 +263,7 @@ export default function CleaningTemplateListView() {
                         Từ {formatDateVi(template.fromDate)}
                         {template.toDate ? ` đến ${formatDateVi(template.toDate)}` : ''}
                       </TableCell>
+                      <TableCell>{shiftTemplateNames(template.shiftTemplateIds || [])}</TableCell>
                       <TableCell>
                         <Label color={template.isActive ? 'success' : 'default'}>
                           {template.isActive ? 'Áp dụng' : 'Ngưng áp dụng'}
@@ -288,98 +292,62 @@ export default function CleaningTemplateListView() {
       </Card>
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingTemplate ? 'Cập nhật' : 'Thêm'} đầu việc vệ sinh</DialogTitle>
-        <DialogContent>
-          <Stack spacing={3} sx={{ mt: 2 }}>
-            <TextField
-              select
-              label="Thứ trong tuần"
-              value={formData.dayOfWeek}
-              onChange={(e) => setFormData({ ...formData, dayOfWeek: e.target.value })}
-              fullWidth
-            >
-              {DAYS_OF_WEEK.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </TextField>
+        <FormProvider methods={methods} onSubmit={onSubmit}>
+          <DialogTitle>{editingTemplate ? 'Cập nhật' : 'Thêm'} đầu việc vệ sinh</DialogTitle>
+          <DialogContent>
+            <Stack spacing={3} sx={{ mt: 2 }}>
+              <RHFSelect name="dayOfWeek" label="Thứ trong tuần">
+                {DAYS_OF_WEEK.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </RHFSelect>
 
-            <TextField
-              select
-              label="Khung ca"
-              value={formData.cleaningBlock}
-              onChange={(e) => setFormData({ ...formData, cleaningBlock: e.target.value })}
-              fullWidth
-            >
-              {CLEANING_BLOCKS.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </TextField>
+              <RHFSelect name="cleaningBlock" label="Khung ca">
+                {CLEANING_BLOCKS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </RHFSelect>
 
-            <TextField
-              label="Tên đầu việc"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              fullWidth
-            />
+              <RHFTextField name="name" label="Tên đầu việc" />
 
-            <TextField
-              label="Khu vực (tuỳ chọn)"
-              value={formData.area}
-              onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-              helperText='Ví dụ: "Tầng 1", "Quầy trưng bày"'
-              fullWidth
-            />
+              <RHFTextField name="area" label="Khu vực (tuỳ chọn)" helperText='Ví dụ: "Tầng 1", "Quầy trưng bày"' />
 
-            <TextField
-              label="Thứ tự hiển thị"
-              type="number"
-              value={formData.sortOrder}
-              onChange={(e) => setFormData({ ...formData, sortOrder: Number(e.target.value) })}
-              fullWidth
-            />
+              <RHFTextField name="sortOrder" label="Thứ tự hiển thị" type="number" />
 
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <DatePicker
-                label="Áp dụng từ ngày"
-                value={parseDateStr(formData.fromDate)}
-                onChange={(val) => setFormData({ ...formData, fromDate: toDateStr(val) })}
-                format="dd/MM/yyyy"
-                sx={{ flex: 1 }}
+              <RHFMultiSelect
+                name="shiftTemplateIds"
+                label="Áp dụng cho ca"
+                options={shiftTemplateOptions}
+                checkbox
+                chip
+                fullWidth
+                placeholder="Chọn các ca làm việc áp dụng đầu việc này"
               />
-              <DatePicker
-                label="Đến ngày (để trống = vô thời hạn)"
-                value={parseDateStr(formData.toDate)}
-                onChange={(val) => setFormData({ ...formData, toDate: toDateStr(val) })}
-                format="dd/MM/yyyy"
-                minDate={parseDateStr(formData.fromDate) ?? undefined}
-                slotProps={{ field: { clearable: true } }}
-                sx={{ flex: 1 }}
-              />
+
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <RHFDatePicker name="fromDate" label="Áp dụng từ ngày" sx={{ flex: 1 }} />
+                <RHFDatePicker
+                  name="toDate"
+                  label="Đến ngày (để trống = vô thời hạn)"
+                  minDate={fromDateValue}
+                  sx={{ flex: 1 }}
+                />
+              </Stack>
+
+              {editingTemplate && <RHFSwitch name="isActive" label="Áp dụng" />}
             </Stack>
-
-            {editingTemplate && (
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formData.isActive}
-                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  />
-                }
-                label="Áp dụng"
-              />
-            )}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Huỷ</Button>
-          <Button variant="contained" onClick={handleSubmit}>
-            {editingTemplate ? 'Cập nhật' : 'Tạo mới'}
-          </Button>
-        </DialogActions>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDialog}>Huỷ</Button>
+            <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
+              {editingTemplate ? 'Cập nhật' : 'Tạo mới'}
+            </LoadingButton>
+          </DialogActions>
+        </FormProvider>
       </Dialog>
     </Container>
   );

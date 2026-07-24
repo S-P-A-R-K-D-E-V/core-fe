@@ -19,7 +19,6 @@ import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/paths';
-import { useRouter } from 'src/routes/hooks';
 
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
@@ -29,6 +28,8 @@ import { useSnackbar } from 'src/components/snackbar';
 
 import type { ICleaningWeekCell } from 'src/types/corecms-api';
 import { getCleaningWeekOverview } from 'src/api/cleaning';
+
+import CleaningReviewDialog from '../cleaning-review-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -43,11 +44,15 @@ const BLOCKS = [
 export default function CleaningWeekOverviewView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
-  const router = useRouter();
 
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [cells, setCells] = useState<ICleaningWeekCell[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewDialog, setReviewDialog] = useState<{ open: boolean; date: Date; block: string }>({
+    open: false,
+    date: new Date(),
+    block: 'Morning',
+  });
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
@@ -76,9 +81,10 @@ export default function CleaningWeekOverviewView() {
   };
 
   const handleOpenReview = (date: Date, block: string) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    router.push(`${paths.dashboard.cleaning.review}?date=${dateStr}&block=${block}`);
+    setReviewDialog({ open: true, date, block });
   };
+
+  const handleCloseReview = () => setReviewDialog((d) => ({ ...d, open: false }));
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
@@ -186,6 +192,14 @@ export default function CleaningWeekOverviewView() {
           </TableContainer>
         )}
       </Card>
+
+      <CleaningReviewDialog
+        open={reviewDialog.open}
+        date={reviewDialog.date}
+        block={reviewDialog.block}
+        onClose={handleCloseReview}
+        onChanged={fetchOverview}
+      />
     </Container>
   );
 }

@@ -17,6 +17,9 @@
     "fm:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx}\"",
     "fm:fix": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\"",
     "fix:all": "npm run lint:fix && npm run fm:fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
     "clean": "rm -rf node_modules .next out dist build",
     "re:start": "yarn clean && yarn install && yarn dev",
     "re:build": "yarn clean && yarn install && yarn build",
@@ -132,7 +135,11 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
+    "@playwright/test": "^1.61.1",
     "@svgr/webpack": "^8.1.0",
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/autosuggest-highlight": "^3.2.3",
     "@types/lodash": "^4.14.202",
     "@types/mapbox-gl": "3.1.0",
@@ -147,6 +154,7 @@
     "@types/turndown": "^5.0.5",
     "@typescript-eslint/eslint-plugin": "^8.19.0",
     "@typescript-eslint/parser": "^8.19.0",
+    "@vitejs/plugin-react": "4.3.4",
     "eslint": "^9.17.0",
     "eslint-import-resolver-typescript": "^3.7.0",
     "eslint-plugin-import": "^2.31.0",
@@ -156,8 +164,16 @@
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-unused-imports": "^4.1.4",
     "globals": "^15.14.0",
+    "jsdom": "^24.1.3",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2",
-    "typescript-eslint": "^8.19.0"
+    "typescript-eslint": "^8.19.0",
+    "vite": "5.4.11",
+    "vitest": "1.6.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
