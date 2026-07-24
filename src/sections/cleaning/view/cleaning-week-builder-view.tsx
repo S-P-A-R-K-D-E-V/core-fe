@@ -26,7 +26,13 @@ import Iconify from 'src/components/iconify';
 import { useSettingsContext } from 'src/components/settings';
 import { useSnackbar } from 'src/components/snackbar';
 
-import type { CleaningShiftBlock, ICleaningTaskDefinition, ICleaningTemplateWeekCell } from 'src/types/corecms-api';
+import type {
+  CleaningShiftBlock,
+  ICleaningTaskDefinition,
+  ICleaningTemplateWeekCell,
+  IShiftTemplate,
+} from 'src/types/corecms-api';
+import { getAllShiftTemplates } from 'src/api/attendance';
 import {
   createCleaningTaskTemplate,
   deleteCleaningTaskTemplate,
@@ -50,6 +56,7 @@ export default function CleaningWeekBuilderView() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [definitions, setDefinitions] = useState<ICleaningTaskDefinition[]>([]);
   const [cells, setCells] = useState<ICleaningTemplateWeekCell[]>([]);
+  const [shiftTemplates, setShiftTemplates] = useState<IShiftTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [duplicating, setDuplicating] = useState(false);
   const [capturing, setCapturing] = useState(false);
@@ -65,12 +72,14 @@ export default function CleaningWeekBuilderView() {
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
-      const [defs, week] = await Promise.all([
+      const [defs, week, shifts] = await Promise.all([
         getCleaningTaskDefinitions(),
         getCleaningTemplateWeek(weekStartStr),
+        getAllShiftTemplates(),
       ]);
       setDefinitions(defs.filter((d) => d.isActive));
       setCells(week);
+      setShiftTemplates(shifts);
     } catch (error) {
       console.error('Error loading week builder:', error);
       enqueueSnackbar('Không thể tải dữ liệu checklist tuần', { variant: 'error' });
@@ -102,6 +111,22 @@ export default function CleaningWeekBuilderView() {
     const existing = cellFor(day, block as CleaningShiftBlock);
     const nextSortOrder = existing ? existing.templates.length : 0;
 
+    // Checklist tuần (kéo-thả) không có UI chọn ca thủ công - mặc định áp dụng cho mọi
+    // ShiftTemplate đang bật đúng khung ca vệ sinh này (giữ hành vi ngầm định cũ).
+    // Backend giờ bắt buộc shiftTemplateIds non-empty, nên nếu chưa có ca nào cấu hình
+    // đúng khung ca này thì chặn lại và hướng dẫn dùng trang Checklist vệ sinh (có UI chọn ca).
+    const matchingShiftTemplateIds = shiftTemplates
+      .filter((s) => s.isActive && s.cleaningBlock === block)
+      .map((s) => s.id);
+
+    if (matchingShiftTemplateIds.length === 0) {
+      enqueueSnackbar(
+        'Chưa có ca làm việc nào cấu hình khung ca vệ sinh này — vào trang "Checklist vệ sinh" để tạo đầu việc và chọn ca áp dụng thủ công.',
+        { variant: 'error' }
+      );
+      return;
+    }
+
     try {
       await createCleaningTaskTemplate({
         dayOfWeek: format(day, 'EEEE'),
@@ -110,6 +135,7 @@ export default function CleaningWeekBuilderView() {
         area: definition.area || undefined,
         sortOrder: nextSortOrder,
         fromDate: weekStartStr,
+        shiftTemplateIds: matchingShiftTemplateIds,
       });
       fetchAll();
     } catch (error: any) {

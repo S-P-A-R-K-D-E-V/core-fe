@@ -2872,6 +2872,8 @@ export interface ICleaningTaskTemplate {
   isActive: boolean;
   fromDate: string; // "yyyy-MM-dd"
   toDate?: string | null;
+  /** Các ca làm việc (ShiftTemplate.Id) áp dụng đầu việc này */
+  shiftTemplateIds: string[];
 }
 
 export interface ICreateCleaningTaskTemplateRequest {
@@ -2882,6 +2884,8 @@ export interface ICreateCleaningTaskTemplateRequest {
   sortOrder: number;
   fromDate: string;
   toDate?: string;
+  /** Bắt buộc, ít nhất 1 - các ca làm việc (ShiftTemplate.Id) áp dụng đầu việc này */
+  shiftTemplateIds: string[];
 }
 
 export interface IUpdateCleaningTaskTemplateRequest {
@@ -2893,6 +2897,8 @@ export interface IUpdateCleaningTaskTemplateRequest {
   isActive: boolean;
   fromDate: string;
   toDate?: string;
+  /** Bắt buộc, ít nhất 1 - các ca làm việc (ShiftTemplate.Id) áp dụng đầu việc này */
+  shiftTemplateIds: string[];
 }
 
 export interface ICleaningPenalty {
