@@ -12,8 +12,9 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 // API — this is the client-side half of the shiftTemplateIds bug fix.
 // ----------------------------------------------------------------------
 
+let mockUser: { role: string; roles: string[] } = { role: 'Admin', roles: ['Admin'] };
 vi.mock('src/auth/hooks', () => ({
-  useAuthContext: () => ({ user: { role: 'Admin', roles: ['Admin'] } }),
+  useAuthContext: () => ({ user: mockUser }),
 }));
 
 vi.mock('src/components/settings', () => ({
@@ -78,6 +79,36 @@ function renderView() {
 
 afterEach(() => {
   vi.clearAllMocks();
+  mockUser = { role: 'Admin', roles: ['Admin'] };
+});
+
+describe('CleaningTemplateListView role gating', () => {
+  it('shows the manage-template actions (thêm/sửa/xoá) for a Manager, not just Admin', async () => {
+    mockUser = { role: 'Manager', roles: ['Manager'] };
+    getCleaningTaskTemplates.mockResolvedValue([
+      {
+        id: 'tpl-1',
+        dayOfWeek: 'Monday',
+        cleaningBlock: 'Morning',
+        name: 'Lau sàn',
+        area: 'Tầng 1',
+        sortOrder: 0,
+        isActive: true,
+        fromDate: '2026-07-20',
+        toDate: null,
+        shiftTemplateIds: ['shift-1'],
+      },
+    ]);
+    getAllShiftTemplates.mockResolvedValue([
+      { id: 'shift-1', name: 'Ca sáng', shiftType: 'Main', isActive: true, createdAt: '2026-01-01' },
+    ]);
+
+    renderView();
+
+    expect(await screen.findByRole('button', { name: 'Thêm đầu việc' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Sửa' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Xoá' })).toBeInTheDocument();
+  });
 });
 
 describe('CleaningTemplateListView dialog', () => {
