@@ -8,6 +8,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { EventClickArg, DateSelectArg, DatesSetArg } from '@fullcalendar/core';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { toPng } from 'html-to-image';
 
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
@@ -318,6 +319,9 @@ export default function AttendanceAssignmentsView() {
   const [bulkHoverStaffId, setBulkHoverStaffId] = useState<string | null>(null);
   const [bulkTab, setBulkTab] = useState(0);
   const bulkConfirm = useBoolean();
+  // Chụp ảnh lưới lịch tuần (không kèm biểu đồ) để lưu/chia sẻ
+  const bulkGridRef = useRef<HTMLDivElement>(null);
+  const [capturingBulkGrid, setCapturingBulkGrid] = useState(false);
 
   // ── Chế độ sắp xếp kéo-thả (thay cho tích chọn NV + tích chọn ca + Phân công) ──
   const [dragModeOn, setDragModeOn] = useState(false);
@@ -540,6 +544,28 @@ export default function AttendanceAssignmentsView() {
       });
     } finally {
       setBulkLockSaving(false);
+    }
+  };
+
+  // Chụp lưới lịch tuần đang xem (không kèm panel NV/biểu đồ) thành ảnh PNG
+  const handleCaptureBulkGrid = async () => {
+    if (!bulkGridRef.current) return;
+    setCapturingBulkGrid(true);
+    try {
+      const dataUrl = await toPng(bulkGridRef.current, {
+        backgroundColor: theme.palette.background.paper,
+        pixelRatio: 2,
+        cacheBust: true,
+      });
+      const link = document.createElement('a');
+      link.download = `lich-phan-cong-${toLocalDateStr(bulkWeekStart)}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error('Error capturing bulk assign week grid:', error);
+      enqueueSnackbar('Không thể chụp lịch tuần', { variant: 'error' });
+    } finally {
+      setCapturingBulkGrid(false);
     }
   };
 
@@ -2071,7 +2097,7 @@ export default function AttendanceAssignmentsView() {
       </Dialog>
 
       {/* Bulk Assign Dialog */}
-      <Dialog open={assignMode === 'bulk' && bulkDialog.value} onClose={bulkDialog.onFalse} maxWidth="xl" fullWidth fullScreen={!smUp} PaperProps={{ sx: { width: '100%', maxWidth: 1320 } }}>
+      <Dialog open={assignMode === 'bulk' && bulkDialog.value} onClose={bulkDialog.onFalse} maxWidth="xl" fullWidth fullScreen={!smUp} PaperProps={{ sx: { width: '100%', maxWidth: 1320, height: { sm: '90vh' } } }}>
         <DialogTitle sx={{ pb: 1, px: { xs: 2, sm: 3 } }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between">
             <Typography variant="h6">Phân công hàng loạt</Typography>
@@ -2177,11 +2203,11 @@ export default function AttendanceAssignmentsView() {
             </Tabs>
           )}
         </DialogTitle>
-        <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
+        <DialogContent sx={{ p: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
           {smUp ? (
           /* ===== Desktop: side-by-side layout ===== */
           <DragDropContext onDragEnd={handleDragModeDragEnd}>
-          <Stack direction="row" sx={{ height: 700 }}>
+          <Stack direction="row" sx={{ flex: '1 1 auto', minHeight: 0 }}>
             {/* ===== Left: Staff List ===== */}
             <Box
               sx={{
@@ -2460,15 +2486,29 @@ export default function AttendanceAssignmentsView() {
                     sx={{ ml: 1 }}
                   />
                 )}
+                <Tooltip title="Chụp lịch tuần thành ảnh PNG">
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={handleCaptureBulkGrid}
+                      disabled={capturingBulkGrid}
+                      sx={{ ml: 1 }}
+                    >
+                      <Iconify icon="solar:camera-bold" width={18} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
               </Stack>
 
               {/* 7-column grid */}
               <Box sx={{ flex: 1, overflowY: 'auto', p: 1.5 }}>
                 <Box
+                  ref={bulkGridRef}
                   sx={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(7, 1fr)',
                     gap: 1,
+                    bgcolor: 'background.paper',
                   }}
                 >
                   {/* Day headers */}
@@ -2764,7 +2804,7 @@ export default function AttendanceAssignmentsView() {
           </DragDropContext>
           ) : (
           /* ===== Mobile: tab-based layout ===== */
-          <Box sx={{ flex: 1, overflow: 'auto' }}>
+          <Box sx={{ flex: '1 1 auto', minHeight: 0, overflow: 'auto' }}>
             {/* Tab 0: Staff list */}
             {bulkTab === 0 && (
               <Box sx={{ p: 1.5 }}>
