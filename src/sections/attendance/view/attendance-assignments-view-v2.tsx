@@ -2539,10 +2539,12 @@ export default function AttendanceAssignmentsView() {
                         <Typography
                           variant="subtitle2"
                           sx={{
-                            width: 26,
+                            px: 0.75,
                             height: 26,
                             mx: 'auto',
-                            borderRadius: '50%',
+                            width: 'fit-content',
+                            minWidth: 26,
+                            borderRadius: 13,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -2551,7 +2553,7 @@ export default function AttendanceAssignmentsView() {
                             fontSize: 12,
                           }}
                         >
-                          {d.getDate()}
+                          {d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
                         </Typography>
                       </Box>
                     );
