@@ -102,7 +102,14 @@ export default function CleaningTemplateListView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
   const { user: authUser } = useAuthContext();
-  const isAdminUser = authUser?.role === 'Admin' || (authUser?.roles || []).includes('Admin');
+  // Quản lý checklist tuần (thêm/sửa/xoá đầu việc) mở cho cả Admin và Manager - đánh giá + phạt đã
+  // mở sẵn cho Manager từ trước (xem CleaningController), đây là phần còn thiếu để Manager tự vận
+  // hành trọn vẹn checklist vệ sinh của cửa hàng mình mà không cần Admin.
+  const canManageTemplates =
+    authUser?.role === 'Admin' ||
+    authUser?.role === 'Manager' ||
+    (authUser?.roles || []).includes('Admin') ||
+    (authUser?.roles || []).includes('Manager');
 
   const [templates, setTemplates] = useState<ICleaningTaskTemplate[]>([]);
   const [shiftTemplates, setShiftTemplates] = useState<IShiftTemplate[]>([]);
@@ -228,7 +235,7 @@ export default function CleaningTemplateListView() {
           { name: 'Checklist' },
         ]}
         action={
-          isAdminUser && (
+          canManageTemplates && (
             <Button
               variant="contained"
               startIcon={<Iconify icon="mingcute:add-line" />}
@@ -270,7 +277,7 @@ export default function CleaningTemplateListView() {
                         </Label>
                       </TableCell>
                       <TableCell>
-                        {isAdminUser && (
+                        {canManageTemplates && (
                           <Stack direction="row" spacing={1}>
                             <Button size="small" onClick={() => handleOpenDialog(template)}>
                               Sửa
