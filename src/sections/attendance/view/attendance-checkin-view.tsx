@@ -41,7 +41,7 @@ import { useAuthContext } from 'src/auth/hooks';
 import { usePageTours } from 'src/hooks/use-tour';
 import type { TourDefinition } from 'src/hooks/use-tour';
 
-import { IShiftAssignment, IAttendanceLog, IBranchLocation } from 'src/types/corecms-api';
+import { IShiftAssignment, IAttendanceLog, IBranchLocation, IMyCleaningChecklist } from 'src/types/corecms-api';
 import {
   getMySchedule,
   getMyAttendanceLogs,
@@ -51,6 +51,9 @@ import {
   smartCheckOut,
 } from 'src/api/attendance';
 import { checkinFace } from 'src/api/checkinFace';
+import { completeCleaningTask, getMyCleaningChecklist } from 'src/api/cleaning';
+import { TaskRow } from 'src/sections/cleaning/cleaning-task-row';
+import { toDateStr } from 'src/utils/format-time';
 
 // ----------------------------------------------------------------------
 
@@ -429,6 +432,44 @@ export default function AttendanceCheckinView() {
       isMultiShift: chain.length > 1,
     };
   }, [isCurrentlyWorking, openNonOvertimeLog, todayAssignments]);
+
+  // ── Cleaning checklist for current shift ──
+  const [cleaningTasks, setCleaningTasks] = useState<IMyCleaningChecklist[]>([]);
+  const [cleaningDialogOpen, setCleaningDialogOpen] = useState(false);
+  const [cleaningBusyTaskId, setCleaningBusyTaskId] = useState<string | null>(null);
+
+  const fetchCleaningChecklist = useCallback(async () => {
+    try {
+      const data = await getMyCleaningChecklist(toDateStr(new Date()));
+      setCleaningTasks(data);
+    } catch (error) {
+      console.error('Failed to fetch cleaning checklist:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isCurrentlyWorking) fetchCleaningChecklist();
+  }, [isCurrentlyWorking, fetchCleaningChecklist]);
+
+  const currentShiftCleaning = useMemo(
+    () => cleaningTasks.find((c) => c.shiftAssignmentId === currentShiftDisplay?.currentShift.assignmentId),
+    [cleaningTasks, currentShiftDisplay]
+  );
+  const cleaningIncompleteCount =
+    currentShiftCleaning?.tasks.filter((t) => t.status === 'Pending').length ?? 0;
+
+  const handleCompleteCleaningTask = async (taskId: string, files: File[]) => {
+    setCleaningBusyTaskId(taskId);
+    try {
+      await completeCleaningTask(taskId, files);
+      enqueueSnackbar('Đã ghi nhận hoàn thành, chờ Quản lý chấm điểm.');
+      fetchCleaningChecklist();
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || 'Có lỗi xảy ra', { variant: 'error' });
+    } finally {
+      setCleaningBusyTaskId(null);
+    }
+  };
 
   // ── Camera ──
   const startCamera = useCallback(
@@ -989,6 +1030,35 @@ export default function AttendanceCheckinView() {
                 >
                   Kết thúc làm việc
                 </Button>
+
+                {currentShiftCleaning && currentShiftCleaning.tasks.length > 0 && (
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    fullWidth
+                    onClick={() => setCleaningDialogOpen(true)}
+                    startIcon={
+                      <Iconify
+                        icon={cleaningIncompleteCount > 0 ? 'solar:checklist-minimalistic-bold' : 'solar:check-circle-bold'}
+                      />
+                    }
+                    sx={{
+                      mt: 1.5,
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                      borderColor: 'rgba(255,255,255,0.5)',
+                      color: '#fff',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.2)', borderColor: 'rgba(255,255,255,0.7)' },
+                      py: 1.25,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      borderRadius: 2,
+                    }}
+                  >
+                    {cleaningIncompleteCount > 0
+                      ? `Nhiệm vụ vệ sinh: còn ${cleaningIncompleteCount} chưa hoàn thành`
+                      : `Đã hoàn thành nhiệm vụ vệ sinh (${currentShiftCleaning.tasks.length}/${currentShiftCleaning.tasks.length})`}
+                  </Button>
+                )}
 
                 {currentShiftDisplay.isMultiShift && (
                   <Typography variant="caption" sx={{ opacity: 0.65, display: 'block', mt: 1 }}>
@@ -1668,6 +1738,45 @@ export default function AttendanceCheckinView() {
               </Button>
             </>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Cleaning Checklist Dialog ── */}
+      <Dialog open={cleaningDialogOpen} onClose={() => setCleaningDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>
+            Checklist vệ sinh
+            {currentShiftCleaning ? ` — Ca ${currentShiftCleaning.shiftName}` : ''}
+          </span>
+          <IconButton onClick={() => setCleaningDialogOpen(false)} size="small">
+            <Iconify icon="mdi:close" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack divider={<Divider />}>
+            {currentShiftCleaning?.tasks.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                currentUserId={user?.id}
+                onComplete={handleCompleteCleaningTask}
+                busy={cleaningBusyTaskId === task.id}
+              />
+            ))}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setCleaningDialogOpen(false);
+              router.push(paths.dashboard.cleaning.myChecklist);
+            }}
+          >
+            Xem đầy đủ checklist
+          </Button>
+          <Button variant="contained" onClick={() => setCleaningDialogOpen(false)}>
+            Đóng
+          </Button>
         </DialogActions>
       </Dialog>
     </Container>
