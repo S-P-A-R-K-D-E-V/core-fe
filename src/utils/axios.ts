@@ -118,6 +118,14 @@ export const endpoints = {
     update: (id: string) => `/shift-templates/${id}`,
     delete: (id: string) => `/shift-templates/${id}`,
   },
+  shiftReminderRules: {
+    list: '/shift-reminder-rules',
+    create: '/shift-reminder-rules',
+    update: (id: string) => `/shift-reminder-rules/${id}`,
+    deactivate: (id: string) => `/shift-reminder-rules/${id}/deactivate`,
+    preview: (id: string) => `/shift-reminder-rules/${id}/preview`,
+    sendTest: (id: string) => `/shift-reminder-rules/${id}/send-test`,
+  },
   shiftSchedules: {
     list: '/shift-schedules/range',
     details: (id: string) => `/shift-schedules/${id}`,

@@ -133,6 +133,12 @@ export const paths = {
         edit: (id: string) => `${ROOTS.DASHBOARD}/shift/schedules/${id}/edit`,
         byTemplate: (templateId: string) => `${ROOTS.DASHBOARD}/shift/schedules/template/${templateId}`,
       },
+      reminderRules: {
+        root: `${ROOTS.DASHBOARD}/shift/reminder-rules`,
+        list: `${ROOTS.DASHBOARD}/shift/reminder-rules`,
+        new: `${ROOTS.DASHBOARD}/shift/reminder-rules/new`,
+        edit: (id: string) => `${ROOTS.DASHBOARD}/shift/reminder-rules/${id}/edit`,
+      },
     },
     attendance: {
       root: `${ROOTS.DASHBOARD}/attendance`,

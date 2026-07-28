@@ -174,6 +174,11 @@ export function useNavData(userRole?: string) {
                 title: t('shiftSchedules'),
                 path: paths.dashboard.shift.schedules.list,
               },
+              {
+                title: t('shiftReminderRules'),
+                path: paths.dashboard.shift.reminderRules.list,
+                roles: ['Admin'],
+              },
             ],
           },
 
