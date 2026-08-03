@@ -64,6 +64,24 @@ const CYCLE_TYPES = [
 
 // ----------------------------------------------------------------------
 
+// BE trả lỗi dạng ProblemDetails ({ title, status, ... }) qua interceptor axios (xem
+// src/utils/axios.ts) — error ở catch chính là object này, không phải AxiosError. Map các
+// code lỗi hay gặp sang tiếng Việt dễ hiểu, còn lại thì fallback về title gốc từ BE thay vì
+// một câu "Có lỗi xảy ra" vô nghĩa khiến không biết vì sao thất bại.
+const ERROR_MESSAGE_MAP: Record<string, string> = {
+  'Payroll cycle dates overlap with existing cycle.':
+    'Khoảng thời gian này trùng với chu kỳ lương đã tồn tại. Kiểm tra lại danh sách chu kỳ hoặc đổi ngày.',
+  'Invalid date range. FromDate must be before ToDate.': 'Ngày bắt đầu phải trước ngày kết thúc.',
+  'Payroll cycle is locked.': 'Chu kỳ lương đã bị khóa, không thể chỉnh sửa.',
+};
+
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  const title = (error as { title?: string; detail?: string })?.title
+    ?? (error as { title?: string; detail?: string })?.detail;
+  if (!title) return fallback;
+  return ERROR_MESSAGE_MAP[title] ?? title;
+}
+
 export default function PayrollCycleListView() {
   const table = useTable();
   const settings = useSettingsContext();
@@ -71,6 +89,7 @@ export default function PayrollCycleListView() {
 
   const [cycles, setCycles] = useState<IPayrollCycle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingCycle, setEditingCycle] = useState<IPayrollCycle | null>(null);
 
@@ -128,6 +147,11 @@ export default function PayrollCycleListView() {
   };
 
   const handleSubmit = async () => {
+    // Chặn double-submit (double-click / double-tap): request đầu tạo cycle thành công,
+    // request thứ hai với cùng khoảng ngày sẽ luôn bị BE từ chối 409 CycleOverlap.
+    if (submitting) return;
+
+    setSubmitting(true);
     try {
       if (editingCycle) {
         await updatePayrollCycle(editingCycle.id, formData);
@@ -140,7 +164,11 @@ export default function PayrollCycleListView() {
       fetchCycles();
     } catch (error) {
       console.error('Error saving cycle:', error);
-      enqueueSnackbar('Có lỗi xảy ra', { variant: 'error' });
+      enqueueSnackbar(getApiErrorMessage(error, 'Không thể lưu chu kỳ lương, vui lòng thử lại'), {
+        variant: 'error',
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -156,7 +184,9 @@ export default function PayrollCycleListView() {
       fetchCycles();
     } catch (error) {
       console.error('Error toggling lock:', error);
-      enqueueSnackbar('Có lỗi xảy ra', { variant: 'error' });
+      enqueueSnackbar(getApiErrorMessage(error, 'Không thể khóa/mở chu kỳ, vui lòng thử lại'), {
+        variant: 'error',
+      });
     }
   };
 
@@ -310,9 +340,11 @@ export default function PayrollCycleListView() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Hủy</Button>
-          <Button variant="contained" onClick={handleSubmit}>
-            {editingCycle ? 'Cập nhật' : 'Tạo mới'}
+          <Button onClick={handleCloseDialog} disabled={submitting}>
+            Hủy
+          </Button>
+          <Button variant="contained" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? 'Đang lưu...' : editingCycle ? 'Cập nhật' : 'Tạo mới'}
           </Button>
         </DialogActions>
       </Dialog>
