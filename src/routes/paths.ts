@@ -218,6 +218,9 @@ export const paths = {
     kiotVietSync: {
       root: `${ROOTS.DASHBOARD}/kiotviet-sync`,
     },
+    systemJobs: {
+      root: `${ROOTS.DASHBOARD}/system-jobs`,
+    },
     // POS / Inventory
     pos: {
       root: `${ROOTS.DASHBOARD}/pos`,

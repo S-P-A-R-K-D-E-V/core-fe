@@ -270,6 +270,13 @@ export function useNavData(userRole?: string) {
             icon: ICONS.ecommerce,
             roles: ['Admin'],
           },
+          // SYSTEM JOBS (Admin only)
+          {
+            title: 'System Jobs',
+            path: paths.dashboard.systemJobs.root,
+            icon: ICONS.job,
+            roles: ['Admin'],
+          },
         ],
       },
       // POS / INVENTORY

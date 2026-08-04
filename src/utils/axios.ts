@@ -318,6 +318,10 @@ export const endpoints = {
     webhookLogs: '/kiotviet/webhooks/logs',
     webhookLogDetail: (id: string) => `/kiotviet/webhooks/logs/${id}`,
   },
+  adminWorkers: {
+    list: '/admin/workers',
+    runNow: (name: string) => `/admin/workers/${name}/run-now`,
+  },
   shiftRegistrations: {
     register: '/shift-registrations/register',
     unregister: '/shift-registrations/unregister',
