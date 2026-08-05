@@ -372,10 +372,18 @@ export default function PendingPoolView() {
                     Loại làm hộ: <strong>{partialSideLabel(target.partialSide)}</strong>
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {target.partialSide === 'LateArrive'
-                      ? 'Người làm hộ ở ca liền trước. Phụ cấp = giờ từ đầu ca đến lúc người nhờ check-in, tính tại kỳ lương.'
-                      : 'Người làm hộ ở ca liền sau. Phụ cấp = giờ từ lúc người nhờ check-out đến hết ca, tính tại kỳ lương.'}
+                    {target.partialSide === 'LateArrive' &&
+                      'Người làm hộ ở ca liền trước. Phụ cấp = giờ từ đầu ca đến lúc người nhờ check-in, tính tại kỳ lương.'}
+                    {target.partialSide === 'EarlyLeave' &&
+                      'Người làm hộ ở ca liền sau. Phụ cấp = giờ từ lúc người nhờ check-out đến hết ca, tính tại kỳ lương.'}
+                    {target.partialSide === 'MidShift' &&
+                      'Người làm hộ ad-hoc, không có ca liền kề. Phụ cấp = giao giữa khoảng vắng của người nhờ và giờ chấm công thực tế của người hộ, tính tại kỳ lương.'}
                   </Typography>
+                  {target.partialSide === 'MidShift' && target.estimatedStartTime && target.estimatedEndTime && (
+                    <Typography variant="caption" color="text.secondary">
+                      Dự kiến: {target.estimatedStartTime.slice(0, 5)} – {target.estimatedEndTime.slice(0, 5)}
+                    </Typography>
+                  )}
                   {target.actualCoverStart && target.actualCoverEnd && (
                     <Typography variant="caption" color="text.secondary">
                       Khoảng đã làm hộ (chấm công): {target.actualCoverStart} → {target.actualCoverEnd}

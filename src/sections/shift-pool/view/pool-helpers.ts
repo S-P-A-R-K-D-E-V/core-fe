@@ -13,10 +13,16 @@ export function needTypeLabel(t: PoolNeedType | string): string {
 export function partialSideLabel(side?: PartialCoverSide | string | null): string {
   if (side === 'LateArrive') return 'Đi muộn (nhờ ca trước)';
   if (side === 'EarlyLeave') return 'Về sớm (nhờ ca sau)';
+  if (side === 'MidShift') return 'Giữa ca (nhờ người khác làm hộ 1 khoảng)';
   return '';
 }
 
 /**
+ * Lưu ý: hàm partialCoverSubType/-Label bên dưới là logic LEGACY suy sub-type từ
+ * partialStartTime/partialEndTime thô (mô hình cũ, trước khi có field PartialSide) — dùng để
+ * hiển thị đúng cho dữ liệu cũ. Giá trị 'MidShift' nó trả về TRÙNG TÊN với PartialCoverSide.MidShift
+ * mới nhưng là 2 khái niệm độc lập, không liên quan trực tiếp — không gộp/sửa chung.
+ *
  * Xác định sub-type của PartialCover từ time window so với giờ ca.
  * - partialStart == shiftStart → "đến muộn" (làm hộ đầu ca, ca trước ở lại)
  * - partialEnd   == shiftEnd   → "về sớm" (làm hộ cuối ca, ca sau đến sớm)

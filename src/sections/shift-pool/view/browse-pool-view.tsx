@@ -432,11 +432,19 @@ export default function BrowsePoolView() {
                       {partialSideLabel(target.partialSide)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {target.partialSide === 'LateArrive'
-                        ? 'Bạn cần có ca liền TRƯỚC ca này. Phụ cấp tính theo giờ người nhờ check-in thực tế.'
-                        : 'Bạn cần có ca liền SAU ca này. Phụ cấp tính theo giờ người nhờ check-out thực tế.'}{' '}
+                      {target.partialSide === 'LateArrive' &&
+                        'Bạn cần có ca liền TRƯỚC ca này. Phụ cấp tính theo giờ người nhờ check-in thực tế.'}
+                      {target.partialSide === 'EarlyLeave' &&
+                        'Bạn cần có ca liền SAU ca này. Phụ cấp tính theo giờ người nhờ check-out thực tế.'}
+                      {target.partialSide === 'MidShift' &&
+                        'Không cần có ca liền kề — bạn check-in/out trực tiếp trên ca này trong lúc người nhờ vắng mặt.'}{' '}
                       Người đăng sẽ xác nhận sau khi bạn nhận.
                     </Typography>
+                    {target.partialSide === 'MidShift' && target.estimatedStartTime && target.estimatedEndTime && (
+                      <Typography variant="caption" color="text.secondary">
+                        Dự kiến: {target.estimatedStartTime.slice(0, 5)} – {target.estimatedEndTime.slice(0, 5)}
+                      </Typography>
+                    )}
                   </Stack>
                 ) : (() => {
                   const sub = partialCoverSubTypeLabel(
