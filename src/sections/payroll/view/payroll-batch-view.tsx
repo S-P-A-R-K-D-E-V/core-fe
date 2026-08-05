@@ -746,17 +746,21 @@ export default function PayrollBatchView() {
 
   const handleOpenCoverTimes = (post: IShiftPoolPost) => {
     setCoverTimesEditId(post.id);
-    // Prefill từ cửa sổ đã suy ra ở lần tính lương gần nhất (nếu có) — format BE trả
-    // "yyyy-MM-dd HH:mm" (giờ UTC) không parse trực tiếp được thành datetime-local VN,
-    // nên chỉ prefill khi parse được; không thì để trống cho admin nhập.
+    // Prefill từ giờ chấm công THẬT của người hộ (claimerCheckInTime/Out) — KHÔNG dùng
+    // actualCoverStart/End, vì đó là cửa sổ OT đã suy/clamp ở lần tính lương gần nhất và có
+    // thể bị payroll xoá về null nếu chưa tính được OT (vd người nhờ chưa có log thứ 2), dù
+    // giờ chấm công thật vẫn tồn tại — dùng actualCoverStart/End để prefill từng khiến admin
+    // tưởng lần lưu trước "không ăn" dù thực ra đã lưu đúng.
+    // Format BE trả "yyyy-MM-dd HH:mm" (giờ UTC) không parse trực tiếp được thành
+    // datetime-local VN, nên chỉ prefill khi parse được; không thì để trống cho admin nhập.
     const toLocal = (v?: string) => {
       if (!v) return '';
       const iso = v.includes('T') ? v : `${v.replace(' ', 'T')}:00Z`;
       const d = new Date(iso);
       return Number.isNaN(d.getTime()) ? '' : toDatetimeLocalValue(d.toISOString());
     };
-    setCoverTimesIn(toLocal(post.actualCoverStart));
-    setCoverTimesOut(toLocal(post.actualCoverEnd));
+    setCoverTimesIn(toLocal(post.claimerCheckInTime));
+    setCoverTimesOut(toLocal(post.claimerCheckOutTime));
   };
 
   const handleSubmitCoverTimes = async () => {
@@ -1985,6 +1989,12 @@ export default function PayrollBatchView() {
                             {p.coveringHours.toFixed(2)}h · {p.extraPayAmount.toLocaleString('vi-VN')}đ
                           </Typography>
                         )}
+                        {p.needType === 'PartialCover' && p.claimerCheckInTime && p.claimerCheckOutTime &&
+                          !p.coveringHours && (
+                            <Typography variant="caption" color="warning.main" sx={{ display: 'block' }}>
+                              Đã có giờ chấm công — cần tính lại lương cho {p.claimerName || 'người hộ'} ở kỳ này để cập nhật phụ cấp.
+                            </Typography>
+                          )}
                         {p.actualCoverStart && p.actualCoverEnd && (
                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                             Chấm công ca hộ: {p.actualCoverStart} → {p.actualCoverEnd} (UTC)
