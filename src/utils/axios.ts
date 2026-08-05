@@ -224,6 +224,7 @@ export const endpoints = {
     directedResolve: (id: string) => `/shift-pool/${id}/directed-resolve`,
     byAssignment: (shiftAssignmentId: string) => `/shift-pool/by-assignment/${shiftAssignmentId}`,
     adminCreateApproved: '/shift-pool/admin-create-approved',
+    adminCoverTimes: (id: string) => `/shift-pool/${id}/admin-cover-times`,
   },
   shiftAudit: {
     list: '/shift-audit',

@@ -83,7 +83,7 @@ import {
 import { adjustAttendanceTime } from 'src/api/attendance';
 import { getAllPayrollCycles, setPayrollCycleVisibility } from 'src/api/payrollCycle';
 import { getActiveStaffUsers } from 'src/api/users';
-import { adminCreateApprovedCover, getShiftPoolPostsByAssignment } from 'src/api/shiftPool';
+import { adminCreateApprovedCover, adminSetCoverTimes, getShiftPoolPostsByAssignment } from 'src/api/shiftPool';
 import { needTypeLabel, partialSideLabel, poolStatusLabel } from 'src/sections/shift-pool/view/pool-helpers';
 
 import SalaryConfigPreviewDialog from 'src/components/salary-config-preview-dialog';
@@ -182,6 +182,15 @@ export default function PayrollBatchView() {
   const [retroPartialSide, setRetroPartialSide] = useState<PartialCoverSide>('LateArrive');
   const [retroNote, setRetroNote] = useState('');
   const [retroSubmitting, setRetroSubmitting] = useState(false);
+  // Giờ chấm công ca hộ (datetime-local, giờ VN) — nhập lúc tạo retroactive để kỳ lương
+  // có dữ liệu tính OT (retroactive = người hộ chưa từng chấm công qua app).
+  const [retroCoverIn, setRetroCoverIn] = useState('');
+  const [retroCoverOut, setRetroCoverOut] = useState('');
+  // Sửa giờ ca hộ cho post đã có (nhân viên có claim nhưng quên chấm công)
+  const [coverTimesEditId, setCoverTimesEditId] = useState<string | null>(null);
+  const [coverTimesIn, setCoverTimesIn] = useState('');
+  const [coverTimesOut, setCoverTimesOut] = useState('');
+  const [coverTimesSubmitting, setCoverTimesSubmitting] = useState(false);
 
   const fetchCycles = useCallback(async () => {
     try {
@@ -684,10 +693,26 @@ export default function PayrollBatchView() {
     setRetroNeedType('PartialCover');
     setRetroPartialSide('LateArrive');
     setRetroNote('');
+    setRetroCoverIn('');
+    setRetroCoverOut('');
+    setCoverTimesEditId(null);
+    setCoverTimesIn('');
+    setCoverTimesOut('');
   };
 
   const handleSubmitRetroCover = async () => {
     if (!editingShift || !retroClaimerId) return;
+    // Giờ ca hộ: nhập thì phải đủ cả 2 mốc và ra > vào (BE cũng validate, chặn sớm cho UX)
+    if (retroNeedType === 'PartialCover' && (retroCoverIn || retroCoverOut)) {
+      if (!retroCoverIn || !retroCoverOut) {
+        enqueueSnackbar('Cần nhập đủ cả giờ vào và giờ ra của ca hộ', { variant: 'warning' });
+        return;
+      }
+      if (retroCoverOut <= retroCoverIn) {
+        enqueueSnackbar('Giờ ra của ca hộ phải sau giờ vào', { variant: 'warning' });
+        return;
+      }
+    }
     try {
       setRetroSubmitting(true);
       await adminCreateApprovedCover({
@@ -696,11 +721,17 @@ export default function PayrollBatchView() {
         needType: retroNeedType,
         partialSide: retroNeedType === 'PartialCover' ? retroPartialSide : undefined,
         note: retroNote || undefined,
+        coverCheckInTime:
+          retroNeedType === 'PartialCover' && retroCoverIn ? datetimeLocalToUtcIso(retroCoverIn) : undefined,
+        coverCheckOutTime:
+          retroNeedType === 'PartialCover' && retroCoverOut ? datetimeLocalToUtcIso(retroCoverOut) : undefined,
       });
       enqueueSnackbar('Đã tạo làm hộ retroactive', { variant: 'success' });
       setRetroOpen(false);
       setRetroClaimerId('');
       setRetroNote('');
+      setRetroCoverIn('');
+      setRetroCoverOut('');
       await fetchCoverPosts(editingShift.shiftAssignmentId);
       if (selectedPayrollRecord) {
         const data = await getPayrollShiftDetails(selectedPayrollRecord.id);
@@ -710,6 +741,49 @@ export default function PayrollBatchView() {
       enqueueSnackbar(error?.title || error?.message || 'Tạo làm hộ thất bại', { variant: 'error' });
     } finally {
       setRetroSubmitting(false);
+    }
+  };
+
+  const handleOpenCoverTimes = (post: IShiftPoolPost) => {
+    setCoverTimesEditId(post.id);
+    // Prefill từ cửa sổ đã suy ra ở lần tính lương gần nhất (nếu có) — format BE trả
+    // "yyyy-MM-dd HH:mm" (giờ UTC) không parse trực tiếp được thành datetime-local VN,
+    // nên chỉ prefill khi parse được; không thì để trống cho admin nhập.
+    const toLocal = (v?: string) => {
+      if (!v) return '';
+      const iso = v.includes('T') ? v : `${v.replace(' ', 'T')}:00Z`;
+      const d = new Date(iso);
+      return Number.isNaN(d.getTime()) ? '' : toDatetimeLocalValue(d.toISOString());
+    };
+    setCoverTimesIn(toLocal(post.actualCoverStart));
+    setCoverTimesOut(toLocal(post.actualCoverEnd));
+  };
+
+  const handleSubmitCoverTimes = async () => {
+    if (!coverTimesEditId || !coverTimesIn || !coverTimesOut) return;
+    if (coverTimesOut <= coverTimesIn) {
+      enqueueSnackbar('Giờ ra của ca hộ phải sau giờ vào', { variant: 'warning' });
+      return;
+    }
+    try {
+      setCoverTimesSubmitting(true);
+      await adminSetCoverTimes(coverTimesEditId, {
+        checkInTime: datetimeLocalToUtcIso(coverTimesIn),
+        checkOutTime: datetimeLocalToUtcIso(coverTimesOut),
+      });
+      enqueueSnackbar('Đã cập nhật giờ chấm công ca hộ', { variant: 'success' });
+      setCoverTimesEditId(null);
+      setCoverTimesIn('');
+      setCoverTimesOut('');
+      if (editingShift) await fetchCoverPosts(editingShift.shiftAssignmentId);
+      if (selectedPayrollRecord) {
+        const data = await getPayrollShiftDetails(selectedPayrollRecord.id);
+        setShiftDetail(data);
+      }
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Cập nhật giờ ca hộ thất bại', { variant: 'error' });
+    } finally {
+      setCoverTimesSubmitting(false);
     }
   };
 
@@ -1911,6 +1985,55 @@ export default function PayrollBatchView() {
                             {p.coveringHours.toFixed(2)}h · {p.extraPayAmount.toLocaleString('vi-VN')}đ
                           </Typography>
                         )}
+                        {p.actualCoverStart && p.actualCoverEnd && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            Chấm công ca hộ: {p.actualCoverStart} → {p.actualCoverEnd} (UTC)
+                          </Typography>
+                        )}
+                        {p.needType === 'PartialCover' && p.status === 'Approved' && p.claimerId && (
+                          coverTimesEditId === p.id ? (
+                            <Stack spacing={1} sx={{ mt: 1 }}>
+                              <AppDateTimePicker
+                                label="Giờ vào ca hộ"
+                                value={coverTimesIn}
+                                onChange={setCoverTimesIn}
+                                fullWidth
+                                size="small"
+                              />
+                              <AppDateTimePicker
+                                label="Giờ ra ca hộ"
+                                value={coverTimesOut}
+                                onChange={setCoverTimesOut}
+                                fullWidth
+                                size="small"
+                              />
+                              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                <Button size="small" color="inherit" onClick={() => setCoverTimesEditId(null)}>
+                                  Huỷ
+                                </Button>
+                                <LoadingButton
+                                  size="small"
+                                  variant="contained"
+                                  loading={coverTimesSubmitting}
+                                  disabled={!coverTimesIn || !coverTimesOut}
+                                  onClick={handleSubmitCoverTimes}
+                                >
+                                  Lưu giờ ca hộ
+                                </LoadingButton>
+                              </Stack>
+                            </Stack>
+                          ) : (
+                            <Button
+                              size="small"
+                              variant="text"
+                              startIcon={<Iconify icon="solar:clock-circle-bold" />}
+                              onClick={() => handleOpenCoverTimes(p)}
+                              sx={{ mt: 0.5 }}
+                            >
+                              Sửa giờ ca hộ
+                            </Button>
+                          )
+                        )}
                       </Box>
                     ))}
                   </Stack>
@@ -1959,6 +2082,28 @@ export default function PayrollBatchView() {
                         <MenuItem value="EarlyLeave">Về sớm (nhờ ca sau)</MenuItem>
                         <MenuItem value="MidShift">Giữa ca</MenuItem>
                       </TextField>
+                    )}
+                    {retroNeedType === 'PartialCover' && (
+                      <>
+                        <Typography variant="caption" color="text.secondary">
+                          Giờ chấm công ca hộ — retroactive nghĩa là người hộ chưa chấm công qua app,
+                          không nhập thì kỳ lương sẽ tính phụ cấp = 0.
+                        </Typography>
+                        <AppDateTimePicker
+                          label="Giờ vào ca hộ"
+                          value={retroCoverIn}
+                          onChange={setRetroCoverIn}
+                          fullWidth
+                          size="small"
+                        />
+                        <AppDateTimePicker
+                          label="Giờ ra ca hộ"
+                          value={retroCoverOut}
+                          onChange={setRetroCoverOut}
+                          fullWidth
+                          size="small"
+                        />
+                      </>
                     )}
                     <TextField
                       size="small"
