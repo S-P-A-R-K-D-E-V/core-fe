@@ -1,6 +1,7 @@
 import axios, { endpoints } from 'src/utils/axios';
 
 import type {
+  IAdminCreateApprovedCoverDto,
   IClaimShiftPoolPostDto,
   ICreateShiftPoolPostDto,
   IDirectedResolveShiftPoolPostDto,
@@ -61,5 +62,17 @@ export async function directedResolveShiftPoolPost(
   data: IDirectedResolveShiftPoolPostDto
 ): Promise<IShiftPoolPost> {
   const response = await axios.post<IShiftPoolPost>(endpoints.shiftPool.directedResolve(id), data);
+  return response.data;
+}
+
+export async function getShiftPoolPostsByAssignment(shiftAssignmentId: string): Promise<IShiftPoolPost[]> {
+  const response = await axios.get<IShiftPoolPost[]>(endpoints.shiftPool.byAssignment(shiftAssignmentId));
+  return response.data;
+}
+
+export async function adminCreateApprovedCover(
+  data: IAdminCreateApprovedCoverDto
+): Promise<IShiftPoolPost> {
+  const response = await axios.post<IShiftPoolPost>(endpoints.shiftPool.adminCreateApproved, data);
   return response.data;
 }

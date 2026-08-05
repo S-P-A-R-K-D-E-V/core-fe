@@ -853,8 +853,11 @@ export interface IReviewLateCoverRequestDto {
 // --- Shift Pool (đổi ca & làm hộ hợp nhất) ---
 export type PoolNeedType = 'Swap' | 'FullCover' | 'PartialCover';
 export type PoolPostStatus = 'Open' | 'WaitingApproval' | 'Approved' | 'Cancelled';
-/** PartialCover: đi muộn (nhờ ca trước) hay về sớm (nhờ ca sau) — thay cho set giờ thủ công. */
-export type PartialCoverSide = 'LateArrive' | 'EarlyLeave';
+/**
+ * PartialCover: đi muộn (nhờ ca trước), về sớm (nhờ ca sau), hoặc giữa ca (rời rồi quay lại,
+ * người hộ hoàn toàn ad-hoc không cần ca liền kề) — thay cho set giờ thủ công.
+ */
+export type PartialCoverSide = 'LateArrive' | 'EarlyLeave' | 'MidShift';
 
 export interface IShiftPoolPost {
   id: string;
@@ -869,6 +872,8 @@ export interface IShiftPoolPost {
   partialSide?: PartialCoverSide;
   partialStartTime?: string;
   partialEndTime?: string;
+  estimatedStartTime?: string; // MidShift: giờ ước tính chỉ hiển thị, không dùng tính lương
+  estimatedEndTime?: string;
   note?: string;
   status: PoolPostStatus;
   claimerId?: string;
@@ -898,6 +903,8 @@ export interface ICreateShiftPoolPostDto {
   partialSide?: PartialCoverSide;   // bắt buộc khi PartialCover (thay cho set giờ)
   partialStartTime?: string;        // [deprecated]
   partialEndTime?: string;          // [deprecated]
+  estimatedStartTime?: string;      // MidShift: giờ ước tính chỉ hiển thị pool, không dùng tính lương
+  estimatedEndTime?: string;
   note?: string;
 }
 
@@ -913,6 +920,18 @@ export interface IReviewShiftPoolPostDto {
 export interface IDirectedResolveShiftPoolPostDto {
   claimerId: string;
   offeredAssignmentId?: string;
+}
+
+/**
+ * Admin tạo trực tiếp 1 bản ghi làm hộ ở trạng thái Approved (bỏ qua đăng-nhận-duyệt) —
+ * dùng tại màn bảng lương khi nhân viên quên thao tác qua app. Chỉ hỗ trợ PartialCover/FullCover.
+ */
+export interface IAdminCreateApprovedCoverDto {
+  shiftAssignmentId: string;
+  claimerId: string;
+  needType: 'PartialCover' | 'FullCover';
+  partialSide?: PartialCoverSide; // bắt buộc khi needType = PartialCover
+  note?: string;
 }
 
 export interface IUserShiftPreferenceResponse {

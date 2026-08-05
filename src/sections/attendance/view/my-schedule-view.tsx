@@ -167,9 +167,13 @@ export default function MyScheduleView() {
   // Publish-to-pool dialog state
   const [openPublish, setOpenPublish] = useState(false);
   const [needType, setNeedType] = useState<PoolNeedType>('Swap');
-  const [partialSubType, setPartialSubType] = useState<'LateArrive' | 'EarlyLeave'>('LateArrive');
+  const [partialSubType, setPartialSubType] = useState<'LateArrive' | 'EarlyLeave' | 'MidShift'>('LateArrive');
   const [partialStart, setPartialStart] = useState('');
   const [partialEnd, setPartialEnd] = useState('');
+  // MidShift: giờ ước tính CHỈ để hiển thị pool (giúp người khác quyết định claim) —
+  // KHÔNG dùng tính lương, lương luôn suy từ chấm công thực tế.
+  const [estimatedStart, setEstimatedStart] = useState('');
+  const [estimatedEnd, setEstimatedEnd] = useState('');
   const [poolNote, setPoolNote] = useState('');
   const [publishing, setPublishing] = useState(false);
 
@@ -475,13 +479,15 @@ export default function MyScheduleView() {
     setPartialSubType('LateArrive');
     setPartialStart(shiftStart); // "đến muộn": start = đầu ca (cố định)
     setPartialEnd('');            // user chọn giờ đến
+    setEstimatedStart('');
+    setEstimatedEnd('');
     setPoolNote('');
     setOpenPublish(true);
   }, [selectedEvent]);
 
-  /** Khi đổi sub-type PartialCover, auto-fill đầu hoặc cuối ca */
+  /** Khi đổi sub-type PartialCover, auto-fill đầu hoặc cuối ca (MidShift không có mép cố định) */
   const handleSubTypeChange = useCallback(
-    (sub: 'LateArrive' | 'EarlyLeave') => {
+    (sub: 'LateArrive' | 'EarlyLeave' | 'MidShift') => {
       if (!selectedEvent) return;
       const shiftStart = (selectedEvent.startTime || selectedEvent.shiftStartTime || '').slice(0, 5);
       const shiftEnd = (selectedEvent.endTime || selectedEvent.shiftEndTime || '').slice(0, 5);
@@ -489,9 +495,12 @@ export default function MyScheduleView() {
       if (sub === 'LateArrive') {
         setPartialStart(shiftStart); // cố định đầu ca
         setPartialEnd('');           // user chọn giờ đến
-      } else {
+      } else if (sub === 'EarlyLeave') {
         setPartialStart('');         // user chọn giờ về
         setPartialEnd(shiftEnd);     // cố định cuối ca
+      } else {
+        setPartialStart('');
+        setPartialEnd('');
       }
     },
     [selectedEvent]
@@ -516,9 +525,18 @@ export default function MyScheduleView() {
       await createShiftPoolPost({
         shiftAssignmentId: selectedEvent.assignmentId || selectedEvent.id,
         needType,
-        // Mô hình mới: PartialCover chỉ gửi phía (đi muộn/về sớm). Khoảng giờ
+        // Mô hình mới: PartialCover chỉ gửi phía (đi muộn/về sớm/giữa ca). Khoảng giờ
         // được suy ra từ chấm công thực tế khi tính lương.
         partialSide: needType === 'PartialCover' ? partialSubType : undefined,
+        // MidShift: giờ ước tính chỉ để hiển thị pool, không ảnh hưởng lương.
+        estimatedStartTime:
+          needType === 'PartialCover' && partialSubType === 'MidShift' && estimatedStart
+            ? estimatedStart
+            : undefined,
+        estimatedEndTime:
+          needType === 'PartialCover' && partialSubType === 'MidShift' && estimatedEnd
+            ? estimatedEnd
+            : undefined,
         note: poolNote || undefined,
       });
       enqueueSnackbar('Đã đăng ca lên pool!', { variant: 'success' });
@@ -530,7 +548,7 @@ export default function MyScheduleView() {
     } finally {
       setPublishing(false);
     }
-  }, [selectedEvent, needType, partialSubType, poolNote, enqueueSnackbar]);
+  }, [selectedEvent, needType, partialSubType, estimatedStart, estimatedEnd, poolNote, enqueueSnackbar]);
 
   // Chỉ cho đăng ca lên pool khi chưa check-in, chưa có post active, và không đang dùng làm offered
   const canPublishSelected =
@@ -1327,6 +1345,13 @@ export default function MyScheduleView() {
                     <Box>
                       <Typography variant="caption" color="text.secondary">Loại làm hộ</Typography>
                       <Typography variant="body2">{partialSideLabel(activePost.partialSide)}</Typography>
+                      {activePost.partialSide === 'MidShift' &&
+                        activePost.estimatedStartTime &&
+                        activePost.estimatedEndTime && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            Dự kiến: {activePost.estimatedStartTime.slice(0, 5)} – {activePost.estimatedEndTime.slice(0, 5)}
+                          </Typography>
+                        )}
                       {activePost.actualCoverStart && activePost.actualCoverEnd && (
                         <Typography variant="caption" color="text.secondary">
                           Khoảng đã làm hộ (theo chấm công): {activePost.actualCoverStart} → {activePost.actualCoverEnd}
@@ -1492,11 +1517,21 @@ export default function MyScheduleView() {
                 <Box>
                   <Typography variant="caption" color="text.secondary">Loại làm hộ</Typography>
                   <Typography variant="body2">{partialSideLabel(claimTarget.partialSide)}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {claimTarget.partialSide === 'LateArrive'
-                      ? 'Bạn cần có ca liền TRƯỚC ca này. Phụ cấp tính theo giờ thực tế người nhờ đến.'
-                      : 'Bạn cần có ca liền SAU ca này. Phụ cấp tính theo giờ thực tế người nhờ về.'}
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    {claimTarget.partialSide === 'LateArrive' &&
+                      'Bạn cần có ca liền TRƯỚC ca này. Phụ cấp tính theo giờ thực tế người nhờ đến.'}
+                    {claimTarget.partialSide === 'EarlyLeave' &&
+                      'Bạn cần có ca liền SAU ca này. Phụ cấp tính theo giờ thực tế người nhờ về.'}
+                    {claimTarget.partialSide === 'MidShift' &&
+                      'Không cần có ca liền kề — bạn check-in/out trực tiếp trên ca này trong lúc người nhờ vắng mặt.'}
                   </Typography>
+                  {claimTarget.partialSide === 'MidShift' &&
+                    claimTarget.estimatedStartTime &&
+                    claimTarget.estimatedEndTime && (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        Dự kiến: {claimTarget.estimatedStartTime.slice(0, 5)} – {claimTarget.estimatedEndTime.slice(0, 5)}
+                      </Typography>
+                    )}
                 </Box>
               )}
               {claimTarget.needType === 'PartialCover' && !claimTarget.partialSide && claimTarget.partialStartTime && (
@@ -1658,19 +1693,48 @@ export default function MyScheduleView() {
                   <ToggleButton value="EarlyLeave" sx={{ flex: 1 }}>
                     🚪 Tôi về sớm
                   </ToggleButton>
+                  <ToggleButton value="MidShift" sx={{ flex: 1 }}>
+                    🔄 Giữa ca
+                  </ToggleButton>
                 </ToggleButtonGroup>
 
                 {/* Description hint — không cần nhập giờ, hệ thống tự tính theo chấm công */}
                 <Box sx={{ p: 1.5, bgcolor: 'info.lighter', borderRadius: 1, border: '1px solid', borderColor: 'info.light' }}>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    {partialSubType === 'LateArrive'
-                      ? '⏰ Nhờ nhân sự ca liền TRƯỚC ở lại làm hộ phần đầu ca. Khoảng làm hộ = từ đầu ca đến đúng lúc bạn check-in.'
-                      : '🚪 Nhờ nhân sự ca liền SAU đến sớm làm hộ phần cuối ca. Khoảng làm hộ = từ lúc bạn check-out đến hết ca.'}
+                    {partialSubType === 'LateArrive' &&
+                      '⏰ Nhờ nhân sự ca liền TRƯỚC ở lại làm hộ phần đầu ca. Khoảng làm hộ = từ đầu ca đến đúng lúc bạn check-in.'}
+                    {partialSubType === 'EarlyLeave' &&
+                      '🚪 Nhờ nhân sự ca liền SAU đến sớm làm hộ phần cuối ca. Khoảng làm hộ = từ lúc bạn check-out đến hết ca.'}
+                    {partialSubType === 'MidShift' &&
+                      '🔄 Bạn rời ca rồi quay lại — người nhận KHÔNG cần có ca liền kề, họ check-in/out trực tiếp trên ca của bạn trong lúc bạn vắng.'}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontStyle: 'italic' }}>
                     Bạn KHÔNG cần nhập giờ — hệ thống tự tính theo giờ check-in/out thực tế và ghi nhận phụ cấp cho người làm hộ.
                   </Typography>
                 </Box>
+
+                {partialSubType === 'MidShift' && (
+                  <Stack direction="row" spacing={1.5}>
+                    <TextField
+                      fullWidth
+                      type="time"
+                      label="Giờ rời (ước tính)"
+                      InputLabelProps={{ shrink: true }}
+                      value={estimatedStart}
+                      onChange={(e) => setEstimatedStart(e.target.value)}
+                      helperText="Chỉ để hiển thị, không tính lương"
+                    />
+                    <TextField
+                      fullWidth
+                      type="time"
+                      label="Giờ quay lại (ước tính)"
+                      InputLabelProps={{ shrink: true }}
+                      value={estimatedEnd}
+                      onChange={(e) => setEstimatedEnd(e.target.value)}
+                      helperText="Chỉ để hiển thị, không tính lương"
+                    />
+                  </Stack>
+                )}
               </Stack>
             )}
 
