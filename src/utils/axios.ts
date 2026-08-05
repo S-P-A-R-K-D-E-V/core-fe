@@ -222,6 +222,8 @@ export const endpoints = {
     cancel: (id: string) => `/shift-pool/${id}/cancel`,
     review: (id: string) => `/shift-pool/${id}/review`,
     directedResolve: (id: string) => `/shift-pool/${id}/directed-resolve`,
+    byAssignment: (shiftAssignmentId: string) => `/shift-pool/by-assignment/${shiftAssignmentId}`,
+    adminCreateApproved: '/shift-pool/admin-create-approved',
   },
   shiftAudit: {
     list: '/shift-audit',

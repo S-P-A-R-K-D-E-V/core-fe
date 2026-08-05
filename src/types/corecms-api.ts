@@ -922,6 +922,18 @@ export interface IDirectedResolveShiftPoolPostDto {
   offeredAssignmentId?: string;
 }
 
+/**
+ * Admin tạo trực tiếp 1 bản ghi làm hộ ở trạng thái Approved (bỏ qua đăng-nhận-duyệt) —
+ * dùng tại màn bảng lương khi nhân viên quên thao tác qua app. Chỉ hỗ trợ PartialCover/FullCover.
+ */
+export interface IAdminCreateApprovedCoverDto {
+  shiftAssignmentId: string;
+  claimerId: string;
+  needType: 'PartialCover' | 'FullCover';
+  partialSide?: PartialCoverSide; // bắt buộc khi needType = PartialCover
+  note?: string;
+}
+
 export interface IUserShiftPreferenceResponse {
   shiftTemplateId: string;
   shiftTemplateName: string;

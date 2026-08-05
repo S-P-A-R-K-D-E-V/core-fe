@@ -17,6 +17,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
+import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
@@ -60,6 +61,9 @@ import type {
   IPayrollShiftDetailResponse,
   IPayrollShiftItem,
   IPayrollSummary,
+  IShiftPoolPost,
+  IUser,
+  PartialCoverSide,
 } from 'src/types/corecms-api';
 import type { IPayrollCycle } from 'src/types/corecms-api';
 
@@ -78,6 +82,9 @@ import {
 } from 'src/api/payroll';
 import { adjustAttendanceTime } from 'src/api/attendance';
 import { getAllPayrollCycles, setPayrollCycleVisibility } from 'src/api/payrollCycle';
+import { getActiveStaffUsers } from 'src/api/users';
+import { adminCreateApprovedCover, getShiftPoolPostsByAssignment } from 'src/api/shiftPool';
+import { needTypeLabel, partialSideLabel, poolStatusLabel } from 'src/sections/shift-pool/view/pool-helpers';
 
 import SalaryConfigPreviewDialog from 'src/components/salary-config-preview-dialog';
 import PaymentQRDialog from 'src/components/payment-qr-dialog';
@@ -165,6 +172,17 @@ export default function PayrollBatchView() {
   const [checkOutValue, setCheckOutValue] = useState('');
   const [editingSubmitting, setEditingSubmitting] = useState(false);
 
+  // Cover posts (ShiftPoolPost) tied to the shift being edited, + admin retroactive-create form
+  const [coverPosts, setCoverPosts] = useState<IShiftPoolPost[]>([]);
+  const [coverPostsLoading, setCoverPostsLoading] = useState(false);
+  const [staffUsers, setStaffUsers] = useState<IUser[]>([]);
+  const [retroOpen, setRetroOpen] = useState(false);
+  const [retroClaimerId, setRetroClaimerId] = useState('');
+  const [retroNeedType, setRetroNeedType] = useState<'PartialCover' | 'FullCover'>('PartialCover');
+  const [retroPartialSide, setRetroPartialSide] = useState<PartialCoverSide>('LateArrive');
+  const [retroNote, setRetroNote] = useState('');
+  const [retroSubmitting, setRetroSubmitting] = useState(false);
+
   const fetchCycles = useCallback(async () => {
     try {
       const data = await getAllPayrollCycles();
@@ -196,6 +214,10 @@ export default function PayrollBatchView() {
   useEffect(() => {
     fetchCycles();
   }, [fetchCycles]);
+
+  useEffect(() => {
+    getActiveStaffUsers().then(setStaffUsers).catch(console.error);
+  }, []);
 
   const fetchSummaryAndCalendar = useCallback(async (cycleId: string) => {
     setSummaryLoading(true);
@@ -616,6 +638,19 @@ export default function PayrollBatchView() {
     return vnDate.toISOString();
   };
 
+  const fetchCoverPosts = async (shiftAssignmentId: string) => {
+    setCoverPostsLoading(true);
+    try {
+      const posts = await getShiftPoolPostsByAssignment(shiftAssignmentId);
+      setCoverPosts(posts);
+    } catch (error) {
+      console.error('Error loading cover posts:', error);
+      setCoverPosts([]);
+    } finally {
+      setCoverPostsLoading(false);
+    }
+  };
+
   // Handler functions for edit dialog
   const handleOpenEditShift = (shift: IPayrollShiftItem) => {
     if (selectedPayrollRecord?.isFinalized) return;
@@ -623,6 +658,7 @@ export default function PayrollBatchView() {
     setCheckInValue(shift.checkInTime ? toDatetimeLocalValue(shift.checkInTime) : '');
     setCheckOutValue(shift.checkOutTime ? toDatetimeLocalValue(shift.checkOutTime) : '');
     setEditDialogOpen(true);
+    fetchCoverPosts(shift.shiftAssignmentId);
   };
 
   const handleSetCheckInToShiftStart = () => {
@@ -642,6 +678,39 @@ export default function PayrollBatchView() {
     setEditingShift(null);
     setCheckInValue('');
     setCheckOutValue('');
+    setCoverPosts([]);
+    setRetroOpen(false);
+    setRetroClaimerId('');
+    setRetroNeedType('PartialCover');
+    setRetroPartialSide('LateArrive');
+    setRetroNote('');
+  };
+
+  const handleSubmitRetroCover = async () => {
+    if (!editingShift || !retroClaimerId) return;
+    try {
+      setRetroSubmitting(true);
+      await adminCreateApprovedCover({
+        shiftAssignmentId: editingShift.shiftAssignmentId,
+        claimerId: retroClaimerId,
+        needType: retroNeedType,
+        partialSide: retroNeedType === 'PartialCover' ? retroPartialSide : undefined,
+        note: retroNote || undefined,
+      });
+      enqueueSnackbar('Đã tạo làm hộ retroactive', { variant: 'success' });
+      setRetroOpen(false);
+      setRetroClaimerId('');
+      setRetroNote('');
+      await fetchCoverPosts(editingShift.shiftAssignmentId);
+      if (selectedPayrollRecord) {
+        const data = await getPayrollShiftDetails(selectedPayrollRecord.id);
+        setShiftDetail(data);
+      }
+    } catch (error: any) {
+      enqueueSnackbar(error?.title || error?.message || 'Tạo làm hộ thất bại', { variant: 'error' });
+    } finally {
+      setRetroSubmitting(false);
+    }
   };
 
   const handleSubmitEditShift = async () => {
@@ -1809,6 +1878,114 @@ export default function PayrollBatchView() {
                   </Tooltip>
                 </Stack>
               </Box>
+
+              <Divider />
+
+              <Stack spacing={1.5}>
+                <Typography variant="subtitle2">Làm hộ (Chợ ca)</Typography>
+
+                {coverPostsLoading ? (
+                  <Typography variant="caption" color="text.secondary">Đang tải...</Typography>
+                ) : coverPosts.length === 0 ? (
+                  <Typography variant="caption" color="text.secondary">
+                    Chưa có bản ghi làm hộ nào cho ca này.
+                  </Typography>
+                ) : (
+                  <Stack spacing={1}>
+                    {coverPosts.map((p) => (
+                      <Box
+                        key={p.id}
+                        sx={{ p: 1, borderRadius: 1, border: '1px solid', borderColor: 'divider' }}
+                      >
+                        <Typography variant="body2">
+                          {needTypeLabel(p.needType)}
+                          {p.needType === 'PartialCover' && p.partialSide ? ` · ${partialSideLabel(p.partialSide)}` : ''}
+                          {' · '}
+                          {poolStatusLabel(p.status)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                          {p.posterName} → {p.claimerName || '(chưa có người nhận)'}
+                        </Typography>
+                        {p.coveringHours != null && p.extraPayAmount != null && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            {p.coveringHours.toFixed(2)}h · {p.extraPayAmount.toLocaleString('vi-VN')}đ
+                          </Typography>
+                        )}
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
+
+                {!retroOpen ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<Iconify icon="solar:add-circle-bold" />}
+                    onClick={() => setRetroOpen(true)}
+                  >
+                    Tạo làm hộ retroactive
+                  </Button>
+                ) : (
+                  <Stack spacing={1.5} sx={{ p: 1.5, borderRadius: 1, bgcolor: 'background.neutral' }}>
+                    <Autocomplete
+                      size="small"
+                      options={staffUsers}
+                      getOptionLabel={(option) => `${option.fullName} - ${option.email}`}
+                      value={staffUsers.find((u) => u.id === retroClaimerId) || null}
+                      onChange={(_, newValue) => setRetroClaimerId(newValue?.id ?? '')}
+                      renderInput={(params) => <TextField {...params} label="Người làm hộ" />}
+                    />
+                    <TextField
+                      select
+                      size="small"
+                      fullWidth
+                      label="Loại"
+                      value={retroNeedType}
+                      onChange={(e) => setRetroNeedType(e.target.value as 'PartialCover' | 'FullCover')}
+                    >
+                      <MenuItem value="PartialCover">Làm hộ 1 phần</MenuItem>
+                      <MenuItem value="FullCover">Làm hộ cả ca</MenuItem>
+                    </TextField>
+                    {retroNeedType === 'PartialCover' && (
+                      <TextField
+                        select
+                        size="small"
+                        fullWidth
+                        label="Phía làm hộ"
+                        value={retroPartialSide}
+                        onChange={(e) => setRetroPartialSide(e.target.value as PartialCoverSide)}
+                      >
+                        <MenuItem value="LateArrive">Đi muộn (nhờ ca trước)</MenuItem>
+                        <MenuItem value="EarlyLeave">Về sớm (nhờ ca sau)</MenuItem>
+                        <MenuItem value="MidShift">Giữa ca</MenuItem>
+                      </TextField>
+                    )}
+                    <TextField
+                      size="small"
+                      fullWidth
+                      multiline
+                      rows={2}
+                      label="Ghi chú (tuỳ chọn)"
+                      value={retroNote}
+                      onChange={(e) => setRetroNote(e.target.value)}
+                    />
+                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                      <Button size="small" color="inherit" onClick={() => setRetroOpen(false)}>
+                        Huỷ
+                      </Button>
+                      <LoadingButton
+                        size="small"
+                        variant="contained"
+                        loading={retroSubmitting}
+                        disabled={!retroClaimerId}
+                        onClick={handleSubmitRetroCover}
+                      >
+                        Tạo
+                      </LoadingButton>
+                    </Stack>
+                  </Stack>
+                )}
+              </Stack>
             </Stack>
           )}
         </DialogContent>
