@@ -932,6 +932,17 @@ export interface IAdminCreateApprovedCoverDto {
   needType: 'PartialCover' | 'FullCover';
   partialSide?: PartialCoverSide; // bắt buộc khi needType = PartialCover
   note?: string;
+  // Giờ chấm công ca hộ (ISO UTC, chỉ PartialCover) — đủ cả 2 mốc thì BE tạo luôn log
+  // chấm công của người hộ trên ca người nhờ để kỳ lương tính OT (retroactive = họ
+  // chưa từng chấm công qua app).
+  coverCheckInTime?: string;
+  coverCheckOutTime?: string;
+}
+
+/** Admin set/sửa giờ chấm công ca hộ cho 1 bài PartialCover đã duyệt (ISO UTC). */
+export interface IAdminSetCoverTimesDto {
+  checkInTime: string;
+  checkOutTime: string;
 }
 
 export interface IUserShiftPreferenceResponse {

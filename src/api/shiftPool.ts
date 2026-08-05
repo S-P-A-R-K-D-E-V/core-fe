@@ -2,6 +2,7 @@ import axios, { endpoints } from 'src/utils/axios';
 
 import type {
   IAdminCreateApprovedCoverDto,
+  IAdminSetCoverTimesDto,
   IClaimShiftPoolPostDto,
   ICreateShiftPoolPostDto,
   IDirectedResolveShiftPoolPostDto,
@@ -74,5 +75,13 @@ export async function adminCreateApprovedCover(
   data: IAdminCreateApprovedCoverDto
 ): Promise<IShiftPoolPost> {
   const response = await axios.post<IShiftPoolPost>(endpoints.shiftPool.adminCreateApproved, data);
+  return response.data;
+}
+
+export async function adminSetCoverTimes(
+  id: string,
+  data: IAdminSetCoverTimesDto
+): Promise<IShiftPoolPost> {
+  const response = await axios.put<IShiftPoolPost>(endpoints.shiftPool.adminCoverTimes(id), data);
   return response.data;
 }
