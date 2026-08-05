@@ -888,6 +888,11 @@ export interface IShiftPoolPost {
   extraPayAmount?: number;
   actualCoverStart?: string;
   actualCoverEnd?: string;
+  // Giờ chấm công THẬT của người hộ — độc lập với actualCoverStart/End (cửa sổ OT đã suy/
+  // clamp, có thể về null nếu payroll chưa tính được OT dù log chấm công vẫn tồn tại). Dùng
+  // để prefill màn "Sửa giờ ca hộ" cho đúng những gì admin đã lưu.
+  claimerCheckInTime?: string;
+  claimerCheckOutTime?: string;
   reviewedBy?: string;
   reviewerName?: string;
   reviewedAt?: string;
