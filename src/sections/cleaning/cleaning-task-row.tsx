@@ -19,7 +19,11 @@ import type { CleaningTaskStatus, ICleaningTaskInstance } from 'src/types/corecm
 // ----------------------------------------------------------------------
 
 export const MAX_PHOTOS = 5;
-export const MAX_PHOTO_SIZE_MB = 3.5; // dưới giới hạn 4MB/ảnh của backend, chừa dư cho overhead nén
+// Nén ảnh vượt ngưỡng này trước khi upload để đỡ tốn băng thông/thời gian tải — không phải giới hạn
+// cứng của backend (ảnh/video giờ PUT thẳng lên R2 qua presigned URL, không còn giới hạn dung
+// lượng ở API). Video không bị nén (imageCompression lỗi im lặng, giữ nguyên file gốc — xem catch
+// bên dưới).
+export const MAX_PHOTO_SIZE_MB = 3.5;
 
 export const BLOCK_LABEL: Record<string, string> = { Morning: 'Sáng', Afternoon: 'Chiều', Evening: 'Tối' };
 
@@ -158,7 +162,7 @@ export function TaskRow({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,video/*"
             multiple
             hidden
             onChange={handleFilesSelected}
