@@ -17,6 +17,7 @@ import type { IProductListItem } from 'src/types/corecms-api';
 import HomeHero from '../home-hero';
 import HomeMinimal from '../home-minimal';
 import HomeFeatures from '../home-features';
+import HomeAiAssistant from '../home-ai-assistant';
 import HomeCleanInterfaces from '../home-clean-interfaces';
 import HomeTestimonials from '../home-testimonials';
 import HomeFAQs from '../home-faqs';
@@ -57,9 +58,11 @@ export default function HomeView() {
           bgcolor: 'background.default',
         }}
       >
-        <HomeMinimal />
+        <HomeAiAssistant />
 
-        <HomeFeatures />
+        <HomeMinimal products={products} />
+
+        <HomeFeatures products={products} />
 
         <HomeCleanInterfaces />
 

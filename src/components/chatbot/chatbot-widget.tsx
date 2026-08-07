@@ -26,6 +26,10 @@ import { chatbotCallbackOrder } from 'src/api/chatbot';
 
 // ----------------------------------------------------------------------
 
+// Cho phép các section khác (vd CTA "Chat ngay với CiCi AI" ở trang chủ) mở widget từ xa —
+// widget là component global độc lập, không có context/store dùng chung nên dùng custom event.
+export const OPEN_CHATBOT_EVENT = 'cici:open-chat';
+
 const GUEST_INFO_KEY = 'chatbot.guestInfo';
 
 type GuestInfo = { name: string; phone: string };
@@ -60,6 +64,12 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
 
   useEffect(() => {
     setGuestInfo(loadGuestInfo());
+  }, []);
+
+  useEffect(() => {
+    const handleOpenRequest = () => setOpen(true);
+    window.addEventListener(OPEN_CHATBOT_EVENT, handleOpenRequest);
+    return () => window.removeEventListener(OPEN_CHATBOT_EVENT, handleOpenRequest);
   }, []);
 
   const needsGuestGate = !user && !guestInfo;
