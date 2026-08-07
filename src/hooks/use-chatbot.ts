@@ -54,7 +54,9 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
     if (loadingRef.current) return;
     loadingRef.current = true;
     try {
-      const res = await fetch(`/api/agent-chat/${id}/messages?limit=20`, { headers: authHeaders() });
+      // trailingSlash:true trong next.config.mjs — gọi thẳng URL có "/" cuối, không dựa vào
+      // redirect 308 (không nhất quán giữa dev/prod và giữa các trình duyệt với POST).
+      const res = await fetch(`/api/agent-chat/${id}/messages/?limit=20`, { headers: authHeaders() });
       if (res.ok) {
         const data = await res.json();
         const items: ChatbotMessage[] = (data.items ?? []).map(
@@ -96,7 +98,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
       setError(null);
 
       try {
-        const res = await fetch('/api/agent-chat', {
+        const res = await fetch('/api/agent-chat/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({
