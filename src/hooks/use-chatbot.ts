@@ -9,6 +9,8 @@ import { type ChatbotSession, type ChatbotMessage } from 'src/api/chatbot';
 // ----------------------------------------------------------------------
 
 const SESSION_STORAGE_KEY = 'chatbot.sessionId';
+const SESSION_CREATED_AT_KEY = 'chatbot.sessionCreatedAt';
+const GUEST_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
 type SseDelta = { role?: string; content?: string };
 type SseChoice = { delta: SseDelta; finish_reason: string | null };
@@ -31,16 +33,34 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-function loadOrCreateSessionId(): string {
-  if (typeof window === 'undefined') return '';
-  const stored = localStorage.getItem(SESSION_STORAGE_KEY);
-  if (stored) return stored;
+function newGuestSessionId(): string {
   const fresh = crypto.randomUUID();
   localStorage.setItem(SESSION_STORAGE_KEY, fresh);
+  localStorage.setItem(SESSION_CREATED_AT_KEY, String(Date.now()));
   return fresh;
 }
 
-export function useChatbot(opts?: { phone?: string | null; displayName?: string | null }): ChatbotPanelState {
+// Mỗi user đăng nhập chỉ có ĐÚNG 1 session_id (suy trực tiếp từ user.id) — reload trang, đổi
+// trình duyệt, hay localStorage bị xoá đều quay lại đúng phiên cũ trên server, không phụ thuộc
+// localStorage còn nguyên vẹn hay không (khác hẳn cơ chế cũ chỉ dựa vào localStorage, dễ "mất
+// lịch sử" khi localStorage bị clear/khác thiết bị). Khách ẩn danh không có identity ổn định nên
+// vẫn dùng UUID lưu localStorage, nhưng tự hết hạn sau 24h theo yêu cầu.
+function loadOrCreateSessionId(userId?: string | null): string {
+  if (typeof window === 'undefined') return '';
+  if (userId) return `user-${userId}`;
+
+  const stored = localStorage.getItem(SESSION_STORAGE_KEY);
+  const createdAt = Number(localStorage.getItem(SESSION_CREATED_AT_KEY) ?? 0);
+  const expired = !createdAt || Date.now() - createdAt > GUEST_SESSION_TTL_MS;
+  if (stored && !expired) return stored;
+  return newGuestSessionId();
+}
+
+export function useChatbot(opts?: {
+  phone?: string | null;
+  displayName?: string | null;
+  userId?: string | null;
+}): ChatbotPanelState {
   const [sessionId, setSessionId] = useState('');
   const [messages, setMessages] = useState<ChatbotMessage[]>([]);
   const [typing, setTyping] = useState(false);
@@ -77,12 +97,15 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
     }
   }, []);
 
-  // 1. Bootstrap session_id (local, không cần round-trip server) + nạp lịch sử trang gần nhất
+  // 1. Bootstrap session_id (local, không cần round-trip server) + nạp lịch sử trang gần nhất.
+  // Chạy lại khi userId đổi (vd. login ngay trong lúc widget đang mở) để chuyển từ session
+  // khách sang session định danh theo user.
   useEffect(() => {
-    const id = loadOrCreateSessionId();
+    const id = loadOrCreateSessionId(opts?.userId);
     setSessionId(id);
+    setReady(false);
     if (id) loadHistory(id);
-  }, [loadHistory]);
+  }, [loadHistory, opts?.userId]);
 
   const sendMessage = useCallback(
     async (content: string, phone?: string | null) => {
@@ -183,13 +206,22 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
   );
 
   const resetSession = useCallback(async () => {
-    const fresh = crypto.randomUUID();
-    if (typeof window !== 'undefined') localStorage.setItem(SESSION_STORAGE_KEY, fresh);
+    // "Phiên mới" = xoá hẳn phiên+lịch sử cũ trên server (mỗi user chỉ giữ 1 phiên), không phải
+    // chỉ lờ đi. Với user đăng nhập, session_id giữ nguyên (suy từ userId) — xoá xong server trả
+    // về rỗng, phiên "mới" tự nhiên bắt đầu từ id cũ đó. Guest thì đổi sang UUID mới.
+    if (sessionId) {
+      try {
+        await fetch(`/agent-chat/${sessionId}`, { method: 'DELETE', headers: authHeaders() });
+      } catch (err) {
+        console.error('[Chatbot] delete session failed', err);
+      }
+    }
+    const fresh = opts?.userId ? sessionId : newGuestSessionId();
     setSessionId(fresh);
     setMessages([]);
     setError(null);
     setReady(true);
-  }, []);
+  }, [sessionId, opts?.userId]);
 
   const session: ChatbotSession | null = sessionId
     ? {
