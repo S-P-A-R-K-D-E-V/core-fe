@@ -1,7 +1,9 @@
 'use client';
 
 import type { BoxProps } from '@mui/material/Box';
+import type { IProductListItem } from 'src/types/corecms-api';
 
+import { useState } from 'react';
 import { m } from 'framer-motion';
 
 import Box from '@mui/material/Box';
@@ -12,6 +14,7 @@ import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 
 import SvgColor from 'src/components/svg-color';
+import Iconify from 'src/components/iconify';
 import { varFade, MotionViewport } from 'src/components/animate';
 
 import { SectionTitle } from './components/section-title';
@@ -52,13 +55,21 @@ const renderLines = () => (
   </>
 );
 
-export default function HomeMinimal({ sx, ...other }: BoxProps) {
+type Props = BoxProps & {
+  products?: IProductListItem[];
+};
+
+export default function HomeMinimal({ sx, products = [], ...other }: Props) {
+  const [imageError, setImageError] = useState(false);
+  const featuredImage = products.find((p) => !!p.imageUrl);
+
   const renderDescription = () => (
     <>
       <SectionTitle
         caption="Về chúng tôi"
         title="Phụ kiện thời trang"
         txtGradient="chính hãng"
+        description="CiCi Accessories là cửa hàng phụ kiện thời trang nữ tại Hà Nội, ra đời với mong muốn giúp mỗi bạn gái tự tin thể hiện phong cách riêng mà không cần chi quá nhiều. Từ trang sức, kẹp tóc đến túi mini — mỗi sản phẩm đều được chọn lọc kỹ, cập nhật liên tục theo xu hướng và luôn có giá hợp lý."
         sx={{ mb: { xs: 5, md: 8 }, textAlign: { xs: 'center', md: 'left' } }}
       />
 
@@ -94,19 +105,38 @@ export default function HomeMinimal({ sx, ...other }: BoxProps) {
           (theme) => ({
             left: 0,
             width: 720,
+            height: 480,
             borderRadius: 2,
             position: 'absolute',
             bgcolor: 'background.default',
             boxShadow: `-40px 40px 80px 0px ${alpha(theme.palette.grey[500], 0.16)}`,
+            overflow: 'hidden',
           }),
         ]}
       >
-        <Box
-          component="img"
-          alt="Sản phẩm CiCi Accessories"
-          src="/assets/images/home/home-chart.webp"
-          sx={{ width: 720, borderRadius: 2 }}
-        />
+        {featuredImage && !imageError ? (
+          <Box
+            component="img"
+            alt={featuredImage.name}
+            src={featuredImage.imageUrl}
+            onError={() => setImageError(true)}
+            sx={{ width: 1, height: 1, borderRadius: 2, objectFit: 'cover' }}
+          />
+        ) : (
+          <Box
+            sx={{
+              width: 1,
+              height: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: (theme) =>
+                `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.24)}, ${alpha(theme.palette.secondary.light, 0.24)})`,
+            }}
+          >
+            <Iconify icon="solar:bag-heart-bold-duotone" width={96} sx={{ color: 'primary.main', opacity: 0.5 }} />
+          </Box>
+        )}
       </Box>
     </Stack>
   );

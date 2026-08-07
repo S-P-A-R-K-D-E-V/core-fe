@@ -2,6 +2,7 @@
 
 import type { BoxProps } from '@mui/material/Box';
 import type { UseClientRectReturn } from 'minimal-shared/hooks';
+import type { IProductListItem } from 'src/types/corecms-api';
 
 import { useRef, useState } from 'react';
 import { useClientRect } from 'minimal-shared/hooks';
@@ -56,7 +57,11 @@ const renderLines = () => (
   </>
 );
 
-export default function HomeFeatures({ sx, ...other }: BoxProps) {
+type Props = BoxProps & {
+  products?: IProductListItem[];
+};
+
+export default function HomeFeatures({ sx, products = [], ...other }: Props) {
   const containerRoot = useClientRect();
 
   return (
@@ -96,16 +101,16 @@ export default function HomeFeatures({ sx, ...other }: BoxProps) {
         </Container>
       </MotionViewport>
 
-      <ScrollableContent containerRoot={containerRoot} />
+      <ScrollableContent containerRoot={containerRoot} products={products} />
     </Box>
   );
 }
 
 // ----------------------------------------------------------------------
 
-type ScrollContentProps = { containerRoot: UseClientRectReturn };
+type ScrollContentProps = { containerRoot: UseClientRectReturn; products: IProductListItem[] };
 
-function ScrollableContent({ containerRoot }: ScrollContentProps) {
+function ScrollableContent({ containerRoot, products }: ScrollContentProps) {
   const theme = useTheme();
   const isRtl = theme.direction === 'rtl';
 
@@ -149,7 +154,7 @@ function ScrollableContent({ containerRoot }: ScrollContentProps) {
           transition={{ ease: 'linear', duration: 0.25 }}
         >
           {CATEGORIES.map((item) => (
-            <CategoryItem key={item.title} item={item} />
+            <CategoryItem key={item.title} item={item} product={findMatchingProduct(item.title, products)} />
           ))}
         </ScrollContent>
       </ScrollContainer>
@@ -189,9 +194,27 @@ const ScrollContent = styled(m.div)(({ theme }) => ({
 
 // ----------------------------------------------------------------------
 
-type CategoryItemProps = BoxProps & { item: (typeof CATEGORIES)[number] };
+/** So khớp lỏng theo tên danh mục hiển thị (không phải categoryId thật) — chỉ để minh hoạ trực
+ * quan hơn khung placeholder cũ, không phải điều hướng chính xác theo danh mục. */
+function findMatchingProduct(categoryTitle: string, products: IProductListItem[]): IProductListItem | undefined {
+  const keyword = categoryTitle.split('&')[0].trim().toLowerCase();
+  return products.find(
+    (p) =>
+      !!p.imageUrl &&
+      (p.categoryName?.toLowerCase().includes(keyword) || keyword.includes(p.categoryName?.toLowerCase() ?? ''))
+  );
+}
 
-function CategoryItem({ item, sx, ...other }: CategoryItemProps) {
+// ----------------------------------------------------------------------
+
+type CategoryItemProps = BoxProps & {
+  item: (typeof CATEGORIES)[number];
+  product?: IProductListItem;
+};
+
+function CategoryItem({ item, product, sx, ...other }: CategoryItemProps) {
+  const [imageError, setImageError] = useState(false);
+  const showImage = !!product?.imageUrl && !imageError;
   return (
     <Box
       component={m.div}
@@ -213,7 +236,7 @@ function CategoryItem({ item, sx, ...other }: CategoryItemProps) {
         </Stack>
       </Box>
 
-      {/* Category showcase placeholder */}
+      {/* Category showcase — ảnh sản phẩm thật nếu khớp được danh mục, không thì dùng icon minh hoạ */}
       <Box
         sx={{
           width: { xs: 280, sm: 380, md: 480 },
@@ -226,6 +249,8 @@ function CategoryItem({ item, sx, ...other }: CategoryItemProps) {
           alignItems: 'center',
           justifyContent: 'center',
           gap: 2,
+          position: 'relative',
+          overflow: 'hidden',
           transition: 'background-color 0.3s ease, border-color 0.3s ease',
           '&:hover': {
             bgcolor: 'rgba(255,255,255,0.22)',
@@ -233,15 +258,43 @@ function CategoryItem({ item, sx, ...other }: CategoryItemProps) {
           },
         }}
       >
-        <m.div
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          <Iconify width={72} icon={item.icon} sx={{ color: 'rgba(255,255,255,0.3)' }} />
-        </m.div>
-        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 2 }}>
-          XEM TẤT CẢ
-        </Typography>
+        {showImage ? (
+          <>
+            <Box
+              component="img"
+              src={product!.imageUrl}
+              alt={product!.name}
+              onError={() => setImageError(true)}
+              sx={{ position: 'absolute', inset: 0, width: 1, height: 1, objectFit: 'cover' }}
+            />
+            <Typography
+              variant="caption"
+              sx={{
+                position: 'relative',
+                color: 'white',
+                letterSpacing: 2,
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 1,
+                bgcolor: 'rgba(0,0,0,0.35)',
+              }}
+            >
+              XEM TẤT CẢ
+            </Typography>
+          </>
+        ) : (
+          <>
+            <m.div
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <Iconify width={72} icon={item.icon} sx={{ color: 'rgba(255,255,255,0.3)' }} />
+            </m.div>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 2 }}>
+              XEM TẤT CẢ
+            </Typography>
+          </>
+        )}
       </Box>
     </Box>
   );
