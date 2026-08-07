@@ -26,6 +26,23 @@ import { chatbotCallbackOrder } from 'src/api/chatbot';
 
 // ----------------------------------------------------------------------
 
+const GUEST_INFO_KEY = 'chatbot.guestInfo';
+
+type GuestInfo = { name: string; phone: string };
+
+function loadGuestInfo(): GuestInfo | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(GUEST_INFO_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed?.name && parsed?.phone) return parsed as GuestInfo;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 type Props = {
   defaultOpen?: boolean;
 };
@@ -34,12 +51,32 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
   const { user } = useAuthContext();
   const [open, setOpen] = useState(defaultOpen);
   const [draft, setDraft] = useState('');
-  const [phone, setPhone] = useState('');
+
+  // Khách chưa đăng nhập phải nhập Tên + SĐT trước khi chat — lưu localStorage nên lần
+  // sau quay lại không phải nhập lại (đồng bộ tinh thần "giữ phiên" đã có cho session_id).
+  const [guestInfo, setGuestInfo] = useState<GuestInfo | null>(null);
+  const [guestNameDraft, setGuestNameDraft] = useState('');
+  const [guestPhoneDraft, setGuestPhoneDraft] = useState('');
+
+  useEffect(() => {
+    setGuestInfo(loadGuestInfo());
+  }, []);
+
+  const needsGuestGate = !user && !guestInfo;
 
   const { ready, session, messages, typing, streamingMessageId, error, sendMessage, resetSession } = useChatbot({
-    phone: user?.phoneNumber ?? null,
-    displayName: user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : null,
+    phone: user?.phoneNumber ?? guestInfo?.phone ?? null,
+    displayName: user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : (guestInfo?.name ?? null),
   });
+
+  const handleGuestInfoSubmit = () => {
+    const name = guestNameDraft.trim();
+    const phoneVal = guestPhoneDraft.trim();
+    if (!name || !phoneVal) return;
+    const info: GuestInfo = { name, phone: phoneVal };
+    if (typeof window !== 'undefined') localStorage.setItem(GUEST_INFO_KEY, JSON.stringify(info));
+    setGuestInfo(info);
+  };
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -53,10 +90,11 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
     const text = draft.trim();
     if (!text) return;
     setDraft('');
-    await sendMessage(text, phone || null);
+    await sendMessage(text, guestInfo?.phone || null);
   };
 
   const handleCallback = async () => {
+    const phone = guestInfo?.phone;
     if (!session?.sessionId || !phone) return;
     try {
       await chatbotCallbackOrder({
@@ -112,16 +150,50 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
             </IconButton>
           </Stack>
 
-          <Box
-            ref={scrollRef}
-            sx={{
-              flexGrow: 1,
-              p: 2,
-              overflowY: 'auto',
-              bgcolor: (t) => (t.palette.mode === 'light' ? 'grey.100' : 'grey.900'),
-            }}
-          >
-            {!ready && (
+          {needsGuestGate ? (
+            <Stack spacing={1.5} sx={{ p: 2.5, flexGrow: 1, justifyContent: 'center' }}>
+              <Typography variant="subtitle2">Trước khi chat, cho CiCi biết bạn là ai nhé 👋</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Giúp CiCi hỗ trợ bạn tốt hơn — thông tin chỉ dùng trong phiên chat này.
+              </Typography>
+              <TextField
+                size="small"
+                label="Tên của bạn"
+                value={guestNameDraft}
+                onChange={(e) => setGuestNameDraft(e.target.value)}
+                fullWidth
+                autoFocus
+              />
+              <TextField
+                size="small"
+                label="Số điện thoại"
+                value={guestPhoneDraft}
+                onChange={(e) => setGuestPhoneDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleGuestInfoSubmit();
+                }}
+                fullWidth
+              />
+              <Button
+                variant="contained"
+                onClick={handleGuestInfoSubmit}
+                disabled={!guestNameDraft.trim() || !guestPhoneDraft.trim()}
+              >
+                Bắt đầu trò chuyện
+              </Button>
+            </Stack>
+          ) : (
+            <>
+              <Box
+                ref={scrollRef}
+                sx={{
+                  flexGrow: 1,
+                  p: 2,
+                  overflowY: 'auto',
+                  bgcolor: (t) => (t.palette.mode === 'light' ? 'grey.100' : 'grey.900'),
+                }}
+              >
+                {!ready && (
               <Stack alignItems="center" justifyContent="center" sx={{ height: '100%' }}>
                 <CircularProgress size={24} />
               </Stack>
@@ -224,43 +296,38 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
                 {error}
               </Typography>
             )}
-          </Box>
+              </Box>
 
-          {!user && (
-            <Stack direction="row" spacing={1} sx={{ px: 1.5, pt: 1 }}>
-              <TextField
-                size="small"
-                placeholder="Nhập SĐT (nếu có) để tra khách hàng"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                fullWidth
-              />
-              <Button size="small" variant="outlined" onClick={handleCallback} disabled={!phone}>
-                Gọi lại
-              </Button>
-            </Stack>
+              {!user && guestInfo?.phone && (
+                <Stack direction="row" justifyContent="flex-end" sx={{ px: 1.5, pt: 1 }}>
+                  <Button size="small" variant="outlined" onClick={handleCallback}>
+                    Gọi lại đặt hàng
+                  </Button>
+                </Stack>
+              )}
+
+              <Stack direction="row" spacing={1} sx={{ p: 1.5 }}>
+                <TextField
+                  size="small"
+                  placeholder="Nhập tin nhắn…"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  fullWidth
+                  multiline
+                  maxRows={3}
+                />
+                <IconButton color="primary" onClick={handleSend} disabled={!ready || !draft.trim()}>
+                  <Iconify icon="solar:plain-bold" />
+                </IconButton>
+              </Stack>
+            </>
           )}
-
-          <Stack direction="row" spacing={1} sx={{ p: 1.5 }}>
-            <TextField
-              size="small"
-              placeholder="Nhập tin nhắn…"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              fullWidth
-              multiline
-              maxRows={3}
-            />
-            <IconButton color="primary" onClick={handleSend} disabled={!ready || !draft.trim()}>
-              <Iconify icon="solar:plain-bold" />
-            </IconButton>
-          </Stack>
         </Paper>
       </Collapse>
 

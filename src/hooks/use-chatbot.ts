@@ -105,6 +105,8 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
             messages: [{ role: 'user', content }],
             session_id: sessionId,
             stream: true,
+            customer_name: opts?.displayName || null,
+            customer_phone: phone || opts?.phone || null,
           }),
         });
 
@@ -177,7 +179,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
         setStreamingMessageId(null);
       }
     },
-    [sessionId]
+    [sessionId, opts?.phone, opts?.displayName]
   );
 
   const resetSession = useCallback(async () => {
