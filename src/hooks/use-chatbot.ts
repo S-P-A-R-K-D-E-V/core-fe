@@ -4,8 +4,8 @@ import { type ChatbotSession, type ChatbotMessage } from 'src/api/chatbot';
 
 // ----------------------------------------------------------------------
 // Agent Middleware (SSE) — thay cho SignalR/ChatHub cũ. Route Handler proxy
-// (`src/app/api/agent-chat/*`) tự forward JWT hoặc gắn X-Client-Api-Key server-side,
-// nên hook này chỉ cần gọi same-origin `/api/agent-chat/*`, không cần biết URL/secret thật.
+// (`src/app/agent-chat/*`) tự forward JWT hoặc gắn X-Client-Api-Key server-side,
+// nên hook này chỉ cần gọi same-origin `/agent-chat/*` (KHÔNG dưới /api — nginx-ingress `core-api` legacy route bắt hết /api/* về .NET backend, xem commit message), không cần biết URL/secret thật.
 // ----------------------------------------------------------------------
 
 const SESSION_STORAGE_KEY = 'chatbot.sessionId';
@@ -56,7 +56,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
     try {
       // trailingSlash:true trong next.config.mjs — gọi thẳng URL có "/" cuối, không dựa vào
       // redirect 308 (không nhất quán giữa dev/prod và giữa các trình duyệt với POST).
-      const res = await fetch(`/api/agent-chat/${id}/messages/?limit=20`, { headers: authHeaders() });
+      const res = await fetch(`/agent-chat/${id}/messages/?limit=20`, { headers: authHeaders() });
       if (res.ok) {
         const data = await res.json();
         const items: ChatbotMessage[] = (data.items ?? []).map(
@@ -98,7 +98,7 @@ export function useChatbot(opts?: { phone?: string | null; displayName?: string 
       setError(null);
 
       try {
-        const res = await fetch('/api/agent-chat/', {
+        const res = await fetch('/agent-chat/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({
