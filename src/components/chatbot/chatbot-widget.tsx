@@ -77,6 +77,7 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
   const { ready, session, messages, typing, streamingMessageId, error, sendMessage, resetSession } = useChatbot({
     phone: user?.phoneNumber ?? guestInfo?.phone ?? null,
     displayName: user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : (guestInfo?.name ?? null),
+    userId: user?.id ?? null,
   });
 
   const handleGuestInfoSubmit = () => {
