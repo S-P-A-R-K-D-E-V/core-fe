@@ -325,6 +325,8 @@ export const endpoints = {
   adminWorkers: {
     list: '/admin/workers',
     runNow: (name: string) => `/admin/workers/${name}/run-now`,
+    enable: (name: string) => `/admin/workers/${name}/enable`,
+    disable: (name: string) => `/admin/workers/${name}/disable`,
   },
   shiftRegistrations: {
     register: '/shift-registrations/register',

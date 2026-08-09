@@ -19,6 +19,8 @@ export interface IWorkerStatus {
   lastError: string | null;
   lastSummary: string | null;
   lastTickWasManual: boolean;
+  supportsEnableToggle: boolean;
+  enabled: boolean;
 }
 
 export interface IRunWorkerNowResponse {
