@@ -131,7 +131,8 @@ export const paths = {
         list: `${ROOTS.DASHBOARD}/shift/schedules`,
         new: `${ROOTS.DASHBOARD}/shift/schedules/new`,
         edit: (id: string) => `${ROOTS.DASHBOARD}/shift/schedules/${id}/edit`,
-        byTemplate: (templateId: string) => `${ROOTS.DASHBOARD}/shift/schedules/template/${templateId}`,
+        byTemplate: (templateId: string) =>
+          `${ROOTS.DASHBOARD}/shift/schedules/template/${templateId}`,
       },
       reminderRules: {
         root: `${ROOTS.DASHBOARD}/shift/reminder-rules`,
@@ -203,6 +204,9 @@ export const paths = {
     },
     shiftAudit: {
       root: `${ROOTS.DASHBOARD}/shift-audit`,
+    },
+    agentSessions: {
+      root: `${ROOTS.DASHBOARD}/agent-sessions`,
     },
     shiftCash: {
       root: `${ROOTS.DASHBOARD}/shift-cash`,
