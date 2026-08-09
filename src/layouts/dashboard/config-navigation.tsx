@@ -256,6 +256,14 @@ export function useNavData(userRole?: string) {
             roles: ['Admin', 'Manager'],
           },
 
+          // PHIÊN CHAT AGENT (Admin, Manager) — theo dõi phiên đang hoạt động + nhận trả lời tay
+          {
+            title: 'Phiên chat AI',
+            path: paths.dashboard.agentSessions.root,
+            icon: ICONS.chat,
+            roles: ['Admin', 'Manager'],
+          },
+
           // NOTIFICATION CONFIG (Admin only)
           {
             title: 'Cấu hình thông báo',

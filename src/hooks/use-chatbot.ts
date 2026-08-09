@@ -33,6 +33,40 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Đọc 1 ReadableStream SSE (khung `data: {...}\n\n`), gọi onEvent cho mỗi frame hợp lệ — dùng
+// chung cho cả stream trả lời trực tiếp (sendMessage) lẫn kênh nghe dài hạn (human handoff).
+async function readSseStream(
+  body: ReadableStream<Uint8Array>,
+  onEvent: (parsed: SseChunk | SseError) => void
+): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const events = buffer.split('\n\n');
+    buffer = events.pop() ?? '';
+
+    for (const rawEvent of events) {
+      const line = rawEvent.trim();
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice('data:'.length).trim();
+      if (payload === '[DONE]') continue;
+
+      try {
+        onEvent(JSON.parse(payload));
+      } catch {
+        // bỏ qua chunk lỗi format
+      }
+    }
+  }
+}
+
 function newGuestSessionId(): string {
   const fresh = crypto.randomUUID();
   localStorage.setItem(SESSION_STORAGE_KEY, fresh);
@@ -107,6 +141,59 @@ export function useChatbot(opts?: {
     if (id) loadHistory(id);
   }, [loadHistory, opts?.userId]);
 
+  // 2. Kênh SSE dài hạn — nhận tin nhắn do nhân viên gõ tay (human handoff) trong lúc panel đang
+  // mở, không cần khách tự gửi tin tiếp theo mới thấy. KHÔNG mang tin nhắn AI (luồng đó đã có SSE
+  // riêng theo từng lần sendMessage ở trên) nên không bị nhận trùng.
+  useEffect(() => {
+    if (!sessionId) return undefined;
+    const controller = new AbortController();
+    let currentId: string | null = null;
+
+    (async () => {
+      try {
+        const res = await fetch(`/agent-chat/${sessionId}/stream`, {
+          headers: authHeaders(),
+          signal: controller.signal,
+        });
+        if (!res.ok || !res.body) return;
+
+        await readSseStream(res.body, (parsed) => {
+          if ('error' in parsed) return;
+          const choice = parsed.choices?.[0];
+          if (!choice?.delta.content) return;
+
+          if (currentId !== parsed.id) {
+            currentId = parsed.id;
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: parsed.id,
+                role: 'assistant',
+                content: choice.delta.content ?? '',
+                createdAt: new Date().toISOString(),
+              },
+            ]);
+          } else {
+            const msgId = parsed.id;
+            setMessages((prev) => {
+              const idx = prev.findIndex((m) => m.id === msgId);
+              if (idx < 0) return prev;
+              const next = prev.slice();
+              next[idx] = { ...next[idx], content: next[idx].content + (choice.delta.content ?? '') };
+              return next;
+            });
+          }
+        });
+      } catch (err) {
+        if ((err as { name?: string })?.name !== 'AbortError') {
+          console.error('[Chatbot] stream listener failed', err);
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [sessionId]);
+
   const sendMessage = useCallback(
     async (content: string, phone?: string | null) => {
       if (!sessionId || !content.trim()) return;
@@ -137,63 +224,36 @@ export function useChatbot(opts?: {
           throw new Error(`agent-chat trả lỗi ${res.status}`);
         }
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let buffer = '';
         let assistantMessageId: string | null = null;
-
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          const events = buffer.split('\n\n');
-          buffer = events.pop() ?? '';
-
-          for (const rawEvent of events) {
-            const line = rawEvent.trim();
-            if (!line.startsWith('data:')) continue;
-            const payload = line.slice('data:'.length).trim();
-            if (payload === '[DONE]') continue;
-
-            let parsed: SseChunk | SseError;
-            try {
-              parsed = JSON.parse(payload);
-            } catch {
-              continue;
-            }
-
-            if ('error' in parsed) {
-              setError(parsed.error.message);
-              return;
-            }
-
-            const choice = parsed.choices?.[0];
-            if (!choice) continue;
-            const { delta } = choice;
-
-            if (delta.content) {
-              if (!assistantMessageId) {
-                assistantMessageId = parsed.id;
-                setStreamingMessageId(parsed.id);
-                setMessages((prev) => [
-                  ...prev,
-                  { id: parsed.id, role: 'assistant', content: delta.content ?? '', createdAt: new Date().toISOString() },
-                ]);
-              } else {
-                const msgId = assistantMessageId;
-                setMessages((prev) => {
-                  const idx = prev.findIndex((m) => m.id === msgId);
-                  if (idx < 0) return prev;
-                  const next = prev.slice();
-                  next[idx] = { ...next[idx], content: next[idx].content + (delta.content ?? '') };
-                  return next;
-                });
-              }
-            }
+        await readSseStream(res.body, (parsed) => {
+          if ('error' in parsed) {
+            setError(parsed.error.message);
+            return;
           }
-        }
+
+          const choice = parsed.choices?.[0];
+          if (!choice) return;
+          const { delta } = choice;
+          if (!delta.content) return;
+
+          if (!assistantMessageId) {
+            assistantMessageId = parsed.id;
+            setStreamingMessageId(parsed.id);
+            setMessages((prev) => [
+              ...prev,
+              { id: parsed.id, role: 'assistant', content: delta.content ?? '', createdAt: new Date().toISOString() },
+            ]);
+          } else {
+            const msgId = assistantMessageId;
+            setMessages((prev) => {
+              const idx = prev.findIndex((m) => m.id === msgId);
+              if (idx < 0) return prev;
+              const next = prev.slice();
+              next[idx] = { ...next[idx], content: next[idx].content + (delta.content ?? '') };
+              return next;
+            });
+          }
+        });
       } catch (err) {
         console.error('[Chatbot] sendMessage failed', err);
         setError('Không gửi được tin nhắn');
