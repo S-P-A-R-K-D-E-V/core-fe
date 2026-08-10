@@ -155,7 +155,7 @@ export default function AttendanceCheckinView() {
   const [faceDialogOpen, setFaceDialogOpen] = useState(false);
   const [overtimeConfirmOpen, setOvertimeConfirmOpen] = useState(false);
   const [pendingCheckin, setPendingCheckin] = useState<{
-    mode: 'smart' | 'overtime';
+    mode: 'smart' | 'overtime' | 'checkout';
     shiftName?: string;
   } | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
@@ -550,7 +550,7 @@ export default function AttendanceCheckinView() {
 
   // ── Dialog ──
   const openFaceDialog = useCallback(
-    (mode: 'smart' | 'overtime', shiftName?: string) => {
+    (mode: 'smart' | 'overtime' | 'checkout', shiftName?: string) => {
       setPendingCheckin({ mode, shiftName });
       setFaceDialogOpen(true);
       setCapturedImage(null);
@@ -573,6 +573,33 @@ export default function AttendanceCheckinView() {
     setActionLoading(pendingCheckin.mode);
     try {
       const staffName = user?.displayName || user?.name || user?.email || 'N/A';
+
+      // Check-out dùng chung dialog chụp ảnh này (BE bắt buộc ảnh khi checkout cho
+      // người đang làm hộ 1 phần ca — LateArrive/EarlyLeave/MidShift).
+      if (pendingCheckin.mode === 'checkout') {
+        await smartCheckOut({
+          latitude: geoLocation?.lat,
+          longitude: geoLocation?.lng,
+          accuracy: geoAccuracy ?? undefined,
+          faceVerified: true,
+        });
+        await checkinFace({
+          candidateName: staffName,
+          imageBase64: capturedImage,
+          lat: geoLocation?.lat,
+          lng: geoLocation?.lng,
+          deviceName: navigator.userAgent.slice(0, 80),
+          time: new Date().toISOString(),
+          branchName: isWithinGeofence ? nearestBranch?.name : undefined,
+          shiftName: pendingCheckin.shiftName,
+          checkInType: 'checkout',
+        });
+        enqueueSnackbar('Kết thúc làm việc thành công!', { variant: 'success' });
+        closeFaceDialog();
+        fetchData();
+        return;
+      }
+
       const shiftLabel =
         pendingCheckin.mode === 'smart' && activeSmartShift
           ? `${activeSmartShift.shiftName || activeSmartShift.scheduleName} (${activeSmartShift.startTime}–${activeSmartShift.endTime})`
@@ -624,25 +651,6 @@ export default function AttendanceCheckinView() {
     }
   }, [capturedImage, pendingCheckin, activeSmartShift, user, geoLocation, geoAccuracy, isWithinGeofence, nearestBranch, enqueueSnackbar, closeFaceDialog, fetchData]);
 
-  const handleSmartCheckOut = async () => {
-    try {
-      setActionLoading('checkout');
-      await smartCheckOut({
-        latitude: geoLocation?.lat,
-        longitude: geoLocation?.lng,
-        accuracy: geoAccuracy ?? undefined,
-        faceVerified: false,
-      });
-      enqueueSnackbar('Kết thúc làm việc thành công!', { variant: 'success' });
-      fetchData();
-    } catch (error: any) {
-      console.error(error);
-      const msg = error?.title || error?.message || 'Check-out thất bại!';
-      enqueueSnackbar(msg, { variant: 'error' });
-    } finally {
-      setActionLoading(null);
-    }
-  };
 
   useEffect(
     () => () => {
@@ -1007,7 +1015,12 @@ export default function AttendanceCheckinView() {
                   variant="contained"
                   size="large"
                   fullWidth
-                  onClick={handleSmartCheckOut}
+                  onClick={() =>
+                    openFaceDialog(
+                      'checkout',
+                      currentShiftDisplay.currentShift.shiftName || currentShiftDisplay.currentShift.scheduleName
+                    )
+                  }
                   disabled={!!actionLoading}
                   startIcon={
                     actionLoading === 'checkout' ? (
@@ -1521,7 +1534,11 @@ export default function AttendanceCheckinView() {
           <Stack direction="row" alignItems="center" spacing={1}>
             <Iconify icon="mdi:camera-account" width={26} />
             <Typography variant="subtitle1" fontWeight={600}>
-              {pendingCheckin?.mode === 'overtime' ? 'Check-in ngoài giờ' : 'Bắt đầu làm việc'}
+              {pendingCheckin?.mode === 'checkout'
+                ? 'Chụp ảnh check-out'
+                : pendingCheckin?.mode === 'overtime'
+                  ? 'Check-in ngoài giờ'
+                  : 'Bắt đầu làm việc'}
               {pendingCheckin?.shiftName && ` — ${pendingCheckin.shiftName}`}
             </Typography>
           </Stack>
@@ -1734,7 +1751,11 @@ export default function AttendanceCheckinView() {
                 onClick={handleFaceCheckin}
                 sx={{ flex: 1, borderRadius: 2, py: 1.5, fontSize: 15, fontWeight: 700 }}
               >
-                {submitting ? 'Đang xử lý...' : 'Xác nhận Check-in'}
+                {submitting
+                  ? 'Đang xử lý...'
+                  : pendingCheckin?.mode === 'checkout'
+                    ? 'Xác nhận Check-out'
+                    : 'Xác nhận Check-in'}
               </Button>
             </>
           )}
