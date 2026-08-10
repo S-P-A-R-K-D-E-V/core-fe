@@ -13,3 +13,13 @@ export async function runWorkerNow(name: string): Promise<IRunWorkerNowResponse>
   const response = await axios.post<IRunWorkerNowResponse>(endpoints.adminWorkers.runNow(name));
   return response.data;
 }
+
+/** Bật/tắt runtime worker (chỉ áp dụng worker có supportsEnableToggle=true) */
+export async function setWorkerEnabled(
+  name: string,
+  enabled: boolean
+): Promise<IRunWorkerNowResponse> {
+  const url = enabled ? endpoints.adminWorkers.enable(name) : endpoints.adminWorkers.disable(name);
+  const response = await axios.post<IRunWorkerNowResponse>(url);
+  return response.data;
+}

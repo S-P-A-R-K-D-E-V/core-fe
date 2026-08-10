@@ -6,6 +6,7 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
+import Switch from '@mui/material/Switch';
 import Tooltip from '@mui/material/Tooltip';
 import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
@@ -29,7 +30,7 @@ import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
 import Scrollbar from 'src/components/scrollbar';
 
-import { getWorkers, runWorkerNow } from 'src/api/system-jobs';
+import { getWorkers, runWorkerNow, setWorkerEnabled } from 'src/api/system-jobs';
 
 import type { IWorkerStatus, WorkerHealth } from 'src/types/worker';
 
@@ -57,6 +58,7 @@ export default function SystemJobsView() {
   const [workers, setWorkers] = useState<IWorkerStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [triggeringName, setTriggeringName] = useState<string | null>(null);
+  const [togglingName, setTogglingName] = useState<string | null>(null);
 
   const fetchWorkers = useCallback(async (showSpinner = false) => {
     if (showSpinner) setLoading(true);
@@ -96,6 +98,24 @@ export default function SystemJobsView() {
     [enqueueSnackbar, fetchWorkers]
   );
 
+  const handleToggleEnabled = useCallback(
+    async (worker: IWorkerStatus, nextEnabled: boolean) => {
+      setTogglingName(worker.name);
+      try {
+        const result = await setWorkerEnabled(worker.name, nextEnabled);
+        enqueueSnackbar(result.message, { variant: 'info' });
+        await fetchWorkers(false);
+      } catch (error: any) {
+        enqueueSnackbar(error?.response?.data?.message || error?.message || 'Không thể đổi trạng thái worker', {
+          variant: 'error',
+        });
+      } finally {
+        setTogglingName(null);
+      }
+    },
+    [enqueueSnackbar, fetchWorkers]
+  );
+
   return (
     <Container maxWidth={settings.themeStretch ? false : 'lg'}>
       <CustomBreadcrumbs
@@ -130,6 +150,9 @@ export default function SystemJobsView() {
                     <TableCell width={170}>Lịch chạy</TableCell>
                     <TableCell width={130}>Hoạt động gần nhất</TableCell>
                     <TableCell>Kết quả / lỗi gần nhất</TableCell>
+                    <TableCell width={90} align="center">
+                      Bật/tắt
+                    </TableCell>
                     <TableCell width={130} align="right">
                       Hành động
                     </TableCell>
@@ -140,7 +163,7 @@ export default function SystemJobsView() {
                   {loading &&
                     [1, 2, 3, 4].map((i) => (
                       <TableRow key={i}>
-                        <TableCell colSpan={7}>
+                        <TableCell colSpan={8}>
                           <Box sx={{ py: 1 }}>
                             <CircularProgress size={16} />
                           </Box>
@@ -150,7 +173,7 @@ export default function SystemJobsView() {
 
                   {!loading && workers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7}>
+                      <TableCell colSpan={8}>
                         <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
                           Chưa có worker nào
                         </Typography>
@@ -215,6 +238,25 @@ export default function SystemJobsView() {
                           ) : (
                             <Typography variant="caption" color="text.secondary">
                               {worker.lastSummary || '—'}
+                            </Typography>
+                          )}
+                        </TableCell>
+
+                        <TableCell align="center">
+                          {worker.supportsEnableToggle ? (
+                            <Tooltip title={worker.enabled ? 'Đang bật — bấm để tắt' : 'Đang tắt — bấm để bật'}>
+                              <span>
+                                <Switch
+                                  size="small"
+                                  checked={worker.enabled}
+                                  disabled={togglingName === worker.name}
+                                  onChange={(e) => handleToggleEnabled(worker, e.target.checked)}
+                                />
+                              </span>
+                            </Tooltip>
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">
+                              —
                             </Typography>
                           )}
                         </TableCell>
