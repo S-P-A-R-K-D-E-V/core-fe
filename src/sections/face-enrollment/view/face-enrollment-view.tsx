@@ -20,6 +20,7 @@ import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
 import RoleBasedGuard from 'src/auth/guard/role-based-guard';
+import { useAuthContext } from 'src/auth/hooks';
 
 import { checkEnrollQuality, submitFaceEnrollment } from 'src/api/faceEnrollment';
 import type { IEnrollQualityResponse } from 'src/types/corecms-api';
@@ -108,6 +109,7 @@ export default function FaceEnrollmentView() {
   const router = useRouter();
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
+  const { refreshUser } = useAuthContext();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -186,6 +188,7 @@ export default function FaceEnrollmentView() {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       setDone(true);
+      refreshUser().catch(() => {});
     } catch (err) {
       setFailedReason(extractApiError(err));
     } finally {
