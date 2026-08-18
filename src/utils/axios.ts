@@ -501,6 +501,10 @@ export const endpoints = {
     customerContext: '/chatbot/context/customer',
     callbackOrder: '/chatbot/callback-order',
   },
+  kiosk: {
+    confirmCheckIn: '/kiosk/confirm-checkin',
+    confirmCheckOut: '/kiosk/confirm-checkout',
+  },
   messenger: {
     conversations: '/messenger/conversations',
     openPrivate: '/messenger/conversations/private',
