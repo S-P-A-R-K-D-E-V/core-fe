@@ -2016,6 +2016,19 @@ export interface IFaceEmbeddingResponse {
   updatedAt: string;
 }
 
+/** POST /face-tracking/verify-self — nhân viên tự kiểm tra khuôn mặt hiện tại (video ngắn)
+ *  có khớp với embedding đã đăng ký không, KHÔNG tạo attendance log. */
+export interface IVerifySelfRequest {
+  videoBase64: string;
+}
+
+export interface IVerifySelfResponse {
+  matched: boolean;
+  similarity: number;
+  liveness: boolean;
+  reason?: string | null;
+}
+
 // ── Checkin Face ──
 
 export interface ICheckinFaceRequest {

@@ -25,6 +25,8 @@ import { useAuthContext } from 'src/auth/hooks';
 import { checkEnrollQuality, submitFaceEnrollment } from 'src/api/faceEnrollment';
 import type { IEnrollQualityResponse } from 'src/types/corecms-api';
 
+import { SelfVerifyDialog } from './self-verify-dialog';
+
 // ----------------------------------------------------------------------
 
 type StepKey = 'straight' | 'left' | 'right' | 'up' | 'down' | 'blink';
@@ -35,24 +37,25 @@ const STEPS: { key: StepKey; label: string; hint: string }[] = [
   { key: 'right', label: 'Quay phải', hint: 'Xoay đầu sang phải một góc rõ rệt' },
   { key: 'up', label: 'Ngước lên', hint: 'Ngước cằm lên trên' },
   { key: 'down', label: 'Cúi xuống', hint: 'Cúi cằm xuống dưới' },
-  { key: 'blink', label: 'Chớp mắt', hint: 'Nhìn thẳng vào camera và chớp mắt ngay lúc chụp' },
+  { key: 'blink', label: 'Chớp mắt', hint: 'Nhìn thẳng vào camera và chớp mắt liên tục' },
 ];
 
 // Ngưỡng heuristic — yaw/pitch từ Core-be là ước lượng thô (xem docstring estimate_yaw_pitch
-// trong face-tracking-service), KHÔNG phải góc độ chính xác. Khớp app-mobile FaceEnrollmentScreen
-// để 2 nền tảng chấp nhận/từ chối ảnh giống nhau.
+// trong face-tracking-service), KHÔNG phải góc độ chính xác. Khớp app-mobile FaceEnrollmentScreen.
 const YAW_STRAIGHT_MAX = 0.08;
 const YAW_TURN_MIN = 0.15;
 const PITCH_STRAIGHT_MAX = 0.08;
 const PITCH_TILT_MIN = 0.12;
 const MIN_QUALITY = 0.35;
 
-/** Validate kết quả enroll/quality theo đúng bước hiện tại. Trả về null nếu hợp lệ, hoặc
- *  thông báo lỗi để yêu cầu chụp lại. Xem cùng logic ở app-mobile FaceEnrollmentScreen —
- *  2 bước "Quay trái"/"Quay phải" CHỈ xác nhận đã xoay đủ góc, không phân biệt đúng chiều. */
+// Nhịp lấy mẫu frame nền — đủ nhanh để cảm giác "tự động", không dồn dập gọi BE quá mức.
+const POLL_INTERVAL_MS = 600;
+// Khoảng nghỉ hiển thị dấu ✓ trước khi chuyển bước kế tiếp.
+const STEP_PASS_PAUSE_MS = 600;
+
 function validateStep(step: StepKey, q: IEnrollQualityResponse): string | null {
   if (q.qualityScore < MIN_QUALITY) {
-    return 'Ảnh chưa đủ rõ nét — vui lòng chụp lại ở nơi đủ sáng, giữ máy ổn định.';
+    return 'Ảnh chưa đủ rõ — di chuyển tới nơi đủ sáng, giữ máy ổn định.';
   }
   switch (step) {
     case 'straight':
@@ -63,22 +66,22 @@ function validateStep(step: StepKey, q: IEnrollQualityResponse): string | null {
     case 'left':
     case 'right':
       if (Math.abs(q.yaw) < YAW_TURN_MIN) {
-        return 'Vui lòng xoay đầu rõ hơn nữa.';
+        return 'Xoay đầu rõ hơn nữa.';
       }
       return null;
     case 'up':
       if (q.pitch < PITCH_TILT_MIN) {
-        return 'Vui lòng ngước cằm lên cao hơn.';
+        return 'Ngước cằm lên cao hơn.';
       }
       return null;
     case 'down':
       if (q.pitch > -PITCH_TILT_MIN) {
-        return 'Vui lòng cúi cằm xuống thấp hơn.';
+        return 'Cúi cằm xuống thấp hơn.';
       }
       return null;
     case 'blink':
       if (!q.blinkDetected) {
-        return 'Chưa phát hiện chớp mắt — vui lòng nhìn thẳng và chớp mắt ngay lúc chụp.';
+        return 'Chưa phát hiện chớp mắt — nhìn thẳng và chớp mắt liên tục.';
       }
       return null;
     default:
@@ -104,33 +107,54 @@ function extractApiError(error: any): string {
   );
 }
 
+type Mode = 'status' | 'capture';
+
 export default function FaceEnrollmentView() {
   const theme = useTheme();
   const router = useRouter();
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
-  const { refreshUser } = useAuthContext();
+  const { user, refreshUser } = useAuthContext();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  const isAdminOrManager =
+    user?.role === 'Admin' ||
+    user?.role === 'Manager' ||
+    !!user?.roles?.some((r: string) => r === 'Admin' || r === 'Manager');
+
+  const [mode, setMode] = useState<Mode>(user?.hasFaceEmbedding ? 'status' : 'capture');
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  // Đồng bộ mode theo user (auth context có thể load user muộn hơn render đầu tiên) — nhưng
+  // KHÔNG ghi đè nếu người dùng đã tự bấm "Đăng ký lại" (vẫn ở capture cho tới khi xong).
+  const manualCaptureRef = useRef(false);
+  useEffect(() => {
+    if (manualCaptureRef.current) return;
+    setMode(user?.hasFaceEmbedding ? 'status' : 'capture');
+  }, [user?.hasFaceEmbedding]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const busyRef = useRef(false);
+  const imagesRef = useRef<string[]>([]);
 
   const [stepIndex, setStepIndex] = useState(0);
-  const [images, setImages] = useState<string[]>([]); // raw base64, no data: prefix
+  const [images, setImages] = useState<string[]>([]);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
-  const [capturedBase64, setCapturedBase64] = useState<string | null>(null);
-  const [validating, setValidating] = useState(false);
+  const [stepPassed, setStepPassed] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [failedReason, setFailedReason] = useState<string | null>(null);
 
   const step = STEPS[stepIndex];
 
-  // ── Camera lifecycle — mở 1 lần, giữ nguyên xuyên suốt cả 6 bước (không đóng/mở lại
-  // giữa các bước, chỉ ẩn/hiện preview) — khớp app-mobile FaceEnrollmentCameraModal. ──
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
+
+  // ── Camera lifecycle — mở 1 lần khi vào chế độ capture, giữ nguyên xuyên suốt cả 6 bước. ──
   const startCamera = useCallback(async () => {
     setCameraError(null);
     try {
@@ -138,9 +162,7 @@ export default function FaceEnrollmentView() {
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+      if (videoRef.current) videoRef.current.srcObject = stream;
       setCameraReady(true);
     } catch {
       setCameraError('Không thể mở camera. Vui lòng cấp quyền truy cập camera cho trình duyệt.');
@@ -148,36 +170,29 @@ export default function FaceEnrollmentView() {
   }, []);
 
   useEffect(() => {
+    if (mode !== 'capture') return undefined;
     startCamera();
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
+      setCameraReady(false);
     };
-  }, [startCamera]);
+  }, [mode, startCamera]);
 
-  const capturePhoto = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return;
+  const captureFrameBase64 = useCallback((): string | null => {
+    if (!videoRef.current || !canvasRef.current) return null;
     const video = videoRef.current;
     const canvas = canvasRef.current;
+    if (video.videoWidth === 0) return null;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Mirror horizontally (front camera) so preview trông tự nhiên.
+    if (!ctx) return null;
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    setCapturedPreview(dataUrl);
-    setCapturedBase64(dataUrl.split(',')[1] ?? '');
-  }, []);
-
-  const handleRetake = useCallback(() => {
-    setCapturedPreview(null);
-    setCapturedBase64(null);
+    return canvas.toDataURL('image/jpeg', 0.85).split(',')[1] ?? null;
   }, []);
 
   async function handleSubmit(finalImages: string[]) {
@@ -196,45 +211,65 @@ export default function FaceEnrollmentView() {
     }
   }
 
-  const handleUseThisPhoto = useCallback(async () => {
-    if (!capturedBase64) return;
-    setValidating(true);
-    try {
-      const quality = await checkEnrollQuality(capturedBase64);
-      const error = validateStep(step.key, quality);
-      if (error) {
-        enqueueSnackbar(error, { variant: 'warning' });
-        handleRetake();
-        return;
-      }
+  // ── Auto-detect: lấy mẫu frame nền, tự chấp nhận/tự chuyển bước — KHÔNG cần bấm chụp. ──
+  useEffect(() => {
+    if (mode !== 'capture' || !cameraReady || stepPassed || submitting || done) return undefined;
 
-      const next = [...images, capturedBase64];
-      setImages(next);
-      setCapturedPreview(null);
-      setCapturedBase64(null);
+    const interval = setInterval(async () => {
+      if (busyRef.current) return;
+      const base64 = captureFrameBase64();
+      if (!base64) return;
 
-      if (stepIndex + 1 >= STEPS.length) {
-        await handleSubmit(next);
-      } else {
-        setStepIndex(stepIndex + 1);
+      busyRef.current = true;
+      try {
+        const quality = await checkEnrollQuality(base64);
+        const error = validateStep(step.key, quality);
+        if (error) {
+          setHint(error);
+          return;
+        }
+
+        setHint(null);
+        setStepPassed(true);
+        const next = [...imagesRef.current, base64];
+        imagesRef.current = next;
+        setImages(next);
+
+        setTimeout(() => {
+          setStepPassed(false);
+          if (stepIndex + 1 >= STEPS.length) {
+            handleSubmit(next);
+          } else {
+            setStepIndex((i) => i + 1);
+          }
+        }, STEP_PASS_PAUSE_MS);
+      } catch (err) {
+        setHint(extractApiError(err));
+      } finally {
+        busyRef.current = false;
       }
-    } catch (err) {
-      enqueueSnackbar(extractApiError(err), { variant: 'error' });
-      handleRetake();
-    } finally {
-      setValidating(false);
-    }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capturedBase64, step.key, images, stepIndex, enqueueSnackbar, handleRetake]);
+  }, [mode, cameraReady, stepPassed, submitting, done, stepIndex, step.key, captureFrameBase64]);
 
   function handleReset() {
     setStepIndex(0);
     setImages([]);
+    imagesRef.current = [];
     setFailedReason(null);
     setDone(false);
-    setCapturedPreview(null);
-    setCapturedBase64(null);
+    setHint(null);
+    setStepPassed(false);
     if (!streamRef.current) startCamera();
+  }
+
+  function startReenroll() {
+    manualCaptureRef.current = true;
+    handleReset();
+    setMode('capture');
   }
 
   return (
@@ -246,7 +281,44 @@ export default function FaceEnrollmentView() {
           sx={{ mb: { xs: 3, md: 5 } }}
         />
 
-        {done ? (
+        {mode === 'status' ? (
+          <Card sx={{ p: 5, textAlign: 'center' }}>
+            <Iconify icon="mdi:check-decagram" width={64} sx={{ color: 'success.main', mb: 2 }} />
+            <Typography variant="h5" sx={{ mb: 1 }}>
+              Bạn đã đăng ký khuôn mặt
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Có thể dùng khuôn mặt để chấm công tại quầy.
+            </Typography>
+            <Stack spacing={1.5} sx={{ maxWidth: 320, mx: 'auto' }}>
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<Iconify icon="mdi:face-recognition" />}
+                onClick={() => setVerifyOpen(true)}
+              >
+                Kiểm tra so khớp
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                color="inherit"
+                disabled={!isAdminOrManager}
+                startIcon={<Iconify icon="mdi:camera-retake" />}
+                onClick={startReenroll}
+              >
+                Đăng ký lại
+              </Button>
+              {!isAdminOrManager && (
+                <Typography variant="caption" color="text.secondary">
+                  Cần Admin hoặc Quản lý thực hiện đăng ký lại — liên hệ quản lý nếu khuôn mặt thay đổi nhiều.
+                </Typography>
+              )}
+            </Stack>
+
+            <SelfVerifyDialog open={verifyOpen} onClose={() => setVerifyOpen(false)} />
+          </Card>
+        ) : done ? (
           <Card sx={{ p: 5, textAlign: 'center' }}>
             <Iconify icon="mdi:check-decagram" width={64} sx={{ color: 'success.main', mb: 2 }} />
             <Typography variant="h5" sx={{ mb: 1 }}>
@@ -303,15 +375,15 @@ export default function FaceEnrollmentView() {
               </Stack>
               <LinearProgress
                 variant="determinate"
-                value={((stepIndex + (capturedPreview ? 1 : 0)) / STEPS.length) * 100}
+                value={((stepIndex + (stepPassed ? 1 : 0)) / STEPS.length) * 100}
                 sx={{ height: 6, borderRadius: 1 }}
               />
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, mb: 2 }}>
-                {step.hint}
+                Giữ khuôn mặt trong khung — tự động nhận diện, không cần bấm chụp.
               </Typography>
             </Box>
 
-            {/* Camera / preview */}
+            {/* Camera */}
             <Box
               sx={{
                 position: 'relative',
@@ -321,101 +393,62 @@ export default function FaceEnrollmentView() {
               }}
             >
               <canvas ref={canvasRef} style={{ display: 'none' }} />
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transform: 'scaleX(-1)' }}
+              />
 
-              {!capturedPreview ? (
-                <>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      display: 'block',
-                      transform: 'scaleX(-1)',
-                    }}
-                  />
-                  {cameraReady && (
-                    <Box
-                      sx={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        pointerEvents: 'none',
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          width: 200,
-                          height: 250,
-                          borderRadius: '50%',
-                          border: '3px solid rgba(255,255,255,0.8)',
-                        }}
-                      />
-                    </Box>
-                  )}
-                </>
-              ) : (
+              {cameraReady && (
                 <Box
-                  component="img"
-                  src={capturedPreview}
-                  alt="Captured"
-                  sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                />
+                  sx={{
+                    position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 200, height: 250, borderRadius: '50%',
+                      border: '3px solid',
+                      borderColor: stepPassed ? 'success.main' : 'rgba(255,255,255,0.8)',
+                      transition: 'border-color 0.2s',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    {stepPassed && <Iconify icon="mdi:check-bold" width={72} sx={{ color: 'success.main' }} />}
+                  </Box>
+                </Box>
               )}
+
+              {!cameraReady && (
+                <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CircularProgress sx={{ color: '#fff' }} />
+                </Box>
+              )}
+
+              {/* Hint bar */}
+              <Box
+                sx={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  bgcolor: 'rgba(0,0,0,0.6)', color: '#fff', px: 2, py: 1.25, textAlign: 'center', minHeight: 40,
+                }}
+              >
+                <Typography variant="caption">
+                  {stepPassed ? '✓ Đạt! Chuyển bước tiếp theo…' : (hint ?? step.hint)}
+                </Typography>
+              </Box>
             </Box>
 
-            {/* Actions */}
-            <Stack spacing={1.5} sx={{ p: 2 }}>
-              {!capturedPreview ? (
-                <Button
-                  variant="contained"
-                  size="large"
-                  disabled={!cameraReady}
-                  startIcon={<Iconify icon="mdi:camera" />}
-                  onClick={capturePhoto}
-                  sx={{ py: 1.5 }}
-                >
-                  Chụp
-                </Button>
-              ) : (
-                <Stack direction="row" spacing={1.5}>
-                  <Button
-                    variant="outlined"
-                    color="inherit"
-                    fullWidth
-                    disabled={validating}
-                    startIcon={<Iconify icon="mdi:camera-retake" />}
-                    onClick={handleRetake}
-                  >
-                    Chụp lại
-                  </Button>
-                  <Button
-                    variant="contained"
-                    fullWidth
-                    disabled={validating}
-                    startIcon={
-                      validating ? <CircularProgress size={18} color="inherit" /> : <Iconify icon="mdi:check-circle" />
-                    }
-                    onClick={handleUseThisPhoto}
-                  >
-                    Dùng ảnh này
-                  </Button>
-                </Stack>
-              )}
-              {submitting && (
-                <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
-                  <CircularProgress size={16} />
-                  <Typography variant="caption" color="text.secondary">
-                    Đang gửi ảnh đăng ký…
-                  </Typography>
-                </Stack>
-              )}
-            </Stack>
+            {submitting && (
+              <Stack direction="row" spacing={1} alignItems="center" justifyContent="center" sx={{ py: 2 }}>
+                <CircularProgress size={16} />
+                <Typography variant="caption" color="text.secondary">
+                  Đang gửi ảnh đăng ký…
+                </Typography>
+              </Stack>
+            )}
           </Card>
         )}
       </Container>
