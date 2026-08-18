@@ -152,6 +152,7 @@ export const paths = {
       myLogs: `${ROOTS.DASHBOARD}/attendance/my-logs`,
       shiftRegistration: `${ROOTS.DASHBOARD}/attendance/shift-registration`,
       adjust: `${ROOTS.DASHBOARD}/attendance/adjust`,
+      faceEnrollment: `${ROOTS.DASHBOARD}/attendance/face-enrollment`,
     },
     salary: {
       root: `${ROOTS.DASHBOARD}/salary`,

@@ -94,6 +94,12 @@ export function useNavData(userRole?: string) {
             icon: ICONS.calendar,
             roles: ['Admin', 'Manager', 'Staff'],
           },
+          {
+            title: t('faceEnrollment'),
+            path: paths.dashboard.attendance.faceEnrollment,
+            icon: ICONS.user,
+            roles: ['Admin', 'Manager', 'Staff'],
+          },
           // {
           //   title: t('myLogs'),
           //   path: paths.dashboard.attendance.myLogs,

@@ -339,6 +339,10 @@ export const endpoints = {
   checkinFace: {
     face: '/checkin/face',
   },
+  faceTracking: {
+    enrollQuality: '/face-tracking/enroll/quality',
+    enrollBatch: '/face-tracking/enroll/batch',
+  },
   notificationConfig: {
     list: '/notification/config',
     create: '/notification/config',

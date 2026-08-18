@@ -54,6 +54,7 @@
   "role": "Role",
   "myAttendance": "My Attendance",
   "checkInOut": "Check In/Out",
+  "faceEnrollment": "Face Registration",
   "mySchedule": "My Schedule",
   "myLogs": "My Logs",
   "shiftRegistration": "Shift Registration",
