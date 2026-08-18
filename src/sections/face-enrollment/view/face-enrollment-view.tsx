@@ -162,7 +162,14 @@ export default function FaceEnrollmentView() {
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
       });
       streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        // iOS Safari đôi khi không tự phát dù có autoPlay khi srcObject được gán sau khi mount
+        // (đặc biệt trong callback async) — video đứng ở khung hình đen (videoWidth vẫn > 0)
+        // khiến mọi frame lấy mẫu đều là ảnh đen, luôn nhận lỗi "không phát hiện khuôn mặt".
+        // Gọi play() chủ động, .catch() nuốt lỗi vì trình duyệt có thể tự phát trước đó rồi.
+        videoRef.current.play().catch(() => {});
+      }
       setCameraReady(true);
     } catch {
       setCameraError('Không thể mở camera. Vui lòng cấp quyền truy cập camera cho trình duyệt.');
@@ -387,9 +394,10 @@ export default function FaceEnrollmentView() {
             <Box
               sx={{
                 position: 'relative',
+                overflow: 'hidden',
                 bgcolor: 'common.black',
-                aspectRatio: '4/3',
-                minHeight: isMobile ? '55vh' : 420,
+                width: '100%',
+                height: isMobile ? '55vh' : 420,
               }}
             >
               <canvas ref={canvasRef} style={{ display: 'none' }} />
@@ -404,13 +412,14 @@ export default function FaceEnrollmentView() {
               {cameraReady && (
                 <Box
                   sx={{
-                    position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                     pointerEvents: 'none',
                   }}
                 >
                   <Box
                     sx={{
-                      width: 200, height: 250, borderRadius: '50%',
+                      width: 'min(200px, 55vw)', height: 'min(250px, 62vw)', borderRadius: '50%',
                       border: '3px solid',
                       borderColor: stepPassed ? 'success.main' : 'rgba(255,255,255,0.8)',
                       transition: 'border-color 0.2s',
@@ -423,7 +432,7 @@ export default function FaceEnrollmentView() {
               )}
 
               {!cameraReady && (
-                <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <CircularProgress sx={{ color: '#fff' }} />
                 </Box>
               )}

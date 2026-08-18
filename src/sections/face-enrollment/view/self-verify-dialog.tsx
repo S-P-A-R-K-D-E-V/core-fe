@@ -82,7 +82,10 @@ export function SelfVerifyDialog({ open, onClose }: Props) {
           return;
         }
         streamRef.current = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
+        }
         setPhase('idle');
       } catch {
         setErrorMsg('Không thể mở camera. Vui lòng cấp quyền truy cập camera.');
@@ -159,7 +162,7 @@ export function SelfVerifyDialog({ open, onClose }: Props) {
         </Stack>
       </Box>
 
-      <Box sx={{ position: 'relative', bgcolor: 'common.black', aspectRatio: '4/3' }}>
+      <Box sx={{ position: 'relative', overflow: 'hidden', bgcolor: 'common.black', width: '100%', height: 320 }}>
         {phase === 'result' || phase === 'error' ? (
           <Box
             sx={{
@@ -212,7 +215,8 @@ export function SelfVerifyDialog({ open, onClose }: Props) {
             {phase === 'opening' && (
               <Box
                 sx={{
-                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}
               >
                 <CircularProgress sx={{ color: '#fff' }} />
@@ -226,7 +230,7 @@ export function SelfVerifyDialog({ open, onClose }: Props) {
             {phase === 'processing' && (
               <Box
                 sx={{
-                  position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 1,
+                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', gap: 1,
                   alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.5)',
                 }}
               >
