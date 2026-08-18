@@ -24,6 +24,9 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import CircularProgress from '@mui/material/CircularProgress';
 
+import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
+
 import { fData } from 'src/utils/format-number';
 import { getStorageUrl } from 'src/utils/storage';
 import { getProfileCompletion } from 'src/utils/profile-completion';
@@ -53,6 +56,7 @@ type AvatarSource = 'upload' | 'google';
 // ----------------------------------------------------------------------
 
 export default function AccountGeneral() {
+  const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
   const { updateUser } = useAuthContext();
 
@@ -403,20 +407,30 @@ export default function AccountGeneral() {
               sx={{ height: 8, borderRadius: 4, mb: 2 }}
             />
             <Box display="grid" gridTemplateColumns={{ xs: '1fr 1fr', sm: 'repeat(3, 1fr)' }} gap={1}>
-              {completionSteps.map((step) => (
-                <Stack key={step.key} direction="row" alignItems="center" spacing={0.5}>
-                  <Box
-                    sx={{
-                      width: 8, height: 8, borderRadius: '50%',
-                      bgcolor: step.done ? 'success.main' : 'error.main',
-                      flexShrink: 0,
-                    }}
-                  />
-                  <Typography variant="caption" color={step.done ? 'text.secondary' : 'error'}>
-                    {step.label}
-                  </Typography>
-                </Stack>
-              ))}
+              {completionSteps.map((step) => {
+                const clickable = step.key === 'faceEmbedding';
+                return (
+                  <Stack
+                    key={step.key}
+                    direction="row"
+                    alignItems="center"
+                    spacing={0.5}
+                    onClick={clickable ? () => router.push(paths.dashboard.attendance.faceEnrollment) : undefined}
+                    sx={clickable ? { cursor: 'pointer', '&:hover': { textDecoration: 'underline' } } : undefined}
+                  >
+                    <Box
+                      sx={{
+                        width: 8, height: 8, borderRadius: '50%',
+                        bgcolor: step.done ? 'success.main' : 'error.main',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Typography variant="caption" color={step.done ? 'text.secondary' : 'error'}>
+                      {step.label}
+                    </Typography>
+                  </Stack>
+                );
+              })}
             </Box>
           </Card>
         </Grid>

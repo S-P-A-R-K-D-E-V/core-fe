@@ -24,6 +24,7 @@ export function getProfileCompletion(user: IUser | null): {
     { key: 'profileImageUrl', label: 'Ảnh đại diện',        done: !!user.profileImageUrl,              weight: 1 },
     { key: 'idCardFrontUrl',  label: 'CCCD mặt trước',      done: !!user.idCardFrontUrl,               weight: 1.5 },
     { key: 'idCardBackUrl',   label: 'CCCD mặt sau',        done: !!user.idCardBackUrl,                weight: 0.5 },
+    { key: 'faceEmbedding',   label: 'Đăng ký khuôn mặt',   done: !!user.hasFaceEmbedding,             weight: 1 },
   ];
 
   const totalWeight  = steps.reduce((s, st) => s + st.weight, 0);

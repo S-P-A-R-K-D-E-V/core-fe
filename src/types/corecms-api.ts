@@ -24,6 +24,7 @@ export interface IUser {
   idCardBackUrl?: string;
   schedulingPriority?: number;
   roles: string[];
+  hasFaceEmbedding: boolean;
 }
 
 export interface IAuthResponse {
