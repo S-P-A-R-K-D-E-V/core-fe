@@ -61,6 +61,9 @@ export async function submitFaceEnrollment(imagesBase64: string[]): Promise<IFac
   } satisfies IEnrollPresignRequest);
   const presigned = presignRes.data;
   pushDebugLog(`presign OK: ${presigned.map((p) => p.objectKey).join(', ')}`);
+  // In nguyên URL #0 (có chữ ký, hết hạn sau 15 phút, chỉ PUT được đúng 1 object key này) để
+  // debug bằng curl từ máy khác khi cần — không phải access key/secret thật.
+  if (presigned[0]) pushDebugLog(`presign URL #0 (full, TTL 15p): ${presigned[0].uploadUrl}`);
 
   await Promise.all(
     presigned.map(async (p, i) => {
