@@ -11,6 +11,25 @@ import {
 } from 'src/types/corecms-api';
 
 // ----------------------------------------------------------------------
+// Debug log tạm — face-enrollment-view có nút "Xem log debug" đọc mảng này để hiển thị ngay
+// trên màn hình (không cần DevTools, hữu ích khi test trên điện thoại). Xoá khi hết cần debug
+// luồng upload R2 trực tiếp qua presigned URL.
+
+export type FaceEnrollDebugEntry = { ts: string; msg: string };
+export const faceEnrollDebugLog: FaceEnrollDebugEntry[] = [];
+
+function pushDebugLog(msg: string) {
+  faceEnrollDebugLog.push({ ts: new Date().toISOString(), msg });
+  if (faceEnrollDebugLog.length > 300) faceEnrollDebugLog.shift();
+  // eslint-disable-next-line no-console
+  console.log(`[face-enrollment] ${msg}`);
+}
+
+export function clearFaceEnrollDebugLog() {
+  faceEnrollDebugLog.length = 0;
+}
+
+// ----------------------------------------------------------------------
 
 /** Validate 1 ảnh chụp trong luồng đăng ký khuôn mặt có hướng dẫn tư thế — gọi ngay sau mỗi
  *  lần chụp để biết đủ góc/đã chớp mắt chưa trước khi coi tấm ảnh hợp lệ. */
@@ -32,10 +51,16 @@ function base64ToBlob(base64: string, contentType = 'image/jpeg'): Blob {
  *  qua presigned URL (không đi qua API/nginx, tránh 413 khi gộp nhiều ảnh base64 gốc camera
  *  vào 1 request JSON), rồi chỉ gửi object key cho BE tự tải về + tính embedding. */
 export async function submitFaceEnrollment(imagesBase64: string[]): Promise<IFaceEmbeddingResponse> {
+  clearFaceEnrollDebugLog();
+  pushDebugLog(`UA: ${typeof navigator !== 'undefined' ? navigator.userAgent : '?'}`);
+  pushDebugLog(`origin: ${typeof window !== 'undefined' ? window.location.origin : '?'}`);
+  pushDebugLog(`presign: xin ${imagesBase64.length} URL…`);
+
   const presignRes = await axios.post<IEnrollPresignedFileResponse[]>(endpoints.faceTracking.enrollPresign, {
     count: imagesBase64.length,
   } satisfies IEnrollPresignRequest);
   const presigned = presignRes.data;
+  pushDebugLog(`presign OK: ${presigned.map((p) => p.objectKey).join(', ')}`);
 
   await Promise.all(
     presigned.map(async (p, i) => {
@@ -46,6 +71,8 @@ export async function submitFaceEnrollment(imagesBase64: string[]): Promise<IFac
           return '?';
         }
       })();
+      const start = Date.now();
+      pushDebugLog(`PUT #${i} -> ${host} key=${p.objectKey} bắt đầu…`);
       let res: Response;
       try {
         res = await fetch(p.uploadUrl, {
@@ -55,22 +82,25 @@ export async function submitFaceEnrollment(imagesBase64: string[]): Promise<IFac
         });
       } catch (err: any) {
         // fetch() reject (không phải HTTP status lỗi) — thường là CORS preflight bị chặn,
-        // DNS/TLS lỗi, hoặc mất mạng giữa chừng. Log ra console để xem chi tiết qua DevTools
-        // (message ở UI chỉ có "Load failed"/"Failed to fetch", không đủ để chẩn đoán).
-        // eslint-disable-next-line no-console
-        console.error('[face-enrollment] upload to R2 failed (network/CORS)', { host, objectKey: p.objectKey, err });
+        // DNS/TLS lỗi, hoặc mất mạng giữa chừng.
+        const detail = `name=${err?.name} message=${err?.message} (${Date.now() - start}ms)`;
+        pushDebugLog(`PUT #${i} FETCH REJECT: ${detail}`);
         throw new Error(`Không tải được ảnh lên R2 (mạng/CORS, host: ${host}) — ${err?.message ?? err}`);
       }
+      pushDebugLog(`PUT #${i} response: status=${res.status} (${Date.now() - start}ms)`);
       if (!res.ok) {
         const body = await res.text().catch(() => '');
+        pushDebugLog(`PUT #${i} BODY: ${body.slice(0, 300)}`);
         throw new Error(`Tải ảnh lên R2 thất bại (${res.status} ${host}): ${body.slice(0, 200)}`);
       }
     })
   );
 
+  pushDebugLog('Tất cả ảnh đã PUT xong -> gọi enroll/batch…');
   const response = await axios.post<IFaceEmbeddingResponse>(endpoints.faceTracking.enrollBatch, {
     objectKeys: presigned.map((p) => p.objectKey),
   } satisfies IEnrollFaceBatchRequest);
+  pushDebugLog('enroll/batch OK.');
   return response.data;
 }
 

@@ -6,6 +6,12 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
@@ -22,7 +28,7 @@ import Iconify from 'src/components/iconify';
 import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 import { useAuthContext } from 'src/auth/hooks';
 
-import { checkEnrollQuality, submitFaceEnrollment } from 'src/api/faceEnrollment';
+import { checkEnrollQuality, submitFaceEnrollment, faceEnrollDebugLog } from 'src/api/faceEnrollment';
 import type { IEnrollQualityResponse } from 'src/types/corecms-api';
 
 import { SelfVerifyDialog } from './self-verify-dialog';
@@ -127,6 +133,25 @@ export default function FaceEnrollmentView() {
 
   const [mode, setMode] = useState<Mode>(user?.hasFaceEmbedding ? 'status' : 'capture');
   const [verifyOpen, setVerifyOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const [logText, setLogText] = useState('');
+  const [logCopied, setLogCopied] = useState(false);
+
+  function openDebugLog() {
+    setLogText(faceEnrollDebugLog.map((e) => `[${e.ts}] ${e.msg}`).join('\n') || '(chưa có log)');
+    setLogCopied(false);
+    setLogOpen(true);
+  }
+
+  async function copyDebugLog() {
+    try {
+      await navigator.clipboard.writeText(logText);
+      setLogCopied(true);
+    } catch {
+      // Clipboard API có thể bị chặn (không phải HTTPS/permission) — người dùng vẫn có thể
+      // bôi đen thủ công trong TextField bên dưới, không cần báo lỗi.
+    }
+  }
   // Đồng bộ mode theo user (auth context có thể load user muộn hơn render đầu tiên) — nhưng
   // KHÔNG ghi đè nếu người dùng đã tự bấm "Đăng ký lại" (vẫn ở capture cho tới khi xong).
   const manualCaptureRef = useRef(false);
@@ -363,6 +388,16 @@ export default function FaceEnrollmentView() {
                 Để sau
               </Button>
             </Stack>
+            <Button
+              variant="text"
+              size="small"
+              color="inherit"
+              startIcon={<Iconify icon="mdi:bug-outline" />}
+              onClick={openDebugLog}
+              sx={{ mt: 2 }}
+            >
+              Xem log debug
+            </Button>
           </Card>
         ) : cameraError ? (
           <Card sx={{ p: 5, textAlign: 'center' }}>
@@ -463,6 +498,36 @@ export default function FaceEnrollmentView() {
             )}
           </Card>
         )}
+
+        <Dialog open={logOpen} onClose={() => setLogOpen(false)} maxWidth="sm" fullWidth fullScreen={isMobile}>
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            Log debug đăng ký khuôn mặt
+            <IconButton onClick={() => setLogOpen(false)} size="small">
+              <Iconify icon="mdi:close" />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+              Bôi đen để copy thủ công nếu nút Copy không hoạt động.
+            </Typography>
+            <TextField
+              value={logText}
+              multiline
+              fullWidth
+              minRows={12}
+              maxRows={24}
+              InputProps={{ readOnly: true, sx: { fontFamily: 'monospace', fontSize: 12 } }}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={copyDebugLog} startIcon={<Iconify icon={logCopied ? 'mdi:check' : 'mdi:content-copy'} />}>
+              {logCopied ? 'Đã copy' : 'Copy'}
+            </Button>
+            <Button variant="contained" onClick={() => setLogOpen(false)}>
+              Đóng
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </RoleBasedGuard>
   );
