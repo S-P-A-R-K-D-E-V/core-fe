@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -8,43 +8,54 @@ import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import Iconify from 'src/components/iconify';
 
+import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
+import { checkEnrollQuality } from 'src/api/faceEnrollment';
 import { smartCheckInFace, smartCheckOutFace, checkInFace } from 'src/api/attendance';
+import type { IEnrollQualityResponse } from 'src/types/corecms-api';
 
 // ----------------------------------------------------------------------
-// Check-in/check-out bằng khuôn mặt (mới): quay 1 video ngắn thay vì chụp ảnh, BE tự verify
-// qua face-tracking-service — verify là best-effort, KHÔNG chặn chấm công nếu fail/service lỗi
-// (xem VerifyFaceCommandHandler bên Core-be), nên dialog này không cần màn "thử lại nếu không
-// khớp" như self-verify-dialog — chỉ cần quay xong là submit thẳng.
+// Check-in/check-out bằng khuôn mặt — camera mở tự động, KHÔNG có nút bấm quay: liên tục lấy
+// mẫu frame nền và validate qua face-tracking-service (đúng pattern tự-động-nhận-diện của
+// face-enrollment, bước "Nhìn thẳng") tới khi có 1 tấm đạt (đủ sáng/rõ, nhìn thẳng), tự chụp
+// tấm đó rồi gửi thẳng sang BE verify BẮT BUỘC (không phải video quay tay + verify best-effort
+// như trước) — không khớp/không đủ tin cậy thì BE tự chặn hẳn check-in/out (xem
+// AttendanceController.RequireFaceMatchAsync), dialog chỉ hiển thị kết quả.
+//
 // mode='checkin'|'checkout': chạy SONG SONG với luồng chụp ảnh cũ (smart-check-in/-out-face).
-// mode='overtime': THAY THẾ hẳn luồng chụp ảnh cũ của action "Check-in ngoài giờ"
-// (check-in-face, IsOvertime=true) — không còn đường chụp ảnh cho action này nữa.
+// mode='overtime': THAY THẾ hẳn luồng chụp ảnh cũ của action "Check-in ngoài giờ" (check-in-face).
 
-const RECORD_MS = 3000;
+const POLL_INTERVAL_MS = 600;
+const YAW_STRAIGHT_MAX = 0.08;
+const PITCH_STRAIGHT_MAX = 0.08;
+const MIN_QUALITY = 0.55; // khớp Settings.QUALITY_THRESHOLD face-tracking-service — xem face-enrollment-view.tsx
 
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve((reader.result as string).split(',')[1] ?? '');
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+function validateStraight(q: IEnrollQualityResponse): string | null {
+  if (q.qualityScore < MIN_QUALITY) {
+    return 'Ảnh chưa đủ rõ — di chuyển tới nơi đủ sáng, giữ máy ổn định.';
+  }
+  if (Math.abs(q.yaw) > YAW_STRAIGHT_MAX || Math.abs(q.pitch) > PITCH_STRAIGHT_MAX) {
+    return 'Vui lòng nhìn thẳng vào camera.';
+  }
+  return null;
 }
 
-function extractApiError(error: any): string {
-  return (
+function extractApiError(error: any): { message: string; notEnrolled: boolean } {
+  const errorCode = error?.errors && typeof error.errors === 'object' ? Object.keys(error.errors)[0] : null;
+  const notEnrolled = errorCode === 'FaceTracking.NoFaceEmbedding';
+  const message =
     error?.detail ||
     error?.description ||
     error?.message ||
     (error?.title !== 'One or more validation errors occurred.' ? error?.title : null) ||
-    'Thất bại. Vui lòng thử lại.'
-  );
+    'Thất bại. Vui lòng thử lại.';
+  return { message, notEnrolled };
 }
 
-type Phase = 'opening' | 'idle' | 'recording' | 'submitting' | 'success' | 'error';
+type Phase = 'opening' | 'scanning' | 'submitting' | 'success' | 'error';
 
 type Props = {
   open: boolean;
@@ -57,20 +68,23 @@ type Props = {
 };
 
 export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClose, onSuccess }: Props) {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const busyRef = useRef(false);
 
   const [phase, setPhase] = useState<Phase>('opening');
+  const [hint, setHint] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [recordProgress, setRecordProgress] = useState(0);
+  const [notEnrolled, setNotEnrolled] = useState(false);
 
   useEffect(() => {
     if (!open) return undefined;
     setPhase('opening');
+    setHint(null);
     setErrorMsg(null);
-    setRecordProgress(0);
+    setNotEnrolled(false);
 
     let cancelled = false;
     (async () => {
@@ -87,7 +101,7 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
           videoRef.current.srcObject = stream;
           videoRef.current.play().catch(() => {});
         }
-        setPhase('idle');
+        setPhase('scanning');
       } catch {
         setErrorMsg('Không thể mở camera. Vui lòng cấp quyền truy cập camera.');
         setPhase('error');
@@ -101,12 +115,28 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
     };
   }, [open]);
 
+  const captureFrameBase64 = useCallback((): string | null => {
+    if (!videoRef.current || !canvasRef.current) return null;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (video.videoWidth === 0) return null;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.85).split(',')[1] ?? null;
+  }, []);
+
   const handleSubmit = useCallback(
-    async (base64: string) => {
+    async (imageBase64: string) => {
       setPhase('submitting');
       try {
         const payload = {
-          videoBase64: base64,
+          imageBase64,
           latitude: geoLocation?.lat,
           longitude: geoLocation?.lng,
           accuracy: geoAccuracy ?? undefined,
@@ -123,48 +153,44 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
         setPhase('success');
         onSuccess();
       } catch (err) {
-        setErrorMsg(extractApiError(err));
+        const { message, notEnrolled: ne } = extractApiError(err);
+        setErrorMsg(message);
+        setNotEnrolled(ne);
         setPhase('error');
       }
     },
     [mode, geoLocation, geoAccuracy, onSuccess]
   );
 
-  const handleRecord = useCallback(() => {
-    if (!streamRef.current) return;
-    chunksRef.current = [];
+  // ── Auto-detect: lấy mẫu frame nền, tự chụp khi đạt "nhìn thẳng" — KHÔNG cần bấm nút. ──
+  useEffect(() => {
+    if (phase !== 'scanning') return undefined;
 
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
-      ? 'video/webm;codecs=vp8'
-      : undefined;
-    const recorder = mimeType ? new MediaRecorder(streamRef.current, { mimeType }) : new MediaRecorder(streamRef.current);
+    const interval = setInterval(async () => {
+      if (busyRef.current) return;
+      const base64 = captureFrameBase64();
+      if (!base64) return;
 
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data);
-    };
-    recorder.onstop = async () => {
-      const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'video/webm' });
-      const base64 = await blobToBase64(blob);
-      handleSubmit(base64);
-    };
+      busyRef.current = true;
+      try {
+        const quality = await checkEnrollQuality(base64);
+        const error = validateStraight(quality);
+        if (error) {
+          setHint(error);
+          return;
+        }
+        setHint(null);
+        handleSubmit(base64);
+      } catch (err) {
+        const { message } = extractApiError(err);
+        setHint(message);
+      } finally {
+        busyRef.current = false;
+      }
+    }, POLL_INTERVAL_MS);
 
-    recorderRef.current = recorder;
-    recorder.start();
-    setPhase('recording');
-
-    const start = Date.now();
-    const progressTimer = setInterval(() => {
-      const pct = Math.min(100, ((Date.now() - start) / RECORD_MS) * 100);
-      setRecordProgress(pct);
-      if (pct >= 100) clearInterval(progressTimer);
-    }, 100);
-
-    setTimeout(() => {
-      clearInterval(progressTimer);
-      setRecordProgress(100);
-      if (recorder.state !== 'inactive') recorder.stop();
-    }, RECORD_MS);
-  }, [handleSubmit]);
+    return () => clearInterval(interval);
+  }, [phase, captureFrameBase64, handleSubmit]);
 
   function handleClose() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -174,8 +200,8 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
 
   function handleRetry() {
     setErrorMsg(null);
-    setRecordProgress(0);
-    setPhase(streamRef.current ? 'idle' : 'opening');
+    setNotEnrolled(false);
+    setPhase(streamRef.current ? 'scanning' : 'opening');
   }
 
   const title =
@@ -216,6 +242,7 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
           </Box>
         ) : (
           <>
+            <canvas ref={canvasRef} style={{ display: 'none' }} />
             <video
               ref={videoRef}
               autoPlay
@@ -228,9 +255,14 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
                 <CircularProgress sx={{ color: '#fff' }} />
               </Box>
             )}
-            {phase === 'recording' && (
-              <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
-                <LinearProgress variant="determinate" value={recordProgress} color="error" sx={{ height: 4 }} />
+            {phase === 'scanning' && (
+              <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                <Box
+                  sx={{
+                    width: 'min(200px, 55vw)', height: 'min(250px, 62vw)', borderRadius: '50%',
+                    border: '3px solid rgba(255,255,255,0.8)',
+                  }}
+                />
               </Box>
             )}
             {phase === 'submitting' && (
@@ -241,7 +273,12 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
                 }}
               >
                 <CircularProgress sx={{ color: '#fff' }} />
-                <Typography variant="caption" sx={{ color: '#fff' }}>Đang xử lý…</Typography>
+                <Typography variant="caption" sx={{ color: '#fff' }}>Đang xác thực…</Typography>
+              </Box>
+            )}
+            {phase === 'scanning' && (
+              <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(0,0,0,0.6)', color: '#fff', px: 2, py: 1.25, textAlign: 'center', minHeight: 40 }}>
+                <Typography variant="caption">{hint ?? 'Giữ khuôn mặt trong khung, nhìn thẳng vào camera…'}</Typography>
               </Box>
             )}
           </>
@@ -249,22 +286,23 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
       </Box>
 
       <Stack spacing={1.5} sx={{ p: 2.5, bgcolor: 'grey.900' }}>
-        {phase === 'idle' && (
-          <Button
-            variant="contained"
-            size="large"
-            startIcon={<Iconify icon="mdi:record-circle-outline" />}
-            onClick={handleRecord}
-          >
-            Bắt đầu quay (3 giây)
-          </Button>
-        )}
         {phase === 'error' && (
-          <Stack direction="row" spacing={1.5}>
-            <Button variant="outlined" color="inherit" fullWidth onClick={handleRetry} sx={{ color: 'grey.300', borderColor: 'grey.600' }}>
-              Thử lại
-            </Button>
-            <Button variant="contained" fullWidth onClick={handleClose}>
+          <Stack spacing={1.5}>
+            {notEnrolled ? (
+              <Button
+                variant="contained"
+                fullWidth
+                startIcon={<Iconify icon="mdi:face-recognition" />}
+                onClick={() => router.push(paths.dashboard.attendance.faceEnrollment)}
+              >
+                Đăng ký khuôn mặt ngay
+              </Button>
+            ) : (
+              <Button variant="contained" fullWidth onClick={handleRetry} startIcon={<Iconify icon="mdi:camera-retake" />}>
+                Thử lại
+              </Button>
+            )}
+            <Button variant="outlined" color="inherit" fullWidth onClick={handleClose} sx={{ color: 'grey.300', borderColor: 'grey.600' }}>
               Đóng
             </Button>
           </Stack>
@@ -274,7 +312,7 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
             Đóng
           </Button>
         )}
-        {(phase === 'opening' || phase === 'recording' || phase === 'submitting') && (
+        {(phase === 'opening' || phase === 'scanning' || phase === 'submitting') && (
           <Button variant="text" color="inherit" onClick={handleClose} sx={{ color: 'grey.400' }}>
             Huỷ
           </Button>
