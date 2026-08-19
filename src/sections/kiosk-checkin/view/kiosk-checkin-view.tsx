@@ -318,6 +318,7 @@ export default function KioskCheckinView() {
           captureWidth={captureDims.width}
           captureHeight={captureDims.height}
           mirror={facingMode === 'user'}
+          candidateLabel={candidate ? { trackId: candidate.trackId, text: candidate.staffName } : null}
         />
 
         <Stack spacing={1} sx={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 5 }}>
