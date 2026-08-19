@@ -223,11 +223,19 @@ export function AuthProvider({ children }: Props) {
     try {
       const res = await axios.get(endpoints.users.me);
       const profileImageUrl: string | undefined = res.data?.profileImageUrl;
-      if (profileImageUrl) {
-        dispatch({ type: Types.LOGIN, payload: { user: { ...baseUser, photoURL: getStorageUrl(profileImageUrl) } } });
-      }
+      const hasFaceEmbedding: boolean | undefined = res.data?.hasFaceEmbedding;
+      dispatch({
+        type: Types.LOGIN,
+        payload: {
+          user: {
+            ...baseUser,
+            ...(profileImageUrl ? { photoURL: getStorageUrl(profileImageUrl) } : null),
+            hasFaceEmbedding: !!hasFaceEmbedding,
+          },
+        },
+      });
     } catch {
-      // non-blocking — keep existing photoURL
+      // non-blocking — keep existing photoURL/hasFaceEmbedding
     }
   }, []);
 
@@ -407,16 +415,19 @@ export function AuthProvider({ children }: Props) {
       refreshToken: getRefreshToken() || (state.user as any)?.refreshToken,
     };
 
-    // Step 3: Fetch latest profile image from server (non-blocking)
+    // Step 3: Fetch latest profile image + face-enrollment status from server (non-blocking)
     try {
       const res = await axios.get(endpoints.users.me);
       const profileImageUrl: string | undefined = res.data?.profileImageUrl;
+      const hasFaceEmbedding: boolean | undefined = res.data?.hasFaceEmbedding;
       dispatch({
         type: Types.LOGIN,
         payload: {
-          user: profileImageUrl
-            ? { ...merged, photoURL: getStorageUrl(profileImageUrl) }
-            : merged,
+          user: {
+            ...merged,
+            ...(profileImageUrl ? { photoURL: getStorageUrl(profileImageUrl) } : null),
+            hasFaceEmbedding: !!hasFaceEmbedding,
+          },
         },
       });
     } catch {
