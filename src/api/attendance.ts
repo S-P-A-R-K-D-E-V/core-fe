@@ -20,6 +20,8 @@ import {
   ICheckOutRequest,
   ISmartCheckInRequest,
   ISmartCheckOutRequest,
+  ISmartCheckInWithFaceRequest,
+  ISmartCheckOutWithFaceRequest,
   IManualAttendanceAdjustmentRequest,
   IAdjustAttendanceTimeRequest,
   IAttendanceRequest,
@@ -309,6 +311,16 @@ export async function smartCheckIn(data: ISmartCheckInRequest): Promise<IAttenda
 
 export async function smartCheckOut(data: ISmartCheckOutRequest): Promise<IAttendanceLog[]> {
   const response = await axios.post<IAttendanceLog[]>(endpoints.attendance.smartCheckOut, data);
+  return response.data;
+}
+
+export async function smartCheckInFace(data: ISmartCheckInWithFaceRequest): Promise<IAttendanceLog> {
+  const response = await axios.post<IAttendanceLog>(endpoints.attendance.smartCheckInFace, data);
+  return response.data;
+}
+
+export async function smartCheckOutFace(data: ISmartCheckOutWithFaceRequest): Promise<IAttendanceLog[]> {
+  const response = await axios.post<IAttendanceLog[]>(endpoints.attendance.smartCheckOutFace, data);
   return response.data;
 }
 

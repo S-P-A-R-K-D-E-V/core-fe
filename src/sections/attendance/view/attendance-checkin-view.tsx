@@ -53,6 +53,7 @@ import {
 import { checkinFace } from 'src/api/checkinFace';
 import { completeCleaningTask, getMyCleaningChecklist } from 'src/api/cleaning';
 import { TaskRow } from 'src/sections/cleaning/cleaning-task-row';
+import { FaceCheckinDialog } from 'src/sections/attendance/face-checkin-dialog';
 import { toDateStr } from 'src/utils/format-time';
 
 // ----------------------------------------------------------------------
@@ -153,6 +154,7 @@ export default function AttendanceCheckinView() {
   const watchIdRef = useRef<number | null>(null);
 
   const [faceDialogOpen, setFaceDialogOpen] = useState(false);
+  const [faceCheckinDialogOpen, setFaceCheckinDialogOpen] = useState(false);
   const [overtimeConfirmOpen, setOvertimeConfirmOpen] = useState(false);
   const [pendingCheckin, setPendingCheckin] = useState<{
     mode: 'smart' | 'overtime' | 'checkout';
@@ -1044,6 +1046,18 @@ export default function AttendanceCheckinView() {
                   Kết thúc làm việc
                 </Button>
 
+                <Button
+                  variant="text"
+                  size="small"
+                  fullWidth
+                  onClick={() => setFaceCheckinDialogOpen(true)}
+                  disabled={!!actionLoading}
+                  startIcon={<Iconify icon="mdi:face-recognition" />}
+                  sx={{ mt: 1, color: 'rgba(255,255,255,0.85)' }}
+                >
+                  Check-out bằng khuôn mặt (mới)
+                </Button>
+
                 {currentShiftCleaning && currentShiftCleaning.tasks.length > 0 && (
                   <Button
                     variant="outlined"
@@ -1202,6 +1216,20 @@ export default function AttendanceCheckinView() {
                     </Button>
                   </span>
                 </Tooltip>
+
+                {activeSmartShift && (
+                  <Button
+                    variant="text"
+                    size="small"
+                    fullWidth
+                    onClick={() => setFaceCheckinDialogOpen(true)}
+                    disabled={!!actionLoading}
+                    startIcon={<Iconify icon="mdi:face-recognition" />}
+                    sx={{ mt: 1, color: 'rgba(255,255,255,0.75)' }}
+                  >
+                    Check-in bằng khuôn mặt (mới)
+                  </Button>
+                )}
               </Box>
             </Card>
           )}
@@ -1800,6 +1828,20 @@ export default function AttendanceCheckinView() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <FaceCheckinDialog
+        open={faceCheckinDialogOpen}
+        mode={isCurrentlyWorking ? 'checkout' : 'checkin'}
+        geoLocation={geoLocation}
+        geoAccuracy={geoAccuracy}
+        onClose={() => setFaceCheckinDialogOpen(false)}
+        onSuccess={() => {
+          enqueueSnackbar(isCurrentlyWorking ? 'Kết thúc làm việc thành công!' : 'Bắt đầu làm việc thành công!', {
+            variant: 'success',
+          });
+          fetchData();
+        }}
+      />
     </Container>
   );
 }
