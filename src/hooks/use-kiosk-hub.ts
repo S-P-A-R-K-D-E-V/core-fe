@@ -79,9 +79,19 @@ export function useKioskHub(deviceKey: string | null) {
     conn.on('candidate_found', (payload: IKioskCandidateFound) => setCandidate(payload));
     conn.on('error', (raw: unknown) => setError(parseErrorMessage(raw)));
 
-    conn.onreconnecting(() => setConnectionState('reconnecting'));
+    // Log lý do mất kết nối/đóng ra console — trước đây "nuốt" luôn error argument nên khi
+    // reconnect loop xảy ra không có cách nào biết BE đóng vì sao (401, hub exception, network...)
+    // ngoài việc lục log server (mà nhiều khi log server cũng không bắt được nếu lỗi xảy ra ở
+    // tầng transport/negotiate trước khi vào tới Hub code).
+    conn.onreconnecting((err) => {
+      console.warn('[useKioskHub] reconnecting, lý do mất kết nối trước đó:', err);
+      setConnectionState('reconnecting');
+    });
     conn.onreconnected(() => setConnectionState('connected'));
-    conn.onclose(() => setConnectionState('disconnected'));
+    conn.onclose((err) => {
+      console.error('[useKioskHub] connection closed:', err);
+      setConnectionState('disconnected');
+    });
 
     conn
       .start()
