@@ -6,8 +6,6 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { useSnackbar } from 'src/components/snackbar';
 
@@ -15,7 +13,6 @@ import { useKioskHub } from 'src/hooks/use-kiosk-hub';
 import { useKioskDevice } from 'src/hooks/use-kiosk-device';
 import { confirmKioskCheckIn, confirmKioskCheckOut } from 'src/api/kiosk';
 
-import type { KioskMode } from 'src/types/kiosk';
 import KioskDeviceSetup from '../kiosk-device-setup';
 import KioskCameraStage from '../kiosk-camera-stage';
 import KioskStatusBanner from '../kiosk-status-banner';
@@ -37,7 +34,6 @@ export default function KioskCheckinView() {
   const { enqueueSnackbar } = useSnackbar();
   const { deviceKey, setDeviceKey, clearDeviceKey } = useKioskDevice();
 
-  const [mode, setMode] = useState<KioskMode>('checkin');
   const {
     connectionState,
     tracks,
@@ -46,7 +42,7 @@ export default function KioskCheckinView() {
     clearCandidate,
     clearError,
     sendFrame,
-  } = useKioskHub(deviceKey, mode);
+  } = useKioskHub(deviceKey);
 
   // ── Camera ────────────────────────────────────────────────────────────
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -166,10 +162,10 @@ export default function KioskCheckinView() {
     if (!candidate || !deviceKey) return;
     setConfirming(true);
     try {
-      const fn = mode === 'checkin' ? confirmKioskCheckIn : confirmKioskCheckOut;
+      const fn = candidate.isCheckIn ? confirmKioskCheckIn : confirmKioskCheckOut;
       await fn(candidate.staffId, deviceKey);
       enqueueSnackbar(
-        `Đã ${mode === 'checkin' ? 'chấm công vào' : 'chấm công ra'} cho ${candidate.staffName}`,
+        `Đã ${candidate.isCheckIn ? 'chấm công vào' : 'chấm công ra'} cho ${candidate.staffName}`,
         { variant: 'success' }
       );
     } catch (err: any) {
@@ -178,7 +174,7 @@ export default function KioskCheckinView() {
       setConfirming(false);
       clearCandidate();
     }
-  }, [candidate, deviceKey, mode, clearCandidate, enqueueSnackbar]);
+  }, [candidate, deviceKey, clearCandidate, enqueueSnackbar]);
 
   useEffect(() => {
     if (!showCandidate) {
@@ -249,16 +245,6 @@ export default function KioskCheckinView() {
     >
       <Stack direction="row" spacing={2} alignItems="center">
         <Typography variant="h4">Kiosk Chấm Công</Typography>
-        <ToggleButtonGroup
-          value={mode}
-          exclusive
-          color="primary"
-          disabled={confirming}
-          onChange={(_, val: KioskMode | null) => val && setMode(val)}
-        >
-          <ToggleButton value="checkin">Check-in</ToggleButton>
-          <ToggleButton value="checkout">Check-out</ToggleButton>
-        </ToggleButtonGroup>
         <Button size="small" color="inherit" onClick={clearDeviceKey}>
           Đổi thiết bị
         </Button>
@@ -300,6 +286,7 @@ export default function KioskCheckinView() {
           <KioskCandidateStage
             staffName={candidate.staffName}
             staffAvatarUrl={candidate.staffAvatarUrl}
+            isCheckIn={candidate.isCheckIn}
             secondsLeft={secondsLeft}
             totalSeconds={AUTO_CONFIRM_SECONDS}
             onCancel={clearCandidate}

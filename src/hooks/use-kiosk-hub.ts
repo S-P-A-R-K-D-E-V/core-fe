@@ -10,15 +10,14 @@ import type {
   IKioskTrack,
   IKioskTracksMessage,
   KioskConnectionState,
-  KioskMode,
 } from 'src/types/kiosk';
 
 // Mirror pattern của src/components/messenger/messenger-provider.tsx (SignalR connection
 // lifecycle) — khác biệt: kiosk auth qua query string `kioskKey` (KioskAuthenticationHandler.
 // QueryParamName phía Core-be), KHÔNG dùng accessTokenFactory (đó là cho JWT Bearer).
 //
-// KioskHub chỉ đọc `?mode=` lúc CONNECT, không đổi được giữa chừng — đổi `mode` ở đây sẽ tự
-// ngắt kết nối cũ và mở kết nối mới (effect cleanup + rerun theo dependency).
+// Không còn `?mode=` — kiosk không gạt tay chọn check-in/check-out nữa, BE tự suy luận theo
+// từng candidate (xem IKioskCandidateFound.isCheckIn).
 
 // "tracks" Core-be forward NGUYÊN VĂN dạng string JSON (không phải object đã parse) —
 // xem KioskStreamSession.HandleTracksAsync: `_caller.SendAsync("tracks", rawJson)`.
@@ -48,7 +47,7 @@ function parseErrorMessage(raw: unknown): string {
   return 'Lỗi không xác định';
 }
 
-export function useKioskHub(deviceKey: string | null, mode: KioskMode) {
+export function useKioskHub(deviceKey: string | null) {
   const connRef = useRef<signalR.HubConnection | null>(null);
   const seqRef = useRef(0);
 
@@ -69,7 +68,7 @@ export function useKioskHub(deviceKey: string | null, mode: KioskMode) {
     setError(null);
     seqRef.current = 0;
 
-    const url = `${HOST_API || ''}/hubs/kiosk?kioskKey=${encodeURIComponent(deviceKey)}&mode=${mode}`;
+    const url = `${HOST_API || ''}/hubs/kiosk?kioskKey=${encodeURIComponent(deviceKey)}`;
     const conn = new signalR.HubConnectionBuilder()
       .withUrl(url)
       .withAutomaticReconnect()
@@ -101,7 +100,7 @@ export function useKioskHub(deviceKey: string | null, mode: KioskMode) {
       connRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deviceKey, mode]);
+  }, [deviceKey]);
 
   const sendFrame = useCallback((base64Data: string) => {
     const conn = connRef.current;

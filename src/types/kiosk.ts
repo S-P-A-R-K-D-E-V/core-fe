@@ -4,8 +4,6 @@
 //      Core-be/CoreCms-facetracking/CoreCms.Application/Kiosk/Commands/Identify/KioskIdentifyCommand.cs,
 //      face-tracking-service/app/core/schemas/{track,common}.py
 
-export type KioskMode = 'checkin' | 'checkout';
-
 export type TrackState =
   | 'NEW'
   | 'TRACKING'
@@ -31,11 +29,14 @@ export interface IKioskTracksMessage {
 
 // Payload thật từ KioskHub — KHÔNG có staffAvatarUrl (Core-be chưa wire field này,
 // xem KioskIdentifyResult record). Để optional cho dễ bổ sung sau.
+// isCheckIn: kiosk KHÔNG còn gạt tay chọn check-in/check-out — BE tự gộp cả 2 pool ứng viên
+// (KioskIdentifyCommandHandler) và trả về nên check-in hay check-out cho người nhận diện được.
 export interface IKioskCandidateFound {
   trackId: string;
   staffId: string;
   staffName: string;
   similarity: number;
+  isCheckIn: boolean;
   staffAvatarUrl?: string;
 }
 

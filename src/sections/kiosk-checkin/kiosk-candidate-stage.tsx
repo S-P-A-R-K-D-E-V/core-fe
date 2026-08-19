@@ -13,6 +13,9 @@ import Iconify from 'src/components/iconify';
 type Props = {
   staffName: string;
   staffAvatarUrl?: string;
+  /** Kiosk không gạt tay chọn chiều nữa — BE tự suy luận theo trạng thái ca/log của người
+   *  nhận diện được (xem IKioskCandidateFound.isCheckIn). */
+  isCheckIn: boolean;
   secondsLeft: number;
   totalSeconds: number;
   onCancel: () => void;
@@ -21,6 +24,7 @@ type Props = {
 export default function KioskCandidateStage({
   staffName,
   staffAvatarUrl,
+  isCheckIn,
   secondsLeft,
   totalSeconds,
   onCancel,
@@ -52,6 +56,12 @@ export default function KioskCandidateStage({
       </Avatar>
 
       <Typography variant="h3">Xin chào, {staffName}</Typography>
+      <Typography
+        variant="subtitle1"
+        sx={{ mt: -2, color: isCheckIn ? 'success.light' : 'warning.light', fontWeight: 700 }}
+      >
+        {isCheckIn ? 'CHẤM CÔNG VÀO' : 'CHẤM CÔNG RA'}
+      </Typography>
 
       <Box sx={{ position: 'relative', display: 'inline-flex' }}>
         <CircularProgress
