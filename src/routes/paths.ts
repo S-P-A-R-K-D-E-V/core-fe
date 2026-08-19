@@ -153,6 +153,7 @@ export const paths = {
       shiftRegistration: `${ROOTS.DASHBOARD}/attendance/shift-registration`,
       adjust: `${ROOTS.DASHBOARD}/attendance/adjust`,
       faceEnrollment: `${ROOTS.DASHBOARD}/attendance/face-enrollment`,
+      kioskDevices: `${ROOTS.DASHBOARD}/attendance/kiosk-devices`,
     },
     salary: {
       root: `${ROOTS.DASHBOARD}/salary`,

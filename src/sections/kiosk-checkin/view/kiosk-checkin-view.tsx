@@ -13,7 +13,7 @@ import { useKioskHub } from 'src/hooks/use-kiosk-hub';
 import { useKioskDevice } from 'src/hooks/use-kiosk-device';
 import { confirmKioskCheckIn, confirmKioskCheckOut } from 'src/api/kiosk';
 
-import KioskDeviceSetup from '../kiosk-device-setup';
+import KioskPairingSetup from '../kiosk-pairing-setup';
 import KioskCameraStage from '../kiosk-camera-stage';
 import KioskStatusBanner from '../kiosk-status-banner';
 import KioskCandidateStage from '../kiosk-candidate-stage';
@@ -199,7 +199,7 @@ export default function KioskCheckinView() {
 
   // ── Render ───────────────────────────────────────────────────────────
   if (!deviceKey) {
-    return <KioskDeviceSetup onSubmit={setDeviceKey} />;
+    return <KioskPairingSetup onSubmit={setDeviceKey} />;
   }
 
   if (cameraError) {

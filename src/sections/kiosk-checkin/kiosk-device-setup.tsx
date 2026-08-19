@@ -13,9 +13,10 @@ import Typography from '@mui/material/Typography';
 
 type Props = {
   onSubmit: (key: string) => void;
+  onBack?: () => void;
 };
 
-export default function KioskDeviceSetup({ onSubmit }: Props) {
+export default function KioskDeviceSetup({ onSubmit, onBack }: Props) {
   const [value, setValue] = useState('');
 
   const handleSubmit = () => {
@@ -53,6 +54,11 @@ export default function KioskDeviceSetup({ onSubmit }: Props) {
           <Button variant="contained" size="large" disabled={!value.trim()} onClick={handleSubmit}>
             Lưu &amp; Kết nối
           </Button>
+          {onBack && (
+            <Button size="small" color="inherit" onClick={onBack}>
+              Quay lại ghép nối bằng mã QR
+            </Button>
+          )}
         </Stack>
       </Card>
     </Box>

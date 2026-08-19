@@ -513,6 +513,11 @@ export const endpoints = {
   kiosk: {
     confirmCheckIn: '/kiosk/confirm-checkin',
     confirmCheckOut: '/kiosk/confirm-checkout',
+    pairingRequest: '/kiosk-pairing/request',
+    pairingStatus: (pairingId: string) => `/kiosk-pairing/${pairingId}/status`,
+    pairingClaim: '/kiosk-pairing/claim',
+    devices: '/kiosk-devices',
+    deviceRevoke: (deviceId: string) => `/kiosk-devices/${deviceId}/revoke`,
   },
   messenger: {
     conversations: '/messenger/conversations',

@@ -100,6 +100,12 @@ export function useNavData(userRole?: string) {
             icon: ICONS.user,
             roles: ['Admin', 'Manager', 'Staff'],
           },
+          {
+            title: 'Thiết bị Kiosk',
+            path: paths.dashboard.attendance.kioskDevices,
+            icon: ICONS.tour,
+            roles: ['Admin', 'Manager'],
+          },
           // {
           //   title: t('myLogs'),
           //   path: paths.dashboard.attendance.myLogs,

@@ -52,3 +52,34 @@ export interface IKioskConfirmResponse {
   checkInTime: string | null;
   checkOutTime: string | null;
 }
+
+// ── Ghép nối thiết bị (KioskPairingController) — thay cho seed tay KioskDevice qua DB ──
+
+export interface IKioskPairingRequest {
+  pairingId: string;
+  code: string;
+  expiresAt: string;
+}
+
+export type KioskPairingStatus = 'pending' | 'expired' | 'claimed';
+
+export interface IKioskPairingStatusResponse {
+  status: KioskPairingStatus;
+  kioskKey?: string | null;
+  deviceName?: string | null;
+}
+
+export interface IKioskClaimResponse {
+  deviceId: string;
+  deviceName: string;
+}
+
+export interface IKioskDeviceItem {
+  id: string;
+  name: string;
+  branchId: string;
+  branchName: string;
+  isActive: boolean;
+  createdAt: string;
+  lastSeenAt: string | null;
+}

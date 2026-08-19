@@ -2,8 +2,8 @@
 
 import { useCallback, useState } from 'react';
 
-// Core-be chưa có endpoint tạo/lấy KioskDevice key (phải seed tay qua DB) — kiosk lưu
-// key nhập tay 1 lần vào localStorage, không có luồng cấp phát tự động.
+// Key được cấp qua luồng ghép nối (KioskPairingController — xem kiosk-pairing-setup.tsx),
+// lưu vào localStorage của trình duyệt kiosk, chỉ cần ghép nối 1 lần.
 const STORAGE_KEY = 'kioskDeviceKey';
 
 export function useKioskDevice() {
