@@ -4,14 +4,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
+import Dialog from '@mui/material/Dialog';
 import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
 import Typography from '@mui/material/Typography';
 
+import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 
 import { useKioskHub } from 'src/hooks/use-kiosk-hub';
 import { useKioskDevice } from 'src/hooks/use-kiosk-device';
 import { confirmKioskCheckIn, confirmKioskCheckOut } from 'src/api/kiosk';
+import { kioskDebugLog, clearKioskDebugLog } from 'src/utils/kiosk-debug-log';
 
 import KioskPairingSetup from '../kiosk-pairing-setup';
 import KioskCameraStage from '../kiosk-camera-stage';
@@ -66,6 +74,33 @@ export default function KioskCheckinView() {
       localStorage.setItem('kioskCameraFacing', next);
       return next;
     });
+  }
+
+  // ── Xem log debug ngay trên màn hình — kiosk thường chạy trên điện thoại/tablet, không mở
+  // được DevTools để soi lý do reconnect/lỗi kết nối. Tự refresh khi đang mở để "theo dõi" live.
+  const [logOpen, setLogOpen] = useState(false);
+  const [logText, setLogText] = useState('');
+  const [logCopied, setLogCopied] = useState(false);
+
+  function formatDebugLog() {
+    return kioskDebugLog.map((e) => `[${e.ts.slice(11, 23)}] ${e.msg}`).join('\n') || '(chưa có log)';
+  }
+
+  useEffect(() => {
+    if (!logOpen) return undefined;
+    setLogText(formatDebugLog());
+    const interval = setInterval(() => setLogText(formatDebugLog()), 500);
+    return () => clearInterval(interval);
+  }, [logOpen]);
+
+  async function copyDebugLog() {
+    try {
+      await navigator.clipboard.writeText(logText);
+      setLogCopied(true);
+      setTimeout(() => setLogCopied(false), 2000);
+    } catch {
+      // Clipboard API có thể bị chặn — người dùng vẫn bôi đen thủ công trong TextField.
+    }
   }
 
   const startCamera = useCallback(async () => {
@@ -262,14 +297,17 @@ export default function KioskCheckinView() {
         p: 2,
       }}
     >
-      <Stack direction="row" spacing={2} alignItems="center">
-        <Typography variant="h4">Kiosk Chấm Công</Typography>
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" justifyContent="center">
+        <Typography variant="h4" sx={{ mr: 1 }}>Kiosk Chấm Công</Typography>
         <Button size="small" color="inherit" onClick={toggleFacingMode}>
           Đổi camera ({facingMode === 'user' ? 'trước' : 'sau'})
         </Button>
         <Button size="small" color="inherit" onClick={clearDeviceKey}>
           Đổi thiết bị
         </Button>
+        <IconButton size="small" color="inherit" onClick={() => setLogOpen(true)} title="Xem log debug">
+          <Iconify icon="mdi:bug-outline" />
+        </IconButton>
       </Stack>
 
       <Box sx={{ position: 'relative', width: '100%', maxWidth: 720 }}>
@@ -318,6 +356,45 @@ export default function KioskCheckinView() {
       </Box>
 
       <canvas ref={captureCanvasRef} style={{ display: 'none' }} />
+
+      <Dialog open={logOpen} onClose={() => setLogOpen(false)} maxWidth="sm" fullWidth fullScreen>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          Log debug kiosk
+          <IconButton onClick={() => setLogOpen(false)} size="small">
+            <Iconify icon="mdi:close" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+            Tự cập nhật mỗi 0.5s trong lúc mở — để nguyên màn này khi hiện tượng đang xảy ra. Bôi
+            đen để copy thủ công nếu nút Copy không hoạt động.
+          </Typography>
+          <TextField
+            value={logText}
+            multiline
+            fullWidth
+            minRows={16}
+            maxRows={40}
+            InputProps={{ readOnly: true, sx: { fontFamily: 'monospace', fontSize: 11 } }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              clearKioskDebugLog();
+              setLogText(formatDebugLog());
+            }}
+          >
+            Xoá log
+          </Button>
+          <Button onClick={copyDebugLog} startIcon={<Iconify icon={logCopied ? 'mdi:check' : 'mdi:content-copy'} />}>
+            {logCopied ? 'Đã copy' : 'Copy'}
+          </Button>
+          <Button variant="contained" onClick={() => setLogOpen(false)}>
+            Đóng
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

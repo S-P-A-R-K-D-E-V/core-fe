@@ -4,6 +4,7 @@ import * as signalR from '@microsoft/signalr';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { HOST_API } from 'src/config-global';
+import { pushKioskDebugLog } from 'src/utils/kiosk-debug-log';
 
 import type {
   IKioskCandidateFound,
@@ -69,38 +70,55 @@ export function useKioskHub(deviceKey: string | null) {
     seqRef.current = 0;
 
     const url = `${HOST_API || ''}/hubs/kiosk?kioskKey=${encodeURIComponent(deviceKey)}`;
+    pushKioskDebugLog(`connect() bắt đầu — url=${url.replace(/kioskKey=[^&]+/, 'kioskKey=***')}`);
+
     const conn = new signalR.HubConnectionBuilder()
       .withUrl(url)
-      .withAutomaticReconnect()
-      .configureLogging(signalR.LogLevel.Warning)
+      // Custom logger thay vì chỉ LogLevel — vừa in console vừa đẩy vào kioskDebugLog để xem
+      // ngay trên màn hình (kiosk chạy trên điện thoại/tablet, không mở được DevTools). Bắt cả
+      // log nội bộ của SignalR (chọn transport, fallback...) chứ không chỉ log tự viết.
+      .configureLogging({
+        log: (logLevel, message) => {
+          if (logLevel < signalR.LogLevel.Warning) return;
+          pushKioskDebugLog(`[signalr] ${message}`);
+        },
+      })
       .build();
 
     conn.on('tracks', (raw: string) => setTracks(parseTracksMessage(raw)));
     conn.on('candidate_found', (payload: IKioskCandidateFound) => setCandidate(payload));
-    conn.on('error', (raw: unknown) => setError(parseErrorMessage(raw)));
+    conn.on('error', (raw: unknown) => {
+      const message = parseErrorMessage(raw);
+      pushKioskDebugLog(`server error event: ${message}`);
+      setError(message);
+    });
 
-    // Log lý do mất kết nối/đóng ra console — trước đây "nuốt" luôn error argument nên khi
-    // reconnect loop xảy ra không có cách nào biết BE đóng vì sao (401, hub exception, network...)
-    // ngoài việc lục log server (mà nhiều khi log server cũng không bắt được nếu lỗi xảy ra ở
-    // tầng transport/negotiate trước khi vào tới Hub code).
+    // Log lý do mất kết nối/đóng — trước đây "nuốt" luôn error argument nên khi reconnect loop
+    // xảy ra không có cách nào biết BE đóng vì sao (401, hub exception, network...) ngoài việc
+    // lục log server (mà nhiều khi log server cũng không bắt được nếu lỗi xảy ra ở tầng
+    // transport/negotiate trước khi vào tới Hub code).
     conn.onreconnecting((err) => {
-      console.warn('[useKioskHub] reconnecting, lý do mất kết nối trước đó:', err);
+      pushKioskDebugLog(`reconnecting — lý do mất kết nối trước đó: ${err?.message ?? err ?? '(không rõ)'}`);
       setConnectionState('reconnecting');
     });
-    conn.onreconnected(() => setConnectionState('connected'));
+    conn.onreconnected(() => {
+      pushKioskDebugLog('reconnected OK');
+      setConnectionState('connected');
+    });
     conn.onclose((err) => {
-      console.error('[useKioskHub] connection closed:', err);
+      pushKioskDebugLog(`connection closed — ${err?.message ?? err ?? '(không rõ)'}`);
       setConnectionState('disconnected');
     });
 
     conn
       .start()
       .then(() => {
+        pushKioskDebugLog('connect() thành công');
         connRef.current = conn;
         setConnectionState('connected');
       })
       .catch((err) => {
-        console.error('[useKioskHub] connect failed', err);
+        pushKioskDebugLog(`connect() thất bại — ${err?.message ?? err ?? '(không rõ)'}`);
         setConnectionState('disconnected');
         const message = String(err?.message ?? err ?? '');
         // Khoá thiết bị sai/đã bị thu hồi → BE trả 401 ngay lúc negotiate, KHÁC lỗi mạng thật sự
