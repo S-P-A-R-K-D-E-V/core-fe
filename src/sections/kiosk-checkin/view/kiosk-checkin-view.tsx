@@ -53,13 +53,27 @@ export default function KioskCheckinView() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [captureDims, setCaptureDims] = useState({ width: 640, height: 480 });
+  // Camera trước/sau — nhớ lựa chọn qua reload (kiosk thường gắn cố định, chỉnh 1 lần khi lắp).
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>(() =>
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('kioskCameraFacing') as 'user' | 'environment') || 'user'
+      : 'user'
+  );
+
+  function toggleFacingMode() {
+    setFacingMode((prev) => {
+      const next = prev === 'user' ? 'environment' : 'user';
+      localStorage.setItem('kioskCameraFacing', next);
+      return next;
+    });
+  }
 
   const startCamera = useCallback(async () => {
     setCameraError(null);
     setCameraReady(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        video: { facingMode, width: { ideal: 640 }, height: { ideal: 480 } },
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -77,10 +91,12 @@ export default function KioskCheckinView() {
     } catch {
       setCameraError('Không thể mở camera. Vui lòng cấp quyền truy cập camera cho trình duyệt.');
     }
-  }, []);
+  }, [facingMode]);
 
   useEffect(() => {
     if (!deviceKey) return undefined;
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
     startCamera();
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -222,6 +238,9 @@ export default function KioskCheckinView() {
         <Button variant="contained" onClick={startCamera}>
           Thử lại
         </Button>
+        <Button variant="outlined" color="inherit" onClick={toggleFacingMode}>
+          Đổi camera ({facingMode === 'user' ? 'trước' : 'sau'})
+        </Button>
         <Button variant="text" color="inherit" onClick={clearDeviceKey}>
           Đổi thiết bị
         </Button>
@@ -245,6 +264,9 @@ export default function KioskCheckinView() {
     >
       <Stack direction="row" spacing={2} alignItems="center">
         <Typography variant="h4">Kiosk Chấm Công</Typography>
+        <Button size="small" color="inherit" onClick={toggleFacingMode}>
+          Đổi camera ({facingMode === 'user' ? 'trước' : 'sau'})
+        </Button>
         <Button size="small" color="inherit" onClick={clearDeviceKey}>
           Đổi thiết bị
         </Button>
@@ -257,6 +279,7 @@ export default function KioskCheckinView() {
           tracks={tracks}
           captureWidth={captureDims.width}
           captureHeight={captureDims.height}
+          mirror={facingMode === 'user'}
         />
 
         <Stack spacing={1} sx={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 5 }}>

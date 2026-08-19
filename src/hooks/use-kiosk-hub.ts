@@ -92,7 +92,15 @@ export function useKioskHub(deviceKey: string | null) {
       .catch((err) => {
         console.error('[useKioskHub] connect failed', err);
         setConnectionState('disconnected');
-        setError('Không kết nối được máy chủ');
+        const message = String(err?.message ?? err ?? '');
+        // Khoá thiết bị sai/đã bị thu hồi → BE trả 401 ngay lúc negotiate, KHÁC lỗi mạng thật sự
+        // (timeout, DNS...). Phân biệt rõ để người dùng biết cần "Đổi thiết bị" chứ không phải
+        // chờ mạng ổn định lại (xem KioskAuthenticationHandler).
+        setError(
+          /401|unauthorized/i.test(message)
+            ? 'Khoá thiết bị không hợp lệ hoặc đã bị thu hồi — bấm "Đổi thiết bị" để ghép nối lại.'
+            : 'Không kết nối được máy chủ'
+        );
       });
 
     return () => {

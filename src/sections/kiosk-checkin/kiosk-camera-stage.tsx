@@ -14,6 +14,9 @@ type Props = {
   tracks: IKioskTrack[];
   captureWidth: number;
   captureHeight: number;
+  /** Chỉ lật gương cho camera trước (selfie-style) — camera sau lật sẽ khiến hình ảnh/chữ
+   *  trong khung hình bị ngược, gây khó hiểu. Mặc định true (camera trước). */
+  mirror?: boolean;
 };
 
 export default function KioskCameraStage({
@@ -22,6 +25,7 @@ export default function KioskCameraStage({
   tracks,
   captureWidth,
   captureHeight,
+  mirror = true,
 }: Props) {
   // bbox trả về là pixel [x1,y1,x2,y2] theo đúng kích thước frame đã gửi lên (captureWidth/
   // Height) — canvas overlay dùng chung kích thước đó nên vẽ thẳng 1:1, không cần quy đổi tỉ lệ.
@@ -53,7 +57,7 @@ export default function KioskCameraStage({
         bgcolor: 'common.black',
         // Mirror CẢ video lẫn canvas overlay CÙNG 1 transform — bbox pixel (toạ độ frame gốc
         // chưa mirror) vẽ thẳng lên canvas vẫn khớp vì 2 lớp cùng bị lật giống nhau.
-        transform: 'scaleX(-1)',
+        transform: mirror ? 'scaleX(-1)' : 'none',
       }}
     >
       <video
