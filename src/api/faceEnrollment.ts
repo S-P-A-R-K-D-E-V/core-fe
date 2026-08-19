@@ -38,15 +38,34 @@ export async function submitFaceEnrollment(imagesBase64: string[]): Promise<IFac
   const presigned = presignRes.data;
 
   await Promise.all(
-    presigned.map((p, i) =>
-      fetch(p.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'image/jpeg' },
-        body: base64ToBlob(imagesBase64[i]),
-      }).then((res) => {
-        if (!res.ok) throw new Error(`Tải ảnh lên thất bại (${res.status})`);
-      })
-    )
+    presigned.map(async (p, i) => {
+      const host = (() => {
+        try {
+          return new URL(p.uploadUrl).host;
+        } catch {
+          return '?';
+        }
+      })();
+      let res: Response;
+      try {
+        res = await fetch(p.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'image/jpeg' },
+          body: base64ToBlob(imagesBase64[i]),
+        });
+      } catch (err: any) {
+        // fetch() reject (không phải HTTP status lỗi) — thường là CORS preflight bị chặn,
+        // DNS/TLS lỗi, hoặc mất mạng giữa chừng. Log ra console để xem chi tiết qua DevTools
+        // (message ở UI chỉ có "Load failed"/"Failed to fetch", không đủ để chẩn đoán).
+        // eslint-disable-next-line no-console
+        console.error('[face-enrollment] upload to R2 failed (network/CORS)', { host, objectKey: p.objectKey, err });
+        throw new Error(`Không tải được ảnh lên R2 (mạng/CORS, host: ${host}) — ${err?.message ?? err}`);
+      }
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Tải ảnh lên R2 thất bại (${res.status} ${host}): ${body.slice(0, 200)}`);
+      }
+    })
   );
 
   const response = await axios.post<IFaceEmbeddingResponse>(endpoints.faceTracking.enrollBatch, {
