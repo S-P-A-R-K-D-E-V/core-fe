@@ -12,15 +12,16 @@ import LinearProgress from '@mui/material/LinearProgress';
 
 import Iconify from 'src/components/iconify';
 
-import { smartCheckInFace, smartCheckOutFace } from 'src/api/attendance';
+import { smartCheckInFace, smartCheckOutFace, checkInFace } from 'src/api/attendance';
 
 // ----------------------------------------------------------------------
-// Check-in/check-out bằng khuôn mặt (mới) — chạy SONG SONG với luồng chụp ảnh cũ
-// (attendance-checkin-view.tsx), không thay thế. Khác biệt duy nhất: quay 1 video ngắn thay
-// vì chụp ảnh, BE tự verify qua face-tracking-service (POST /attendance/smart-check-in-face,
-// -out-face) — verify là best-effort, KHÔNG chặn chấm công nếu fail/service lỗi (xem
-// VerifyFaceCommandHandler bên Core-be), nên dialog này không cần màn "thử lại nếu không khớp"
-// như self-verify-dialog — chỉ cần quay xong là submit thẳng.
+// Check-in/check-out bằng khuôn mặt (mới): quay 1 video ngắn thay vì chụp ảnh, BE tự verify
+// qua face-tracking-service — verify là best-effort, KHÔNG chặn chấm công nếu fail/service lỗi
+// (xem VerifyFaceCommandHandler bên Core-be), nên dialog này không cần màn "thử lại nếu không
+// khớp" như self-verify-dialog — chỉ cần quay xong là submit thẳng.
+// mode='checkin'|'checkout': chạy SONG SONG với luồng chụp ảnh cũ (smart-check-in/-out-face).
+// mode='overtime': THAY THẾ hẳn luồng chụp ảnh cũ của action "Check-in ngoài giờ"
+// (check-in-face, IsOvertime=true) — không còn đường chụp ảnh cho action này nữa.
 
 const RECORD_MS = 3000;
 
@@ -47,7 +48,7 @@ type Phase = 'opening' | 'idle' | 'recording' | 'submitting' | 'success' | 'erro
 
 type Props = {
   open: boolean;
-  mode: 'checkin' | 'checkout';
+  mode: 'checkin' | 'checkout' | 'overtime';
   geoLocation?: { lat: number; lng: number } | null;
   geoAccuracy?: number | null;
   onClose: () => void;
@@ -112,8 +113,10 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
         };
         if (mode === 'checkin') {
           await smartCheckInFace(payload);
-        } else {
+        } else if (mode === 'checkout') {
           await smartCheckOutFace(payload);
+        } else {
+          await checkInFace({ ...payload, isOvertime: true });
         }
         streamRef.current?.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
@@ -175,7 +178,8 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
     setPhase(streamRef.current ? 'idle' : 'opening');
   }
 
-  const title = mode === 'checkin' ? 'Check-in bằng khuôn mặt' : 'Check-out bằng khuôn mặt';
+  const title =
+    mode === 'checkout' ? 'Check-out bằng khuôn mặt' : mode === 'overtime' ? 'Check-in ngoài giờ bằng khuôn mặt' : 'Check-in bằng khuôn mặt';
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}>
@@ -205,7 +209,7 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
               <>
                 <Iconify icon="mdi:check-decagram" width={56} sx={{ color: 'success.main' }} />
                 <Typography variant="h6" sx={{ color: '#fff' }}>
-                  {mode === 'checkin' ? 'Check-in thành công!' : 'Check-out thành công!'}
+                  {mode === 'checkout' ? 'Check-out thành công!' : 'Check-in thành công!'}
                 </Typography>
               </>
             )}

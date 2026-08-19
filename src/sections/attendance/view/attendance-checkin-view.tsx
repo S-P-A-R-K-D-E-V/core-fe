@@ -154,7 +154,9 @@ export default function AttendanceCheckinView() {
   const watchIdRef = useRef<number | null>(null);
 
   const [faceDialogOpen, setFaceDialogOpen] = useState(false);
-  const [faceCheckinDialogOpen, setFaceCheckinDialogOpen] = useState(false);
+  // null = đóng. 'overtime' THAY THẾ hẳn dialog chụp ảnh cũ cho action check-in ngoài giờ;
+  // 'checkin'/'checkout' vẫn chạy song song với luồng chụp ảnh cũ (xem face-checkin-dialog.tsx).
+  const [faceCheckinMode, setFaceCheckinMode] = useState<'checkin' | 'checkout' | 'overtime' | null>(null);
   const [overtimeConfirmOpen, setOvertimeConfirmOpen] = useState(false);
   const [pendingCheckin, setPendingCheckin] = useState<{
     mode: 'smart' | 'overtime' | 'checkout';
@@ -1050,7 +1052,7 @@ export default function AttendanceCheckinView() {
                   variant="text"
                   size="small"
                   fullWidth
-                  onClick={() => setFaceCheckinDialogOpen(true)}
+                  onClick={() => setFaceCheckinMode('checkout')}
                   disabled={!!actionLoading}
                   startIcon={<Iconify icon="mdi:face-recognition" />}
                   sx={{ mt: 1, color: 'rgba(255,255,255,0.85)' }}
@@ -1222,7 +1224,7 @@ export default function AttendanceCheckinView() {
                     variant="text"
                     size="small"
                     fullWidth
-                    onClick={() => setFaceCheckinDialogOpen(true)}
+                    onClick={() => setFaceCheckinMode('checkin')}
                     disabled={!!actionLoading}
                     startIcon={<Iconify icon="mdi:face-recognition" />}
                     sx={{ mt: 1, color: 'rgba(255,255,255,0.75)' }}
@@ -1436,14 +1438,14 @@ export default function AttendanceCheckinView() {
                   actionLoading === 'overtime' ? (
                     <CircularProgress size={16} color="inherit" />
                   ) : (
-                    <Iconify icon="mdi:camera" />
+                    <Iconify icon="mdi:face-recognition" />
                   )
                 }
-                onClick={() => openFaceDialog('overtime', 'Ngoài giờ')}
+                onClick={() => setFaceCheckinMode('overtime')}
                 disabled={!!actionLoading || (branches.length > 0 && !gpsReadyForCheckin && !gpsErrorFallbackEnabled)}
                 sx={{ borderRadius: 2, fontWeight: 600 }}
               >
-                Chụp & Check In
+                Check In bằng khuôn mặt
               </Button>
             </Stack>
           </Card>
@@ -1515,10 +1517,10 @@ export default function AttendanceCheckinView() {
             color="warning"
             size="large"
             fullWidth
-            startIcon={<Iconify icon="mdi:camera" />}
+            startIcon={<Iconify icon="mdi:face-recognition" />}
             onClick={() => {
               setOvertimeConfirmOpen(false);
-              openFaceDialog('overtime', 'Ngoài giờ');
+              setFaceCheckinMode('overtime');
             }}
             sx={{ borderRadius: 2, py: 1.25, fontWeight: 700 }}
           >
@@ -1830,15 +1832,16 @@ export default function AttendanceCheckinView() {
       </Dialog>
 
       <FaceCheckinDialog
-        open={faceCheckinDialogOpen}
-        mode={isCurrentlyWorking ? 'checkout' : 'checkin'}
+        open={faceCheckinMode !== null}
+        mode={faceCheckinMode ?? 'checkin'}
         geoLocation={geoLocation}
         geoAccuracy={geoAccuracy}
-        onClose={() => setFaceCheckinDialogOpen(false)}
+        onClose={() => setFaceCheckinMode(null)}
         onSuccess={() => {
-          enqueueSnackbar(isCurrentlyWorking ? 'Kết thúc làm việc thành công!' : 'Bắt đầu làm việc thành công!', {
-            variant: 'success',
-          });
+          enqueueSnackbar(
+            faceCheckinMode === 'checkout' ? 'Kết thúc làm việc thành công!' : 'Bắt đầu làm việc thành công!',
+            { variant: 'success' }
+          );
           fetchData();
         }}
       />

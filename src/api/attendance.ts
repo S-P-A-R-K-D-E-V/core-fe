@@ -18,6 +18,7 @@ import {
   IAttendanceLog,
   ICheckInRequest,
   ICheckOutRequest,
+  ICheckInWithFaceRequest,
   ISmartCheckInRequest,
   ISmartCheckOutRequest,
   ISmartCheckInWithFaceRequest,
@@ -296,6 +297,11 @@ export async function swapShiftAssignments(
 
 export async function checkIn(data: ICheckInRequest): Promise<IAttendanceLog> {
   const response = await axios.post<IAttendanceLog>(endpoints.attendance.checkIn, data);
+  return response.data;
+}
+
+export async function checkInFace(data: ICheckInWithFaceRequest): Promise<IAttendanceLog> {
+  const response = await axios.post<IAttendanceLog>(endpoints.attendance.checkInFace, data);
   return response.data;
 }
 

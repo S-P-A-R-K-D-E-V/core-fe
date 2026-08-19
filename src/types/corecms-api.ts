@@ -394,6 +394,20 @@ export interface ICheckInRequest {
   faceVerified: boolean;
 }
 
+/** POST /attendance/check-in-face — đối xứng ICheckInRequest: KHÔNG có faceVerified (server
+ *  tự verify video qua Face Tracking Service). Dùng cho check-in ngoài giờ (isOvertime=true,
+ *  shiftAssignmentId=undefined). */
+export interface ICheckInWithFaceRequest {
+  videoBase64: string;
+  shiftAssignmentId?: string;
+  isOvertime?: boolean;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  ipAddress?: string;
+  wifiName?: string;
+}
+
 export interface ICheckOutRequest {
   attendanceLogId: string;
   latitude?: number;
