@@ -341,6 +341,7 @@ export const endpoints = {
   },
   faceTracking: {
     enrollQuality: '/face-tracking/enroll/quality',
+    enrollPresign: '/face-tracking/enroll/presign',
     enrollBatch: '/face-tracking/enroll/batch',
     verifySelf: '/face-tracking/verify-self',
   },

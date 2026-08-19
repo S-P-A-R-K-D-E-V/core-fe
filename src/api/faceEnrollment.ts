@@ -2,6 +2,8 @@ import axios, { endpoints } from 'src/utils/axios';
 import {
   IEnrollQualityRequest,
   IEnrollQualityResponse,
+  IEnrollPresignRequest,
+  IEnrollPresignedFileResponse,
   IEnrollFaceBatchRequest,
   IFaceEmbeddingResponse,
   IVerifySelfRequest,
@@ -19,10 +21,36 @@ export async function checkEnrollQuality(imageBase64: string): Promise<IEnrollQu
   return response.data;
 }
 
-/** Gửi toàn bộ ảnh đã qua validate (đủ 6 bước) để đăng ký/cập nhật khuôn mặt. */
+function base64ToBlob(base64: string, contentType = 'image/jpeg'): Blob {
+  const byteChars = atob(base64);
+  const byteNumbers = new Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i += 1) byteNumbers[i] = byteChars.charCodeAt(i);
+  return new Blob([new Uint8Array(byteNumbers)], { type: contentType });
+}
+
+/** Gửi toàn bộ ảnh đã qua validate để đăng ký/cập nhật khuôn mặt — PUT thẳng từng ảnh lên R2
+ *  qua presigned URL (không đi qua API/nginx, tránh 413 khi gộp nhiều ảnh base64 gốc camera
+ *  vào 1 request JSON), rồi chỉ gửi object key cho BE tự tải về + tính embedding. */
 export async function submitFaceEnrollment(imagesBase64: string[]): Promise<IFaceEmbeddingResponse> {
+  const presignRes = await axios.post<IEnrollPresignedFileResponse[]>(endpoints.faceTracking.enrollPresign, {
+    count: imagesBase64.length,
+  } satisfies IEnrollPresignRequest);
+  const presigned = presignRes.data;
+
+  await Promise.all(
+    presigned.map((p, i) =>
+      fetch(p.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'image/jpeg' },
+        body: base64ToBlob(imagesBase64[i]),
+      }).then((res) => {
+        if (!res.ok) throw new Error(`Tải ảnh lên thất bại (${res.status})`);
+      })
+    )
+  );
+
   const response = await axios.post<IFaceEmbeddingResponse>(endpoints.faceTracking.enrollBatch, {
-    imagesBase64,
+    objectKeys: presigned.map((p) => p.objectKey),
   } satisfies IEnrollFaceBatchRequest);
   return response.data;
 }
