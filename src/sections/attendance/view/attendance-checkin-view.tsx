@@ -1847,6 +1847,7 @@ export default function AttendanceCheckinView() {
         mode={faceCheckinMode ?? 'checkin'}
         geoLocation={geoLocation}
         geoAccuracy={geoAccuracy}
+        staffName={user?.displayName || user?.name || user?.email || 'N/A'}
         onClose={() => setFaceCheckinMode(null)}
         onSuccess={() => {
           enqueueSnackbar(

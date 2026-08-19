@@ -15,6 +15,7 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 import { checkEnrollQuality } from 'src/api/faceEnrollment';
 import { smartCheckInFace, smartCheckOutFace, checkInFace } from 'src/api/attendance';
+import { checkinFace } from 'src/api/checkinFace';
 import type { IEnrollQualityResponse } from 'src/types/corecms-api';
 
 // ----------------------------------------------------------------------
@@ -62,12 +63,15 @@ type Props = {
   mode: 'checkin' | 'checkout' | 'overtime';
   geoLocation?: { lat: number; lng: number } | null;
   geoAccuracy?: number | null;
+  /** Tên hiển thị của nhân viên — dùng cho thông báo Telegram (checkinFace), không ảnh
+   *  hưởng tới xác thực khuôn mặt (BE tự xác định staff qua token). */
+  staffName: string;
   onClose: () => void;
   /** Gọi khi check-in/out thành công — cha tự fetchData() lại. */
   onSuccess: () => void;
 };
 
-export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClose, onSuccess }: Props) {
+export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, staffName, onClose, onSuccess }: Props) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -148,10 +152,23 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
         } else {
           await checkInFace({ ...payload, isOvertime: true });
         }
+        // Đẩy ảnh lên Telegram — không chặn kết quả check-in/out nếu lỗi (chỉ là thông báo phụ).
+        checkinFace({
+          candidateName: staffName,
+          imageBase64: `data:image/jpeg;base64,${imageBase64}`,
+          lat: geoLocation?.lat,
+          lng: geoLocation?.lng,
+          deviceName: navigator.userAgent.slice(0, 80),
+          time: new Date().toISOString(),
+          checkInType: mode,
+        }).catch(() => {});
         streamRef.current?.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
         setPhase('success');
         onSuccess();
+        // Tự đóng dialog sau khi cha đã hiện snackbar — tránh còn sót khung camera/nút
+        // "Đóng" thủ công khiến người dùng tưởng chưa xong dù check-in/out đã thành công.
+        setTimeout(onClose, 700);
       } catch (err) {
         const { message, notEnrolled: ne } = extractApiError(err);
         setErrorMsg(message);
@@ -159,7 +176,7 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, onClos
         setPhase('error');
       }
     },
-    [mode, geoLocation, geoAccuracy, onSuccess]
+    [mode, geoLocation, geoAccuracy, staffName, onSuccess, onClose]
   );
 
   // ── Auto-detect: lấy mẫu frame nền, tự chụp khi đạt "nhìn thẳng" — KHÔNG cần bấm nút. ──
