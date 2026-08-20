@@ -97,6 +97,9 @@ export function useKioskHub(deviceKey: string | null) {
     const url = `${HOST_API || ''}/hubs/kiosk?kioskKey=${encodeURIComponent(deviceKey)}`;
     pushKioskDebugLog(`connect() bắt đầu — url=${url.replace(/kioskKey=[^&]+/, 'kioskKey=***')}`);
 
+    let stoppedIntentionally = false;
+    let manualRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
     const conn = new signalR.HubConnectionBuilder()
       .withUrl(url)
       // Custom logger thay vì chỉ LogLevel — vừa in console vừa đẩy vào kioskDebugLog để xem
@@ -108,6 +111,12 @@ export function useKioskHub(deviceKey: string | null) {
           pushKioskDebugLog(`[signalr] ${message}`);
         },
       })
+      // Không có option này thì SignalR KHÔNG tự nối lại — 1 lần WebSocket rớt (vd 1006 do
+      // mạng chập chờn trên điện thoại/wifi kiosk) là kiosk đứng im vĩnh viễn ở màn "Mất kết nối
+      // máy chủ" cho tới khi có người vào reload tay. Mảng delay là các lần retry TRONG 1 phiên
+      // kết nối (onreconnecting/onreconnected) — nếu SignalR tự bỏ cuộc sau khi hết mảng này,
+      // onclose bên dưới còn 1 vòng lặp retry thủ công riêng để không bao giờ bỏ cuộc hẳn.
+      .withAutomaticReconnect([0, 2000, 5000, 10000, 15000, 30000])
       .build();
 
     conn.on('tracks', (raw: string) => setTracks(parseTracksMessage(raw)));
@@ -133,9 +142,40 @@ export function useKioskHub(deviceKey: string | null) {
       pushKioskDebugLog('reconnected OK');
       setConnectionState('connected');
     });
+    // Retry thủ công KHÔNG GIỚI HẠN SỐ LẦN — chạy khi SignalR tự bỏ cuộc sau khi hết mảng delay
+    // của withAutomaticReconnect, hoặc khi start() ban đầu thất bại (server down lúc mở app).
+    // Kiosk là thiết bị chạy 24/7 không người trông — thà retry vô hạn còn hơn đứng im chờ người
+    // vào reload tay. Backoff tăng dần, trần 30s để không spam server khi mất mạng dài.
+    function scheduleManualRetry(delayMs: number, reason: string) {
+      if (stoppedIntentionally) return;
+      pushKioskDebugLog(`tự kết nối lại sau ${delayMs}ms (${reason})`);
+      manualRetryTimer = setTimeout(() => {
+        if (stoppedIntentionally) return;
+        setConnectionState('reconnecting');
+        conn
+          .start()
+          .then(() => {
+            pushKioskDebugLog('tự kết nối lại thành công');
+            connRef.current = conn;
+            setConnectionState('connected');
+          })
+          .catch((err) => {
+            const message = String(err?.message ?? err ?? '');
+            pushKioskDebugLog(`tự kết nối lại thất bại — ${message}`);
+            if (/401|unauthorized/i.test(message)) {
+              // Khoá thiết bị bị thu hồi — retry vô hạn vô ích, cần người vào đổi thiết bị.
+              setError('Khoá thiết bị không hợp lệ hoặc đã bị thu hồi — bấm "Đổi thiết bị" để ghép nối lại.');
+              return;
+            }
+            scheduleManualRetry(Math.min(delayMs * 2, 30000), 'lần trước vẫn thất bại');
+          });
+      }, delayMs);
+    }
+
     conn.onclose((err) => {
       pushKioskDebugLog(`connection closed — ${err?.message ?? err ?? '(không rõ)'}`);
       setConnectionState('disconnected');
+      scheduleManualRetry(3000, 'automatic reconnect đã bỏ cuộc hoặc connection closed');
     });
 
     conn
@@ -152,14 +192,17 @@ export function useKioskHub(deviceKey: string | null) {
         // Khoá thiết bị sai/đã bị thu hồi → BE trả 401 ngay lúc negotiate, KHÁC lỗi mạng thật sự
         // (timeout, DNS...). Phân biệt rõ để người dùng biết cần "Đổi thiết bị" chứ không phải
         // chờ mạng ổn định lại (xem KioskAuthenticationHandler).
-        setError(
-          /401|unauthorized/i.test(message)
-            ? 'Khoá thiết bị không hợp lệ hoặc đã bị thu hồi — bấm "Đổi thiết bị" để ghép nối lại.'
-            : 'Không kết nối được máy chủ'
-        );
+        if (/401|unauthorized/i.test(message)) {
+          setError('Khoá thiết bị không hợp lệ hoặc đã bị thu hồi — bấm "Đổi thiết bị" để ghép nối lại.');
+          return;
+        }
+        setError('Không kết nối được máy chủ');
+        scheduleManualRetry(3000, 'start() ban đầu thất bại');
       });
 
     return () => {
+      stoppedIntentionally = true;
+      if (manualRetryTimer) clearTimeout(manualRetryTimer);
       conn.stop().catch(() => {});
       connRef.current = null;
     };
