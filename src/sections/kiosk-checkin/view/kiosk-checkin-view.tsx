@@ -217,7 +217,7 @@ export default function KioskCheckinView() {
       // không (KioskConfirmCheckInCommandHandler tự suy ra ngoài giờ nếu không có ca), FE không
       // cần phân biệt ở tầng gọi API.
       const fn = candidate.action === 'checkout' ? confirmKioskCheckOut : confirmKioskCheckIn;
-      await fn(candidate.staffId, deviceKey);
+      await fn(candidate.staffId, deviceKey, candidate.similarity);
       const successMsg =
         candidate.action === 'checkout'
           ? `Đã chấm công ra cho ${candidate.staffName}`

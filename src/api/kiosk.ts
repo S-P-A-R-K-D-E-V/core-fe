@@ -13,11 +13,12 @@ import type {
 
 export async function confirmKioskCheckIn(
   staffId: string,
-  deviceKey: string
+  deviceKey: string,
+  similarity?: number
 ): Promise<IKioskConfirmResponse> {
   const res = await axios.post<IKioskConfirmResponse>(
     endpoints.kiosk.confirmCheckIn,
-    { staffId },
+    { staffId, similarity },
     { headers: { 'X-Kiosk-Key': deviceKey } }
   );
   return res.data;
@@ -25,11 +26,12 @@ export async function confirmKioskCheckIn(
 
 export async function confirmKioskCheckOut(
   staffId: string,
-  deviceKey: string
+  deviceKey: string,
+  similarity?: number
 ): Promise<IKioskConfirmResponse> {
   const res = await axios.post<IKioskConfirmResponse>(
     endpoints.kiosk.confirmCheckOut,
-    { staffId },
+    { staffId, similarity },
     { headers: { 'X-Kiosk-Key': deviceKey } }
   );
   return res.data;
