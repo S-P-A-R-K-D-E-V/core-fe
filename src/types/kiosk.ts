@@ -29,14 +29,21 @@ export interface IKioskTracksMessage {
 
 // Payload thật từ KioskHub — KHÔNG có staffAvatarUrl (Core-be chưa wire field này,
 // xem KioskIdentifyResult record). Để optional cho dễ bổ sung sau.
-// isCheckIn: kiosk KHÔNG còn gạt tay chọn check-in/check-out — BE tự gộp cả 2 pool ứng viên
-// (KioskIdentifyCommandHandler) và trả về nên check-in hay check-out cho người nhận diện được.
+// action: kiosk KHÔNG gạt tay chọn — BE tự nhận diện rồi suy luận nên làm gì cho người đó
+// (KioskIdentifyCommandHandler): "checkout" nếu đang có log mở, "checkin" nếu có ca hôm nay
+// chưa check-in, "overtime" nếu không có ca (tự động check-in ngoài giờ, không cần xác nhận
+// thêm). shiftName/shiftStartTime/shiftEndTime chỉ có giá trị khi action="checkin".
+export type KioskAction = 'checkin' | 'checkout' | 'overtime';
+
 export interface IKioskCandidateFound {
   trackId: string;
   staffId: string;
   staffName: string;
   similarity: number;
-  isCheckIn: boolean;
+  action: KioskAction;
+  shiftName?: string | null;
+  shiftStartTime?: string | null;
+  shiftEndTime?: string | null;
   staffAvatarUrl?: string;
 }
 

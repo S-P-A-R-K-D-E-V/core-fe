@@ -24,7 +24,7 @@ import { kioskDebugLog, clearKioskDebugLog } from 'src/utils/kiosk-debug-log';
 import KioskPairingSetup from '../kiosk-pairing-setup';
 import KioskCameraStage from '../kiosk-camera-stage';
 import KioskStatusBanner from '../kiosk-status-banner';
-import KioskCandidateStage from '../kiosk-candidate-stage';
+import KioskCandidateFooter from '../kiosk-candidate-footer';
 
 // ----------------------------------------------------------------------
 
@@ -213,12 +213,18 @@ export default function KioskCheckinView() {
     if (!candidate || !deviceKey) return;
     setConfirming(true);
     try {
-      const fn = candidate.isCheckIn ? confirmKioskCheckIn : confirmKioskCheckOut;
+      // "checkin" và "overtime" đều gọi confirmKioskCheckIn — BE tự xác định lại có ca hay
+      // không (KioskConfirmCheckInCommandHandler tự suy ra ngoài giờ nếu không có ca), FE không
+      // cần phân biệt ở tầng gọi API.
+      const fn = candidate.action === 'checkout' ? confirmKioskCheckOut : confirmKioskCheckIn;
       await fn(candidate.staffId, deviceKey);
-      enqueueSnackbar(
-        `Đã ${candidate.isCheckIn ? 'chấm công vào' : 'chấm công ra'} cho ${candidate.staffName}`,
-        { variant: 'success' }
-      );
+      const successMsg =
+        candidate.action === 'checkout'
+          ? `Đã chấm công ra cho ${candidate.staffName}`
+          : candidate.action === 'overtime'
+            ? `Đã check-in ngoài giờ cho ${candidate.staffName}`
+            : `Đã chấm công vào cho ${candidate.staffName}`;
+      enqueueSnackbar(successMsg, { variant: 'success' });
     } catch (err: any) {
       enqueueSnackbar(err?.title || err?.message || 'Chấm công thất bại', { variant: 'error' });
     } finally {
@@ -344,17 +350,25 @@ export default function KioskCheckinView() {
           )}
         </Stack>
 
-        {showCandidate && candidate && (
-          <KioskCandidateStage
+      </Box>
+
+      {/* Footer xác nhận — KHÔNG che camera, người đứng trước vẫn thấy khung hình/tiến trình
+          trong lúc đếm ngược tự động (xem KioskCandidateFooter). */}
+      {showCandidate && candidate && (
+        <Box sx={{ width: '100%', maxWidth: 720 }}>
+          <KioskCandidateFooter
             staffName={candidate.staffName}
             staffAvatarUrl={candidate.staffAvatarUrl}
-            isCheckIn={candidate.isCheckIn}
+            action={candidate.action}
+            shiftName={candidate.shiftName}
+            shiftStartTime={candidate.shiftStartTime}
+            shiftEndTime={candidate.shiftEndTime}
             secondsLeft={secondsLeft}
             totalSeconds={AUTO_CONFIRM_SECONDS}
             onCancel={clearCandidate}
           />
-        )}
-      </Box>
+        </Box>
+      )}
 
       <canvas ref={captureCanvasRef} style={{ display: 'none' }} />
 
