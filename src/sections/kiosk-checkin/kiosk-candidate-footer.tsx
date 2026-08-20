@@ -32,6 +32,9 @@ const ACTION_META: Record<KioskAction, { label: string; color: 'success' | 'warn
   checkin: { label: 'Chuẩn bị check-in', color: 'success' },
   checkout: { label: 'Chuẩn bị check-out', color: 'warning' },
   overtime: { label: 'Không có ca hôm nay — check-in ngoài giờ', color: 'info' },
+  // Không bao giờ thực sự render — KioskCheckinView.showCandidate lọc action="noaction" ra khỏi
+  // footer (chỉ dùng để hiện tên trên khung camera). Giữ entry để Record<KioskAction, ...> đủ case.
+  noaction: { label: 'Không có ca cần chấm công', color: 'info' },
 };
 
 export default function KioskCandidateFooter({

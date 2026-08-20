@@ -32,8 +32,11 @@ export interface IKioskTracksMessage {
 // action: kiosk KHÔNG gạt tay chọn — BE tự nhận diện rồi suy luận nên làm gì cho người đó
 // (KioskIdentifyCommandHandler): "checkout" nếu đang có log mở, "checkin" nếu có ca hôm nay
 // chưa check-in, "overtime" nếu không có ca (tự động check-in ngoài giờ, không cần xác nhận
-// thêm). shiftName/shiftStartTime/shiftEndTime chỉ có giá trị khi action="checkin".
-export type KioskAction = 'checkin' | 'checkout' | 'overtime';
+// thêm). shiftName/shiftStartTime/shiftEndTime chỉ có giá trị khi action="checkin". "noaction":
+// ĐÃ nhận diện đúng người nhưng hiện không có ca nào cần chấm công (ngoài khung giờ mọi ca hôm
+// nay) — vẫn hiện tên trên khung camera, KHÔNG hiện footer xác nhận/đếm ngược (xem
+// KioskCheckinView.showCandidate).
+export type KioskAction = 'checkin' | 'checkout' | 'overtime' | 'noaction';
 
 export interface IKioskCandidateFound {
   trackId: string;

@@ -47,7 +47,6 @@ export default function KioskCheckinView() {
     tracks,
     candidate,
     trackLabels,
-    noActionSignal,
     error,
     clearCandidate,
     clearError,
@@ -163,8 +162,13 @@ export default function KioskCheckinView() {
 
   // ── Multiple-faces guard + candidate validity ───────────────────────────
   const multipleFaces = tracks.length > 1;
+  // action="noaction": ĐÃ nhận diện đúng người (candidate tồn tại, trackLabels đã hiện tên) nhưng
+  // không có ca cần chấm công ngay lúc này — không hiện footer xác nhận/đếm ngược cho case này.
   const showCandidate =
-    !!candidate && tracks.length === 1 && tracks[0].trackId === candidate.trackId;
+    !!candidate &&
+    candidate.action !== 'noaction' &&
+    tracks.length === 1 &&
+    tracks[0].trackId === candidate.trackId;
 
   // Mất track hoặc có >1 người xuất hiện giữa lúc đang xác nhận → huỷ ngay, quay lại màn chờ.
   useEffect(() => {
@@ -187,17 +191,12 @@ export default function KioskCheckinView() {
     });
   }, [tracks]);
 
+  // candidate bao gồm CẢ action="noaction" (đã nhận diện đúng người, chỉ là không có ca ngay lúc
+  // này) — vẫn phải tính là "đã giải quyết", không tính vào bộ đếm thất bại, nếu không sau vài lần
+  // sẽ hiện nhầm "Không nhận diện được — liên hệ quản lý" dù hệ thống đã nhận đúng người.
   useEffect(() => {
     if (candidate) resolvedTrackIdsRef.current.add(candidate.trackId);
   }, [candidate]);
-
-  // NoActionAvailable: BE ĐÃ nhận diện đúng người, chỉ là không có ca cần chấm công ngay lúc này
-  // (ngoài khung giờ mọi ca hôm nay) — KHÔNG được tính là "thất bại" giống NoCandidate/Ambiguous,
-  // nếu không sau vài lần sẽ hiện nhầm "Không nhận diện được — liên hệ quản lý" dù hệ thống đã
-  // nhận đúng người (đây chính là nguyên nhân gây hiểu lầm suốt quá trình debug trước đó).
-  useEffect(() => {
-    if (noActionSignal) resolvedTrackIdsRef.current.add(noActionSignal.trackId);
-  }, [noActionSignal]);
 
   useEffect(() => {
     const timer = setInterval(() => {
