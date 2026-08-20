@@ -63,6 +63,15 @@ export function useKioskHub(deviceKey: string | null) {
   const [candidate, setCandidate] = useState<IKioskCandidateFound | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // "no_action": BE ĐÃ nhận diện đúng người (khác NoCandidate/Ambiguous) nhưng hiện không có ca
+  // nào cần chấm công (ngoài khung giờ mọi ca hôm nay — xem Errors.Kiosk.NoActionAvailable). Nếu
+  // để track này bị tính như 1 lần "thất bại" giống NoCandidate, sau vài lần sẽ hiện nhầm cảnh báo
+  // "Không nhận diện được — liên hệ quản lý" dù thực ra hệ thống đã nhận đúng người. Đếm tăng dần
+  // (không phải boolean) để mỗi lần bắn ra là 1 update mới, component cha dùng useEffect bắt được
+  // kể cả khi trackId trùng lặp giữa 2 lần liên tiếp.
+  const [noActionSignal, setNoActionSignal] = useState<{ trackId: string; seq: number } | null>(null);
+  const noActionSeqRef = useRef(0);
+
   // Tên hiện trên khung nhận diện live phải LUÔN hiện khi track còn trong khung hình — tách khỏi
   // `candidate` (chỉ tồn tại trong lúc chờ xác nhận check-in/out, bị clear ngay sau khi confirm
   // xong). Không tách 2 state này thì sau khi auto-confirm xong (~4s) mà nhân viên vẫn đứng
@@ -97,6 +106,7 @@ export function useKioskHub(deviceKey: string | null) {
     setTracks([]);
     setCandidate(null);
     setTrackLabels({});
+    setNoActionSignal(null);
     setError(null);
     seqRef.current = 0;
     lastTrackStateRef.current = {};
@@ -153,6 +163,11 @@ export function useKioskHub(deviceKey: string | null) {
     // SendDebugAsync) — dùng khi log server không xem được/không tin cậy được (đã gặp: log level
     // đúng bản mới nhưng không dòng nào xuất hiện, nghi do cấu hình hạ tầng nằm ngoài repo).
     conn.on('debug', (message: string) => pushKioskDebugLog(message));
+    conn.on('no_action', (trackId: string) => {
+      pushKioskDebugLog(`[no_action] track=${trackId} — đã nhận diện nhưng hiện không có ca cần chấm công`);
+      noActionSeqRef.current += 1;
+      setNoActionSignal({ trackId, seq: noActionSeqRef.current });
+    });
     conn.on('candidate_found', (payload: IKioskCandidateFound) => {
       pushKioskDebugLog(
         `[candidate_found] track=${payload.trackId} staff=${payload.staffName} action=${payload.action} similarity=${payload.similarity.toFixed(3)}`
@@ -252,5 +267,5 @@ export function useKioskHub(deviceKey: string | null) {
     conn.invoke('Frame', seqRef.current, base64Data).catch(() => {});
   }, []);
 
-  return { connectionState, tracks, candidate, trackLabels, error, clearCandidate, clearError, sendFrame };
+  return { connectionState, tracks, candidate, trackLabels, noActionSignal, error, clearCandidate, clearError, sendFrame };
 }

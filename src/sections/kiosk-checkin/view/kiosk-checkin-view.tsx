@@ -47,6 +47,7 @@ export default function KioskCheckinView() {
     tracks,
     candidate,
     trackLabels,
+    noActionSignal,
     error,
     clearCandidate,
     clearError,
@@ -189,6 +190,14 @@ export default function KioskCheckinView() {
   useEffect(() => {
     if (candidate) resolvedTrackIdsRef.current.add(candidate.trackId);
   }, [candidate]);
+
+  // NoActionAvailable: BE ĐÃ nhận diện đúng người, chỉ là không có ca cần chấm công ngay lúc này
+  // (ngoài khung giờ mọi ca hôm nay) — KHÔNG được tính là "thất bại" giống NoCandidate/Ambiguous,
+  // nếu không sau vài lần sẽ hiện nhầm "Không nhận diện được — liên hệ quản lý" dù hệ thống đã
+  // nhận đúng người (đây chính là nguyên nhân gây hiểu lầm suốt quá trình debug trước đó).
+  useEffect(() => {
+    if (noActionSignal) resolvedTrackIdsRef.current.add(noActionSignal.trackId);
+  }, [noActionSignal]);
 
   useEffect(() => {
     const timer = setInterval(() => {
