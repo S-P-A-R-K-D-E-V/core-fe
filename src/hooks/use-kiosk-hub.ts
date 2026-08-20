@@ -149,6 +149,10 @@ export function useKioskHub(deviceKey: string | null) {
         }
       });
     });
+    // Chẩn đoán đẩy thẳng từ core-api qua kênh SignalR đang chạy (xem KioskStreamSession.
+    // SendDebugAsync) — dùng khi log server không xem được/không tin cậy được (đã gặp: log level
+    // đúng bản mới nhưng không dòng nào xuất hiện, nghi do cấu hình hạ tầng nằm ngoài repo).
+    conn.on('debug', (message: string) => pushKioskDebugLog(message));
     conn.on('candidate_found', (payload: IKioskCandidateFound) => {
       pushKioskDebugLog(
         `[candidate_found] track=${payload.trackId} staff=${payload.staffName} action=${payload.action} similarity=${payload.similarity.toFixed(3)}`
