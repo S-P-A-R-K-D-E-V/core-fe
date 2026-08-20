@@ -46,6 +46,7 @@ export default function KioskCheckinView() {
     connectionState,
     tracks,
     candidate,
+    trackLabels,
     error,
     clearCandidate,
     clearError,
@@ -324,7 +325,14 @@ export default function KioskCheckinView() {
           captureWidth={captureDims.width}
           captureHeight={captureDims.height}
           mirror={facingMode === 'user'}
-          candidateLabel={candidate ? { trackId: candidate.trackId, text: candidate.staffName } : null}
+          // Tên phải hiện SUỐT lúc track còn trong khung hình, không chỉ trong lúc đang chờ xác
+          // nhận check-in/out (candidate) — xem ghi chú trackLabels ở useKioskHub. Chỉ áp dụng khi
+          // đúng 1 khuôn mặt (giữ đúng ràng buộc "mỗi lần 1 người" của toàn luồng kiosk).
+          candidateLabel={
+            tracks.length === 1 && trackLabels[tracks[0].trackId]
+              ? { trackId: tracks[0].trackId, text: trackLabels[tracks[0].trackId] }
+              : null
+          }
         />
 
         <Stack spacing={1} sx={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 5 }}>

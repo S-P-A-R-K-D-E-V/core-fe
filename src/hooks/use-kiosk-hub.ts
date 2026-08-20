@@ -57,8 +57,32 @@ export function useKioskHub(deviceKey: string | null) {
   const [candidate, setCandidate] = useState<IKioskCandidateFound | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Tên hiện trên khung nhận diện live phải LUÔN hiện khi track còn trong khung hình — tách khỏi
+  // `candidate` (chỉ tồn tại trong lúc chờ xác nhận check-in/out, bị clear ngay sau khi confirm
+  // xong). Không tách 2 state này thì sau khi auto-confirm xong (~4s) mà nhân viên vẫn đứng
+  // nguyên trước cam, khung sẽ mất tên dù track chưa hề đổi — trông như "không nhận diện được"
+  // dù thực ra đã chấm công thành công. Nhận diện lại chỉ chạy 1 lần/track (transition sang
+  // EMBEDDED — xem KioskStreamSession) nên đây là tên gần nhất đã biết cho track đó, không phải
+  // gọi lại BE liên tục (tránh lặp check-in/out ngoài ý muốn khi đứng lâu trước cam).
+  const [trackLabels, setTrackLabels] = useState<Record<string, string>>({});
+
   const clearCandidate = useCallback(() => setCandidate(null), []);
   const clearError = useCallback(() => setError(null), []);
+
+  // Dọn nhãn của track đã biến mất khỏi khung hình (người đã rời đi) — tránh rò rỉ state và
+  // tránh gán nhầm tên cũ nếu trackId (lý thuyết) bị cấp phát lại.
+  useEffect(() => {
+    setTrackLabels((prev) => {
+      const liveIds = new Set(tracks.map((t) => t.trackId));
+      const next: Record<string, string> = {};
+      let changed = false;
+      Object.entries(prev).forEach(([id, name]) => {
+        if (liveIds.has(id)) next[id] = name;
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [tracks]);
 
   useEffect(() => {
     if (!deviceKey) return undefined;
@@ -66,6 +90,7 @@ export function useKioskHub(deviceKey: string | null) {
     setConnectionState('connecting');
     setTracks([]);
     setCandidate(null);
+    setTrackLabels({});
     setError(null);
     seqRef.current = 0;
 
@@ -86,7 +111,10 @@ export function useKioskHub(deviceKey: string | null) {
       .build();
 
     conn.on('tracks', (raw: string) => setTracks(parseTracksMessage(raw)));
-    conn.on('candidate_found', (payload: IKioskCandidateFound) => setCandidate(payload));
+    conn.on('candidate_found', (payload: IKioskCandidateFound) => {
+      setCandidate(payload);
+      setTrackLabels((prev) => ({ ...prev, [payload.trackId]: payload.staffName }));
+    });
     conn.on('error', (raw: unknown) => {
       const message = parseErrorMessage(raw);
       pushKioskDebugLog(`server error event: ${message}`);
@@ -145,5 +173,5 @@ export function useKioskHub(deviceKey: string | null) {
     conn.invoke('Frame', seqRef.current, base64Data).catch(() => {});
   }, []);
 
-  return { connectionState, tracks, candidate, error, clearCandidate, clearError, sendFrame };
+  return { connectionState, tracks, candidate, trackLabels, error, clearCandidate, clearError, sendFrame };
 }
