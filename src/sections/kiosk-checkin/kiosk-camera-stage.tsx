@@ -33,8 +33,10 @@ export default function KioskCameraStage({
   mirror = true,
   candidateLabel = null,
 }: Props) {
-  // bbox trả về là pixel [x1,y1,x2,y2] theo đúng kích thước frame đã gửi lên (captureWidth/
-  // Height) — canvas overlay dùng chung kích thước đó nên vẽ thẳng 1:1, không cần quy đổi tỉ lệ.
+  // Canvas CHỈ vẽ khung bbox — không vẽ chữ ở đây nữa. bbox trả về là pixel [x1,y1,x2,y2] theo
+  // đúng kích thước frame đã gửi lên (captureWidth/Height), canvas cùng kích thước đó nên vẽ
+  // thẳng 1:1. Canvas nằm TRONG lớp bị CSS scaleX(-1) (mirror) nên khung tự lật đúng theo video,
+  // không cần xử lý gì thêm.
   useEffect(() => {
     const canvas = overlayCanvasRef.current;
     if (!canvas) return;
@@ -50,37 +52,17 @@ export default function KioskCameraStage({
       const [x1, y1, x2, y2] = track.bbox;
       ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
     });
+  }, [tracks, overlayCanvasRef, captureWidth, captureHeight]);
 
-    // Nhãn tên — vẽ SAU cùng, đè lên box của đúng track vừa khớp. Cả canvas bị CSS scaleX(-1)
-    // khi dùng camera trước (mirror=true) nên chữ vẽ trực tiếp sẽ bị ngược; counter-flip NGAY
-    // TRONG context trước khi vẽ để 2 lần lật triệt tiêu nhau — vẫn dùng toạ độ bbox gốc, không
-    // cần tự tính lại vị trí đối xứng.
-    if (candidateLabel) {
-      const track = tracks.find((t) => t.trackId === candidateLabel.trackId);
-      if (track) {
-        const [x1, y1, x2] = track.bbox;
-        const fontSize = Math.max(16, Math.round(captureWidth / 26));
-        ctx.font = `600 ${fontSize}px sans-serif`;
-        const textWidth = ctx.measureText(candidateLabel.text).width;
-        const paddingX = 10;
-        const labelHeight = fontSize + 12;
-        const labelWidth = Math.max(x2 - x1, textWidth + paddingX * 2);
-        const labelY = Math.max(0, y1 - labelHeight - 4);
-
-        ctx.save();
-        if (mirror) {
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
-        }
-        ctx.fillStyle = '#00A76F';
-        ctx.fillRect(x1, labelY, labelWidth, labelHeight);
-        ctx.fillStyle = '#fff';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(candidateLabel.text, x1 + paddingX, labelY + labelHeight / 2);
-        ctx.restore();
-      }
-    }
-  }, [tracks, overlayCanvasRef, captureWidth, captureHeight, candidateLabel, mirror]);
+  // Nhãn tên vẽ bằng 1 <Box> HTML riêng, NẰM NGOÀI lớp bị mirror (không phải vẽ chữ ngược trong
+  // canvas rồi tự lật lại bằng ctx.scale — dễ sai vị trí/kích thước khi label rộng hơn box, nhất
+  // là gần mép khung hình). Vị trí tính bằng % dựa trên bbox gốc (KHÔNG mirror) so với
+  // captureWidth/Height — tự quy đổi cạnh trái đúng khi mirror=true thay vì dựa vào CSS transform.
+  const labelTrack = candidateLabel ? tracks.find((t) => t.trackId === candidateLabel.trackId) : undefined;
+  const labelLeftPercent = labelTrack
+    ? ((mirror ? captureWidth - labelTrack.bbox[2] : labelTrack.bbox[0]) / captureWidth) * 100
+    : 0;
+  const labelTopPercent = labelTrack ? (labelTrack.bbox[1] / captureHeight) * 100 : 0;
 
   return (
     <Box
@@ -91,22 +73,53 @@ export default function KioskCameraStage({
         borderRadius: 2,
         overflow: 'hidden',
         bgcolor: 'common.black',
-        // Mirror CẢ video lẫn canvas overlay CÙNG 1 transform — bbox pixel (toạ độ frame gốc
-        // chưa mirror) vẽ thẳng lên canvas vẫn khớp vì 2 lớp cùng bị lật giống nhau.
-        transform: mirror ? 'scaleX(-1)' : 'none',
       }}
     >
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        style={{ width: '100%', height: '100%', display: 'block', objectFit: 'contain' }}
-      />
-      <canvas
-        ref={overlayCanvasRef}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-      />
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          // Mirror CẢ video lẫn canvas overlay CÙNG 1 transform — bbox pixel (toạ độ frame gốc
+          // chưa mirror) vẽ thẳng lên canvas vẫn khớp vì 2 lớp cùng bị lật giống nhau.
+          transform: mirror ? 'scaleX(-1)' : 'none',
+        }}
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{ width: '100%', height: '100%', display: 'block', objectFit: 'contain' }}
+        />
+        <canvas
+          ref={overlayCanvasRef}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+        />
+      </Box>
+
+      {labelTrack && candidateLabel && (
+        <Box
+          sx={{
+            position: 'absolute',
+            left: `${labelLeftPercent}%`,
+            top: `${labelTopPercent}%`,
+            transform: 'translateY(-100%)',
+            mt: '-4px',
+            bgcolor: '#00A76F',
+            color: '#fff',
+            fontWeight: 700,
+            fontSize: 14,
+            lineHeight: 1.6,
+            px: 1,
+            borderRadius: 0.75,
+            whiteSpace: 'nowrap',
+            boxShadow: 2,
+            zIndex: 2,
+          }}
+        >
+          {candidateLabel.text}
+        </Box>
+      )}
     </Box>
   );
 }

@@ -169,6 +169,13 @@ export default function KioskCheckinView() {
     candidate.action !== 'noaction' &&
     tracks.length === 1 &&
     tracks[0].trackId === candidate.trackId;
+  // Vẫn phải BÁO cho người đứng trước cam biết kết quả (không chỉ im lặng hiện tên trên khung) —
+  // đã nhận ra đúng họ nhưng không có ca nào cần chấm công ngay lúc này.
+  const showNoActionHint =
+    !!candidate &&
+    candidate.action === 'noaction' &&
+    tracks.length === 1 &&
+    tracks[0].trackId === candidate.trackId;
 
   // Mất track hoặc có >1 người xuất hiện giữa lúc đang xác nhận → huỷ ngay, quay lại màn chờ.
   useEffect(() => {
@@ -357,6 +364,12 @@ export default function KioskCheckinView() {
           )}
           {multipleFaces && !showCandidate && (
             <KioskStatusBanner severity="warning" message="Vui lòng xếp hàng, mỗi lần 1 người." />
+          )}
+          {showNoActionHint && candidate && (
+            <KioskStatusBanner
+              severity="info"
+              message={`Đã nhận diện ${candidate.staffName} — hiện không có ca cần chấm công.`}
+            />
           )}
           {showFailHint && (
             <KioskStatusBanner
