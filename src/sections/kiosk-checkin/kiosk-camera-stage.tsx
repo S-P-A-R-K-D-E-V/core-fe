@@ -5,10 +5,9 @@ import { useEffect } from 'react';
 import Box from '@mui/material/Box';
 
 import type { IKioskTrack } from 'src/types/kiosk';
+import type { KioskTrackCandidate } from 'src/hooks/use-kiosk-hub';
 
 // ----------------------------------------------------------------------
-
-type CandidateLabel = { trackId: string; text: string } | null;
 
 type Props = {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -19,10 +18,32 @@ type Props = {
   /** Chỉ lật gương cho camera trước (selfie-style) — camera sau lật sẽ khiến hình ảnh/chữ
    *  trong khung hình bị ngược, gây khó hiểu. Mặc định true (camera trước). */
   mirror?: boolean;
-  /** Tên nhân viên vừa nhận diện được cho 1 track cụ thể — hiện ngay trên khung nhận diện live,
-   *  không cần chờ KioskCandidateStage (overlay xác nhận toàn màn). */
-  candidateLabel?: CandidateLabel;
+  /** Danh tính + action gần nhất đã biết theo từng trackId (persist độc lập với vòng đời xác
+   *  nhận check-in/out — xem useKioskHub.trackCandidates). */
+  trackCandidates: Record<string, KioskTrackCandidate>;
 };
+
+// Màu khung theo đúng 2 trục: (1) tracking có thành công không (state pipeline phía
+// face-tracking-service), (2) đã nhận diện ra ai chưa và người đó có ca cần chấm công không.
+// Ưu tiên từ trên xuống — nhiều khuôn mặt cùng lúc đè hết mọi trạng thái khác (yêu cầu xếp hàng).
+const COLOR_MULTI_FACE = '#FFAB00'; // warning — nhiều người cùng lúc, cần xếp hàng
+const COLOR_TRACKING_FAILED = '#FF5630'; // error — liveness thất bại (nghi giả mạo/ảnh chụp lại)
+const COLOR_HAS_ACTION = '#00A76F'; // success — đã nhận diện, CÓ ca cần chấm công
+const COLOR_NO_ACTION = '#00B8D9'; // info — đã nhận diện, KHÔNG có ca cần chấm công
+const COLOR_TRACKING = '#919EAB'; // neutral — đang theo dõi/phát hiện, chưa có kết quả
+
+function trackColor(track: IKioskTrack, candidate: KioskTrackCandidate | undefined, multiFace: boolean): string {
+  if (multiFace) return COLOR_MULTI_FACE;
+  if (candidate) return candidate.action === 'noaction' ? COLOR_NO_ACTION : COLOR_HAS_ACTION;
+  if (track.state === 'LIVENESS_FAILED') return COLOR_TRACKING_FAILED;
+  return COLOR_TRACKING;
+}
+
+function statusText(track: IKioskTrack, candidate: KioskTrackCandidate | undefined): string {
+  if (candidate) return candidate.action === 'noaction' ? 'Không có ca' : 'Có ca';
+  if (track.state === 'LIVENESS_FAILED') return 'Không xác thực được khuôn mặt';
+  return 'Đang nhận diện...';
+}
 
 export default function KioskCameraStage({
   videoRef,
@@ -31,12 +52,12 @@ export default function KioskCameraStage({
   captureWidth,
   captureHeight,
   mirror = true,
-  candidateLabel = null,
+  trackCandidates,
 }: Props) {
-  // Canvas CHỈ vẽ khung bbox — không vẽ chữ ở đây nữa. bbox trả về là pixel [x1,y1,x2,y2] theo
-  // đúng kích thước frame đã gửi lên (captureWidth/Height), canvas cùng kích thước đó nên vẽ
-  // thẳng 1:1. Canvas nằm TRONG lớp bị CSS scaleX(-1) (mirror) nên khung tự lật đúng theo video,
-  // không cần xử lý gì thêm.
+  const multiFace = tracks.length > 1;
+
+  // Canvas CHỈ vẽ khung bbox, màu theo từng track — không vẽ chữ ở đây (xem 2 <Box> HTML overlay
+  // bên dưới, nằm ngoài lớp bị mirror nên không cần double-transform để chữ khỏi bị ngược).
   useEffect(() => {
     const canvas = overlayCanvasRef.current;
     if (!canvas) return;
@@ -47,22 +68,40 @@ export default function KioskCameraStage({
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.lineWidth = Math.max(2, captureWidth / 160);
-    ctx.strokeStyle = tracks.length > 1 ? '#FFAB00' : '#00A76F';
     tracks.forEach((track) => {
       const [x1, y1, x2, y2] = track.bbox;
+      ctx.strokeStyle = trackColor(track, trackCandidates[track.trackId], multiFace);
       ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
     });
-  }, [tracks, overlayCanvasRef, captureWidth, captureHeight]);
+  }, [tracks, overlayCanvasRef, captureWidth, captureHeight, trackCandidates, multiFace]);
 
-  // Nhãn tên vẽ bằng 1 <Box> HTML riêng, NẰM NGOÀI lớp bị mirror (không phải vẽ chữ ngược trong
-  // canvas rồi tự lật lại bằng ctx.scale — dễ sai vị trí/kích thước khi label rộng hơn box, nhất
-  // là gần mép khung hình). Vị trí tính bằng % dựa trên bbox gốc (KHÔNG mirror) so với
-  // captureWidth/Height — tự quy đổi cạnh trái đúng khi mirror=true thay vì dựa vào CSS transform.
-  const labelTrack = candidateLabel ? tracks.find((t) => t.trackId === candidateLabel.trackId) : undefined;
-  const labelLeftPercent = labelTrack
-    ? ((mirror ? captureWidth - labelTrack.bbox[2] : labelTrack.bbox[0]) / captureWidth) * 100
+  // Tên + trạng thái chỉ hiện khi ĐÚNG 1 khuôn mặt (giữ đúng ràng buộc "mỗi lần 1 người" của toàn
+  // luồng kiosk) — vị trí tính bằng % dựa trên bbox GỐC (chưa mirror) so với captureWidth/Height,
+  // tự quy đổi cạnh trái đúng khi mirror=true bằng tay (captureWidth - x2) thay vì dựa vào CSS
+  // transform + canvas transform chồng nhau (cách cũ dễ lệch vị trí/tràn khung khi label dài).
+  const soloTrack = tracks.length === 1 ? tracks[0] : undefined;
+  const soloCandidate = soloTrack ? trackCandidates[soloTrack.trackId] : undefined;
+  const leftPercent = soloTrack
+    ? ((mirror ? captureWidth - soloTrack.bbox[2] : soloTrack.bbox[0]) / captureWidth) * 100
     : 0;
-  const labelTopPercent = labelTrack ? (labelTrack.bbox[1] / captureHeight) * 100 : 0;
+  const topPercent = soloTrack ? (soloTrack.bbox[1] / captureHeight) * 100 : 0;
+  const bottomPercent = soloTrack ? (soloTrack.bbox[3] / captureHeight) * 100 : 0;
+  const color = soloTrack ? trackColor(soloTrack, soloCandidate, false) : COLOR_TRACKING;
+
+  const badgeSx = {
+    position: 'absolute' as const,
+    left: `${leftPercent}%`,
+    bgcolor: color,
+    color: '#fff',
+    fontWeight: 700,
+    fontSize: 14,
+    lineHeight: 1.6,
+    px: 1,
+    borderRadius: 0.75,
+    whiteSpace: 'nowrap' as const,
+    boxShadow: 2,
+    zIndex: 2,
+  };
 
   return (
     <Box
@@ -97,27 +136,18 @@ export default function KioskCameraStage({
         />
       </Box>
 
-      {labelTrack && candidateLabel && (
-        <Box
-          sx={{
-            position: 'absolute',
-            left: `${labelLeftPercent}%`,
-            top: `${labelTopPercent}%`,
-            transform: 'translateY(-100%)',
-            mt: '-4px',
-            bgcolor: '#00A76F',
-            color: '#fff',
-            fontWeight: 700,
-            fontSize: 14,
-            lineHeight: 1.6,
-            px: 1,
-            borderRadius: 0.75,
-            whiteSpace: 'nowrap',
-            boxShadow: 2,
-            zIndex: 2,
-          }}
-        >
-          {candidateLabel.text}
+      {soloTrack && soloCandidate && (
+        // Tên — chỉ hiện khi ĐÃ nhận diện được (chưa có candidate thì chưa biết tên).
+        <Box sx={{ ...badgeSx, top: `${topPercent}%`, transform: 'translateY(-100%)', mt: '-4px' }}>
+          {soloCandidate.name}
+        </Box>
+      )}
+      {soloTrack && (
+        // Trạng thái — LUÔN hiện khi có đúng 1 khuôn mặt, kể cả trước khi nhận diện xong (báo
+        // "Đang nhận diện...") để người đứng trước cam biết hệ thống đang xử lý, không phải đứng
+        // im không rõ chuyện gì đang xảy ra.
+        <Box sx={{ ...badgeSx, top: `${bottomPercent}%`, mt: '4px' }}>
+          {statusText(soloTrack, soloCandidate)}
         </Box>
       )}
     </Box>

@@ -10,8 +10,13 @@ import type {
   IKioskCandidateFound,
   IKioskTrack,
   IKioskTracksMessage,
+  KioskAction,
   KioskConnectionState,
 } from 'src/types/kiosk';
+
+/** Danh tính + action gần nhất đã biết cho 1 track — persist độc lập với `candidate` (xem ghi
+ *  chú ở trackCandidates bên dưới). */
+export type KioskTrackCandidate = { name: string; action: KioskAction };
 
 // Mirror pattern của src/components/messenger/messenger-provider.tsx (SignalR connection
 // lifecycle) — khác biệt: kiosk auth qua query string `kioskKey` (KioskAuthenticationHandler.
@@ -63,27 +68,28 @@ export function useKioskHub(deviceKey: string | null) {
   const [candidate, setCandidate] = useState<IKioskCandidateFound | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Tên hiện trên khung nhận diện live phải LUÔN hiện khi track còn trong khung hình — tách khỏi
-  // `candidate` (chỉ tồn tại trong lúc chờ xác nhận check-in/out, bị clear ngay sau khi confirm
-  // xong). Không tách 2 state này thì sau khi auto-confirm xong (~4s) mà nhân viên vẫn đứng
-  // nguyên trước cam, khung sẽ mất tên dù track chưa hề đổi — trông như "không nhận diện được"
-  // dù thực ra đã chấm công thành công. Nhận diện lại chỉ chạy 1 lần/track (transition sang
-  // EMBEDDED — xem KioskStreamSession) nên đây là tên gần nhất đã biết cho track đó, không phải
-  // gọi lại BE liên tục (tránh lặp check-in/out ngoài ý muốn khi đứng lâu trước cam).
-  const [trackLabels, setTrackLabels] = useState<Record<string, string>>({});
+  // Tên + action hiện trên khung nhận diện live phải LUÔN hiện khi track còn trong khung hình —
+  // tách khỏi `candidate` (chỉ tồn tại trong lúc chờ xác nhận check-in/out, bị clear ngay sau khi
+  // confirm xong). Không tách 2 state này thì sau khi auto-confirm xong (~4s) mà nhân viên vẫn
+  // đứng nguyên trước cam, khung sẽ mất tên dù track chưa hề đổi — trông như "không nhận diện
+  // được" dù thực ra đã chấm công thành công. Nhận diện lại chỉ chạy 1 lần/track (transition sang
+  // EMBEDDED — xem KioskStreamSession) nên đây là kết quả gần nhất đã biết cho track đó, không
+  // phải gọi lại BE liên tục (tránh lặp check-in/out ngoài ý muốn khi đứng lâu trước cam). Lưu cả
+  // `action` (không chỉ tên) để khung camera tô màu/trạng thái đúng theo có ca hay không.
+  const [trackCandidates, setTrackCandidates] = useState<Record<string, KioskTrackCandidate>>({});
 
   const clearCandidate = useCallback(() => setCandidate(null), []);
   const clearError = useCallback(() => setError(null), []);
 
   // Dọn nhãn của track đã biến mất khỏi khung hình (người đã rời đi) — tránh rò rỉ state và
-  // tránh gán nhầm tên cũ nếu trackId (lý thuyết) bị cấp phát lại.
+  // tránh gán nhầm kết quả cũ nếu trackId (lý thuyết) bị cấp phát lại.
   useEffect(() => {
-    setTrackLabels((prev) => {
+    setTrackCandidates((prev) => {
       const liveIds = new Set(tracks.map((t) => t.trackId));
-      const next: Record<string, string> = {};
+      const next: Record<string, KioskTrackCandidate> = {};
       let changed = false;
-      Object.entries(prev).forEach(([id, name]) => {
-        if (liveIds.has(id)) next[id] = name;
+      Object.entries(prev).forEach(([id, value]) => {
+        if (liveIds.has(id)) next[id] = value;
         else changed = true;
       });
       return changed ? next : prev;
@@ -96,7 +102,7 @@ export function useKioskHub(deviceKey: string | null) {
     setConnectionState('connecting');
     setTracks([]);
     setCandidate(null);
-    setTrackLabels({});
+    setTrackCandidates({});
     setError(null);
     seqRef.current = 0;
     lastTrackStateRef.current = {};
@@ -158,7 +164,7 @@ export function useKioskHub(deviceKey: string | null) {
         `[candidate_found] track=${payload.trackId} staff=${payload.staffName} action=${payload.action} similarity=${payload.similarity.toFixed(3)}`
       );
       setCandidate(payload);
-      setTrackLabels((prev) => ({ ...prev, [payload.trackId]: payload.staffName }));
+      setTrackCandidates((prev) => ({ ...prev, [payload.trackId]: { name: payload.staffName, action: payload.action } }));
     });
     conn.on('error', (raw: unknown) => {
       const message = parseErrorMessage(raw);
@@ -252,5 +258,5 @@ export function useKioskHub(deviceKey: string | null) {
     conn.invoke('Frame', seqRef.current, base64Data).catch(() => {});
   }, []);
 
-  return { connectionState, tracks, candidate, trackLabels, error, clearCandidate, clearError, sendFrame };
+  return { connectionState, tracks, candidate, trackCandidates, error, clearCandidate, clearError, sendFrame };
 }

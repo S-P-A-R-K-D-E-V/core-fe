@@ -46,7 +46,7 @@ export default function KioskCheckinView() {
     connectionState,
     tracks,
     candidate,
-    trackLabels,
+    trackCandidates,
     error,
     clearCandidate,
     clearError,
@@ -162,18 +162,12 @@ export default function KioskCheckinView() {
 
   // ── Multiple-faces guard + candidate validity ───────────────────────────
   const multipleFaces = tracks.length > 1;
-  // action="noaction": ĐÃ nhận diện đúng người (candidate tồn tại, trackLabels đã hiện tên) nhưng
-  // không có ca cần chấm công ngay lúc này — không hiện footer xác nhận/đếm ngược cho case này.
+  // action="noaction": ĐÃ nhận diện đúng người (candidate tồn tại, hiện "Không có ca" ngay dưới
+  // khung camera — xem KioskCameraStage) nhưng không có ca cần chấm công ngay lúc này — không
+  // hiện footer xác nhận/đếm ngược cho case này.
   const showCandidate =
     !!candidate &&
     candidate.action !== 'noaction' &&
-    tracks.length === 1 &&
-    tracks[0].trackId === candidate.trackId;
-  // Vẫn phải BÁO cho người đứng trước cam biết kết quả (không chỉ im lặng hiện tên trên khung) —
-  // đã nhận ra đúng họ nhưng không có ca nào cần chấm công ngay lúc này.
-  const showNoActionHint =
-    !!candidate &&
-    candidate.action === 'noaction' &&
     tracks.length === 1 &&
     tracks[0].trackId === candidate.trackId;
 
@@ -340,14 +334,10 @@ export default function KioskCheckinView() {
           captureWidth={captureDims.width}
           captureHeight={captureDims.height}
           mirror={facingMode === 'user'}
-          // Tên phải hiện SUỐT lúc track còn trong khung hình, không chỉ trong lúc đang chờ xác
-          // nhận check-in/out (candidate) — xem ghi chú trackLabels ở useKioskHub. Chỉ áp dụng khi
-          // đúng 1 khuôn mặt (giữ đúng ràng buộc "mỗi lần 1 người" của toàn luồng kiosk).
-          candidateLabel={
-            tracks.length === 1 && trackLabels[tracks[0].trackId]
-              ? { trackId: tracks[0].trackId, text: trackLabels[tracks[0].trackId] }
-              : null
-          }
+          // Tên + trạng thái ("Có ca"/"Không có ca"/"Đang nhận diện"...) phải hiện SUỐT lúc track
+          // còn trong khung hình, không chỉ trong lúc đang chờ xác nhận check-in/out (candidate) —
+          // xem ghi chú trackCandidates ở useKioskHub. KioskCameraStage tự lọc "chỉ 1 khuôn mặt".
+          trackCandidates={trackCandidates}
         />
 
         <Stack spacing={1} sx={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 5 }}>
@@ -364,12 +354,6 @@ export default function KioskCheckinView() {
           )}
           {multipleFaces && !showCandidate && (
             <KioskStatusBanner severity="warning" message="Vui lòng xếp hàng, mỗi lần 1 người." />
-          )}
-          {showNoActionHint && candidate && (
-            <KioskStatusBanner
-              severity="info"
-              message={`Đã nhận diện ${candidate.staffName} — hiện không có ca cần chấm công.`}
-            />
           )}
           {showFailHint && (
             <KioskStatusBanner
