@@ -51,6 +51,12 @@ function parseErrorMessage(raw: unknown): string {
 export function useKioskHub(deviceKey: string | null) {
   const connRef = useRef<signalR.HubConnection | null>(null);
   const seqRef = useRef(0);
+  // Chỉ log khi STATE của 1 track đổi (không log mỗi "tracks" message — tần suất ~6-7fps sẽ
+  // spam log không đọc nổi). Đây là cách duy nhất để xem trực tiếp trên điện thoại/tablet track
+  // có bao giờ chuyển sang EMBEDDED hay không — không cần vào log core-api (grep "KioskHub" đã
+  // không ra dòng nào dù face-service xác nhận liveness PASS, cần xem phía client để biết
+  // pipeline dừng ở bước nào: track không lên EMBEDDED, hay lên rồi mà identify không có phản hồi).
+  const lastTrackStateRef = useRef<Record<string, string>>({});
 
   const [connectionState, setConnectionState] = useState<KioskConnectionState>('connecting');
   const [tracks, setTracks] = useState<IKioskTrack[]>([]);
@@ -93,6 +99,7 @@ export function useKioskHub(deviceKey: string | null) {
     setTrackLabels({});
     setError(null);
     seqRef.current = 0;
+    lastTrackStateRef.current = {};
 
     const url = `${HOST_API || ''}/hubs/kiosk?kioskKey=${encodeURIComponent(deviceKey)}`;
     pushKioskDebugLog(`connect() bắt đầu — url=${url.replace(/kioskKey=[^&]+/, 'kioskKey=***')}`);
@@ -119,8 +126,33 @@ export function useKioskHub(deviceKey: string | null) {
       .withAutomaticReconnect([0, 2000, 5000, 10000, 15000, 30000])
       .build();
 
-    conn.on('tracks', (raw: string) => setTracks(parseTracksMessage(raw)));
+    conn.on('tracks', (raw: string) => {
+      const parsed = parseTracksMessage(raw);
+      setTracks(parsed);
+
+      const liveIds = new Set<string>();
+      parsed.forEach((t) => {
+        liveIds.add(t.trackId);
+        const prevState = lastTrackStateRef.current[t.trackId];
+        if (prevState !== t.state) {
+          lastTrackStateRef.current[t.trackId] = t.state;
+          pushKioskDebugLog(
+            `[track] ${t.trackId} ${prevState ?? '(mới)'} -> ${t.state} (quality=${t.quality?.toFixed(2) ?? '?'}, conf=${t.confidence.toFixed(2)})`
+          );
+        }
+      });
+      // Track rời khung hình (không còn trong "tracks") — dọn để lần sau quay lại tính là track mới.
+      Object.keys(lastTrackStateRef.current).forEach((id) => {
+        if (!liveIds.has(id)) {
+          pushKioskDebugLog(`[track] ${id} rời khung hình (state cuối: ${lastTrackStateRef.current[id]})`);
+          delete lastTrackStateRef.current[id];
+        }
+      });
+    });
     conn.on('candidate_found', (payload: IKioskCandidateFound) => {
+      pushKioskDebugLog(
+        `[candidate_found] track=${payload.trackId} staff=${payload.staffName} action=${payload.action} similarity=${payload.similarity.toFixed(3)}`
+      );
       setCandidate(payload);
       setTrackLabels((prev) => ({ ...prev, [payload.trackId]: payload.staffName }));
     });
