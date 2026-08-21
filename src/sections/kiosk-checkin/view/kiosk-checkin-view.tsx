@@ -185,18 +185,35 @@ export default function KioskCheckinView() {
   const [showFailHint, setShowFailHint] = useState(false);
 
   useEffect(() => {
+    const liveIds = new Set(tracks.map((t) => t.trackId));
     tracks.forEach((t) => {
       if (t.state === 'EMBEDDED' && !embeddedSinceRef.current.has(t.trackId)) {
         embeddedSinceRef.current.set(t.trackId, Date.now());
       }
     });
+    // Track rời khung hình TRƯỚC KHI đủ FAIL_THRESHOLD_MS (rất phổ biến khi tracking không ổn
+    // định — track chỉ sống vài trăm ms tới vài giây, xem debug log thực tế đã thu thập) KHÔNG
+    // được tính là 1 lần thất bại — người đó có thể chỉ đi ngang qua, chưa chắc đã cố tình đứng
+    // lại để chấm công. Trước đây bản ghi cứ nằm im trong embeddedSinceRef chờ đủ 8s mới bị xoá
+    // (dù track đã biến mất từ lâu), khiến bộ đếm thất bại tích luỹ rất nhanh chỉ vì đi ra vào
+    // camera vài lần — đây là nguyên nhân chính khiến "Không nhận diện được" hiện ra quá dễ.
+    embeddedSinceRef.current.forEach((_, trackId) => {
+      if (!liveIds.has(trackId) && !resolvedTrackIdsRef.current.has(trackId)) {
+        embeddedSinceRef.current.delete(trackId);
+      }
+    });
   }, [tracks]);
 
   // candidate bao gồm CẢ action="noaction" (đã nhận diện đúng người, chỉ là không có ca ngay lúc
-  // này) — vẫn phải tính là "đã giải quyết", không tính vào bộ đếm thất bại, nếu không sau vài lần
-  // sẽ hiện nhầm "Không nhận diện được — liên hệ quản lý" dù hệ thống đã nhận đúng người.
+  // này) — vẫn phải tính là "đã giải quyết", không tính vào bộ đếm thất bại. Nhận diện thành công
+  // (bất kỳ track nào) cũng chứng minh hệ thống đang hoạt động bình thường — reset hẳn bộ đếm và
+  // ẩn cảnh báo cũ thay vì chỉ đánh dấu riêng track đó, để không bị "kẹt" cảnh báo mãi sau khi đã
+  // nhận diện được người tiếp theo (trước đây showFailHint không có cách nào tự tắt lại).
   useEffect(() => {
-    if (candidate) resolvedTrackIdsRef.current.add(candidate.trackId);
+    if (!candidate) return;
+    resolvedTrackIdsRef.current.add(candidate.trackId);
+    failCountRef.current = 0;
+    setShowFailHint(false);
   }, [candidate]);
 
   useEffect(() => {
@@ -356,9 +373,18 @@ export default function KioskCheckinView() {
             <KioskStatusBanner severity="warning" message="Vui lòng xếp hàng, mỗi lần 1 người." />
           )}
           {showFailHint && (
+            // KHÔNG gợi ý "liên hệ quản lý chấm công thủ công" — luồng kiosk không có lối rẽ thủ
+            // công nào cả, gợi ý đó gây hiểu lầm. Chỉ báo lỗi + cho nút tải lại để khởi động lại
+            // toàn bộ màn hình (reset camera, kết nối SignalR, mọi state đếm thất bại) — cách chắc
+            // chắn nhất khi nghi ngờ tracking/nhận diện đang kẹt.
             <KioskStatusBanner
-              severity="warning"
-              message="Không nhận diện được. Vui lòng liên hệ quản lý để chấm công thủ công."
+              severity="error"
+              message="Không nhận diện được sau nhiều lần thử."
+              action={
+                <Button color="inherit" size="small" onClick={() => window.location.reload()}>
+                  Tải lại
+                </Button>
+              }
             />
           )}
         </Stack>
