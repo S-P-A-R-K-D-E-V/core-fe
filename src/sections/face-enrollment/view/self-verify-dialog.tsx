@@ -1,53 +1,27 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
+import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
-import LinearProgress from '@mui/material/LinearProgress';
 
 import Iconify from 'src/components/iconify';
-
-import { verifySelfFace } from 'src/api/faceEnrollment';
-import type { IVerifySelfResponse } from 'src/types/corecms-api';
+import { useSelfVerifyHub } from 'src/hooks/use-self-verify-hub';
 
 // ----------------------------------------------------------------------
+// Live camera GIỐNG TRẢI NGHIỆM KIOSK (xem kiosk-checkin-view.tsx) thay cho luồng quay video 3s
+// cũ — tự nhận diện liên tục, hiện ngay khớp/không khớp + % tương đồng, không cần bấm quay/chờ xử
+// lý. KHÔNG check-in, thuần chẩn đoán (xem SelfVerifyStreamCommand phía BE).
 
-const RECORD_MS = 3000;
-
-const REASON_LABELS: Record<string, string> = {
-  NO_FACE_DETECTED: 'Không phát hiện khuôn mặt trong video.',
-  MULTIPLE_FACES: 'Phát hiện nhiều hơn 1 khuôn mặt.',
-  LIVENESS_FAILED: 'Không xác nhận được đây là người thật (liveness).',
-  LOW_QUALITY: 'Chất lượng video chưa đủ rõ.',
-  LOW_SIMILARITY: 'Khuôn mặt không đủ giống với hồ sơ đã đăng ký.',
-  SERVICE_ERROR: 'Dịch vụ nhận diện khuôn mặt gặp sự cố.',
-};
-
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve((reader.result as string).split(',')[1] ?? '');
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-function extractApiError(error: any): string {
-  return (
-    error?.detail ||
-    error?.description ||
-    error?.message ||
-    (error?.title !== 'One or more validation errors occurred.' ? error?.title : null) ||
-    'Thất bại. Vui lòng thử lại.'
-  );
-}
-
-type Phase = 'opening' | 'idle' | 'recording' | 'processing' | 'result' | 'error';
+const COLOR_MATCHED = '#00A76F';
+const COLOR_NOT_MATCHED = '#FF5630';
+const COLOR_DETECTING = '#919EAB';
+const COLOR_MULTI_FACE = '#FFAB00';
 
 type Props = {
   open: boolean;
@@ -56,20 +30,21 @@ type Props = {
 
 export function SelfVerifyDialog({ open, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const captureCanvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
 
-  const [phase, setPhase] = useState<Phase>('opening');
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [result, setResult] = useState<IVerifySelfResponse | null>(null);
-  const [recordProgress, setRecordProgress] = useState(0);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [captureDims, setCaptureDims] = useState({ width: 640, height: 480 });
 
+  const { connectionState, tracks, verifyResult, error, clearError, sendFrame } = useSelfVerifyHub(open);
+
+  // ── Camera lifecycle — mở khi dialog mở, tắt hẳn khi đóng. ──────────────
   useEffect(() => {
     if (!open) return undefined;
-    setPhase('opening');
-    setResult(null);
-    setErrorMsg(null);
+    setCameraError(null);
+    setCameraReady(false);
 
     let cancelled = false;
     (async () => {
@@ -84,12 +59,18 @@ export function SelfVerifyDialog({ open, onClose }: Props) {
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
+          videoRef.current.onloadedmetadata = () => {
+            if (videoRef.current) {
+              setCaptureDims({
+                width: videoRef.current.videoWidth || 640,
+                height: videoRef.current.videoHeight || 480,
+              });
+            }
+            setCameraReady(true);
+          };
         }
-        setPhase('idle');
       } catch {
-        setErrorMsg('Không thể mở camera. Vui lòng cấp quyền truy cập camera.');
-        setPhase('error');
+        setCameraError('Không thể mở camera. Vui lòng cấp quyền truy cập camera.');
       }
     })();
 
@@ -100,55 +81,86 @@ export function SelfVerifyDialog({ open, onClose }: Props) {
     };
   }, [open]);
 
-  const handleRecord = useCallback(() => {
-    if (!streamRef.current) return;
-    chunksRef.current = [];
+  // ── Vòng lặp gửi frame ~6-7fps — giống kiosk-checkin-view.tsx. ──────────
+  useEffect(() => {
+    if (!cameraReady || connectionState !== 'connected') return undefined;
+    const interval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      const video = videoRef.current;
+      const canvas = captureCanvasRef.current;
+      if (!video || !canvas || video.readyState < 2) return;
+      canvas.width = captureDims.width;
+      canvas.height = captureDims.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+      if (base64) sendFrame(base64);
+    }, 150);
+    return () => clearInterval(interval);
+  }, [cameraReady, connectionState, captureDims, sendFrame]);
 
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
-      ? 'video/webm;codecs=vp8'
-      : undefined;
-    const recorder = mimeType ? new MediaRecorder(streamRef.current, { mimeType }) : new MediaRecorder(streamRef.current);
+  // ── Vẽ khung bbox — 1 khuôn mặt duy nhất, màu theo kết quả verify. ──────
+  const multiFace = tracks.length > 1;
+  const soloTrack = tracks.length === 1 ? tracks[0] : undefined;
+  const soloResult = soloTrack && verifyResult?.trackId === soloTrack.trackId ? verifyResult : undefined;
 
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data);
-    };
-    recorder.onstop = async () => {
-      setPhase('processing');
-      try {
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'video/webm' });
-        const base64 = await blobToBase64(blob);
-        const res = await verifySelfFace(base64);
-        setResult(res);
-        setPhase('result');
-      } catch (err) {
-        setErrorMsg(extractApiError(err));
-        setPhase('error');
-      }
-    };
+  useEffect(() => {
+    const canvas = overlayCanvasRef.current;
+    if (!canvas) return;
+    canvas.width = captureDims.width;
+    canvas.height = captureDims.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    recorderRef.current = recorder;
-    recorder.start();
-    setPhase('recording');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!soloTrack) return;
+    const color = multiFace
+      ? COLOR_MULTI_FACE
+      : soloResult
+        ? soloResult.matched
+          ? COLOR_MATCHED
+          : COLOR_NOT_MATCHED
+        : COLOR_DETECTING;
+    const [x1, y1, x2, y2] = soloTrack.bbox;
+    ctx.lineWidth = Math.max(2, captureDims.width / 160);
+    ctx.strokeStyle = color;
+    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+  }, [soloTrack, soloResult, multiFace, captureDims]);
 
-    const start = Date.now();
-    const progressTimer = setInterval(() => {
-      const pct = Math.min(100, ((Date.now() - start) / RECORD_MS) * 100);
-      setRecordProgress(pct);
-      if (pct >= 100) clearInterval(progressTimer);
-    }, 100);
-
-    setTimeout(() => {
-      clearInterval(progressTimer);
-      setRecordProgress(100);
-      if (recorder.state !== 'inactive') recorder.stop();
-    }, RECORD_MS);
-  }, []);
-
-  function handleRetry() {
-    setResult(null);
-    setErrorMsg(null);
-    setRecordProgress(0);
-    setPhase(streamRef.current ? 'idle' : 'opening');
+  function statusNode() {
+    if (multiFace)
+      return <Alert severity="warning">Chỉ 1 người trong khung hình một lúc.</Alert>;
+    if (!soloTrack)
+      return (
+        <Typography variant="body2" sx={{ color: 'grey.400', textAlign: 'center' }}>
+          Đưa khuôn mặt vào khung hình
+        </Typography>
+      );
+    if (!soloResult)
+      return (
+        <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
+          <CircularProgress size={16} sx={{ color: 'grey.400' }} />
+          <Typography variant="body2" sx={{ color: 'grey.400' }}>Đang nhận diện...</Typography>
+        </Stack>
+      );
+    return (
+      <Stack alignItems="center" spacing={0.5}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Iconify
+            icon={soloResult.matched ? 'mdi:check-decagram' : 'mdi:close-circle-outline'}
+            width={28}
+            sx={{ color: soloResult.matched ? 'success.main' : 'error.main' }}
+          />
+          <Typography variant="h6" sx={{ color: '#fff' }}>
+            {soloResult.matched ? 'Khớp!' : 'Không khớp'}
+          </Typography>
+        </Stack>
+        <Typography variant="body2" sx={{ color: 'grey.400' }}>
+          Độ tương đồng: {Math.round(soloResult.similarity * 100)}%
+        </Typography>
+      </Stack>
+    );
   }
 
   return (
@@ -163,112 +175,53 @@ export function SelfVerifyDialog({ open, onClose }: Props) {
       </Box>
 
       <Box sx={{ position: 'relative', overflow: 'hidden', bgcolor: 'common.black', width: '100%', height: 320 }}>
-        {phase === 'result' || phase === 'error' ? (
-          <Box
-            sx={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 1.5,
-              p: 3,
-              textAlign: 'center',
-            }}
-          >
-            {phase === 'error' ? (
-              <>
-                <Iconify icon="mdi:alert-circle-outline" width={56} sx={{ color: 'error.main' }} />
-                <Typography sx={{ color: '#fff' }}>{errorMsg}</Typography>
-              </>
-            ) : result ? (
-              <>
-                <Iconify
-                  icon={result.matched ? 'mdi:check-decagram' : 'mdi:close-circle-outline'}
-                  width={56}
-                  sx={{ color: result.matched ? 'success.main' : 'error.main' }}
-                />
-                <Typography variant="h6" sx={{ color: '#fff' }}>
-                  {result.matched ? 'Khớp!' : 'Không khớp'}
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'grey.400' }}>
-                  Độ tương đồng: {Math.round(result.similarity * 100)}%
-                </Typography>
-                {!result.matched && result.reason && (
-                  <Typography variant="caption" sx={{ color: 'grey.500' }}>
-                    {REASON_LABELS[result.reason] ?? result.reason}
-                  </Typography>
-                )}
-              </>
-            ) : null}
+        {cameraError ? (
+          <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5, p: 3, textAlign: 'center' }}>
+            <Iconify icon="mdi:alert-circle-outline" width={56} sx={{ color: 'error.main' }} />
+            <Typography sx={{ color: '#fff' }}>{cameraError}</Typography>
           </Box>
         ) : (
           <>
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
-            />
-            {phase === 'opening' && (
-              <Box
-                sx={{
-                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
+            <Box sx={{ position: 'absolute', inset: 0, transform: 'scaleX(-1)' }}>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+              <canvas ref={overlayCanvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
+            </Box>
+            {!cameraReady && (
+              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <CircularProgress sx={{ color: '#fff' }} />
               </Box>
             )}
-            {phase === 'recording' && (
-              <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
-                <LinearProgress variant="determinate" value={recordProgress} color="error" sx={{ height: 4 }} />
-              </Box>
-            )}
-            {phase === 'processing' && (
-              <Box
-                sx={{
-                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', gap: 1,
-                  alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.5)',
-                }}
-              >
+            {cameraReady && connectionState !== 'connected' && (
+              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.5)' }}>
                 <CircularProgress sx={{ color: '#fff' }} />
-                <Typography variant="caption" sx={{ color: '#fff' }}>Đang kiểm tra…</Typography>
+                <Typography variant="caption" sx={{ color: '#fff' }}>
+                  {connectionState === 'reconnecting' ? 'Đang kết nối lại...' : 'Đang kết nối...'}
+                </Typography>
               </Box>
             )}
           </>
         )}
       </Box>
 
-      <Stack spacing={1.5} sx={{ p: 2.5, bgcolor: 'grey.900' }}>
-        {phase === 'idle' && (
-          <Button
-            variant="contained"
-            size="large"
-            startIcon={<Iconify icon="mdi:record-circle-outline" />}
-            onClick={handleRecord}
-          >
-            Bắt đầu quay (3 giây)
-          </Button>
+      <Stack spacing={1.5} sx={{ p: 2.5, bgcolor: 'grey.900', minHeight: 96, justifyContent: 'center' }}>
+        {error && (
+          <Alert severity="error" onClose={clearError}>
+            {error}
+          </Alert>
         )}
-        {(phase === 'result' || phase === 'error') && (
-          <Stack direction="row" spacing={1.5}>
-            <Button variant="outlined" color="inherit" fullWidth onClick={handleRetry} sx={{ color: 'grey.300', borderColor: 'grey.600' }}>
-              Thử lại
-            </Button>
-            <Button variant="contained" fullWidth onClick={onClose}>
-              Đóng
-            </Button>
-          </Stack>
-        )}
-        {(phase === 'opening' || phase === 'recording' || phase === 'processing') && (
-          <Button variant="text" color="inherit" onClick={onClose} sx={{ color: 'grey.400' }}>
-            Huỷ
-          </Button>
-        )}
+        {!cameraError && !error && statusNode()}
+        <Button variant="outlined" color="inherit" onClick={onClose} sx={{ color: 'grey.300', borderColor: 'grey.600' }}>
+          Đóng
+        </Button>
       </Stack>
+
+      <canvas ref={captureCanvasRef} style={{ display: 'none' }} />
     </Dialog>
   );
 }
