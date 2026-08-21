@@ -3,11 +3,20 @@
 import { useEffect } from 'react';
 
 import Box from '@mui/material/Box';
+import Zoom from '@mui/material/Zoom';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+
+import Iconify from 'src/components/iconify';
 
 import type { IKioskTrack } from 'src/types/kiosk';
 import type { KioskTrackCandidate } from 'src/hooks/use-kiosk-hub';
 
 // ----------------------------------------------------------------------
+
+/** Chấm công vừa THÀNH CÔNG (API confirm đã trả về OK) cho 1 track cụ thể — hiệu ứng tự tắt sau
+ *  vài giây (xem SUCCESS_FLASH_MS ở KioskCheckinView). */
+type SuccessFlash = { trackId: string; kind: 'checkin' | 'checkout' | 'overtime'; staffName: string } | null;
 
 type Props = {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -21,6 +30,7 @@ type Props = {
   /** Danh tính + action gần nhất đã biết theo từng trackId (persist độc lập với vòng đời xác
    *  nhận check-in/out — xem useKioskHub.trackCandidates). */
   trackCandidates: Record<string, KioskTrackCandidate>;
+  successFlash?: SuccessFlash;
 };
 
 // Màu khung theo đúng 2 trục: (1) tracking có thành công không (state pipeline phía
@@ -32,12 +42,19 @@ const COLOR_HAS_SHIFT = '#00A76F'; // success — đã nhận diện, CÓ ca th�
 const COLOR_OVERTIME = '#7635DC'; // secondary — đã nhận diện, KHÔNG có ca, tự động chấm ngoài giờ
 const COLOR_NO_ACTION = '#00B8D9'; // info — đã nhận diện, KHÔNG có ca và không có action nào
 const COLOR_TRACKING = '#919EAB'; // neutral — đang theo dõi/phát hiện, chưa có kết quả
+const COLOR_SUCCESS_FLASH = '#00E676'; // chấm công vừa THÀNH CÔNG — sáng hơn hẳn COLOR_HAS_SHIFT để nổi bật
 
 // action="overtime" nghĩa là KHÔNG có ca hôm nay (đó chính xác là điều kiện BE tự chọn overtime —
 // xem KioskIdentifyCommandHandler: chỉ rơi vào overtime khi todayAssignments.Count == 0) — PHẢI
 // tách riêng khỏi checkin/checkout (CÓ ca thật), nếu không sẽ hiện "Có ca" ngược hoàn toàn cho
 // người không hề có ca nào hôm nay (đã xảy ra thực tế, xem báo cáo user).
-function trackColor(track: IKioskTrack, candidate: KioskTrackCandidate | undefined, multiFace: boolean): string {
+function trackColor(
+  track: IKioskTrack,
+  candidate: KioskTrackCandidate | undefined,
+  multiFace: boolean,
+  isSuccessFlash: boolean
+): string {
+  if (isSuccessFlash) return COLOR_SUCCESS_FLASH;
   if (multiFace) return COLOR_MULTI_FACE;
   if (candidate) {
     if (candidate.action === 'noaction') return COLOR_NO_ACTION;
@@ -47,6 +64,12 @@ function trackColor(track: IKioskTrack, candidate: KioskTrackCandidate | undefin
   if (track.state === 'LIVENESS_FAILED') return COLOR_TRACKING_FAILED;
   return COLOR_TRACKING;
 }
+
+const SUCCESS_FLASH_LABEL: Record<NonNullable<SuccessFlash>['kind'], string> = {
+  checkin: 'Đã chấm công vào!',
+  checkout: 'Đã chấm công ra!',
+  overtime: 'Đã check-in ngoài giờ!',
+};
 
 function statusText(track: IKioskTrack, candidate: KioskTrackCandidate | undefined): string {
   if (candidate) {
@@ -66,6 +89,7 @@ export default function KioskCameraStage({
   captureHeight,
   mirror = true,
   trackCandidates,
+  successFlash = null,
 }: Props) {
   const multiFace = tracks.length > 1;
 
@@ -80,13 +104,14 @@ export default function KioskCameraStage({
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.lineWidth = Math.max(2, captureWidth / 160);
     tracks.forEach((track) => {
+      const isFlash = track.trackId === successFlash?.trackId;
       const [x1, y1, x2, y2] = track.bbox;
-      ctx.strokeStyle = trackColor(track, trackCandidates[track.trackId], multiFace);
+      ctx.lineWidth = isFlash ? Math.max(3, captureWidth / 100) : Math.max(2, captureWidth / 160);
+      ctx.strokeStyle = trackColor(track, trackCandidates[track.trackId], multiFace, isFlash);
       ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
     });
-  }, [tracks, overlayCanvasRef, captureWidth, captureHeight, trackCandidates, multiFace]);
+  }, [tracks, overlayCanvasRef, captureWidth, captureHeight, trackCandidates, multiFace, successFlash]);
 
   // Tên + trạng thái chỉ hiện khi ĐÚNG 1 khuôn mặt (giữ đúng ràng buộc "mỗi lần 1 người" của toàn
   // luồng kiosk) — vị trí tính bằng % dựa trên bbox GỐC (chưa mirror) so với captureWidth/Height,
@@ -94,12 +119,13 @@ export default function KioskCameraStage({
   // transform + canvas transform chồng nhau (cách cũ dễ lệch vị trí/tràn khung khi label dài).
   const soloTrack = tracks.length === 1 ? tracks[0] : undefined;
   const soloCandidate = soloTrack ? trackCandidates[soloTrack.trackId] : undefined;
+  const soloIsFlash = !!soloTrack && soloTrack.trackId === successFlash?.trackId;
   const leftPercent = soloTrack
     ? ((mirror ? captureWidth - soloTrack.bbox[2] : soloTrack.bbox[0]) / captureWidth) * 100
     : 0;
   const topPercent = soloTrack ? (soloTrack.bbox[1] / captureHeight) * 100 : 0;
   const bottomPercent = soloTrack ? (soloTrack.bbox[3] / captureHeight) * 100 : 0;
-  const color = soloTrack ? trackColor(soloTrack, soloCandidate, false) : COLOR_TRACKING;
+  const color = soloTrack ? trackColor(soloTrack, soloCandidate, false, soloIsFlash) : COLOR_TRACKING;
 
   const badgeSx = {
     position: 'absolute' as const,
@@ -165,6 +191,36 @@ export default function KioskCameraStage({
           {statusText(soloTrack, soloCandidate)}
         </Box>
       )}
+
+      {/* Chấm công THÀNH CÔNG — hiệu ứng nổi bật giữa khung hình (không chỉ dựa vào snackbar góc
+          màn hình, người đứng trước cam đang nhìn thẳng vào khung nhận diện). CỐ Ý đặt cố định
+          giữa khung hình thay vì bám theo bbox của track — người có thể rời khung ngay sau khi
+          countdown chạm 0 (trước khi kịp thấy hiệu ứng), lúc đó soloTrack đã mất nên không thể
+          định vị theo bbox được nữa. Tự tắt sau vài giây, xem SUCCESS_FLASH_MS ở KioskCheckinView. */}
+      <Zoom in={!!successFlash} unmountOnExit>
+        <Stack
+          alignItems="center"
+          spacing={0.5}
+          sx={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 3,
+            pointerEvents: 'none',
+          }}
+        >
+          <Iconify icon="mdi:check-circle" width={56} sx={{ color: COLOR_SUCCESS_FLASH, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.5))' }} />
+          {successFlash && (
+            <Typography
+              variant="subtitle2"
+              sx={{ color: '#fff', fontWeight: 700, textShadow: '0 1px 4px rgba(0,0,0,0.7)' }}
+            >
+              {SUCCESS_FLASH_LABEL[successFlash.kind]}
+            </Typography>
+          )}
+        </Stack>
+      </Zoom>
     </Box>
   );
 }

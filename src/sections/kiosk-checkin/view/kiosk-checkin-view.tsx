@@ -236,6 +236,13 @@ export default function KioskCheckinView() {
   const [secondsLeft, setSecondsLeft] = useState(AUTO_CONFIRM_SECONDS);
   const [confirming, setConfirming] = useState(false);
 
+  // Hiệu ứng xác nhận NGAY TRÊN khung camera khi check-in/out THÀNH CÔNG — snackbar dễ bị bỏ lỡ
+  // vì người đứng trước cam đang nhìn vào khung nhận diện, không nhìn góc màn hình. Tự tắt sau
+  // vài giây, không cần người dùng bấm gì.
+  const [successFlash, setSuccessFlash] = useState<{ trackId: string; kind: 'checkin' | 'checkout' | 'overtime'; staffName: string } | null>(null);
+  const successFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const SUCCESS_FLASH_MS = 2500;
+
   const handleConfirm = useCallback(async () => {
     if (!candidate || !deviceKey) return;
     setConfirming(true);
@@ -252,6 +259,14 @@ export default function KioskCheckinView() {
             ? `Đã check-in ngoài giờ cho ${candidate.staffName}`
             : `Đã chấm công vào cho ${candidate.staffName}`;
       enqueueSnackbar(successMsg, { variant: 'success' });
+
+      if (successFlashTimerRef.current) clearTimeout(successFlashTimerRef.current);
+      setSuccessFlash({
+        trackId: candidate.trackId,
+        kind: candidate.action === 'checkout' ? 'checkout' : candidate.action === 'overtime' ? 'overtime' : 'checkin',
+        staffName: candidate.staffName,
+      });
+      successFlashTimerRef.current = setTimeout(() => setSuccessFlash(null), SUCCESS_FLASH_MS);
     } catch (err: any) {
       enqueueSnackbar(err?.title || err?.message || 'Chấm công thất bại', { variant: 'error' });
     } finally {
@@ -259,6 +274,10 @@ export default function KioskCheckinView() {
       clearCandidate();
     }
   }, [candidate, deviceKey, clearCandidate, enqueueSnackbar]);
+
+  useEffect(() => () => {
+    if (successFlashTimerRef.current) clearTimeout(successFlashTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!showCandidate) {
@@ -355,6 +374,7 @@ export default function KioskCheckinView() {
           // còn trong khung hình, không chỉ trong lúc đang chờ xác nhận check-in/out (candidate) —
           // xem ghi chú trackCandidates ở useKioskHub. KioskCameraStage tự lọc "chỉ 1 khuôn mặt".
           trackCandidates={trackCandidates}
+          successFlash={successFlash}
         />
 
         <Stack spacing={1} sx={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 5 }}>
