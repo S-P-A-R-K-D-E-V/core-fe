@@ -137,9 +137,11 @@ export default function KioskCameraStage({
       </Box>
 
       {soloTrack && soloCandidate && (
-        // Tên — chỉ hiện khi ĐÃ nhận diện được (chưa có candidate thì chưa biết tên).
+        // Tên + độ khớp (%) — chỉ hiện khi ĐÃ nhận diện được (chưa có candidate thì chưa biết
+        // tên). Hiện % để người vận hành thấy được mức độ tự tin của lần khớp — hữu ích khi đang
+        // đánh giá độ chính xác lúc đeo kính/khẩu trang.
         <Box sx={{ ...badgeSx, top: `${topPercent}%`, transform: 'translateY(-100%)', mt: '-4px' }}>
-          {soloCandidate.name}
+          {soloCandidate.name} — {Math.round(soloCandidate.similarity * 100)}%
         </Box>
       )}
       {soloTrack && (

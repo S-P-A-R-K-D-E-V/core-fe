@@ -14,9 +14,11 @@ import type {
   KioskConnectionState,
 } from 'src/types/kiosk';
 
-/** Danh tính + action gần nhất đã biết cho 1 track — persist độc lập với `candidate` (xem ghi
- *  chú ở trackCandidates bên dưới). */
-export type KioskTrackCandidate = { name: string; action: KioskAction };
+/** Danh tính + action + độ khớp (%) gần nhất đã biết cho 1 track — persist độc lập với `candidate`
+ *  (xem ghi chú ở trackCandidates bên dưới). similarity hiện ngay cạnh tên trên khung camera để
+ *  người vận hành thấy được mức độ tự tin của lần nhận diện (hữu ích khi đang đánh giá độ chính
+ *  xác lúc đeo kính/khẩu trang). */
+export type KioskTrackCandidate = { name: string; action: KioskAction; similarity: number };
 
 // Mirror pattern của src/components/messenger/messenger-provider.tsx (SignalR connection
 // lifecycle) — khác biệt: kiosk auth qua query string `kioskKey` (KioskAuthenticationHandler.
@@ -164,7 +166,10 @@ export function useKioskHub(deviceKey: string | null) {
         `[candidate_found] track=${payload.trackId} staff=${payload.staffName} action=${payload.action} similarity=${payload.similarity.toFixed(3)}`
       );
       setCandidate(payload);
-      setTrackCandidates((prev) => ({ ...prev, [payload.trackId]: { name: payload.staffName, action: payload.action } }));
+      setTrackCandidates((prev) => ({
+        ...prev,
+        [payload.trackId]: { name: payload.staffName, action: payload.action, similarity: payload.similarity },
+      }));
     });
     conn.on('error', (raw: unknown) => {
       const message = parseErrorMessage(raw);
