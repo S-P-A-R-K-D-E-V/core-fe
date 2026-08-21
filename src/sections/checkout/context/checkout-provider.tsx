@@ -8,6 +8,7 @@ import { useRouter } from 'src/routes/hooks';
 
 import { getStorage, useLocalStorage } from 'src/hooks/use-local-storage';
 
+import { createSalesOrder } from 'src/api/sales-orders';
 import { PRODUCT_CHECKOUT_STEPS } from 'src/_mock/_product';
 
 import { IAddressItem } from 'src/types/address';
@@ -156,12 +157,26 @@ export function CheckoutProvider({ children }: Props) {
   );
 
   const onCreateBilling = useCallback(
-    (address: IAddressItem) => {
+    async (address: IAddressItem) => {
       update('billing', address);
 
-      onNextStep();
+      const invoiceDetails = state.items.map((item: ICheckoutItem) => ({
+        productId: item.id,
+        productName: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      }));
+
+      const result = await createSalesOrder({
+        totalPayment: state.total,
+        method: 'cash',
+        invoiceDetails,
+      });
+
+      update('orderId', result.id);
+      update('activeStep', PRODUCT_CHECKOUT_STEPS.length);
     },
-    [onNextStep, update]
+    [update, state.items, state.total]
   );
 
   const onApplyDiscount = useCallback(
@@ -179,14 +194,6 @@ export function CheckoutProvider({ children }: Props) {
   );
 
   const completed = state.activeStep === PRODUCT_CHECKOUT_STEPS.length;
-
-  const onCompleteWithOrder = useCallback(
-    (orderId: string) => {
-      update('orderId', orderId);
-      update('activeStep', PRODUCT_CHECKOUT_STEPS.length);
-    },
-    [update]
-  );
 
   // Reset
   const onReset = useCallback(() => {
@@ -211,8 +218,6 @@ export function CheckoutProvider({ children }: Props) {
       onApplyDiscount,
       onApplyShipping,
       //
-      onCompleteWithOrder,
-      //
       onBackStep,
       onNextStep,
       onGotoStep,
@@ -226,7 +231,6 @@ export function CheckoutProvider({ children }: Props) {
       onApplyDiscount,
       onApplyShipping,
       onBackStep,
-      onCompleteWithOrder,
       onCreateBilling,
       onDecreaseQuantity,
       onDeleteCart,

@@ -80,7 +80,7 @@ export default function CheckoutCart() {
           disabled={empty}
           onClick={checkout.onNextStep}
         >
-          Tiến hành thanh toán
+          Tiếp tục đặt hàng
         </Button>
       </Grid>
     </Grid>

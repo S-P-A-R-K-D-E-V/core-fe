@@ -1,12 +1,16 @@
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Grid from '@mui/material/Grid2';
+import LoadingButton from '@mui/lab/LoadingButton';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
 import { _addressBooks } from 'src/_mock';
 
 import Iconify from 'src/components/iconify';
+import { useSnackbar } from 'src/components/snackbar';
+
+import { IAddressItem } from 'src/types/address';
 
 import { useCheckoutContext } from './context';
 import CheckoutSummary from './checkout-summary';
@@ -17,7 +21,23 @@ import { AddressItem, AddressNewForm } from '../address';
 export default function CheckoutBillingAddress() {
   const checkout = useCheckoutContext();
 
+  const { enqueueSnackbar } = useSnackbar();
+
   const addressForm = useBoolean();
+
+  const submitting = useBoolean();
+
+  const handleSelectAddress = async (address: IAddressItem) => {
+    submitting.onTrue();
+    try {
+      await checkout.onCreateBilling(address);
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar('Đặt hàng thất bại, vui lòng thử lại', { variant: 'error' });
+    } finally {
+      submitting.onFalse();
+    }
+  };
 
   return (
     <>
@@ -34,13 +54,14 @@ export default function CheckoutBillingAddress() {
                       Xóa
                     </Button>
                   )}
-                  <Button
+                  <LoadingButton
                     variant="outlined"
                     size="small"
-                    onClick={() => checkout.onCreateBilling(address)}
+                    loading={submitting.value}
+                    onClick={() => handleSelectAddress(address)}
                   >
                     Chọn địa chỉ này
-                  </Button>
+                  </LoadingButton>
                 </Stack>
               }
               sx={{
@@ -85,7 +106,7 @@ export default function CheckoutBillingAddress() {
       <AddressNewForm
         open={addressForm.value}
         onClose={addressForm.onFalse}
-        onCreate={checkout.onCreateBilling}
+        onCreate={handleSelectAddress}
       />
     </>
   );
