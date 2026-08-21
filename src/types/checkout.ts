@@ -14,23 +14,6 @@ export type ICheckoutItem = {
   subTotal: number;
 };
 
-export type ICheckoutDeliveryOption = {
-  value: number;
-  label: string;
-  description: string;
-};
-
-export type ICheckoutPaymentOption = {
-  value: string;
-  label: string;
-  description: string;
-};
-
-export type ICheckoutCardOption = {
-  value: string;
-  label: string;
-};
-
 export type ICheckoutValue = {
   total: number;
   subTotal: number;
@@ -56,11 +39,9 @@ export type CheckoutContextProps = ICheckoutValue & {
   onNextStep: VoidFunction;
   onGotoStep: (step: number) => void;
   //
-  onCreateBilling: (billing: IAddressItem) => void;
+  onCreateBilling: (billing: IAddressItem) => Promise<void>;
   onApplyDiscount: (discount: number) => void;
   onApplyShipping: (discount: number) => void;
-  //
-  onCompleteWithOrder: (orderId: string) => void;
   //
   canReset: boolean;
   onReset: VoidFunction;
