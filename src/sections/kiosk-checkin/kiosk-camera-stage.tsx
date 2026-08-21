@@ -28,19 +28,32 @@ type Props = {
 // Ưu tiên từ trên xuống — nhiều khuôn mặt cùng lúc đè hết mọi trạng thái khác (yêu cầu xếp hàng).
 const COLOR_MULTI_FACE = '#FFAB00'; // warning — nhiều người cùng lúc, cần xếp hàng
 const COLOR_TRACKING_FAILED = '#FF5630'; // error — liveness thất bại (nghi giả mạo/ảnh chụp lại)
-const COLOR_HAS_ACTION = '#00A76F'; // success — đã nhận diện, CÓ ca cần chấm công
-const COLOR_NO_ACTION = '#00B8D9'; // info — đã nhận diện, KHÔNG có ca cần chấm công
+const COLOR_HAS_SHIFT = '#00A76F'; // success — đã nhận diện, CÓ ca thật hôm nay (checkin/checkout)
+const COLOR_OVERTIME = '#7635DC'; // secondary — đã nhận diện, KHÔNG có ca, tự động chấm ngoài giờ
+const COLOR_NO_ACTION = '#00B8D9'; // info — đã nhận diện, KHÔNG có ca và không có action nào
 const COLOR_TRACKING = '#919EAB'; // neutral — đang theo dõi/phát hiện, chưa có kết quả
 
+// action="overtime" nghĩa là KHÔNG có ca hôm nay (đó chính xác là điều kiện BE tự chọn overtime —
+// xem KioskIdentifyCommandHandler: chỉ rơi vào overtime khi todayAssignments.Count == 0) — PHẢI
+// tách riêng khỏi checkin/checkout (CÓ ca thật), nếu không sẽ hiện "Có ca" ngược hoàn toàn cho
+// người không hề có ca nào hôm nay (đã xảy ra thực tế, xem báo cáo user).
 function trackColor(track: IKioskTrack, candidate: KioskTrackCandidate | undefined, multiFace: boolean): string {
   if (multiFace) return COLOR_MULTI_FACE;
-  if (candidate) return candidate.action === 'noaction' ? COLOR_NO_ACTION : COLOR_HAS_ACTION;
+  if (candidate) {
+    if (candidate.action === 'noaction') return COLOR_NO_ACTION;
+    if (candidate.action === 'overtime') return COLOR_OVERTIME;
+    return COLOR_HAS_SHIFT;
+  }
   if (track.state === 'LIVENESS_FAILED') return COLOR_TRACKING_FAILED;
   return COLOR_TRACKING;
 }
 
 function statusText(track: IKioskTrack, candidate: KioskTrackCandidate | undefined): string {
-  if (candidate) return candidate.action === 'noaction' ? 'Không có ca' : 'Có ca';
+  if (candidate) {
+    if (candidate.action === 'noaction') return 'Không có ca';
+    if (candidate.action === 'overtime') return 'Không có ca — chấm ngoài giờ';
+    return 'Có ca';
+  }
   if (track.state === 'LIVENESS_FAILED') return 'Không xác thực được khuôn mặt';
   return 'Đang nhận diện...';
 }
