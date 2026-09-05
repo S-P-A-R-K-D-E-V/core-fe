@@ -1143,6 +1143,13 @@ export interface IPayrollShiftDetailResponse {
   shifts: IPayrollShiftItem[];
 }
 
+// 1 waiver đang áp dụng cho 1 ca — 1 ca có thể có nhiều waiver cùng lúc (vd. Late + EarlyLeave).
+export interface IShiftWaiverInfo {
+  waiverId: string;
+  violationType: string;
+  reason?: string;
+}
+
 export interface IPayrollShiftItem {
   shiftAssignmentId: string;
   date: string;
@@ -1151,13 +1158,14 @@ export interface IPayrollShiftItem {
   shiftEndTime: string;
   checkInTime?: string;
   checkOutTime?: string;
-  workedHours: number;
   paidHours: number;
   lateMinutes: number;
-  status: 'Present' | 'Absent' | 'Wrong';
-  isWaived: boolean;
-  waiverId?: string;
-  waiverReason?: string;
+  earlyLeaveMinutes: number;
+  status: 'Present' | 'Absent' | 'MissingCheckOut' | 'MissingCheckIn' | 'Pending';
+  // Loại vi phạm THẬT SỰ áp dụng cho ca này (0-2 phần tử) — dùng để hiển thị checkbox
+  // "bỏ qua lỗi" đúng loại, khớp với logic tính lương thật (không tự suy đoán từ `status`).
+  applicableViolationTypes: string[];
+  waivers: IShiftWaiverInfo[];
   isHolidayShift: boolean;
 }
 
@@ -1180,6 +1188,27 @@ export interface IWaivePenaltyResponse {
   waivedBy: string;
   waivedByName: string;
   createdAt: string;
+}
+
+// --- Manual Payroll Penalty (phạt thủ công, không thuộc 5 loại vi phạm chuẩn) ---
+export interface IManualPenalty {
+  id: string;
+  userId: string;
+  userName?: string;
+  payrollCycleId: string;
+  amount: number;
+  description: string;
+  createdByUserId: string;
+  createdByName?: string;
+  createdAt: string;
+  voidedAt?: string;
+}
+
+export interface ICreateManualPenaltyRequest {
+  userId: string;
+  payrollCycleId: string;
+  amount: number;
+  description: string;
 }
 
 // --- Salary History ---

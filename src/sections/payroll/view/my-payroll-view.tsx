@@ -179,20 +179,36 @@ export default function MyPayrollView() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
+  // 1 ca có thể có 0-2 vi phạm cùng lúc (Late+EarlyLeave) và mỗi vi phạm có thể được bỏ qua
+  // riêng — "đã bỏ qua hết" nghĩa là mọi vi phạm áp dụng đều đã có waiver.
+  const unwaivedViolationsOf = (shift: IPayrollShiftItem) => {
+    const waived = new Set(shift.waivers.map((w) => w.violationType));
+    return shift.applicableViolationTypes.filter((v) => !waived.has(v));
+  };
+
   const getShiftCardColor = (shift: IPayrollShiftItem) => {
-    if (shift.isWaived) return { bg: alpha(theme.palette.info.main, 0.08), border: theme.palette.info.main };
+    const unwaived = unwaivedViolationsOf(shift);
+    if (shift.applicableViolationTypes.length > 0 && unwaived.length === 0)
+      return { bg: alpha(theme.palette.info.main, 0.08), border: theme.palette.info.main };
     if (shift.status === 'Absent') return { bg: alpha(theme.palette.error.main, 0.08), border: theme.palette.error.main };
-    if (shift.status === 'Wrong') return { bg: alpha(theme.palette.warning.main, 0.1), border: theme.palette.warning.main };
-    if (shift.lateMinutes > 0) return { bg: alpha(theme.palette.warning.main, 0.08), border: theme.palette.warning.light };
+    if (shift.status === 'MissingCheckOut' || shift.status === 'MissingCheckIn')
+      return { bg: alpha(theme.palette.warning.main, 0.1), border: theme.palette.warning.main };
+    if (unwaived.length > 0) return { bg: alpha(theme.palette.warning.main, 0.08), border: theme.palette.warning.light };
     return { bg: alpha(theme.palette.success.main, 0.08), border: theme.palette.success.main };
   };
 
   const getShiftStatusLabel = (shift: IPayrollShiftItem) => {
-    if (shift.isWaived) return <Label color="info">Đã bỏ qua lỗi</Label>;
-    if (shift.status === 'Present' && shift.lateMinutes > 0)
+    const unwaived = unwaivedViolationsOf(shift);
+    if (shift.applicableViolationTypes.length > 0 && unwaived.length === 0)
+      return <Label color="info">Đã bỏ qua lỗi</Label>;
+    if (shift.status === 'Pending') return <Label color="default">Chưa tới giờ</Label>;
+    if (shift.status === 'Present' && unwaived.includes('Late'))
       return <Label color="warning">Đi muộn {shift.lateMinutes}p</Label>;
+    if (shift.status === 'Present' && unwaived.includes('EarlyLeave'))
+      return <Label color="warning">Về sớm {shift.earlyLeaveMinutes}p</Label>;
     if (shift.status === 'Present') return <Label color="success">Có mặt</Label>;
-    if (shift.status === 'Wrong') return <Label color="error">Sai ca</Label>;
+    if (shift.status === 'MissingCheckOut') return <Label color="error">Quên checkout</Label>;
+    if (shift.status === 'MissingCheckIn') return <Label color="error">Quên checkin</Label>;
     return <Label color="error">Vắng</Label>;
   };
 
@@ -481,7 +497,16 @@ export default function MyPayrollView() {
                                       {shift.lateMinutes > 0 && (
                                         <Chip
                                           label={`Muộn ${shift.lateMinutes}p`}
-                                          color={shift.isWaived ? 'default' : 'warning'}
+                                          color={unwaivedViolationsOf(shift).includes('Late') ? 'warning' : 'default'}
+                                          size="small"
+                                          variant="outlined"
+                                          sx={{ mt: 0.25, mr: 0.25, height: 16, fontSize: '0.65rem' }}
+                                        />
+                                      )}
+                                      {shift.earlyLeaveMinutes > 0 && (
+                                        <Chip
+                                          label={`Về sớm ${shift.earlyLeaveMinutes}p`}
+                                          color={unwaivedViolationsOf(shift).includes('EarlyLeave') ? 'warning' : 'default'}
                                           size="small"
                                           variant="outlined"
                                           sx={{ mt: 0.25, height: 16, fontSize: '0.65rem' }}
@@ -514,6 +539,7 @@ export default function MyPayrollView() {
                         <TableCell>Check-out</TableCell>
                         <TableCell>Giờ được tính lương</TableCell>
                         <TableCell>Đi muộn</TableCell>
+                        <TableCell>Về sớm</TableCell>
                         <TableCell>Trạng thái</TableCell>
                       </TableRow>
                     </TableHead>
@@ -542,9 +568,19 @@ export default function MyPayrollView() {
                             {shift.lateMinutes > 0 ? (
                               <Chip
                                 label={`${shift.lateMinutes} phút`}
-                                color={shift.isWaived ? 'default' : 'warning'}
+                                color={unwaivedViolationsOf(shift).includes('Late') ? 'warning' : 'default'}
                                 size="small"
-                                variant={shift.isWaived ? 'outlined' : 'filled'}
+                                variant={unwaivedViolationsOf(shift).includes('Late') ? 'filled' : 'outlined'}
+                              />
+                            ) : '—'}
+                          </TableCell>
+                          <TableCell>
+                            {shift.earlyLeaveMinutes > 0 ? (
+                              <Chip
+                                label={`${shift.earlyLeaveMinutes} phút`}
+                                color={unwaivedViolationsOf(shift).includes('EarlyLeave') ? 'warning' : 'default'}
+                                size="small"
+                                variant={unwaivedViolationsOf(shift).includes('EarlyLeave') ? 'filled' : 'outlined'}
                               />
                             ) : '—'}
                           </TableCell>
@@ -553,7 +589,7 @@ export default function MyPayrollView() {
                       ))}
                       {shiftDetail.shifts.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={8} align="center">
+                          <TableCell colSpan={9} align="center">
                             <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
                               Không có ca làm việc nào trong kỳ này
                             </Typography>

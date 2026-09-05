@@ -54,6 +54,7 @@ import {
 
 import type {
   IBatchPayrollResponse,
+  IManualPenalty,
   IPayrollCalendar,
   IPayrollCalendarDay,
   IPayrollCycleDetailResponse,
@@ -69,8 +70,10 @@ import type { IPayrollCycle } from 'src/types/corecms-api';
 
 import {
   bulkFinalizePayroll,
+  createManualPenalty,
   finalizePayroll,
   generateBatchPayroll,
+  getManualPenalties,
   getPayrollByCycle,
   getPayrollCalendar,
   getPayrollShiftDetails,
@@ -78,6 +81,7 @@ import {
   recalculatePayrollByCycle,
   recalculatePayrollRecord,
   removeWaiver,
+  voidManualPenalty,
   waivePenalty,
 } from 'src/api/payroll';
 import { adjustAttendanceTime } from 'src/api/attendance';
@@ -156,6 +160,13 @@ export default function PayrollBatchView() {
   const [selectedPayrollRecord, setSelectedPayrollRecord] = useState<IPayrollRecord | null>(null);
   const [waiveReason, setWaiveReason] = useState('');
   const [waivingShiftId, setWaivingShiftId] = useState<string | null>(null);
+  const [checkedViolationTypes, setCheckedViolationTypes] = useState<string[]>([]);
+  // Phạt thủ công (không thuộc 5 loại vi phạm chuẩn)
+  const [manualPenalties, setManualPenalties] = useState<IManualPenalty[]>([]);
+  const [openManualPenaltyDialog, setOpenManualPenaltyDialog] = useState(false);
+  const [manualPenaltyAmount, setManualPenaltyAmount] = useState('');
+  const [manualPenaltyDescription, setManualPenaltyDescription] = useState('');
+  const [manualPenaltySubmitting, setManualPenaltySubmitting] = useState(false);
   const [shiftDetailTab, setShiftDetailTab] = useState<'calendar' | 'table'>('calendar');
   const [calendarWeekOffset, setCalendarWeekOffset] = useState(0);
 
@@ -456,8 +467,12 @@ export default function PayrollBatchView() {
       setSelectedPayrollRecord(row);
       setOpenShiftDetail(true);
       setShiftDetailLoading(true);
-      const data = await getPayrollShiftDetails(row.id);
+      const [data, penalties] = await Promise.all([
+        getPayrollShiftDetails(row.id),
+        getManualPenalties(row.id).catch(() => []),
+      ]);
       setShiftDetail(data);
+      setManualPenalties(penalties);
     } catch (error) {
       console.error('Failed to fetch shift details:', error);
       enqueueSnackbar('Không thể tải chi tiết ca', { variant: 'error' });
@@ -472,8 +487,61 @@ export default function PayrollBatchView() {
     setSelectedPayrollRecord(null);
     setWaiveReason('');
     setWaivingShiftId(null);
+    setCheckedViolationTypes([]);
+    setManualPenalties([]);
+    setOpenManualPenaltyDialog(false);
+    setManualPenaltyAmount('');
+    setManualPenaltyDescription('');
     setShiftDetailTab('calendar');
     setCalendarWeekOffset(0);
+  };
+
+  const handleOpenManualPenaltyDialog = () => {
+    setManualPenaltyAmount('');
+    setManualPenaltyDescription('');
+    setOpenManualPenaltyDialog(true);
+  };
+
+  const handleSubmitManualPenalty = async () => {
+    if (!selectedPayrollRecord || !selectedPayrollRecord.payrollCycleId) return;
+    const amount = Number(manualPenaltyAmount);
+    if (!amount || amount <= 0) {
+      enqueueSnackbar('Số tiền phạt phải lớn hơn 0', { variant: 'error' });
+      return;
+    }
+    if (!manualPenaltyDescription.trim()) {
+      enqueueSnackbar('Nội dung phạt không được để trống', { variant: 'error' });
+      return;
+    }
+    try {
+      setManualPenaltySubmitting(true);
+      await createManualPenalty({
+        userId: selectedPayrollRecord.userId,
+        payrollCycleId: selectedPayrollRecord.payrollCycleId,
+        amount,
+        description: manualPenaltyDescription.trim(),
+      });
+      enqueueSnackbar('Đã thêm khoản phạt thủ công — tính lại lương để áp dụng', { variant: 'success' });
+      setOpenManualPenaltyDialog(false);
+      const penalties = await getManualPenalties(selectedPayrollRecord.id);
+      setManualPenalties(penalties);
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || 'Thêm phạt thủ công thất bại', { variant: 'error' });
+    } finally {
+      setManualPenaltySubmitting(false);
+    }
+  };
+
+  const handleVoidManualPenalty = async (id: string) => {
+    if (!selectedPayrollRecord) return;
+    try {
+      await voidManualPenalty(id);
+      enqueueSnackbar('Đã huỷ khoản phạt thủ công — tính lại lương để áp dụng', { variant: 'success' });
+      const penalties = await getManualPenalties(selectedPayrollRecord.id);
+      setManualPenalties(penalties);
+    } catch (error: any) {
+      enqueueSnackbar(error?.message || 'Huỷ phạt thủ công thất bại', { variant: 'error' });
+    }
   };
 
   const handleFinalizeRecord = async (isFinalized: boolean) => {
@@ -557,25 +625,31 @@ export default function PayrollBatchView() {
     return weeks;
   }, [shiftDetail]);
 
-  const handleWaivePenalty = async (shift: IPayrollShiftItem) => {
+  // violationType phải là 1 trong shift.applicableViolationTypes — đúng loại vi phạm THẬT SỰ áp
+  // dụng cho ca này (lấy từ backend, không tự suy đoán từ `status` — 1 ca có thể có 0-2 loại
+  // cùng lúc, vd. Late + EarlyLeave).
+  const handleWaivePenalty = async (shift: IPayrollShiftItem, violationType: string) => {
     if (!selectedPayrollRecord) return;
+    await waivePenalty({
+      shiftAssignmentId: shift.shiftAssignmentId,
+      userId: selectedPayrollRecord.userId,
+      violationType,
+      payrollCycleId: selectedPayrollRecord.payrollCycleId,
+      reason: waiveReason || undefined,
+    });
+  };
 
-    const violationType =
-      shift.status === 'Absent' ? 'Absent' : shift.status === 'Wrong' ? 'WrongShift' : 'Late';
-
+  // Bấm OK trên panel bỏ qua lỗi — bỏ qua TỪNG loại đã tích chọn (có thể nhiều hơn 1, vd. cả
+  // Late lẫn EarlyLeave cùng lúc), rồi tải lại chi tiết ca đúng 1 lần.
+  const handleSubmitWaive = async (shift: IPayrollShiftItem) => {
+    if (!selectedPayrollRecord || checkedViolationTypes.length === 0) return;
     try {
-      await waivePenalty({
-        shiftAssignmentId: shift.shiftAssignmentId,
-        userId: selectedPayrollRecord.userId,
-        violationType,
-        payrollCycleId: selectedPayrollRecord.payrollCycleId,
-        reason: waiveReason || undefined,
-      });
+      await Promise.all(checkedViolationTypes.map((vt) => handleWaivePenalty(shift, vt)));
       enqueueSnackbar('Đã bỏ qua lỗi vi phạm', { variant: 'success' });
       setWaiveReason('');
       setWaivingShiftId(null);
+      setCheckedViolationTypes([]);
 
-      // Refresh shift detail
       const data = await getPayrollShiftDetails(selectedPayrollRecord.id);
       setShiftDetail(data);
     } catch (error: any) {
@@ -583,11 +657,11 @@ export default function PayrollBatchView() {
     }
   };
 
-  const handleRemoveWaiver = async (shift: IPayrollShiftItem) => {
-    if (!shift.waiverId || !selectedPayrollRecord) return;
+  const handleRemoveWaiver = async (waiverId: string) => {
+    if (!selectedPayrollRecord) return;
 
     try {
-      await removeWaiver(shift.waiverId);
+      await removeWaiver(waiverId);
       enqueueSnackbar('Đã xóa bỏ qua lỗi', { variant: 'success' });
 
       // Refresh shift detail
@@ -598,23 +672,145 @@ export default function PayrollBatchView() {
     }
   };
 
+  const VIOLATION_TYPE_LABELS: Record<string, string> = {
+    Late: 'Đi trễ',
+    EarlyLeave: 'Về sớm',
+    Absent: 'Vắng mặt',
+    MissingCheckOut: 'Quên checkout',
+    MissingCheckIn: 'Quên checkin',
+  };
+
+  // Vi phạm nào của ca này đang có waiver (đã bỏ qua lỗi) — 1 ca có thể chỉ bỏ qua 1 TRONG 2
+  // vi phạm đồng thời (vd. bỏ qua Late nhưng vẫn phạt EarlyLeave), nên không còn khái niệm
+  // "isWaived" boolean chung cho cả ca nữa.
+  const waivedTypesOf = (shift: IPayrollShiftItem) => new Set(shift.waivers.map((w) => w.violationType));
+  const unwaivedViolationsOf = (shift: IPayrollShiftItem) => {
+    const waived = waivedTypesOf(shift);
+    return shift.applicableViolationTypes.filter((v) => !waived.has(v));
+  };
+
   const getShiftStatusLabel = (shift: IPayrollShiftItem) => {
-    if (shift.isWaived) return <Label color="info">Đã bỏ qua lỗi</Label>;
-    if (shift.status === 'Present' && shift.lateMinutes > 0)
-      return <Label color="warning">Đi muộn {shift.lateMinutes}p</Label>;
+    const unwaived = unwaivedViolationsOf(shift);
+    if (shift.applicableViolationTypes.length > 0 && unwaived.length === 0)
+      return <Label color="info">Đã bỏ qua lỗi</Label>;
+    if (shift.status === 'Pending') return <Label color="default">Chưa tới giờ</Label>;
+    if (shift.status === 'Present' && unwaived.length > 0)
+      return <Label color="warning">{unwaived.map((v) => VIOLATION_TYPE_LABELS[v] ?? v).join(', ')}</Label>;
     if (shift.status === 'Present') return <Label color="success">Có mặt</Label>;
-    if (shift.status === 'Wrong') return <Label color="error">Sai ca</Label>;
+    if (shift.status === 'MissingCheckOut') return <Label color="error">Quên checkout</Label>;
+    if (shift.status === 'MissingCheckIn') return <Label color="error">Quên checkin</Label>;
     return <Label color="error">Vắng</Label>;
+  };
+
+  // Panel "bỏ qua lỗi" dùng chung cho cả 2 view (lịch + bảng) — checkbox theo TỪNG loại vi
+  // phạm thật sự áp dụng cho ca này (shift.applicableViolationTypes), không phải 1 nút chung.
+  const renderWaiverPanel = (shift: IPayrollShiftItem, compact: boolean) => {
+    const isFinalized = selectedPayrollRecord?.isFinalized;
+    const isWaiving = waivingShiftId === shift.shiftAssignmentId;
+    const unwaived = unwaivedViolationsOf(shift);
+    const btnSx = compact ? { fontSize: '0.65rem', py: 0.25 } : {};
+
+    return (
+      <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+        {!isFinalized && unwaived.length > 0 && (
+          isWaiving ? (
+            <Stack spacing={0.5} onClick={(e) => e.stopPropagation()}>
+              {unwaived.map((vt) => (
+                <FormControlLabel
+                  key={vt}
+                  sx={{ m: 0 }}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={checkedViolationTypes.includes(vt)}
+                      onChange={(e) =>
+                        setCheckedViolationTypes((prev) =>
+                          e.target.checked ? [...prev, vt] : prev.filter((v) => v !== vt)
+                        )
+                      }
+                    />
+                  }
+                  label={<Typography variant="caption">{VIOLATION_TYPE_LABELS[vt] ?? vt}</Typography>}
+                />
+              ))}
+              <TextField
+                size="small"
+                placeholder="Lý do..."
+                value={waiveReason}
+                onChange={(e) => setWaiveReason(e.target.value)}
+                inputProps={compact ? { style: { fontSize: '0.75rem', padding: '4px 6px' } } : undefined}
+              />
+              <Stack direction="row" spacing={0.5}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="info"
+                  sx={btnSx}
+                  disabled={checkedViolationTypes.length === 0}
+                  onClick={() => handleSubmitWaive(shift)}
+                >
+                  OK
+                </Button>
+                <Button
+                  size="small"
+                  color="inherit"
+                  sx={btnSx}
+                  onClick={() => { setWaivingShiftId(null); setWaiveReason(''); setCheckedViolationTypes([]); }}
+                >
+                  Hủy
+                </Button>
+              </Stack>
+            </Stack>
+          ) : (
+            <Button
+              size="small"
+              variant="outlined"
+              color="info"
+              fullWidth={compact}
+              sx={btnSx}
+              startIcon={<Iconify icon="mingcute:shield-line" width={12} />}
+              onClick={(e) => { e.stopPropagation(); setWaivingShiftId(shift.shiftAssignmentId); setCheckedViolationTypes([]); }}
+            >
+              Bỏ qua lỗi
+            </Button>
+          )
+        )}
+        {shift.waivers.map((w) => (
+          <Stack key={w.waiverId} direction="row" alignItems="center" spacing={0.5}>
+            <Chip
+              size="small"
+              color="info"
+              variant="outlined"
+              label={VIOLATION_TYPE_LABELS[w.violationType] ?? w.violationType}
+              sx={compact ? { height: 18, fontSize: '0.6rem' } : undefined}
+            />
+            {w.reason && (
+              <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                {w.reason}
+              </Typography>
+            )}
+            {!isFinalized && (
+              <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); handleRemoveWaiver(w.waiverId); }}>
+                <Iconify icon="mingcute:close-line" width={14} />
+              </IconButton>
+            )}
+          </Stack>
+        ))}
+      </Stack>
+    );
   };
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const getShiftCardColor = (shift: IPayrollShiftItem) => {
-    if (shift.isWaived) return { bg: alpha(theme.palette.info.main, 0.08), border: theme.palette.info.main };
+    const unwaived = unwaivedViolationsOf(shift);
+    if (shift.applicableViolationTypes.length > 0 && unwaived.length === 0)
+      return { bg: alpha(theme.palette.info.main, 0.08), border: theme.palette.info.main };
     if (shift.status === 'Absent') return { bg: alpha(theme.palette.error.main, 0.08), border: theme.palette.error.main };
-    if (shift.status === 'Wrong') return { bg: alpha(theme.palette.warning.main, 0.1), border: theme.palette.warning.main };
-    if (shift.lateMinutes > 0) return { bg: alpha(theme.palette.warning.main, 0.08), border: theme.palette.warning.light };
+    if (shift.status === 'MissingCheckOut' || shift.status === 'MissingCheckIn')
+      return { bg: alpha(theme.palette.warning.main, 0.1), border: theme.palette.warning.main };
+    if (unwaived.length > 0) return { bg: alpha(theme.palette.warning.main, 0.08), border: theme.palette.warning.light };
     return { bg: alpha(theme.palette.success.main, 0.08), border: theme.palette.success.main };
   };
 
@@ -1504,6 +1700,19 @@ export default function PayrollBatchView() {
                   </Button>
                 </Tooltip>
               )}
+              {!selectedPayrollRecord?.isFinalized && selectedPayrollRecord?.payrollCycleId && (
+                <Tooltip title="Thêm khoản phạt thủ công — không thuộc 5 loại vi phạm chuẩn">
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    startIcon={<Iconify icon="mingcute:hand-money-line" />}
+                    onClick={handleOpenManualPenaltyDialog}
+                  >
+                    Phạt thủ công
+                  </Button>
+                </Tooltip>
+              )}
               <IconButton onClick={handleCloseShiftDetail} size="small">
                 <Iconify icon="mingcute:close-line" />
               </IconButton>
@@ -1517,6 +1726,30 @@ export default function PayrollBatchView() {
               {selectedPayrollRecord.isFinalized && (
                 <Label color="success">Đã chốt</Label>
               )}
+            </Stack>
+          )}
+          {manualPenalties.length > 0 && (
+            <Stack spacing={0.5} sx={{ mt: 1, p: 1, bgcolor: 'error.lighter', borderRadius: 1 }}>
+              <Typography variant="caption" fontWeight={700} color="error.dark">
+                Phạt thủ công
+              </Typography>
+              {manualPenalties.map((p) => (
+                <Stack key={p.id} direction="row" alignItems="center" spacing={1}>
+                  <Typography
+                    variant="caption"
+                    sx={{ textDecoration: p.voidedAt ? 'line-through' : 'none', flexGrow: 1 }}
+                    color={p.voidedAt ? 'text.disabled' : 'text.primary'}
+                  >
+                    {formatCurrency(p.amount)} — {p.description}
+                    {p.createdByName ? ` (${p.createdByName})` : ''}
+                  </Typography>
+                  {!p.voidedAt && !selectedPayrollRecord?.isFinalized && (
+                    <Button size="small" color="inherit" onClick={() => handleVoidManualPenalty(p.id)}>
+                      Huỷ
+                    </Button>
+                  )}
+                </Stack>
+              ))}
             </Stack>
           )}
           <Tabs
@@ -1620,7 +1853,6 @@ export default function PayrollBatchView() {
                               <Stack spacing={0.75}>
                                 {day.shifts.map((shift) => {
                                   const colors = getShiftCardColor(shift);
-                                  const isWaiving = waivingShiftId === shift.shiftAssignmentId;
                                   return (
                                     <Box
                                       key={shift.shiftAssignmentId}
@@ -1660,7 +1892,16 @@ export default function PayrollBatchView() {
                                       {shift.lateMinutes > 0 && (
                                         <Chip
                                           label={`Muộn ${shift.lateMinutes}p`}
-                                          color={shift.isWaived ? 'default' : 'warning'}
+                                          color={shift.applicableViolationTypes.includes('Late') ? 'warning' : 'default'}
+                                          size="small"
+                                          variant="outlined"
+                                          sx={{ mt: 0.25, mr: 0.25, height: 16, fontSize: '0.65rem' }}
+                                        />
+                                      )}
+                                      {shift.earlyLeaveMinutes > 0 && (
+                                        <Chip
+                                          label={`Về sớm ${shift.earlyLeaveMinutes}p`}
+                                          color={shift.applicableViolationTypes.includes('EarlyLeave') ? 'warning' : 'default'}
                                           size="small"
                                           variant="outlined"
                                           sx={{ mt: 0.25, height: 16, fontSize: '0.65rem' }}
@@ -1669,64 +1910,7 @@ export default function PayrollBatchView() {
                                       <Box sx={{ mt: 0.5 }}>{getShiftStatusLabel(shift)}</Box>
 
                                       {/* Waive actions — disabled when record is finalized */}
-                                      {!selectedPayrollRecord?.isFinalized && !shift.isWaived &&
-                                        (shift.status === 'Absent' ||
-                                          shift.status === 'Wrong' ||
-                                          (shift.status === 'Present' && shift.lateMinutes > 0)) && (
-                                          <Box sx={{ mt: 0.5 }}>
-                                            {isWaiving ? (
-                                              <Stack spacing={0.5}>
-                                                <TextField
-                                                  size="small"
-                                                  placeholder="Lý do..."
-                                                  value={waiveReason}
-                                                  onChange={(e) => setWaiveReason(e.target.value)}
-                                                  inputProps={{ style: { fontSize: '0.75rem', padding: '4px 6px' } }}
-                                                />
-                                                <Stack direction="row" spacing={0.5}>
-                                                  <Button size="small" variant="contained" color="info" sx={{ fontSize: '0.65rem', py: 0.25 }} onClick={() => handleWaivePenalty(shift)}>
-                                                    OK
-                                                  </Button>
-                                                  <Button size="small" color="inherit" sx={{ fontSize: '0.65rem', py: 0.25 }} onClick={() => { setWaivingShiftId(null); setWaiveReason(''); }}>
-                                                    Hủy
-                                                  </Button>
-                                                </Stack>
-                                              </Stack>
-                                            ) : (
-                                              <Button
-                                                size="small"
-                                                variant="outlined"
-                                                color="info"
-                                                fullWidth
-                                                sx={{ fontSize: '0.65rem', py: 0.25 }}
-                                                startIcon={<Iconify icon="mingcute:shield-line" width={12} />}
-                                                onClick={(e) => { e.stopPropagation(); setWaivingShiftId(shift.shiftAssignmentId); }}
-                                              >
-                                                Bỏ qua lỗi
-                                              </Button>
-                                            )}
-                                          </Box>
-                                        )}
-                                      {!selectedPayrollRecord?.isFinalized && shift.isWaived && (
-                                        <Box sx={{ mt: 0.5 }}>
-                                          {shift.waiverReason && (
-                                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontStyle: 'italic' }}>
-                                              {shift.waiverReason}
-                                            </Typography>
-                                          )}
-                                          <Button
-                                            size="small"
-                                            variant="outlined"
-                                            color="error"
-                                            fullWidth
-                                            sx={{ fontSize: '0.65rem', py: 0.25 }}
-                                            startIcon={<Iconify icon="mingcute:close-line" width={12} />}
-                                            onClick={(e) => { e.stopPropagation(); handleRemoveWaiver(shift); }}
-                                          >
-                                            Hủy bỏ qua
-                                          </Button>
-                                        </Box>
-                                      )}
+                                      {renderWaiverPanel(shift, true)}
                                       {!selectedPayrollRecord?.isFinalized && (
                                         <Button
                                           size="small"
@@ -1766,6 +1950,7 @@ export default function PayrollBatchView() {
                         <TableCell>Check-out</TableCell>
                         <TableCell>Giờ được tính lương</TableCell>
                         <TableCell>Đi muộn</TableCell>
+                        <TableCell>Về sớm</TableCell>
                         <TableCell>Trạng thái</TableCell>
                         <TableCell align="center">Thao tác</TableCell>
                       </TableRow>
@@ -1805,9 +1990,21 @@ export default function PayrollBatchView() {
                             {shift.lateMinutes > 0 ? (
                               <Chip
                                 label={`${shift.lateMinutes} phút`}
-                                color={shift.isWaived ? 'default' : 'warning'}
+                                color={shift.applicableViolationTypes.includes('Late') ? 'warning' : 'default'}
                                 size="small"
-                                variant={shift.isWaived ? 'outlined' : 'filled'}
+                                variant={shift.applicableViolationTypes.includes('Late') ? 'filled' : 'outlined'}
+                              />
+                            ) : (
+                              '—'
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {shift.earlyLeaveMinutes > 0 ? (
+                              <Chip
+                                label={`${shift.earlyLeaveMinutes} phút`}
+                                color={shift.applicableViolationTypes.includes('EarlyLeave') ? 'warning' : 'default'}
+                                size="small"
+                                variant={shift.applicableViolationTypes.includes('EarlyLeave') ? 'filled' : 'outlined'}
                               />
                             ) : (
                               '—'
@@ -1815,63 +2012,7 @@ export default function PayrollBatchView() {
                           </TableCell>
                           <TableCell>{getShiftStatusLabel(shift)}</TableCell>
                           <TableCell align="center">
-                            {!selectedPayrollRecord?.isFinalized &&
-                              !shift.isWaived &&
-                              (shift.status === 'Absent' ||
-                                shift.status === 'Wrong' ||
-                                (shift.status === 'Present' && shift.lateMinutes > 0)) && (
-                                <>
-                                  {waivingShiftId === shift.shiftAssignmentId ? (
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                      <TextField
-                                        size="small"
-                                        placeholder="Lý do..."
-                                        value={waiveReason}
-                                        onChange={(e) => setWaiveReason(e.target.value)}
-                                        sx={{ width: 160 }}
-                                      />
-                                      <Button size="small" variant="contained" color="info" onClick={() => handleWaivePenalty(shift)}>
-                                        Xác nhận
-                                      </Button>
-                                      <Button size="small" color="inherit" onClick={() => { setWaivingShiftId(null); setWaiveReason(''); }}>
-                                        Hủy
-                                      </Button>
-                                    </Stack>
-                                  ) : (
-                                    <Tooltip title="Bỏ qua lỗi vi phạm">
-                                      <Button
-                                        size="small"
-                                        variant="outlined"
-                                        color="info"
-                                        startIcon={<Iconify icon="mingcute:shield-line" />}
-                                        onClick={(e) => { e.stopPropagation(); setWaivingShiftId(shift.shiftAssignmentId); }}
-                                      >
-                                        Bỏ qua lỗi
-                                      </Button>
-                                    </Tooltip>
-                                  )}
-                                </>
-                              )}
-                            {shift.isWaived && !selectedPayrollRecord?.isFinalized && (
-                              <Stack spacing={0.5} alignItems="center">
-                                {shift.waiverReason && (
-                                  <Typography variant="caption" color="text.secondary">
-                                    {shift.waiverReason}
-                                  </Typography>
-                                )}
-                                <Tooltip title="Hủy bỏ qua lỗi">
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    color="error"
-                                    startIcon={<Iconify icon="mingcute:close-line" />}
-                                    onClick={(e) => { e.stopPropagation(); handleRemoveWaiver(shift); }}
-                                  >
-                                    Hủy bỏ qua
-                                  </Button>
-                                </Tooltip>
-                              </Stack>
-                            )}
+                            {renderWaiverPanel(shift, false)}
                             {!selectedPayrollRecord?.isFinalized && (
                               <Box sx={{ mt: 1 }}>
                                 <Tooltip title="Chỉnh sửa thời gian checkin/checkout">
@@ -1893,7 +2034,7 @@ export default function PayrollBatchView() {
                       ))}
                       {shiftDetail.shifts.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={9} align="center">
+                          <TableCell colSpan={10} align="center">
                             <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
                               Không có ca làm việc nào trong kỳ này
                             </Typography>
@@ -1911,6 +2052,48 @@ export default function PayrollBatchView() {
           <Button onClick={handleCloseShiftDetail} color="inherit">
             Đóng
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ========== Manual Penalty Dialog (phạt thủ công) ========== */}
+      <Dialog open={openManualPenaltyDialog} onClose={() => setOpenManualPenaltyDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Thêm phạt thủ công — {selectedPayrollRecord?.userName}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Khoản phạt tự do, không thuộc 5 loại vi phạm chuẩn (đi trễ, về sớm, vắng, quên
+            checkin/checkout) — không áp dụng bỏ qua lỗi, huỷ trực tiếp khi cần.
+          </Typography>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Số tiền phạt (VNĐ)"
+              type="number"
+              value={manualPenaltyAmount}
+              onChange={(e) => setManualPenaltyAmount(e.target.value)}
+              fullWidth
+              autoFocus
+            />
+            <TextField
+              label="Nội dung / lý do phạt"
+              value={manualPenaltyDescription}
+              onChange={(e) => setManualPenaltyDescription(e.target.value)}
+              fullWidth
+              multiline
+              rows={2}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenManualPenaltyDialog(false)} color="inherit">
+            Hủy
+          </Button>
+          <LoadingButton
+            variant="contained"
+            color="error"
+            loading={manualPenaltySubmitting}
+            onClick={handleSubmitManualPenalty}
+          >
+            Thêm phạt
+          </LoadingButton>
         </DialogActions>
       </Dialog>
 

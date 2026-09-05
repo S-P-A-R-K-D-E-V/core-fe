@@ -5,7 +5,9 @@ import type {
   IBatchPayrollResponse,
   IBulkFinalizePayrollRequest,
   IBulkFinalizePayrollResponse,
+  ICreateManualPenaltyRequest,
   IFinalizePayrollRequest,
+  IManualPenalty,
   IMarkPayrollPaidRequest,
   IPayrollCalculationRequest,
   IPayrollCalendar,
@@ -85,6 +87,24 @@ export async function waivePenalty(
 
 export async function removeWaiver(waiverId: string): Promise<void> {
   await axios.delete(endpoints.payroll.removeWaiver(waiverId));
+}
+
+// Manual penalties (phạt thủ công, không thuộc 5 loại vi phạm chuẩn)
+
+export async function getManualPenalties(payrollRecordId: string): Promise<IManualPenalty[]> {
+  const response = await axios.get<IManualPenalty[]>(endpoints.payroll.manualPenalties(payrollRecordId));
+  return response.data;
+}
+
+export async function createManualPenalty(
+  data: ICreateManualPenaltyRequest
+): Promise<IManualPenalty> {
+  const response = await axios.post<IManualPenalty>(endpoints.payroll.createManualPenalty, data);
+  return response.data;
+}
+
+export async function voidManualPenalty(id: string): Promise<void> {
+  await axios.delete(endpoints.payroll.voidManualPenalty(id));
 }
 
 // ── New endpoints ────────────────────────────────────────────────────────
