@@ -74,7 +74,7 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
 
   const needsGuestGate = !user && !guestInfo;
 
-  const { ready, session, messages, typing, streamingMessageId, error, sendMessage, resetSession } = useChatbot({
+  const { ready, session, messages, typing, streamingMessageId, activity, error, sendMessage, resetSession } = useChatbot({
     phone: user?.phoneNumber ?? guestInfo?.phone ?? null,
     displayName: user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : (guestInfo?.name ?? null),
     userId: user?.id ?? null,
@@ -234,9 +234,13 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
                 >
                   {!m.content && m.role === 'assistant' && m.id === streamingMessageId ? (
                     <Stack direction="row" alignItems="center" spacing={0.75} sx={{ py: 0.25 }}>
-                      <CircularProgress size={12} thickness={5} />
+                      {activity?.kind === 'tool' ? (
+                        <Iconify icon="solar:programming-bold-duotone" width={14} sx={{ color: 'text.secondary' }} />
+                      ) : (
+                        <CircularProgress size={12} thickness={5} />
+                      )}
                       <Typography variant="caption" color="text.secondary">
-                        đang trả lời…
+                        {activity?.label || 'đang trả lời…'}
                       </Typography>
                     </Stack>
                   ) : m.role === 'assistant' ? (
