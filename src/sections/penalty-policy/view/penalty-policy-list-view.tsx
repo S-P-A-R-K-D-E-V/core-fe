@@ -62,6 +62,7 @@ const VIOLATION_TYPES = [
   { value: 'EarlyLeave', label: 'Về sớm' },
   { value: 'WrongShift', label: 'Sai ca' },
   { value: 'Absent', label: 'Vắng mặt' },
+  { value: 'MissingCheckIn', label: 'Quên checkin' },
 ];
 
 const PENALTY_TYPES = [

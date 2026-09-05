@@ -607,6 +607,7 @@ export interface IPayrollRecord {
   totalHoursWorked: number;
   overtimeHours: number;
   wrongShifts: number;
+  missingCheckInShifts: number;
   totalLateMinutes: number;
   absentShifts: number;
   baseSalary: number;
@@ -1051,7 +1052,7 @@ export interface IUpdateHolidayPolicyRequest {
 }
 
 // --- Penalty Policy ---
-export type ViolationType = 'Late' | 'EarlyLeave' | 'WrongShift' | 'Absent';
+export type ViolationType = 'Late' | 'EarlyLeave' | 'WrongShift' | 'Absent' | 'MissingCheckIn';
 export type PenaltyType = 'FixedAmount' | 'Percentage' | 'HourlyRate';
 
 export interface IPenaltyPolicy {

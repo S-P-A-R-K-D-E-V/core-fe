@@ -98,6 +98,7 @@ const TABLE_HEAD = [
   { id: 'presentShifts', label: 'Có mặt', width: 80 },
   { id: 'absentShifts', label: 'Nghỉ', width: 80 },
   { id: 'wrongShifts', label: 'Sai ca', width: 80 },
+  { id: 'missingCheckInShifts', label: 'Quên checkin', width: 100 },
   { id: 'totalLateMinutes', label: 'Đi muộn (phút)', width: 110 },
   { id: 'totalHoursWorked', label: 'Giờ làm', width: 100 },
   { id: 'baseSalary', label: 'Lương CB', width: 140 },
@@ -1048,6 +1049,13 @@ export default function PayrollBatchView() {
                         <TableCell onClick={() => handleOpenShiftDetail(row)}>
                           {row.wrongShifts > 0 ? (
                             <Chip label={row.wrongShifts} color="warning" size="small" />
+                          ) : (
+                            '0'
+                          )}
+                        </TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
+                          {row.missingCheckInShifts > 0 ? (
+                            <Chip label={row.missingCheckInShifts} color="warning" size="small" />
                           ) : (
                             '0'
                           )}
