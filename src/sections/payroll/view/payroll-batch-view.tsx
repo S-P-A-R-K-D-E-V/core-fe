@@ -63,6 +63,7 @@ import type {
   IPayrollShiftItem,
   IPayrollSummary,
   IShiftPoolPost,
+  IUnscheduledAttendanceItem,
   IUser,
   PartialCoverSide,
 } from 'src/types/corecms-api';
@@ -78,6 +79,7 @@ import {
   getPayrollCalendar,
   getPayrollShiftDetails,
   getPayrollSummary,
+  getUnscheduledAttendance,
   recalculatePayrollByCycle,
   recalculatePayrollRecord,
   removeWaiver,
@@ -101,8 +103,9 @@ const TABLE_HEAD = [
   { id: 'totalShifts', label: 'Tổng ca', width: 80 },
   { id: 'presentShifts', label: 'Có mặt', width: 80 },
   { id: 'absentShifts', label: 'Nghỉ', width: 80 },
-  { id: 'wrongShifts', label: 'Sai ca', width: 80 },
+  { id: 'missingCheckOutShifts', label: 'Quên checkout', width: 100 },
   { id: 'missingCheckInShifts', label: 'Quên checkin', width: 100 },
+  { id: 'unscheduledAttendanceCount', label: 'Sai ca', width: 80 },
   { id: 'totalLateMinutes', label: 'Đi muộn (phút)', width: 110 },
   { id: 'totalHoursWorked', label: 'Giờ làm', width: 100 },
   { id: 'baseSalary', label: 'Lương CB', width: 140 },
@@ -167,6 +170,8 @@ export default function PayrollBatchView() {
   const [manualPenaltyAmount, setManualPenaltyAmount] = useState('');
   const [manualPenaltyDescription, setManualPenaltyDescription] = useState('');
   const [manualPenaltySubmitting, setManualPenaltySubmitting] = useState(false);
+  // Sai ca (chấm công không khớp lịch phân công nào — không phạt, không tự trả lương)
+  const [unscheduledAttendance, setUnscheduledAttendance] = useState<IUnscheduledAttendanceItem[]>([]);
   const [shiftDetailTab, setShiftDetailTab] = useState<'calendar' | 'table'>('calendar');
   const [calendarWeekOffset, setCalendarWeekOffset] = useState(0);
 
@@ -467,12 +472,14 @@ export default function PayrollBatchView() {
       setSelectedPayrollRecord(row);
       setOpenShiftDetail(true);
       setShiftDetailLoading(true);
-      const [data, penalties] = await Promise.all([
+      const [data, penalties, unscheduled] = await Promise.all([
         getPayrollShiftDetails(row.id),
         getManualPenalties(row.id).catch(() => []),
+        getUnscheduledAttendance(row.id).catch(() => []),
       ]);
       setShiftDetail(data);
       setManualPenalties(penalties);
+      setUnscheduledAttendance(unscheduled);
     } catch (error) {
       console.error('Failed to fetch shift details:', error);
       enqueueSnackbar('Không thể tải chi tiết ca', { variant: 'error' });
@@ -489,6 +496,7 @@ export default function PayrollBatchView() {
     setWaivingShiftId(null);
     setCheckedViolationTypes([]);
     setManualPenalties([]);
+    setUnscheduledAttendance([]);
     setOpenManualPenaltyDialog(false);
     setManualPenaltyAmount('');
     setManualPenaltyDescription('');
@@ -1243,8 +1251,8 @@ export default function PayrollBatchView() {
                           )}
                         </TableCell>
                         <TableCell onClick={() => handleOpenShiftDetail(row)}>
-                          {row.wrongShifts > 0 ? (
-                            <Chip label={row.wrongShifts} color="warning" size="small" />
+                          {row.missingCheckOutShifts > 0 ? (
+                            <Chip label={row.missingCheckOutShifts} color="warning" size="small" />
                           ) : (
                             '0'
                           )}
@@ -1252,6 +1260,20 @@ export default function PayrollBatchView() {
                         <TableCell onClick={() => handleOpenShiftDetail(row)}>
                           {row.missingCheckInShifts > 0 ? (
                             <Chip label={row.missingCheckInShifts} color="warning" size="small" />
+                          ) : (
+                            '0'
+                          )}
+                        </TableCell>
+                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
+                          {row.unscheduledAttendanceCount > 0 ? (
+                            <Tooltip title="Có chấm công nhưng KHÔNG khớp lịch phân công nào — xem chi tiết trong bảng lương của nhân viên">
+                              <Chip
+                                label={row.unscheduledAttendanceCount}
+                                color="default"
+                                variant="outlined"
+                                size="small"
+                              />
+                            </Tooltip>
                           ) : (
                             '0'
                           )}
@@ -1749,6 +1771,18 @@ export default function PayrollBatchView() {
                     </Button>
                   )}
                 </Stack>
+              ))}
+            </Stack>
+          )}
+          {unscheduledAttendance.length > 0 && (
+            <Stack spacing={0.5} sx={{ mt: 1, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
+              <Typography variant="caption" fontWeight={700} color="text.secondary">
+                Sai ca — chấm công không khớp lịch phân công nào (không phạt, không tự trả lương)
+              </Typography>
+              {unscheduledAttendance.map((u) => (
+                <Typography key={u.logId} variant="caption" color="text.secondary">
+                  {u.date}: {u.checkInTime ? u.checkInTime.split(' ')[1] : '—'} → {u.checkOutTime ? u.checkOutTime.split(' ')[1] : '—'}
+                </Typography>
               ))}
             </Stack>
           )}

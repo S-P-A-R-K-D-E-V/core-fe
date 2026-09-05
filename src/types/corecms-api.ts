@@ -606,8 +606,9 @@ export interface IPayrollRecord {
   presentShifts: number;
   totalHoursWorked: number;
   overtimeHours: number;
-  wrongShifts: number;
+  missingCheckOutShifts: number;
   missingCheckInShifts: number;
+  unscheduledAttendanceCount: number;
   totalLateMinutes: number;
   absentShifts: number;
   baseSalary: number;
@@ -1052,7 +1053,7 @@ export interface IUpdateHolidayPolicyRequest {
 }
 
 // --- Penalty Policy ---
-export type ViolationType = 'Late' | 'EarlyLeave' | 'WrongShift' | 'Absent' | 'MissingCheckIn';
+export type ViolationType = 'Late' | 'EarlyLeave' | 'MissingCheckOut' | 'Absent' | 'MissingCheckIn';
 export type PenaltyType = 'FixedAmount' | 'Percentage' | 'HourlyRate';
 
 export interface IPenaltyPolicy {
@@ -1209,6 +1210,14 @@ export interface ICreateManualPenaltyRequest {
   payrollCycleId: string;
   amount: number;
   description: string;
+}
+
+// --- Unscheduled attendance ("sai ca" — chấm công không khớp lịch phân công nào) ---
+export interface IUnscheduledAttendanceItem {
+  logId: string;
+  date: string;
+  checkInTime?: string;
+  checkOutTime?: string;
 }
 
 // --- Salary History ---

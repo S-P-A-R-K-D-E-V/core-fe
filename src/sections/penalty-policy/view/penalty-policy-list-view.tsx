@@ -60,7 +60,7 @@ const TABLE_HEAD = [
 const VIOLATION_TYPES = [
   { value: 'Late', label: 'Đi trễ' },
   { value: 'EarlyLeave', label: 'Về sớm' },
-  { value: 'WrongShift', label: 'Sai ca' },
+  { value: 'MissingCheckOut', label: 'Quên checkout' },
   { value: 'Absent', label: 'Vắng mặt' },
   { value: 'MissingCheckIn', label: 'Quên checkin' },
 ];

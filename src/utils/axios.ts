@@ -195,6 +195,7 @@ export const endpoints = {
     manualPenalties: (payrollRecordId: string) => `/payroll/${payrollRecordId}/manual-penalties`,
     createManualPenalty: '/payroll/manual-penalties',
     voidManualPenalty: (id: string) => `/payroll/manual-penalties/${id}`,
+    unscheduledAttendance: (payrollRecordId: string) => `/payroll/${payrollRecordId}/unscheduled-attendance`,
     salaryConfigPreview: '/payroll/salary-config-preview',
     bulkFinalize: '/payroll/bulk-finalize',
     payment: (id: string) => `/payroll/${id}/payment`,

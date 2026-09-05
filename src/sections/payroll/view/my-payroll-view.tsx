@@ -6,6 +6,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
+import Tooltip from '@mui/material/Tooltip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
 import Dialog from '@mui/material/Dialog';
@@ -54,8 +55,9 @@ const TABLE_HEAD = [
   { id: 'totalShifts', label: 'Tổng ca', width: 80 },
   { id: 'presentShifts', label: 'Có mặt', width: 80 },
   { id: 'absentShifts', label: 'Nghỉ', width: 80 },
-  { id: 'wrongShifts', label: 'Sai ca', width: 80 },
+  { id: 'missingCheckOutShifts', label: 'Quên checkout', width: 100 },
   { id: 'missingCheckInShifts', label: 'Quên checkin', width: 100 },
+  { id: 'unscheduledAttendanceCount', label: 'Sai ca', width: 80 },
   { id: 'totalLateMinutes', label: 'Đi muộn (phút)', width: 110 },
   { id: 'totalHoursWorked', label: 'Giờ làm', width: 100 },
   { id: 'baseSalary', label: 'Lương CB', width: 140 },
@@ -272,8 +274,8 @@ export default function MyPayrollView() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {row.wrongShifts > 0 ? (
-                            <Chip label={row.wrongShifts} color="warning" size="small" />
+                          {row.missingCheckOutShifts > 0 ? (
+                            <Chip label={row.missingCheckOutShifts} color="warning" size="small" />
                           ) : (
                             '0'
                           )}
@@ -281,6 +283,20 @@ export default function MyPayrollView() {
                         <TableCell>
                           {row.missingCheckInShifts > 0 ? (
                             <Chip label={row.missingCheckInShifts} color="warning" size="small" />
+                          ) : (
+                            '0'
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {row.unscheduledAttendanceCount > 0 ? (
+                            <Tooltip title="Có chấm công nhưng không khớp lịch phân công nào">
+                              <Chip
+                                label={row.unscheduledAttendanceCount}
+                                color="default"
+                                variant="outlined"
+                                size="small"
+                              />
+                            </Tooltip>
                           ) : (
                             '0'
                           )}

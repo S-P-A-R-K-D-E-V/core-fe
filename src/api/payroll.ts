@@ -18,6 +18,7 @@ import type {
   IPayrollSummary,
   IPreparePayrollPaymentResponse,
   ISalaryConfigPreviewItem,
+  IUnscheduledAttendanceItem,
   IWaivePenaltyRequest,
   IWaivePenaltyResponse,
 } from 'src/types/corecms-api';
@@ -105,6 +106,15 @@ export async function createManualPenalty(
 
 export async function voidManualPenalty(id: string): Promise<void> {
   await axios.delete(endpoints.payroll.voidManualPenalty(id));
+}
+
+// Sai ca (chấm công không khớp lịch phân công nào — không phạt, không tự trả lương)
+
+export async function getUnscheduledAttendance(payrollRecordId: string): Promise<IUnscheduledAttendanceItem[]> {
+  const response = await axios.get<IUnscheduledAttendanceItem[]>(
+    endpoints.payroll.unscheduledAttendance(payrollRecordId)
+  );
+  return response.data;
 }
 
 // ── New endpoints ────────────────────────────────────────────────────────
