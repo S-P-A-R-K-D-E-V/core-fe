@@ -1,21 +1,62 @@
+import * as signalR from '@microsoft/signalr';
 import { useRef, useState, useEffect, useCallback } from 'react';
 
-import { type ChatbotSession, type ChatbotMessage } from 'src/api/chatbot';
+import { HOST_API } from 'src/config-global';
+
+import {
+  type ChatbotSession,
+  type ChatbotMessage,
+  getChatbotMessages,
+  sendChatbotMessage,
+  startChatbotSession,
+} from 'src/api/chatbot';
 
 // ----------------------------------------------------------------------
-// Agent Middleware (SSE) — thay cho SignalR/ChatHub cũ. Route Handler proxy
-// (`src/app/agent-chat/*`) tự forward JWT hoặc gắn X-Client-Api-Key server-side,
-// nên hook này chỉ cần gọi same-origin `/agent-chat/*` (KHÔNG dưới /api — nginx-ingress `core-api` legacy route bắt hết /api/* về .NET backend, xem commit message), không cần biết URL/secret thật.
+// ChatHub (SignalR) + REST /chatbot/* trên core-be — KHÔNG qua "agent-middleware".
+//
+// Bối cảnh: 07/08/2026 widget từng được chuyển sang gọi 1 service Python riêng
+// ("agent-middleware", qua proxy /agent-chat/*) để thay cho ChatHub/ChatbotController. Service đó
+// chưa bao giờ được deploy thật (không có Deployment/Service nào tên "agent-middleware" trên
+// cluster — xác nhận qua kubectl 2026-09-05), nên suốt 1 tháng qua chat KHÔNG hoạt động được trên
+// production. Quay lại ChatHub/ChatbotController — đường này giờ đã đi qua SPARK AI Gateway +
+// 9Router cho agent InternalAdmin (xem ChatOrchestrator.cs), có tool-calling thật, đã verify chạy
+// ổn định bằng dữ liệu thật. `src/api/chatbot.ts` (REST) không hề bị đổi khi migrate sang
+// agent-middleware nên dùng lại y nguyên.
+//
+// Giữ lại từ bản agent-middleware (đáng giữ, không liên quan tới chuyện dùng SignalR hay SSE):
+// session theo userId (sống sót qua đổi thiết bị/xoá localStorage), guest TTL 24h, guard chống
+// load lịch sử trùng lặp.
+//
+// MỚI so với cả 2 bản trước: lắng nghe event "status" (ChatHubNotifier.SendStatusAsync, thêm hôm
+// nay) để hiện "đang gọi tool X…" — chỉ agent InternalAdmin mới phát event này (CustomerSupport
+// không có tool), nên tự nhiên chỉ admin mới thấy, không cần gate thêm ở FE.
 // ----------------------------------------------------------------------
 
 const SESSION_STORAGE_KEY = 'chatbot.sessionId';
 const SESSION_CREATED_AT_KEY = 'chatbot.sessionCreatedAt';
 const GUEST_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
-type SseDelta = { role?: string; content?: string };
-type SseChoice = { delta: SseDelta; finish_reason: string | null };
-type SseChunk = { id: string; choices: SseChoice[] };
-type SseError = { error: { message: string; type: string } };
+type StreamingStartedEvent = { sessionId: string; messageId: string };
+type ChunkEvent = { sessionId: string; messageId: string; content: string };
+type StatusEvent = {
+  sessionId: string;
+  messageId: string;
+  kind: 'thinking' | 'tool';
+  phase: 'start' | 'end' | 'error' | null;
+  name: string | null;
+  label: string;
+  detail: string | null;
+};
+type CompletedEvent = { sessionId: string; messageId: string; content: string; fromCache: boolean };
+type ErrorEvent = { sessionId: string; messageId: string; error: string };
+
+export type ChatActivity = {
+  kind: 'thinking' | 'tool';
+  phase: 'start' | 'end' | 'error' | null;
+  name: string | null;
+  label: string;
+  detail: string | null;
+} | null;
 
 export type ChatbotPanelState = {
   ready: boolean;
@@ -23,49 +64,12 @@ export type ChatbotPanelState = {
   messages: ChatbotMessage[];
   typing: boolean;
   streamingMessageId: string | null;
+  /** Tool-calling progress của lượt trả lời đang stream (chỉ InternalAdmin có). null = không có gì đang chạy. */
+  activity: ChatActivity;
   error: string | null;
   sendMessage: (content: string, phone?: string | null) => Promise<void>;
   resetSession: () => Promise<void>;
 };
-
-function authHeaders(): Record<string, string> {
-  const token = typeof window !== 'undefined' ? sessionStorage.getItem('accessToken') : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-// Đọc 1 ReadableStream SSE (khung `data: {...}\n\n`), gọi onEvent cho mỗi frame hợp lệ — dùng
-// chung cho cả stream trả lời trực tiếp (sendMessage) lẫn kênh nghe dài hạn (human handoff).
-async function readSseStream(
-  body: ReadableStream<Uint8Array>,
-  onEvent: (parsed: SseChunk | SseError) => void
-): Promise<void> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder('utf-8');
-  let buffer = '';
-
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    const events = buffer.split('\n\n');
-    buffer = events.pop() ?? '';
-
-    for (const rawEvent of events) {
-      const line = rawEvent.trim();
-      if (!line.startsWith('data:')) continue;
-      const payload = line.slice('data:'.length).trim();
-      if (payload === '[DONE]') continue;
-
-      try {
-        onEvent(JSON.parse(payload));
-      } catch {
-        // bỏ qua chunk lỗi format
-      }
-    }
-  }
-}
 
 function newGuestSessionId(): string {
   const fresh = crypto.randomUUID();
@@ -75,10 +79,8 @@ function newGuestSessionId(): string {
 }
 
 // Mỗi user đăng nhập chỉ có ĐÚNG 1 session_id (suy trực tiếp từ user.id) — reload trang, đổi
-// trình duyệt, hay localStorage bị xoá đều quay lại đúng phiên cũ trên server, không phụ thuộc
-// localStorage còn nguyên vẹn hay không (khác hẳn cơ chế cũ chỉ dựa vào localStorage, dễ "mất
-// lịch sử" khi localStorage bị clear/khác thiết bị). Khách ẩn danh không có identity ổn định nên
-// vẫn dùng UUID lưu localStorage, nhưng tự hết hạn sau 24h theo yêu cầu.
+// trình duyệt, hay localStorage bị xoá đều quay lại đúng phiên cũ trên server. Khách ẩn danh dùng
+// UUID lưu localStorage, tự hết hạn sau 24h.
 function loadOrCreateSessionId(userId?: string | null): string {
   if (typeof window === 'undefined') return '';
   if (userId) return `user-${userId}`;
@@ -95,108 +97,154 @@ export function useChatbot(opts?: {
   displayName?: string | null;
   userId?: string | null;
 }): ChatbotPanelState {
-  const [sessionId, setSessionId] = useState('');
+  const [session, setSession] = useState<ChatbotSession | null>(null);
   const [messages, setMessages] = useState<ChatbotMessage[]>([]);
   const [typing, setTyping] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [activity, setActivity] = useState<ChatActivity>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
+  const connRef = useRef<signalR.HubConnection | null>(null);
   const loadingRef = useRef(false);
 
-  const loadHistory = useCallback(async (id: string) => {
-    if (loadingRef.current) return;
-    loadingRef.current = true;
-    try {
-      // trailingSlash:true trong next.config.mjs — gọi thẳng URL có "/" cuối, không dựa vào
-      // redirect 308 (không nhất quán giữa dev/prod và giữa các trình duyệt với POST).
-      const res = await fetch(`/agent-chat/${id}/messages/?limit=20`, { headers: authHeaders() });
-      if (res.ok) {
-        const data = await res.json();
-        const items: ChatbotMessage[] = (data.items ?? []).map(
-          (m: { role: string; content: string; createdAt: string }, idx: number) => ({
-            id: `history-${idx}-${m.createdAt}`,
-            role: m.role,
-            content: m.content,
-            createdAt: m.createdAt,
-          })
-        );
-        setMessages(items);
-      }
-    } catch (err) {
-      console.error('[Chatbot] load history failed', err);
-    } finally {
-      loadingRef.current = false;
-      setReady(true);
-    }
-  }, []);
-
-  // 1. Bootstrap session_id (local, không cần round-trip server) + nạp lịch sử trang gần nhất.
-  // Chạy lại khi userId đổi (vd. login ngay trong lúc widget đang mở) để chuyển từ session
-  // khách sang session định danh theo user.
+  // 1. Bootstrap session (local id trước, KHÔNG round-trip server) + start/resume + nạp lịch sử.
   useEffect(() => {
-    const id = loadOrCreateSessionId(opts?.userId);
-    setSessionId(id);
-    setReady(false);
-    if (id) loadHistory(id);
-  }, [loadHistory, opts?.userId]);
-
-  // 2. Kênh SSE dài hạn — nhận tin nhắn do nhân viên gõ tay (human handoff) trong lúc panel đang
-  // mở, không cần khách tự gửi tin tiếp theo mới thấy. KHÔNG mang tin nhắn AI (luồng đó đã có SSE
-  // riêng theo từng lần sendMessage ở trên) nên không bị nhận trùng.
-  useEffect(() => {
-    if (!sessionId) return undefined;
-    const controller = new AbortController();
-    let currentId: string | null = null;
+    let cancelled = false;
+    const localId = loadOrCreateSessionId(opts?.userId);
 
     (async () => {
+      if (loadingRef.current) return;
+      loadingRef.current = true;
+      setReady(false);
       try {
-        const res = await fetch(`/agent-chat/${sessionId}/stream`, {
-          headers: authHeaders(),
-          signal: controller.signal,
+        const s = await startChatbotSession({
+          sessionId: localId || null,
+          phone: opts?.phone ?? null,
+          displayName: opts?.displayName ?? null,
         });
-        if (!res.ok || !res.body) return;
-
-        await readSseStream(res.body, (parsed) => {
-          if ('error' in parsed) return;
-          const choice = parsed.choices?.[0];
-          if (!choice?.delta.content) return;
-
-          if (currentId !== parsed.id) {
-            currentId = parsed.id;
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: parsed.id,
-                role: 'assistant',
-                content: choice.delta.content ?? '',
-                createdAt: new Date().toISOString(),
-              },
-            ]);
-          } else {
-            const msgId = parsed.id;
-            setMessages((prev) => {
-              const idx = prev.findIndex((m) => m.id === msgId);
-              if (idx < 0) return prev;
-              const next = prev.slice();
-              next[idx] = { ...next[idx], content: next[idx].content + (choice.delta.content ?? '') };
-              return next;
-            });
-          }
-        });
-      } catch (err) {
-        if ((err as { name?: string })?.name !== 'AbortError') {
-          console.error('[Chatbot] stream listener failed', err);
+        if (cancelled) return;
+        setSession(s);
+        if (typeof window !== 'undefined' && !opts?.userId) {
+          localStorage.setItem(SESSION_STORAGE_KEY, s.sessionId);
         }
+
+        const history = await getChatbotMessages(s.sessionId, 50);
+        // Bỏ placeholder assistant rỗng mồ côi (stream bị ngắt giữa chừng) — không thì hiện "…" kẹt
+        // mỗi lần load lại trang.
+        const cleaned = history.filter(
+          (m) => !(m.role === 'assistant' && (!m.content || m.content.trim() === ''))
+        );
+        if (!cancelled) setMessages(cleaned);
+      } catch (err) {
+        console.error('[Chatbot] init failed', err);
+        if (!cancelled) setError('Không kết nối được chatbot');
+      } finally {
+        loadingRef.current = false;
+        if (!cancelled) setReady(true);
       }
     })();
 
-    return () => controller.abort();
-  }, [sessionId]);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opts?.userId, opts?.phone, opts?.displayName]);
+
+  // 2. Connect SignalR + join group theo sessionId thật (từ server, không phải local id).
+  useEffect(() => {
+    if (!session?.sessionId) return undefined;
+
+    const connection = new signalR.HubConnectionBuilder()
+      // HOST_API rỗng ở prod → URL hub tương đối, đi qua ingress.
+      .withUrl(`${HOST_API || ''}/hubs/chat`, {
+        accessTokenFactory: () =>
+          (typeof window !== 'undefined' && sessionStorage.getItem('accessToken')) || '',
+      })
+      .withAutomaticReconnect()
+      .configureLogging(signalR.LogLevel.Warning)
+      .build();
+
+    connection.on('streamingStarted', (ev: StreamingStartedEvent) => {
+      if (ev.sessionId !== session.sessionId) return;
+      setTyping(true);
+      setStreamingMessageId(ev.messageId);
+      setActivity(null);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === ev.messageId)) return prev;
+        return [...prev, { id: ev.messageId, role: 'assistant', content: '', createdAt: new Date().toISOString() }];
+      });
+    });
+
+    connection.on('status', (ev: StatusEvent) => {
+      if (ev.sessionId !== session.sessionId) return;
+      setActivity({ kind: ev.kind, phase: ev.phase, name: ev.name, label: ev.label, detail: ev.detail });
+    });
+
+    connection.on('chunk', (ev: ChunkEvent) => {
+      if (ev.sessionId !== session.sessionId) return;
+      setTyping(true);
+      setStreamingMessageId(ev.messageId);
+      // Nội dung đã bắt đầu chảy về — hoạt động tool (nếu có) của lượt này coi như xong.
+      setActivity(null);
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.id === ev.messageId);
+        if (idx >= 0) {
+          const next = prev.slice();
+          next[idx] = { ...next[idx], content: next[idx].content + ev.content };
+          return next;
+        }
+        return [...prev, { id: ev.messageId, role: 'assistant', content: ev.content, createdAt: new Date().toISOString() }];
+      });
+    });
+
+    connection.on('completed', (ev: CompletedEvent) => {
+      if (ev.sessionId !== session.sessionId) return;
+      setTyping(false);
+      setStreamingMessageId(null);
+      setActivity(null);
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.id === ev.messageId);
+        if (idx < 0) return prev;
+        const next = prev.slice();
+        next[idx] = { ...next[idx], content: ev.content || next[idx].content };
+        return next;
+      });
+    });
+
+    connection.on('error', (ev: ErrorEvent) => {
+      if (ev.sessionId !== session.sessionId) return;
+      setTyping(false);
+      setStreamingMessageId(null);
+      setActivity(null);
+      setError(ev.error);
+    });
+
+    connection.onreconnected(() => {
+      connection.invoke('JoinSession', session.sessionId).catch((err) => {
+        console.error('[Chatbot] re-join after reconnect failed', err);
+      });
+    });
+
+    connection
+      .start()
+      .then(() => {
+        connRef.current = connection;
+        return connection.invoke('JoinSession', session.sessionId);
+      })
+      .catch((err) => {
+        console.error('[Chatbot] SignalR connect failed', err);
+      });
+
+    return () => {
+      connection.stop().catch(() => {});
+      connRef.current = null;
+    };
+  }, [session?.sessionId]);
 
   const sendMessage = useCallback(
     async (content: string, phone?: string | null) => {
-      if (!sessionId || !content.trim()) return;
+      if (!session?.sessionId || !content.trim()) return;
       const optimistic: ChatbotMessage = {
         id: `local-${Date.now()}`,
         role: 'user',
@@ -205,93 +253,75 @@ export function useChatbot(opts?: {
       };
       setMessages((prev) => [...prev, optimistic]);
       setTyping(true);
+      setActivity(null);
       setError(null);
 
       try {
-        const res = await fetch('/agent-chat/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({
-            messages: [{ role: 'user', content }],
-            session_id: sessionId,
-            stream: true,
-            customer_name: opts?.displayName || null,
-            customer_phone: phone || opts?.phone || null,
-          }),
+        const res = await sendChatbotMessage({
+          sessionId: session.sessionId,
+          content,
+          phone: phone ?? opts?.phone ?? null,
         });
 
-        if (!res.ok || !res.body) {
-          throw new Error(`agent-chat trả lỗi ${res.status}`);
+        if (res.fromCache && res.cachedAnswer) {
+          setTyping(false);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: res.assistantMessageId,
+              role: 'assistant',
+              content: res.cachedAnswer ?? '',
+              createdAt: new Date().toISOString(),
+              fromCache: true,
+            },
+          ]);
+        } else {
+          // Đặt streamingMessageId ngay — placeholder hiện spinner trước cả khi SignalR
+          // "streamingStarted" tới.
+          setStreamingMessageId(res.assistantMessageId);
+          setMessages((prev) => [
+            ...prev,
+            { id: res.assistantMessageId, role: 'assistant', content: '', createdAt: new Date().toISOString() },
+          ]);
         }
-
-        let assistantMessageId: string | null = null;
-        await readSseStream(res.body, (parsed) => {
-          if ('error' in parsed) {
-            setError(parsed.error.message);
-            return;
-          }
-
-          const choice = parsed.choices?.[0];
-          if (!choice) return;
-          const { delta } = choice;
-          if (!delta.content) return;
-
-          if (!assistantMessageId) {
-            assistantMessageId = parsed.id;
-            setStreamingMessageId(parsed.id);
-            setMessages((prev) => [
-              ...prev,
-              { id: parsed.id, role: 'assistant', content: delta.content ?? '', createdAt: new Date().toISOString() },
-            ]);
-          } else {
-            const msgId = assistantMessageId;
-            setMessages((prev) => {
-              const idx = prev.findIndex((m) => m.id === msgId);
-              if (idx < 0) return prev;
-              const next = prev.slice();
-              next[idx] = { ...next[idx], content: next[idx].content + (delta.content ?? '') };
-              return next;
-            });
-          }
-        });
       } catch (err) {
         console.error('[Chatbot] sendMessage failed', err);
-        setError('Không gửi được tin nhắn');
-      } finally {
         setTyping(false);
         setStreamingMessageId(null);
+        setError('Không gửi được tin nhắn');
       }
     },
-    [sessionId, opts?.phone, opts?.displayName]
+    [session?.sessionId, opts?.phone]
   );
 
   const resetSession = useCallback(async () => {
-    // "Phiên mới" = xoá hẳn phiên+lịch sử cũ trên server (mỗi user chỉ giữ 1 phiên), không phải
-    // chỉ lờ đi. Với user đăng nhập, session_id giữ nguyên (suy từ userId) — xoá xong server trả
-    // về rỗng, phiên "mới" tự nhiên bắt đầu từ id cũ đó. Guest thì đổi sang UUID mới.
-    if (sessionId) {
-      try {
-        await fetch(`/agent-chat/${sessionId}`, { method: 'DELETE', headers: authHeaders() });
-      } catch (err) {
-        console.error('[Chatbot] delete session failed', err);
-      }
-    }
-    const fresh = opts?.userId ? sessionId : newGuestSessionId();
-    setSessionId(fresh);
+    // Khách: đổi hẳn sang UUID mới -> phiên mới thật sự. User đăng nhập: session_id suy từ userId
+    // nên không đổi được — backend hiện chưa có API xoá cứng, resetSession chỉ tải lại đúng phiên
+    // đó (không phải regression, hành vi giống bản trước khi có agent-middleware).
     setMessages([]);
     setError(null);
-    setReady(true);
-  }, [sessionId, opts?.userId]);
-
-  const session: ChatbotSession | null = sessionId
-    ? {
-        sessionId,
-        ownerType: opts?.phone || opts?.displayName ? 'Customer' : 'Guest',
-        agent: 'CustomerSupport',
+    setActivity(null);
+    setReady(false);
+    try {
+      const nextId = opts?.userId ? session?.sessionId || null : newGuestSessionId();
+      const s = await startChatbotSession({
+        sessionId: nextId,
+        phone: opts?.phone ?? null,
         displayName: opts?.displayName ?? null,
-        createdAt: new Date().toISOString(),
+      });
+      setSession(s);
+      if (typeof window !== 'undefined' && !opts?.userId) {
+        localStorage.setItem(SESSION_STORAGE_KEY, s.sessionId);
       }
-    : null;
+      const history = await getChatbotMessages(s.sessionId, 50);
+      setMessages(history.filter((m) => !(m.role === 'assistant' && (!m.content || m.content.trim() === ''))));
+    } catch (err) {
+      console.error('[Chatbot] resetSession failed', err);
+      setError('Không tạo được phiên mới');
+    } finally {
+      setReady(true);
+    }
+  }, [session?.sessionId, opts?.userId, opts?.phone, opts?.displayName]);
 
-  return { ready, session, messages, typing, streamingMessageId, error, sendMessage, resetSession };
+  return { ready, session, messages, typing, streamingMessageId, activity, error, sendMessage, resetSession };
 }
