@@ -190,6 +190,7 @@ export const endpoints = {
     finalize: (id: string) => `/payroll/${id}/finalize`,
     myPayroll: '/payroll/my-payroll',
     shiftDetails: (id: string) => `/payroll/${id}/shift-details`,
+    penaltyDetails: (id: string) => `/payroll/${id}/penalty-details`,
     waivePenalty: '/payroll/waive-penalty',
     removeWaiver: (waiverId: string) => `/payroll/waive-penalty/${waiverId}`,
     manualPenalties: (payrollRecordId: string) => `/payroll/${payrollRecordId}/manual-penalties`,

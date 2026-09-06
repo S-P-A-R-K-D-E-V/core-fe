@@ -94,6 +94,8 @@ import { needTypeLabel, partialSideLabel, poolStatusLabel } from 'src/sections/s
 
 import SalaryConfigPreviewDialog from 'src/components/salary-config-preview-dialog';
 import PaymentQRDialog from 'src/components/payment-qr-dialog';
+import PenaltyDetailDialog from 'src/components/penalty-detail-dialog';
+import ShiftCrossCheckBadge from 'src/components/shift-cross-check-badge';
 
 
 // ----------------------------------------------------------------------
@@ -144,6 +146,7 @@ export default function PayrollBatchView() {
 
   // Payment QR dialog state
   const [paymentDialogRecord, setPaymentDialogRecord] = useState<IPayrollRecord | null>(null);
+  const [penaltyDetailRecord, setPenaltyDetailRecord] = useState<IPayrollRecord | null>(null);
 
   // Salary config preview state — shown before generate/recalculate
   const [salaryConfigOpen, setSalaryConfigOpen] = useState(false);
@@ -1295,9 +1298,19 @@ export default function PayrollBatchView() {
                         <TableCell onClick={() => handleOpenShiftDetail(row)}>
                           {row.bonus > 0 ? formatCurrency(row.bonus) : '-'}
                         </TableCell>
-                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
+                        <TableCell
+                          onClick={(e) => {
+                            if (row.penaltyAmount <= 0) return;
+                            e.stopPropagation();
+                            setPenaltyDetailRecord(row);
+                          }}
+                        >
                           {row.penaltyAmount > 0 ? (
-                            <Typography color="error.main" variant="body2">
+                            <Typography
+                              color="error.main"
+                              variant="body2"
+                              sx={{ textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}
+                            >
                               -{formatCurrency(row.penaltyAmount)}
                             </Typography>
                           ) : (
@@ -1941,7 +1954,10 @@ export default function PayrollBatchView() {
                                           sx={{ mt: 0.25, height: 16, fontSize: '0.65rem' }}
                                         />
                                       )}
-                                      <Box sx={{ mt: 0.5 }}>{getShiftStatusLabel(shift)}</Box>
+                                      <Box sx={{ mt: 0.5 }}>
+                                        {getShiftStatusLabel(shift)}
+                                        <ShiftCrossCheckBadge swapEvents={shift.swapEvents} coverEvents={shift.coverEvents} />
+                                      </Box>
 
                                       {/* Waive actions — disabled when record is finalized */}
                                       {renderWaiverPanel(shift, true)}
@@ -2044,7 +2060,10 @@ export default function PayrollBatchView() {
                               '—'
                             )}
                           </TableCell>
-                          <TableCell>{getShiftStatusLabel(shift)}</TableCell>
+                          <TableCell>
+                            {getShiftStatusLabel(shift)}
+                            <ShiftCrossCheckBadge swapEvents={shift.swapEvents} coverEvents={shift.coverEvents} />
+                          </TableCell>
                           <TableCell align="center">
                             {renderWaiverPanel(shift, false)}
                             {!selectedPayrollRecord?.isFinalized && (
@@ -2383,6 +2402,13 @@ export default function PayrollBatchView() {
           </LoadingButton>
         </DialogActions>
       </Dialog>
+
+      {/* ── Penalty Detail Dialog ─────────────────────────────────────────── */}
+      <PenaltyDetailDialog
+        open={!!penaltyDetailRecord}
+        record={penaltyDetailRecord}
+        onClose={() => setPenaltyDetailRecord(null)}
+      />
 
       {/* ── Payment QR Dialog ─────────────────────────────────────────────── */}
       <PaymentQRDialog
