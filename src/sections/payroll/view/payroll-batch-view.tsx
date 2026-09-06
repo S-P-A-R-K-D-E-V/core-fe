@@ -94,6 +94,7 @@ import { needTypeLabel, partialSideLabel, poolStatusLabel } from 'src/sections/s
 
 import SalaryConfigPreviewDialog from 'src/components/salary-config-preview-dialog';
 import PaymentQRDialog from 'src/components/payment-qr-dialog';
+import PenaltyDetailDialog from 'src/components/penalty-detail-dialog';
 
 
 // ----------------------------------------------------------------------
@@ -144,6 +145,7 @@ export default function PayrollBatchView() {
 
   // Payment QR dialog state
   const [paymentDialogRecord, setPaymentDialogRecord] = useState<IPayrollRecord | null>(null);
+  const [penaltyDetailRecord, setPenaltyDetailRecord] = useState<IPayrollRecord | null>(null);
 
   // Salary config preview state — shown before generate/recalculate
   const [salaryConfigOpen, setSalaryConfigOpen] = useState(false);
@@ -1295,9 +1297,19 @@ export default function PayrollBatchView() {
                         <TableCell onClick={() => handleOpenShiftDetail(row)}>
                           {row.bonus > 0 ? formatCurrency(row.bonus) : '-'}
                         </TableCell>
-                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
+                        <TableCell
+                          onClick={(e) => {
+                            if (row.penaltyAmount <= 0) return;
+                            e.stopPropagation();
+                            setPenaltyDetailRecord(row);
+                          }}
+                        >
                           {row.penaltyAmount > 0 ? (
-                            <Typography color="error.main" variant="body2">
+                            <Typography
+                              color="error.main"
+                              variant="body2"
+                              sx={{ textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}
+                            >
                               -{formatCurrency(row.penaltyAmount)}
                             </Typography>
                           ) : (
@@ -2383,6 +2395,13 @@ export default function PayrollBatchView() {
           </LoadingButton>
         </DialogActions>
       </Dialog>
+
+      {/* ── Penalty Detail Dialog ─────────────────────────────────────────── */}
+      <PenaltyDetailDialog
+        open={!!penaltyDetailRecord}
+        record={penaltyDetailRecord}
+        onClose={() => setPenaltyDetailRecord(null)}
+      />
 
       {/* ── Payment QR Dialog ─────────────────────────────────────────────── */}
       <PaymentQRDialog

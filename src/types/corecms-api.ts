@@ -1151,6 +1151,18 @@ export interface IShiftWaiverInfo {
   reason?: string;
 }
 
+// 1 dòng trong "Chi tiết khoản phạt" (GET /payroll/{id}/penalty-details) — chỉ gồm các dòng
+// ItemType thuộc nhóm phạt (Penalty/ManualPenalty/CleaningPenalty), tổng Amount luôn khớp
+// penaltyAmount của IPayrollRecord.
+export interface IPayrollPenaltyDetailItem {
+  id: string;
+  itemType: 'Penalty' | 'ManualPenalty' | 'CleaningPenalty';
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+}
+
 export interface IPayrollShiftItem {
   shiftAssignmentId: string;
   date: string;

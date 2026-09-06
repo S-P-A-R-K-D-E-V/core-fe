@@ -15,6 +15,7 @@ import type {
   IPayrollPaymentDetail,
   IPayrollRecord,
   IPayrollShiftDetailResponse,
+  IPayrollPenaltyDetailItem,
   IPayrollSummary,
   IPreparePayrollPaymentResponse,
   ISalaryConfigPreviewItem,
@@ -75,6 +76,15 @@ export async function getPayrollShiftDetails(
 ): Promise<IPayrollShiftDetailResponse> {
   const response = await axios.get<IPayrollShiftDetailResponse>(
     endpoints.payroll.shiftDetails(payrollRecordId)
+  );
+  return response.data;
+}
+
+export async function getPayrollPenaltyDetails(
+  payrollRecordId: string
+): Promise<IPayrollPenaltyDetailItem[]> {
+  const response = await axios.get<IPayrollPenaltyDetailItem[]>(
+    endpoints.payroll.penaltyDetails(payrollRecordId)
   );
   return response.data;
 }

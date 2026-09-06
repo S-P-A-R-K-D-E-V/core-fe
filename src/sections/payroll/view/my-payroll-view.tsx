@@ -34,6 +34,7 @@ import { paths } from 'src/routes/paths';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
+import PenaltyDetailDialog from 'src/components/penalty-detail-dialog';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
 import { useSnackbar } from 'src/components/snackbar';
@@ -97,6 +98,9 @@ export default function MyPayrollView() {
   const [selectedPayroll, setSelectedPayroll] = useState<IPayrollRecord | null>(null);
   const [shiftDetailTab, setShiftDetailTab] = useState<'calendar' | 'table'>('calendar');
   const [calendarWeekOffset, setCalendarWeekOffset] = useState(0);
+
+  // Penalty detail popup
+  const [penaltyDetailRecord, setPenaltyDetailRecord] = useState<IPayrollRecord | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -318,9 +322,17 @@ export default function MyPayrollView() {
                         <TableCell>
                           {row.bonus > 0 ? formatCurrency(row.bonus) : '-'}
                         </TableCell>
-                        <TableCell>
+                        <TableCell
+                          onClick={() => {
+                            if (row.penaltyAmount > 0) setPenaltyDetailRecord(row);
+                          }}
+                        >
                           {row.penaltyAmount > 0 ? (
-                            <Typography color="error.main" variant="body2">
+                            <Typography
+                              color="error.main"
+                              variant="body2"
+                              sx={{ textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}
+                            >
                               -{formatCurrency(row.penaltyAmount)}
                             </Typography>
                           ) : (
@@ -625,6 +637,12 @@ export default function MyPayrollView() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <PenaltyDetailDialog
+        open={!!penaltyDetailRecord}
+        record={penaltyDetailRecord}
+        onClose={() => setPenaltyDetailRecord(null)}
+      />
     </Container>
   );
 }
