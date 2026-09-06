@@ -95,6 +95,7 @@ import { needTypeLabel, partialSideLabel, poolStatusLabel } from 'src/sections/s
 import SalaryConfigPreviewDialog from 'src/components/salary-config-preview-dialog';
 import PaymentQRDialog from 'src/components/payment-qr-dialog';
 import PenaltyDetailDialog from 'src/components/penalty-detail-dialog';
+import ShiftCrossCheckBadge from 'src/components/shift-cross-check-badge';
 
 
 // ----------------------------------------------------------------------
@@ -1953,7 +1954,10 @@ export default function PayrollBatchView() {
                                           sx={{ mt: 0.25, height: 16, fontSize: '0.65rem' }}
                                         />
                                       )}
-                                      <Box sx={{ mt: 0.5 }}>{getShiftStatusLabel(shift)}</Box>
+                                      <Box sx={{ mt: 0.5 }}>
+                                        {getShiftStatusLabel(shift)}
+                                        <ShiftCrossCheckBadge swapEvents={shift.swapEvents} coverEvents={shift.coverEvents} />
+                                      </Box>
 
                                       {/* Waive actions — disabled when record is finalized */}
                                       {renderWaiverPanel(shift, true)}
@@ -2056,7 +2060,10 @@ export default function PayrollBatchView() {
                               '—'
                             )}
                           </TableCell>
-                          <TableCell>{getShiftStatusLabel(shift)}</TableCell>
+                          <TableCell>
+                            {getShiftStatusLabel(shift)}
+                            <ShiftCrossCheckBadge swapEvents={shift.swapEvents} coverEvents={shift.coverEvents} />
+                          </TableCell>
                           <TableCell align="center">
                             {renderWaiverPanel(shift, false)}
                             {!selectedPayrollRecord?.isFinalized && (

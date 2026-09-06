@@ -35,6 +35,7 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
 import PenaltyDetailDialog from 'src/components/penalty-detail-dialog';
+import ShiftCrossCheckBadge from 'src/components/shift-cross-check-badge';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
 import { useSnackbar } from 'src/components/snackbar';
@@ -540,7 +541,10 @@ export default function MyPayrollView() {
                                           sx={{ mt: 0.25, height: 16, fontSize: '0.65rem' }}
                                         />
                                       )}
-                                      <Box sx={{ mt: 0.5 }}>{getShiftStatusLabel(shift)}</Box>
+                                      <Box sx={{ mt: 0.5 }}>
+                                        {getShiftStatusLabel(shift)}
+                                        <ShiftCrossCheckBadge swapEvents={shift.swapEvents} coverEvents={shift.coverEvents} />
+                                      </Box>
                                     </Box>
                                   );
                                 })}
@@ -612,7 +616,10 @@ export default function MyPayrollView() {
                               />
                             ) : '—'}
                           </TableCell>
-                          <TableCell>{getShiftStatusLabel(shift)}</TableCell>
+                          <TableCell>
+                            {getShiftStatusLabel(shift)}
+                            <ShiftCrossCheckBadge swapEvents={shift.swapEvents} coverEvents={shift.coverEvents} />
+                          </TableCell>
                         </TableRow>
                       ))}
                       {shiftDetail.shifts.length === 0 && (

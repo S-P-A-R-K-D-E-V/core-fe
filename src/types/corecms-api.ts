@@ -1163,6 +1163,32 @@ export interface IPayrollPenaltyDetailItem {
   amount: number;
 }
 
+// 1 yêu cầu đổi ca liên quan tới ca này — liệt kê nguyên trạng để đối chiếu, không suy đoán
+// ai là "chủ ca gốc" (StaffId của assignment đã đổi thật sự khi status=Approved).
+export interface IPayrollShiftSwapEvent {
+  id: string;
+  status: string;
+  requesterName: string;
+  targetName?: string;
+  currentShiftName: string;
+  targetShiftName?: string;
+  createdAt: string;
+  reviewedAt?: string;
+}
+
+// 1 bài đăng làm hộ/chợ ca liên quan tới ca này — liệt kê nguyên trạng để đối chiếu.
+export interface IPayrollShiftCoverEvent {
+  id: string;
+  needType: 'Swap' | 'FullCover' | 'PartialCover';
+  status: string;
+  posterName: string;
+  claimerName?: string;
+  coveringHours?: number;
+  extraPayAmount?: number;
+  createdAt: string;
+  claimedAt?: string;
+}
+
 export interface IPayrollShiftItem {
   shiftAssignmentId: string;
   date: string;
@@ -1180,6 +1206,9 @@ export interface IPayrollShiftItem {
   applicableViolationTypes: string[];
   waivers: IShiftWaiverInfo[];
   isHolidayShift: boolean;
+  // Đối chiếu đổi ca/làm hộ (mọi trạng thái) liên quan tới ca này.
+  swapEvents: IPayrollShiftSwapEvent[];
+  coverEvents: IPayrollShiftCoverEvent[];
 }
 
 // --- Penalty Waiver ---
