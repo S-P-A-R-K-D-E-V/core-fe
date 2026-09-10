@@ -13,6 +13,7 @@ import Iconify from 'src/components/iconify';
 
 import { getAllProducts } from 'src/api/products';
 import type { IProductListItem } from 'src/types/corecms-api';
+import type { TenantBranding } from 'src/lib/tenant-branding';
 
 import HomeHero from '../home-hero';
 import HomeMinimal from '../home-minimal';
@@ -25,7 +26,11 @@ import HomeAdvertisement from '../home-advertisement';
 
 // ----------------------------------------------------------------------
 
-export default function HomeView() {
+type Props = {
+  branding: TenantBranding | null;
+};
+
+export default function HomeView({ branding }: Props) {
   const { scrollYProgress } = useScroll();
 
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -49,7 +54,7 @@ export default function HomeView() {
     <MainLayout>
       <ScrollProgress scrollYProgress={scrollYProgress} />
 
-      <HomeHero products={products} productsLoading={productsLoading} />
+      <HomeHero products={products} productsLoading={productsLoading} branding={branding} />
 
       <Box
         sx={{
