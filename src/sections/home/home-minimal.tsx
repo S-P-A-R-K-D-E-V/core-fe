@@ -17,31 +17,10 @@ import SvgColor from 'src/components/svg-color';
 import Iconify from 'src/components/iconify';
 import { varFade, MotionViewport } from 'src/components/animate';
 
+import type { TenantBranding } from 'src/lib/tenant-branding';
+
 import { SectionTitle } from './components/section-title';
 import { CircleSvg, FloatLine, FloatPlusIcon } from './components/svg-elements';
-
-// ----------------------------------------------------------------------
-
-const ITEMS = [
-  {
-    icon: `/assets/icons/home/ic-make-brand.svg`,
-    title: 'Đa dạng mẫu mã',
-    description:
-      'Hàng trăm mẫu trang sức, kẹp tóc, túi mini và phụ kiện thời trang mới nhất — cập nhật liên tục theo xu hướng.',
-  },
-  {
-    icon: `/assets/icons/home/ic-design.svg`,
-    title: 'Chất lượng đảm bảo',
-    description:
-      'Sản phẩm được tuyển chọn kỹ lưỡng, chất liệu an toàn, bền đẹp. Đội ngũ kiểm định kỹ trước khi đến tay khách hàng.',
-  },
-  {
-    icon: `/assets/icons/home/ic-development.svg`,
-    title: 'Cửa hàng tại Hà Nội',
-    description:
-      'Ghé thăm trực tiếp tại 21 Chùa Láng, Hà Nội để xem và chọn hàng. Tư vấn phụ kiện miễn phí ngay tại cửa hàng.',
-  },
-];
 
 // ----------------------------------------------------------------------
 
@@ -57,24 +36,52 @@ const renderLines = () => (
 
 type Props = BoxProps & {
   products?: IProductListItem[];
+  branding?: TenantBranding | null;
 };
 
-export default function HomeMinimal({ sx, products = [], ...other }: Props) {
+export default function HomeMinimal({ sx, products = [], branding, ...other }: Props) {
   const [imageError, setImageError] = useState(false);
   const featuredImage = products.find((p) => !!p.imageUrl);
+  const storeName = branding?.storeName ?? 'CiCi Accessories';
+
+  const items = [
+    {
+      icon: `/assets/icons/home/ic-make-brand.svg`,
+      title: 'Đa dạng mẫu mã',
+      description: 'Hàng trăm mẫu sản phẩm mới nhất — cập nhật liên tục theo xu hướng.',
+    },
+    {
+      icon: `/assets/icons/home/ic-design.svg`,
+      title: 'Chất lượng đảm bảo',
+      description:
+        'Sản phẩm được tuyển chọn kỹ lưỡng, chất liệu an toàn, bền đẹp. Đội ngũ kiểm định kỹ trước khi đến tay khách hàng.',
+    },
+    ...(branding?.address
+      ? [
+          {
+            icon: `/assets/icons/home/ic-development.svg`,
+            title: 'Ghé thăm cửa hàng',
+            description: `Ghé thăm trực tiếp tại ${branding.address} để xem và chọn hàng. Tư vấn miễn phí ngay tại cửa hàng.`,
+          },
+        ]
+      : []),
+  ];
 
   const renderDescription = () => (
     <>
       <SectionTitle
         caption="Về chúng tôi"
-        title="Phụ kiện thời trang"
-        txtGradient="chính hãng"
-        description="CiCi Accessories là cửa hàng phụ kiện thời trang nữ tại Hà Nội, ra đời với mong muốn giúp mỗi bạn gái tự tin thể hiện phong cách riêng mà không cần chi quá nhiều. Từ trang sức, kẹp tóc đến túi mini — mỗi sản phẩm đều được chọn lọc kỹ, cập nhật liên tục theo xu hướng và luôn có giá hợp lý."
+        title={storeName}
+        txtGradient=""
+        description={
+          branding?.shortDescription ??
+          `${storeName} ra đời với mong muốn mang đến trải nghiệm mua sắm tốt nhất — sản phẩm chọn lọc kỹ, cập nhật liên tục, giá cả hợp lý.`
+        }
         sx={{ mb: { xs: 5, md: 8 }, textAlign: { xs: 'center', md: 'left' } }}
       />
 
       <Stack spacing={6} sx={{ maxWidth: { sm: 560, md: 400 }, mx: { xs: 'auto', md: 'unset' } }}>
-        {ITEMS.map((item) => (
+        {items.map((item) => (
           <Box
             component={m.div}
             variants={varFade('inUp', { distance: 24 })}

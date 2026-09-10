@@ -15,37 +15,10 @@ import Typography from '@mui/material/Typography';
 import { varFade, MotionViewport } from 'src/components/animate';
 import Iconify from 'src/components/iconify';
 
+import type { TenantBranding } from 'src/lib/tenant-branding';
+
 import { SectionTitle } from './components/section-title';
 import { FloatLine, FloatPlusIcon } from './components/svg-elements';
-
-// ----------------------------------------------------------------------
-
-const REASONS = [
-  {
-    icon: 'solar:shield-check-bold-duotone',
-    title: 'Chất lượng đảm bảo',
-    desc: 'Kiểm định kỹ từng sản phẩm trước khi đến tay khách — chỉ bán hàng đạt chuẩn, chắc chắn về mẫu mã và chất liệu.',
-    color: '#EC4899',
-  },
-  {
-    icon: 'solar:map-point-bold-duotone',
-    title: 'Dễ tìm, dễ ghé',
-    desc: 'Cửa hàng duy nhất tại 21 Chùa Láng, Hà Nội. Ghé xem hàng thực tế, được tư vấn trực tiếp miễn phí.',
-    color: '#8B5CF6',
-  },
-  {
-    icon: 'solar:heart-bold-duotone',
-    title: 'Chăm sóc tận tình',
-    desc: 'Tư vấn phụ kiện miễn phí qua Messenger. Đội ngũ nhiệt tình, phản hồi trong vòng 30 phút.',
-    color: '#F59E0B',
-  },
-  {
-    icon: 'solar:tag-price-bold-duotone',
-    title: 'Giá hợp lý',
-    desc: 'Cam kết giá tốt nhất thị trường. Khách hàng thân thiết hưởng ưu đãi tích điểm đặc biệt.',
-    color: '#10B981',
-  },
-];
 
 // ----------------------------------------------------------------------
 
@@ -57,7 +30,42 @@ const renderLines = () => (
   </>
 );
 
-export default function HomeCleanInterfaces({ sx, ...other }: BoxProps) {
+type Props = BoxProps & {
+  branding?: TenantBranding | null;
+};
+
+export default function HomeCleanInterfaces({ sx, branding, ...other }: Props) {
+  const storeName = branding?.storeName ?? 'CiCi';
+
+  const reasons = [
+    {
+      icon: 'solar:shield-check-bold-duotone',
+      title: 'Chất lượng đảm bảo',
+      desc: 'Kiểm định kỹ từng sản phẩm trước khi đến tay khách — chỉ bán hàng đạt chuẩn, chắc chắn về mẫu mã và chất liệu.',
+      color: '#EC4899',
+    },
+    {
+      icon: 'solar:map-point-bold-duotone',
+      title: 'Dễ tìm, dễ ghé',
+      desc: branding?.address
+        ? `Cửa hàng tại ${branding.address}. Ghé xem hàng thực tế, được tư vấn trực tiếp miễn phí.`
+        : 'Ghé xem hàng thực tế, được tư vấn trực tiếp miễn phí.',
+      color: '#8B5CF6',
+    },
+    {
+      icon: 'solar:heart-bold-duotone',
+      title: 'Chăm sóc tận tình',
+      desc: 'Tư vấn miễn phí qua Messenger / Zalo. Đội ngũ nhiệt tình, phản hồi trong vòng 30 phút.',
+      color: '#F59E0B',
+    },
+    {
+      icon: 'solar:tag-price-bold-duotone',
+      title: 'Giá hợp lý',
+      desc: 'Cam kết giá tốt nhất thị trường. Khách hàng thân thiết hưởng ưu đãi tích điểm đặc biệt.',
+      color: '#10B981',
+    },
+  ];
+
   return (
     <Box
       component="section"
@@ -72,14 +80,14 @@ export default function HomeCleanInterfaces({ sx, ...other }: BoxProps) {
 
         <Container sx={{ position: 'relative' }}>
           <SectionTitle
-            caption="Tại sao chọn CiCi"
+            caption={`Tại sao chọn ${storeName}`}
             title="Cam kết"
             txtGradient="từ chúng tôi"
             sx={{ mb: { xs: 6, md: 10 }, textAlign: 'center', alignItems: 'center' }}
           />
 
           <Grid container spacing={3}>
-            {REASONS.map((item, index) => (
+            {reasons.map((item, index) => (
               <Grid key={item.title} size={{ xs: 12, sm: 6, md: 3 }}>
                 <Box
                   component={m.div}

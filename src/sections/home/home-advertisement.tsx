@@ -20,10 +20,18 @@ import { bgGradient } from 'src/theme/css';
 import Iconify from 'src/components/iconify';
 import { varFade, MotionViewport } from 'src/components/animate';
 
+import type { TenantBranding } from 'src/lib/tenant-branding';
+
 // ----------------------------------------------------------------------
 
-export default function HomeAdvertisement({ sx, ...other }: BoxProps) {
+type Props = BoxProps & {
+  branding?: TenantBranding | null;
+};
+
+export default function HomeAdvertisement({ sx, branding, ...other }: Props) {
   const theme = useTheme();
+  const storeName = branding?.storeName ?? 'CiCi Accessories';
+  const contactLink = branding?.messengerLink ?? branding?.zaloLink ?? null;
 
   const renderImg = (
     <Stack component={m.div} variants={varFade('inUp', { distance: 24 })} alignItems="center">
@@ -54,7 +62,7 @@ export default function HomeAdvertisement({ sx, ...other }: BoxProps) {
       >
         Bắt đầu mua sắm
         <br />
-        tại CiCi Accessories
+        tại {storeName}
       </Box>
 
       <Box
@@ -62,8 +70,9 @@ export default function HomeAdvertisement({ sx, ...other }: BoxProps) {
         variants={varFade('inDown', { distance: 24 })}
         sx={{ color: 'rgba(255,255,255,0.72)', mb: 5, typography: 'body1' }}
       >
-        Hàng trăm mẫu phụ kiện thời trang nữ — trang sức, kẹp tóc, túi mini. Ghé thăm cửa hàng
-        tại 21 Chùa Láng, Hà Nội hoặc nhắn tin để được tư vấn.
+        {branding?.address
+          ? `Hàng trăm mẫu sản phẩm mới. Ghé thăm cửa hàng tại ${branding.address} hoặc nhắn tin để được tư vấn.`
+          : 'Hàng trăm mẫu sản phẩm mới. Nhắn tin để được tư vấn ngay.'}
       </Box>
 
       <Stack
@@ -90,24 +99,31 @@ export default function HomeAdvertisement({ sx, ...other }: BoxProps) {
           </Button>
         </m.div>
 
-        <m.div variants={varFade('inRight', { distance: 24 })}>
-          <Button
-            color="inherit"
-            size="large"
-            variant="outlined"
-            href="https://m.me/ciciaccessories"
-            target="_blank"
-            rel="noopener"
-            startIcon={<Iconify icon="logos:messenger" width={20} />}
-            sx={{
-              color: 'common.white',
-              borderColor: 'rgba(255,255,255,0.48)',
-              '&:hover': { borderColor: 'common.white', bgcolor: 'rgba(255,255,255,0.08)' },
-            }}
-          >
-            Nhắn tin đặt hàng
-          </Button>
-        </m.div>
+        {contactLink && (
+          <m.div variants={varFade('inRight', { distance: 24 })}>
+            <Button
+              color="inherit"
+              size="large"
+              variant="outlined"
+              href={contactLink}
+              target="_blank"
+              rel="noopener"
+              startIcon={
+                <Iconify
+                  icon={branding?.messengerLink ? 'logos:messenger' : 'simple-icons:zalo'}
+                  width={20}
+                />
+              }
+              sx={{
+                color: 'common.white',
+                borderColor: 'rgba(255,255,255,0.48)',
+                '&:hover': { borderColor: 'common.white', bgcolor: 'rgba(255,255,255,0.08)' },
+              }}
+            >
+              Nhắn tin đặt hàng
+            </Button>
+          </m.div>
+        )}
       </Stack>
 
       {/* Discreet staff login link */}

@@ -15,31 +15,10 @@ import { varFade, MotionViewport } from 'src/components/animate';
 import Iconify from 'src/components/iconify';
 import { OPEN_CHATBOT_EVENT } from 'src/components/chatbot';
 
+import type { TenantBranding } from 'src/lib/tenant-branding';
+
 import { SectionTitle } from './components/section-title';
 import { FloatLine, FloatPlusIcon } from './components/svg-elements';
-
-// ----------------------------------------------------------------------
-
-const CAPABILITIES = [
-  {
-    icon: 'solar:magnifer-bold-duotone',
-    title: 'Tra cứu sản phẩm tức thì',
-    desc: 'Hỏi tên hoặc mã sản phẩm — CiCi AI trả lời ngay về giá, mẫu mã, biến thể mà không cần tìm thủ công.',
-    color: '#EC4899',
-  },
-  {
-    icon: 'solar:box-bold-duotone',
-    title: 'Kiểm tra tồn kho',
-    desc: 'Muốn biết còn hàng không trước khi ghé cửa hàng? Chỉ cần hỏi CiCi AI, biết ngay không cần chờ nhân viên.',
-    color: '#8B5CF6',
-  },
-  {
-    icon: 'solar:chat-round-dots-bold-duotone',
-    title: 'Hỏi đáp 24/7',
-    desc: 'Giờ mở cửa, địa chỉ, chính sách đổi trả... CiCi AI trực sẵn sàng trả lời mọi lúc, kể cả ngoài giờ hành chính.',
-    color: '#F59E0B',
-  },
-];
 
 // ----------------------------------------------------------------------
 
@@ -51,7 +30,34 @@ const renderLines = () => (
   </>
 );
 
-export default function HomeAiAssistant({ sx, ...other }: BoxProps) {
+type Props = BoxProps & {
+  branding?: TenantBranding | null;
+};
+
+export default function HomeAiAssistant({ sx, branding, ...other }: Props) {
+  const aiName = `${branding?.storeName ?? 'CiCi'} AI`;
+
+  const capabilities = [
+    {
+      icon: 'solar:magnifer-bold-duotone',
+      title: 'Tra cứu sản phẩm tức thì',
+      desc: `Hỏi tên hoặc mã sản phẩm — ${aiName} trả lời ngay về giá, mẫu mã, biến thể mà không cần tìm thủ công.`,
+      color: '#EC4899',
+    },
+    {
+      icon: 'solar:box-bold-duotone',
+      title: 'Kiểm tra tồn kho',
+      desc: `Muốn biết còn hàng không trước khi ghé cửa hàng? Chỉ cần hỏi ${aiName}, biết ngay không cần chờ nhân viên.`,
+      color: '#8B5CF6',
+    },
+    {
+      icon: 'solar:chat-round-dots-bold-duotone',
+      title: 'Hỏi đáp 24/7',
+      desc: `Giờ mở cửa, địa chỉ, chính sách đổi trả... ${aiName} trực sẵn sàng trả lời mọi lúc, kể cả ngoài giờ hành chính.`,
+      color: '#F59E0B',
+    },
+  ];
+
   const handleOpenChat = () => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(OPEN_CHATBOT_EVENT));
@@ -75,13 +81,13 @@ export default function HomeAiAssistant({ sx, ...other }: BoxProps) {
           <SectionTitle
             caption="Trợ lý AI"
             title="Tư vấn tức thì cùng"
-            txtGradient="CiCi AI"
-            description="Không cần chờ nhân viên — hỏi CiCi AI bất cứ lúc nào về sản phẩm, giá cả, tồn kho hay thông tin cửa hàng. Trả lời ngay trong vài giây, ngay tại góc màn hình."
+            txtGradient={aiName}
+            description={`Không cần chờ nhân viên — hỏi ${aiName} bất cứ lúc nào về sản phẩm, giá cả, tồn kho hay thông tin cửa hàng. Trả lời ngay trong vài giây, ngay tại góc màn hình.`}
             sx={{ mb: { xs: 6, md: 10 }, textAlign: 'center', alignItems: 'center' }}
           />
 
           <Grid container spacing={3} sx={{ mb: { xs: 5, md: 8 } }}>
-            {CAPABILITIES.map((item) => (
+            {capabilities.map((item) => (
               <Grid key={item.title} size={{ xs: 12, sm: 6, md: 4 }}>
                 <Box
                   component={m.div}
@@ -139,7 +145,7 @@ export default function HomeAiAssistant({ sx, ...other }: BoxProps) {
               onClick={handleOpenChat}
               startIcon={<Iconify icon="solar:chat-round-dots-bold" />}
             >
-              Chat ngay với CiCi AI
+              Chat ngay với {aiName}
             </Button>
           </Box>
         </Container>

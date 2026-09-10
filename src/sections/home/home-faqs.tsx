@@ -19,48 +19,52 @@ import AccordionSummary, { accordionSummaryClasses } from '@mui/material/Accordi
 import Iconify from 'src/components/iconify';
 import { varFade, MotionViewport } from 'src/components/animate';
 
+import type { TenantBranding } from 'src/lib/tenant-branding';
+
 import { SectionTitle } from './components/section-title';
 import { FloatLine, FloatPlusIcon, FloatTriangleDownIcon } from './components/svg-elements';
 
 // ----------------------------------------------------------------------
 
-const FAQs = [
-  {
-    question: 'CiCi Accessories bán những sản phẩm gì?',
-    answer:
-      'CiCi Accessories chuyên cung cấp phụ kiện thời trang nữ bao gồm: trang sức (nhẫn, bông tai, dây chuyền, vòng tay), phụ kiện tóc (kẹp cua, kẹp bướm, băng đô, nơ tóc), túi xách mini, ví và các phụ kiện thời trang khác. Mẫu mã đa dạng, cập nhật xu hướng liên tục.',
-  },
-  {
-    question: 'Làm thế nào để đặt hàng?',
-    answer:
-      'Bạn có thể nhắn tin trực tiếp qua Facebook Messenger / Zalo của shop để chọn hàng và hẹn giờ đến nhận tại 21 Chùa Láng, Hà Nội. Hoặc ghé thẳng cửa hàng trong giờ mở cửa 9:00 – 21:00 hàng ngày.',
-  },
-  {
-    question: 'Cửa hàng CiCi Accessories ở đâu?',
-    answer:
-      'CiCi Accessories có cửa hàng duy nhất tại 21 Chùa Láng, Hà Nội. Bạn có thể ghé trực tiếp để xem hàng thực tế và được tư vấn miễn phí. Ngoài ra bạn cũng có thể đặt hàng qua Messenger / Zalo và đến lấy tại cửa hàng.',
-  },
-  {
-    question: 'Giờ mở cửa của shop như thế nào?',
-    answer:
-      'CiCi Accessories mở cửa từ 9:00 – 21:00 tất cả các ngày trong tuần, kể cả cuối tuần và ngày lễ. Ngoài giờ mở cửa bạn vẫn có thể nhắn tin đặt hàng qua Messenger / Zalo và đến nhận hàng vào ngày hôm sau.',
-  },
-  {
-    question: 'Có thể xem hàng trực tiếp không?',
-    answer:
-      'Hoàn toàn có thể! Cửa hàng tại 21 Chùa Láng, Hà Nội mở cửa 9:00 – 21:00 mỗi ngày. Bạn có thể ghé xem hàng thực tế và thử trực tiếp trước khi mua. Nếu chưa tiện đến, nhắn tin để shop gửi video/ảnh thực tế sản phẩm.',
-  },
-  {
-    question: 'Phương thức thanh toán nào được chấp nhận?',
-    answer:
-      'Shop chấp nhận: tiền mặt tại cửa hàng, chuyển khoản ngân hàng (Vietcombank, MB Bank, Techcombank...) và ví điện tử MoMo / ZaloPay / VNPay.',
-  },
-];
+type Props = BoxProps & {
+  branding?: TenantBranding | null;
+};
 
-// ----------------------------------------------------------------------
+export default function HomeFAQs({ sx, branding, ...other }: Props) {
+  const storeName = branding?.storeName ?? 'CiCi Accessories';
+  const contactChannel = branding?.messengerLink
+    ? 'Messenger'
+    : branding?.zaloLink
+      ? 'Zalo'
+      : 'Messenger / Zalo';
+  const contactLink = branding?.messengerLink ?? branding?.zaloLink ?? null;
 
-export default function HomeFAQs({ sx, ...other }: BoxProps) {
-  const [expanded, setExpanded] = useState<string | false>(FAQs[0].question);
+  const faqs = [
+    {
+      question: `${storeName} bán những sản phẩm gì?`,
+      answer: `${storeName} luôn cập nhật mẫu mã mới liên tục, đa dạng lựa chọn cho khách hàng. Nhắn tin để được tư vấn chi tiết về sản phẩm hiện có.`,
+    },
+    {
+      question: 'Làm thế nào để đặt hàng?',
+      answer: branding?.address
+        ? `Bạn có thể nhắn tin trực tiếp qua ${contactChannel} để chọn hàng và hẹn giờ đến nhận tại ${branding.address}. Hoặc ghé thẳng cửa hàng trong giờ mở cửa.`
+        : `Bạn có thể nhắn tin trực tiếp qua ${contactChannel} để chọn hàng và được tư vấn giao nhận.`,
+    },
+    ...(branding?.address
+      ? [
+          {
+            question: `Cửa hàng ${storeName} ở đâu?`,
+            answer: `${storeName} có cửa hàng tại ${branding.address}. Bạn có thể ghé trực tiếp để xem hàng thực tế và được tư vấn miễn phí. Ngoài ra bạn cũng có thể đặt hàng qua ${contactChannel} và đến lấy tại cửa hàng.`,
+          },
+        ]
+      : []),
+    {
+      question: 'Phương thức thanh toán nào được chấp nhận?',
+      answer: 'Shop chấp nhận: tiền mặt tại cửa hàng, chuyển khoản ngân hàng và các ví điện tử phổ biến.',
+    },
+  ];
+
+  const [expanded, setExpanded] = useState<string | false>(faqs[0].question);
 
   const handleChange = (panel: string) => (_: React.SyntheticEvent, isExpanded: boolean) => {
     setExpanded(isExpanded ? panel : false);
@@ -83,7 +87,7 @@ export default function HomeFAQs({ sx, ...other }: BoxProps) {
             spacing={1}
             sx={{ mt: 8, mx: 'auto', maxWidth: 720, mb: { xs: 5, md: 8 } }}
           >
-            {FAQs.map((item, index) => (
+            {faqs.map((item, index) => (
               <Accordion
                 key={item.question}
                 component={m.div}
@@ -153,23 +157,30 @@ export default function HomeFAQs({ sx, ...other }: BoxProps) {
 
             <m.div variants={varFade('in')}>
               <Typography sx={{ mt: 2, mb: 3, color: 'text.secondary' }}>
-                Nhắn tin cho CiCi — đội ngũ sẽ phản hồi trong vòng 30 phút!
+                Nhắn tin cho {storeName} — đội ngũ sẽ phản hồi trong vòng 30 phút!
               </Typography>
             </m.div>
 
-            <m.div variants={varFade('in')}>
-              <Button
-                color="primary"
-                variant="contained"
-                size="large"
-                href="https://m.me/ciciaccessories"
-                target="_blank"
-                rel="noopener"
-                startIcon={<Iconify icon="logos:messenger" width={20} />}
-              >
-                Nhắn tin ngay
-              </Button>
-            </m.div>
+            {contactLink && (
+              <m.div variants={varFade('in')}>
+                <Button
+                  color="primary"
+                  variant="contained"
+                  size="large"
+                  href={contactLink}
+                  target="_blank"
+                  rel="noopener"
+                  startIcon={
+                    <Iconify
+                      icon={branding?.messengerLink ? 'logos:messenger' : 'simple-icons:zalo'}
+                      width={20}
+                    />
+                  }
+                >
+                  Nhắn tin ngay
+                </Button>
+              </m.div>
+            )}
           </Box>
         </Stack>
       </MotionViewport>

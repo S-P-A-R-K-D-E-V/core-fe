@@ -63,19 +63,19 @@ export default function HomeView({ branding }: Props) {
           bgcolor: 'background.default',
         }}
       >
-        <HomeAiAssistant />
+        <HomeAiAssistant branding={branding} />
 
-        <HomeMinimal products={products} />
+        <HomeMinimal products={products} branding={branding} />
 
         <HomeFeatures products={products} />
 
-        <HomeCleanInterfaces />
+        <HomeCleanInterfaces branding={branding} />
 
         <HomeTestimonials />
 
-        <HomeFAQs />
+        <HomeFAQs branding={branding} />
 
-        <HomeAdvertisement />
+        <HomeAdvertisement branding={branding} />
       </Box>
 
       {showBackToTop && (
