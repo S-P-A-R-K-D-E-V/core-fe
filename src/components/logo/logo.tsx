@@ -10,10 +10,12 @@ import { RouterLink } from 'src/routes/components';
 
 export interface LogoProps extends BoxProps {
   disabledLink?: boolean;
+  /** Logo riêng của tenant (TenantBranding.logoUrl) — mặc định về logo tĩnh khi tenant chưa cấu hình. */
+  logoSrc?: string | null;
 }
 
 const Logo = forwardRef<HTMLDivElement, LogoProps>(
-  ({ disabledLink = false, sx, ...other }, ref) => {
+  ({ disabledLink = false, logoSrc, sx, ...other }, ref) => {
     const theme = useTheme();
 
     const PRIMARY_LIGHT = theme.palette.primary.light;
@@ -27,8 +29,8 @@ const Logo = forwardRef<HTMLDivElement, LogoProps>(
      const logo = (
        <Box
          component="img"
-         src="/logo/logo_single.png"
-         sx={{ width: 60, height: 40, cursor: 'pointer', ...sx }}
+         src={logoSrc || '/logo/logo_single.png'}
+         sx={{ width: 60, height: 40, cursor: 'pointer', objectFit: 'contain', ...sx }}
        />
      );
 

@@ -51,7 +51,7 @@ export default function HomeView({ branding }: Props) {
   }, []);
 
   return (
-    <MainLayout hasProducts={productsLoading || products.length > 0}>
+    <MainLayout hasProducts={productsLoading || products.length > 0} logoUrl={branding?.logoUrl}>
       <ScrollProgress scrollYProgress={scrollYProgress} />
 
       <HomeHero products={products} productsLoading={productsLoading} branding={branding} />

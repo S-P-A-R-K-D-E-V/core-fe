@@ -12,16 +12,17 @@ import Header from './header';
 type Props = {
   children: React.ReactNode;
   hasProducts?: boolean;
+  logoUrl?: string | null;
 };
 
-export default function MainLayout({ children, hasProducts }: Props) {
+export default function MainLayout({ children, hasProducts, logoUrl }: Props) {
   const pathname = usePathname();
 
   const homePage = pathname === '/';
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: 1 }}>
-      <Header hasProducts={hasProducts} />
+      <Header hasProducts={hasProducts} logoUrl={logoUrl} />
 
       <Box
         component="main"

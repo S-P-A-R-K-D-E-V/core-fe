@@ -30,9 +30,10 @@ import SettingsButton from '../common/settings-button';
 
 type Props = {
   hasProducts?: boolean;
+  logoUrl?: string | null;
 };
 
-export default function Header({ hasProducts = true }: Props) {
+export default function Header({ hasProducts = true, logoUrl }: Props) {
   const theme = useTheme();
 
   const mdUp = useResponsive('up', 'md');
@@ -86,7 +87,7 @@ export default function Header({ hasProducts = true }: Props) {
               </Link>
             }
           >
-            <Logo />
+            <Logo logoSrc={logoUrl} />
           </Badge>
 
           <Box sx={{ flexGrow: 1 }} />
