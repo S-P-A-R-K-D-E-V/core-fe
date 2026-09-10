@@ -28,12 +28,19 @@ import SettingsButton from '../common/settings-button';
 
 // ----------------------------------------------------------------------
 
-export default function Header() {
+type Props = {
+  hasProducts?: boolean;
+};
+
+export default function Header({ hasProducts = true }: Props) {
   const theme = useTheme();
 
   const mdUp = useResponsive('up', 'md');
 
   const offsetTop = useOffSetTop(HEADER.H_DESKTOP);
+
+  const navData = hasProducts ? navConfig : navConfig.filter((item) => item.path !== paths.product.root);
+
   return (
     <AppBar>
       <Toolbar
@@ -84,7 +91,7 @@ export default function Header() {
 
           <Box sx={{ flexGrow: 1 }} />
 
-          {mdUp && <NavDesktop data={navConfig} />}
+          {mdUp && <NavDesktop data={navData} />}
 
           <Stack alignItems="center" direction={{ xs: 'row', md: 'row-reverse' }}>
             {mdUp && <LoginOrAccount />}
@@ -96,7 +103,7 @@ export default function Header() {
               }}
             />
 
-            {!mdUp && <NavMobile data={navConfig} />}
+            {!mdUp && <NavMobile data={navData} />}
           </Stack>
         </Container>
       </Toolbar>

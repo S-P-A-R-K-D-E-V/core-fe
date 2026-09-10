@@ -11,16 +11,17 @@ import Header from './header';
 
 type Props = {
   children: React.ReactNode;
+  hasProducts?: boolean;
 };
 
-export default function MainLayout({ children }: Props) {
+export default function MainLayout({ children, hasProducts }: Props) {
   const pathname = usePathname();
 
   const homePage = pathname === '/';
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: 1 }}>
-      <Header />
+      <Header hasProducts={hasProducts} />
 
       <Box
         component="main"
