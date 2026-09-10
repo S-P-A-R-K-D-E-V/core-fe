@@ -28,6 +28,7 @@ import Iconify from 'src/components/iconify';
 import { varFade, MotionContainer } from 'src/components/animate';
 
 import type { IProductListItem } from 'src/types/corecms-api';
+import type { TenantBranding } from 'src/lib/tenant-branding';
 
 // ----------------------------------------------------------------------
 
@@ -251,9 +252,20 @@ function ProductCard({ product, index, loading }: ProductCardProps) {
 type Props = BoxProps & {
   products?: IProductListItem[];
   productsLoading?: boolean;
+  branding?: TenantBranding | null;
 };
 
-export default function HomeHero({ sx, products = [], productsLoading = true, ...other }: Props) {
+export default function HomeHero({
+  sx,
+  products = [],
+  productsLoading = true,
+  branding,
+  ...other
+}: Props) {
+  const storeName = branding?.storeName ?? 'CiCi Accessories';
+  const tagline =
+    branding?.shortDescription ??
+    'Phụ kiện thời trang nữ — trang sức, kẹp tóc, túi mini và hơn thế nữa. Phong cách, cá tính, giá cả hợp lý.';
   const scrollProgress = useScrollPercent();
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up(mdKey));
@@ -312,7 +324,7 @@ export default function HomeHero({ sx, products = [], productsLoading = true, ..
             ml: { xs: 0.5, md: 1 },
           }}
         >
-          CiCi Accessories
+          {storeName}
         </Box>
       </Box>
     </m.div>
@@ -330,13 +342,20 @@ export default function HomeHero({ sx, products = [], productsLoading = true, ..
           [theme.breakpoints.up(lgKey)]: { fontSize: 18, lineHeight: '32px' },
         }}
       >
-        Phụ kiện thời trang nữ — trang sức, kẹp tóc, túi mini và hơn thế nữa.
-        {' '}Phong cách, cá tính, giá cả hợp lý.
+        {tagline}
       </Typography>
     </m.div>
   );
 
-  const renderBadges = () => (
+  const renderBadges = () => {
+    const badges = [
+      ...(branding?.address
+        ? [{ icon: 'solar:map-point-bold-duotone', label: branding.address }]
+        : []),
+      { icon: 'solar:chat-round-bold-duotone', label: 'Tư vấn miễn phí' },
+    ];
+
+    return (
     <m.div {...motionProps}>
       <Stack
         direction="row"
@@ -345,11 +364,7 @@ export default function HomeHero({ sx, products = [], productsLoading = true, ..
         justifyContent="center"
         sx={{ gap: 1 }}
       >
-        {[
-          { icon: 'solar:star-bold-duotone', label: '2,000+ khách hàng' },
-          { icon: 'solar:map-point-bold-duotone', label: '21 Chùa Láng, Hà Nội' },
-          { icon: 'solar:chat-round-bold-duotone', label: 'Tư vấn miễn phí' },
-        ].map((b) => (
+        {badges.map((b) => (
           <Chip
             key={b.label}
             icon={<Iconify icon={b.icon} width={16} />}
@@ -365,7 +380,8 @@ export default function HomeHero({ sx, products = [], productsLoading = true, ..
         ))}
       </Stack>
     </m.div>
-  );
+    );
+  };
 
   const renderButtons = () => (
     <Box
@@ -389,19 +405,37 @@ export default function HomeHero({ sx, products = [], productsLoading = true, ..
         </Button>
       </m.div>
 
-      <m.div {...motionProps}>
-        <Button
-          size="large"
-          color="inherit"
-          variant="outlined"
-          href="https://m.me/ciciaccessories"
-          target="_blank"
-          rel="noopener"
-          startIcon={<Iconify width={20} icon="logos:messenger" />}
-        >
-          Nhắn tin đặt hàng
-        </Button>
-      </m.div>
+      {branding?.messengerLink && (
+        <m.div {...motionProps}>
+          <Button
+            size="large"
+            color="inherit"
+            variant="outlined"
+            href={branding.messengerLink}
+            target="_blank"
+            rel="noopener"
+            startIcon={<Iconify width={20} icon="logos:messenger" />}
+          >
+            Nhắn tin Messenger
+          </Button>
+        </m.div>
+      )}
+
+      {branding?.zaloLink && (
+        <m.div {...motionProps}>
+          <Button
+            size="large"
+            color="inherit"
+            variant="outlined"
+            href={branding.zaloLink}
+            target="_blank"
+            rel="noopener"
+            startIcon={<Iconify width={20} icon="simple-icons:zalo" />}
+          >
+            Nhắn tin Zalo
+          </Button>
+        </m.div>
+      )}
     </Box>
   );
 
