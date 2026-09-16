@@ -265,21 +265,28 @@ export function SyncNotificationProvider({ children }: Props) {
           let message = '';
 
           if (status.status === 'Running') {
-            // Ưu tiên bước đang chạy (kèm % + message chi tiết từ BE); fallback bước cuối.
-            const running = status.steps?.find((s) => s.isRunning);
-            const current = running ?? status.steps?.[completedSteps - 1];
-            if (current?.message) {
-              message =
-                running && running.percent > 0
-                  ? `${current.message} (${running.percent}%)`
-                  : current.message;
-            } else if (current) {
-              message = `Đang xử lý: ${current.entity}`;
+            // Có thể có nhiều bước chạy song song (xem KiotVietSyncService.RunStepsConcurrentlyAsync)
+            // — chỉ lấy bước đầu tiên sẽ trông như hệ thống chỉ đang làm 1 việc.
+            const runningSteps = status.steps?.filter((s) => s.isRunning) ?? [];
+            if (runningSteps.length > 1) {
+              message = `Đang chạy song song ${runningSteps.length} bước: ${runningSteps.map((s) => s.entity).join(', ')}`;
             } else {
-              message = 'Đang khởi tạo...';
+              const current = runningSteps[0] ?? status.steps?.[completedSteps - 1];
+              if (current?.message) {
+                message =
+                  runningSteps[0] && runningSteps[0].percent > 0
+                    ? `${current.message} (${runningSteps[0].percent}%)`
+                    : current.message;
+              } else if (current) {
+                message = `Đang xử lý: ${current.entity}`;
+              } else {
+                message = 'Đang khởi tạo...';
+              }
             }
           } else if (status.status === 'Completed') {
             message = `Hoàn thành ${completedSteps} bước đồng bộ`;
+          } else if (status.status === 'Cancelled') {
+            message = 'Đã hủy theo yêu cầu';
           } else if (status.status === 'Failed') {
             message = status.error || 'Đồng bộ thất bại';
           }

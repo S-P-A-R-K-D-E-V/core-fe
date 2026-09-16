@@ -78,6 +78,10 @@ export default function KiotVietSyncView() {
   const [currentTab, setCurrentTab] = useState('sync');
   const [syncLoading, setSyncLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+  // Giữ nút Hủy ở trạng thái loading/disabled cho tới khi job THẬT SỰ dừng (status khác Running) —
+  // trước đây chỉ dựa vào cancelLoading nên tắt loading ngay khi POST xong (~vài trăm ms), trong khi
+  // Worker cần tới 1-2s để nhận ra cờ hủy + dừng đúng checkpoint, cho phép bấm lại nhiều lần.
+  const [cancelRequested, setCancelRequested] = useState(false);
   const [retryingKeys, setRetryingKeys] = useState<Set<string>>(new Set());
 
   // Khoảng thời gian lấy dữ liệu giao dịch (Order/Return/SalesOrder). Mặc định 01/01/2026 → hiện tại.
@@ -130,10 +134,21 @@ export default function KiotVietSyncView() {
         if (data.sync) {
           setSyncJob(data.sync);
           subscribeToJob(data.sync.jobId);
+          return;
         }
         if (data.syncAndTransform) {
           setSyncJob(data.syncAndTransform);
           subscribeToJob(data.syncAndTransform.jobId);
+          return;
+        }
+
+        // Không có job nào đang chạy — vẫn lấy job gần nhất để không mất trắng kết quả/step lỗi của
+        // lần chạy trước sau khi reload trang (đặc biệt cần để còn thấy nút "Thử lại" cho step lỗi).
+        const { data: recentJobs } = await axios.get(endpoints.kiotViet.syncJobs, { params: { limit: 1 } });
+        const lastJob = Array.isArray(recentJobs) ? recentJobs[0] : null;
+        if (lastJob && SYNC_TYPES.has(lastJob.type)) {
+          setSyncJob(lastJob);
+          if (lastJob.status === 'Running') subscribeToJob(lastJob.jobId);
         }
       } catch (error) {
         // Ignore — user may not be admin
@@ -179,16 +194,28 @@ export default function KiotVietSyncView() {
   const handleCancel = useCallback(async () => {
     if (!syncJob?.jobId) return;
     setCancelLoading(true);
+    setCancelRequested(true);
     try {
       await axios.post(endpoints.kiotViet.syncJobCancel(syncJob.jobId));
-      enqueueSnackbar('Đã gửi yêu cầu hủy, tiến trình sẽ dừng ở bước hiện tại', { variant: 'info' });
+      enqueueSnackbar('Đã gửi yêu cầu hủy, tiến trình sẽ dừng ở bước hiện tại (có thể mất vài giây)', {
+        variant: 'info',
+      });
     } catch (error: any) {
       const msg = error?.response?.data?.message ?? error?.message;
       enqueueSnackbar(msg || 'Không thể hủy tiến trình', { variant: 'error' });
+      setCancelRequested(false); // gửi yêu cầu hủy thất bại — cho phép bấm lại ngay
     } finally {
       setCancelLoading(false);
     }
   }, [syncJob?.jobId, enqueueSnackbar]);
+
+  // Job đã dừng thật sự (Cancelled/Completed/Failed) — mở khoá lại nút Hủy (dù nó sẽ ẩn đi ngay sau
+  // đó vì chỉ hiện khi status === 'Running').
+  useEffect(() => {
+    if (syncJob?.status && syncJob.status !== 'Running') {
+      setCancelRequested(false);
+    }
+  }, [syncJob?.status]);
 
   const handleRetryStep = useCallback(
     async (jobId: string, step: ISyncJobStep) => {
@@ -241,15 +268,22 @@ export default function KiotVietSyncView() {
             ? 'info'
             : 'warning';
 
-    const completedSteps = job.steps?.filter((s) => !s.isRunning && s.error === null).length || 0;
+    // completedSteps loại cả step "Pending" (chưa chạy, error=null) — nếu không sẽ bị đếm nhầm là
+    // đã xong ngay khi vừa lên kế hoạch (đăng ký trước toàn bộ sub-job trước khi chạy cái nào cả).
+    const completedSteps = job.steps?.filter((s) => !s.isRunning && !s.isPending && s.error === null).length || 0;
     const totalSteps = job.steps?.length || 0;
-    const runningStep = job.steps?.find((s) => s.isRunning);
-    // Tiến trình tổng: số bước xong + % của bước đang chạy (mượt hơn so với chỉ đếm bước).
+    const runningSteps = job.steps?.filter((s) => s.isRunning) || [];
+    // Tiến trình tổng: số bước xong + tổng % của các bước đang chạy song song (mượt hơn so với chỉ đếm bước).
     const overallProgress =
       totalSteps > 0
-        ? ((completedSteps + (runningStep ? (runningStep.percent || 0) / 100 : 0)) / totalSteps) * 100
+        ? ((completedSteps + runningSteps.reduce((sum, s) => sum + (s.percent || 0) / 100, 0)) / totalSteps) * 100
         : 0;
-    const currentMessage = runningStep?.message ?? job.steps?.[totalSteps - 1]?.message ?? null;
+    // Chạy song song nhiều bước cùng lúc — không thể chỉ hiển thị message của 1 bước như trước
+    // (gây hiểu nhầm chỉ có 1 việc đang diễn ra), nên gộp lại khi có từ 2 bước trở lên.
+    const currentMessage =
+      runningSteps.length > 1
+        ? `Đang chạy song song ${runningSteps.length} bước: ${runningSteps.map((s) => s.entity).join(', ')}`
+        : (runningSteps[0]?.message ?? job.steps?.[totalSteps - 1]?.message ?? null);
 
     return (
       <Box sx={{ mt: 2 }}>
@@ -276,26 +310,40 @@ export default function KiotVietSyncView() {
             {job.steps.map((step, index) => {
               const stepKey = step.key || step.entity;
               const isRetrying = retryingKeys.has(stepKey);
-              const canRetry = !step.isRunning && !!step.error && !isRetrying;
+              const isCancelled = step.errorType === 'Cancelled';
+              const canRetry = !step.isRunning && !step.isPending && !!step.error && !isRetrying;
               const errorTypeLabel =
                 step.errorType === 'Unauthorized'
                   ? 'Lỗi xác thực KiotViet'
                   : step.errorType === 'RateLimited'
                     ? 'Bị giới hạn tần suất API'
-                    : null;
+                    : isCancelled
+                      ? 'Đã hủy'
+                      : null;
 
               return (
                 <Box key={stepKey || index} sx={{ py: 0.5, px: 1 }}>
                   <Stack direction="row" alignItems="center" spacing={1} sx={{ fontSize: 13 }}>
                     {step.isRunning || isRetrying ? (
                       <CircularProgress size={16} color="info" />
+                    ) : step.isPending ? (
+                      <Iconify icon="eva:clock-outline" sx={{ color: 'text.disabled', width: 18 }} />
                     ) : (
                       <Iconify
-                        icon={step.error === null ? 'eva:checkmark-circle-2-fill' : 'eva:close-circle-fill'}
-                        sx={{ color: step.error === null ? 'success.main' : 'error.main', width: 18 }}
+                        icon={
+                          step.error === null
+                            ? 'eva:checkmark-circle-2-fill'
+                            : isCancelled
+                              ? 'eva:slash-outline'
+                              : 'eva:close-circle-fill'
+                        }
+                        sx={{
+                          color: step.error === null ? 'success.main' : isCancelled ? 'text.disabled' : 'error.main',
+                          width: 18,
+                        }}
                       />
                     )}
-                    <Typography variant="body2" sx={{ flexGrow: 1 }}>
+                    <Typography variant="body2" sx={{ flexGrow: 1, color: step.isPending ? 'text.disabled' : 'text.primary' }}>
                       {step.entity}
                       {(step.attempts || 1) > 1 && (
                         <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
@@ -308,9 +356,11 @@ export default function KiotVietSyncView() {
                         ? step.totalKnown > 0
                           ? `${step.processed}/${step.totalKnown} (${step.percent}%)`
                           : '...'
-                        : step.error
-                          ? errorTypeLabel || 'Lỗi'
-                          : `+${step.created} ~${step.updated}${step.skipped > 0 ? ` (bỏ qua ${step.skipped})` : ''}${step.totalKnown > 0 ? ` / ${step.totalKnown}` : ''}`}
+                        : step.isPending
+                          ? 'Đang chờ'
+                          : step.error
+                            ? errorTypeLabel || 'Lỗi'
+                            : `+${step.created} ~${step.updated}${step.skipped > 0 ? ` (bỏ qua ${step.skipped})` : ''}${step.totalKnown > 0 ? ` / ${step.totalKnown}` : ''}`}
                     </Typography>
                     {canRetry && (
                       <IconButton
@@ -337,7 +387,7 @@ export default function KiotVietSyncView() {
                       {step.message}
                     </Typography>
                   )}
-                  {!step.isRunning && step.error && (
+                  {!step.isRunning && step.error && !isCancelled && (
                     <Typography variant="caption" color="error.main" sx={{ display: 'block', ml: 3.25 }}>
                       {step.error}
                     </Typography>
@@ -503,11 +553,12 @@ export default function KiotVietSyncView() {
                     variant="outlined"
                     color="error"
                     size="large"
-                    loading={cancelLoading}
+                    loading={cancelLoading || cancelRequested}
+                    disabled={cancelLoading || cancelRequested}
                     startIcon={<Iconify icon="mdi:stop-circle-outline" />}
                     onClick={handleCancel}
                   >
-                    Hủy đồng bộ
+                    {cancelRequested ? 'Đang hủy...' : 'Hủy đồng bộ'}
                   </LoadingButton>
                 )}
               </Stack>

@@ -32,8 +32,10 @@ export interface ISyncJobStep {
   /** Thông điệp trạng thái hiện tại của bước. */
   message: string | null;
   isRunning: boolean;
+  /** true = đã lên kế hoạch nhưng chưa chạy (đang chờ tới lượt/chờ phase trước xong). */
+  isPending?: boolean;
   error: string | null;
-  /** "Unauthorized" | "RateLimited" | "Other" */
+  /** "Unauthorized" | "RateLimited" | "Other" | "Cancelled" */
   errorType?: string | null;
   attempts?: number;
 }
