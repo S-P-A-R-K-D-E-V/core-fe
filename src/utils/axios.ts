@@ -319,6 +319,7 @@ export const endpoints = {
     syncSelected: '/kiotviet/sync/selected',
     syncJobStatus: (jobId: string) => `/kiotviet/sync/jobs/${jobId}`,
     syncJobCancel: (jobId: string) => `/kiotviet/sync/jobs/${jobId}/cancel`,
+    syncStepRetry: (jobId: string, key: string) => `/kiotviet/sync/jobs/${jobId}/steps/${encodeURIComponent(key)}/retry`,
     syncRunning: '/kiotviet/sync/running',
     transform: '/kiotviet/transform',
     syncAndTransform: '/kiotviet/sync-and-transform',

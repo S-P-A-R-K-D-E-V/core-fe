@@ -15,6 +15,11 @@ export interface ISyncJobStatus {
 
 export interface ISyncJobStep {
   entity: string;
+  /** Khoá ổn định để retry đúng sub-job này (vd "Invoices_2022-01", "Categories"). */
+  key?: string | null;
+  kind?: string | null;
+  fromDate?: string | null;
+  toDate?: string | null;
   created: number;
   updated: number;
   skipped: number;
@@ -28,6 +33,9 @@ export interface ISyncJobStep {
   message: string | null;
   isRunning: boolean;
   error: string | null;
+  /** "Unauthorized" | "RateLimited" | "Other" */
+  errorType?: string | null;
+  attempts?: number;
 }
 
 export interface ISyncJobResponse {

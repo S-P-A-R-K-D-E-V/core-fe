@@ -16,6 +16,7 @@ import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
 import CircularProgress from '@mui/material/CircularProgress';
+import IconButton from '@mui/material/IconButton';
 import LoadingButton from '@mui/lab/LoadingButton';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 
@@ -34,7 +35,7 @@ import KiotVietJobHistoryTab from '../kiotviet-job-history-tab';
 import KiotVietWebhookTab from '../kiotviet-webhook-tab';
 import KiotVietPendingPushTab from '../kiotviet-pending-push-tab';
 
-import type { ISyncJobStatus } from 'src/types/sync-job';
+import type { ISyncJobStatus, ISyncJobStep } from 'src/types/sync-job';
 
 import axios, { endpoints } from 'src/utils/axios';
 
@@ -77,6 +78,7 @@ export default function KiotVietSyncView() {
   const [currentTab, setCurrentTab] = useState('sync');
   const [syncLoading, setSyncLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [retryingKeys, setRetryingKeys] = useState<Set<string>>(new Set());
 
   // Khoảng thời gian lấy dữ liệu giao dịch (Order/Return/SalesOrder). Mặc định 01/01/2026 → hiện tại.
   const [fromDate, setFromDate] = useState('2026-01-01');
@@ -188,6 +190,45 @@ export default function KiotVietSyncView() {
     }
   }, [syncJob?.jobId, enqueueSnackbar]);
 
+  const handleRetryStep = useCallback(
+    async (jobId: string, step: ISyncJobStep) => {
+      const stepKey = step.key || step.entity;
+      setRetryingKeys((prev) => new Set(prev).add(stepKey));
+      try {
+        await axios.post(endpoints.kiotViet.syncStepRetry(jobId, stepKey));
+        enqueueSnackbar(`Đã gửi yêu cầu thử lại: ${step.entity}`, { variant: 'info' });
+      } catch (error: any) {
+        const msg = error?.response?.data?.message ?? error?.message;
+        enqueueSnackbar(msg || 'Không thể thử lại bước này', { variant: 'error' });
+        setRetryingKeys((prev) => {
+          const next = new Set(prev);
+          next.delete(stepKey);
+          return next;
+        });
+      }
+    },
+    [enqueueSnackbar]
+  );
+
+  // Khi có cập nhật mới cho 1 step (qua SignalR), bỏ trạng thái "đang thử lại" của step đó —
+  // tránh nút Thử lại bị kẹt loading mãi nếu Worker đã xử lý xong nhưng response POST bị mất.
+  useEffect(() => {
+    if (!syncJob?.steps) return;
+    setRetryingKeys((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set(prev);
+      let changed = false;
+      syncJob.steps.forEach((s) => {
+        const stepKey = s.key || s.entity;
+        if (next.has(stepKey) && !s.isRunning) {
+          next.delete(stepKey);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [syncJob?.steps]);
+
   const renderJobStatus = (job: ISyncJobStatus | null, label: string) => {
     if (!job) return null;
 
@@ -232,51 +273,78 @@ export default function KiotVietSyncView() {
 
         {job.steps && job.steps.length > 0 && (
           <Box sx={{ mt: 1, maxHeight: 340, overflow: 'auto' }}>
-            {job.steps.map((step, index) => (
-              <Box key={index} sx={{ py: 0.5, px: 1 }}>
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ fontSize: 13 }}>
-                  {step.isRunning ? (
-                    <CircularProgress size={16} color="info" />
-                  ) : (
-                    <Iconify
-                      icon={step.error === null ? 'eva:checkmark-circle-2-fill' : 'eva:close-circle-fill'}
-                      sx={{ color: step.error === null ? 'success.main' : 'error.main', width: 18 }}
+            {job.steps.map((step, index) => {
+              const stepKey = step.key || step.entity;
+              const isRetrying = retryingKeys.has(stepKey);
+              const canRetry = !step.isRunning && !!step.error && !isRetrying;
+              const errorTypeLabel =
+                step.errorType === 'Unauthorized'
+                  ? 'Lỗi xác thực KiotViet'
+                  : step.errorType === 'RateLimited'
+                    ? 'Bị giới hạn tần suất API'
+                    : null;
+
+              return (
+                <Box key={stepKey || index} sx={{ py: 0.5, px: 1 }}>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ fontSize: 13 }}>
+                    {step.isRunning || isRetrying ? (
+                      <CircularProgress size={16} color="info" />
+                    ) : (
+                      <Iconify
+                        icon={step.error === null ? 'eva:checkmark-circle-2-fill' : 'eva:close-circle-fill'}
+                        sx={{ color: step.error === null ? 'success.main' : 'error.main', width: 18 }}
+                      />
+                    )}
+                    <Typography variant="body2" sx={{ flexGrow: 1 }}>
+                      {step.entity}
+                      {(step.attempts || 1) > 1 && (
+                        <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                          (lần {step.attempts})
+                        </Typography>
+                      )}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {step.isRunning
+                        ? step.totalKnown > 0
+                          ? `${step.processed}/${step.totalKnown} (${step.percent}%)`
+                          : '...'
+                        : step.error
+                          ? errorTypeLabel || 'Lỗi'
+                          : `+${step.created} ~${step.updated}${step.skipped > 0 ? ` (bỏ qua ${step.skipped})` : ''}${step.totalKnown > 0 ? ` / ${step.totalKnown}` : ''}`}
+                    </Typography>
+                    {canRetry && (
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        title="Thử lại"
+                        onClick={() => syncJob && handleRetryStep(syncJob.jobId, step)}
+                      >
+                        <Iconify icon="mdi:refresh" width={16} />
+                      </IconButton>
+                    )}
+                  </Stack>
+
+                  {/* Thanh % + message của bước đang chạy */}
+                  {step.isRunning && step.totalKnown > 0 && (
+                    <LinearProgress
+                      variant="determinate"
+                      value={step.percent}
+                      sx={{ mt: 0.5, ml: 3.25, height: 4, borderRadius: 1 }}
                     />
                   )}
-                  <Typography variant="body2" sx={{ flexGrow: 1 }}>
-                    {step.entity}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {step.isRunning
-                      ? step.totalKnown > 0
-                        ? `${step.processed}/${step.totalKnown} (${step.percent}%)`
-                        : '...'
-                      : step.error
-                        ? 'Lỗi'
-                        : `+${step.created} ~${step.updated}${step.skipped > 0 ? ` (bỏ qua ${step.skipped})` : ''}${step.totalKnown > 0 ? ` / ${step.totalKnown}` : ''}`}
-                  </Typography>
-                </Stack>
-
-                {/* Thanh % + message của bước đang chạy */}
-                {step.isRunning && step.totalKnown > 0 && (
-                  <LinearProgress
-                    variant="determinate"
-                    value={step.percent}
-                    sx={{ mt: 0.5, ml: 3.25, height: 4, borderRadius: 1 }}
-                  />
-                )}
-                {step.isRunning && step.message && (
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 3.25 }}>
-                    {step.message}
-                  </Typography>
-                )}
-                {!step.isRunning && step.error && (
-                  <Typography variant="caption" color="error.main" sx={{ display: 'block', ml: 3.25 }}>
-                    {step.error}
-                  </Typography>
-                )}
-              </Box>
-            ))}
+                  {step.isRunning && step.message && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 3.25 }}>
+                      {step.message}
+                    </Typography>
+                  )}
+                  {!step.isRunning && step.error && (
+                    <Typography variant="caption" color="error.main" sx={{ display: 'block', ml: 3.25 }}>
+                      {step.error}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })}
           </Box>
         )}
       </Box>
