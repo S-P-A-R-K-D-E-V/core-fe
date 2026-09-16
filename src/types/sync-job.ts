@@ -4,7 +4,7 @@
 
 export interface ISyncJobStatus {
   jobId: string;
-  status: 'Pending' | 'Running' | 'Completed' | 'Failed';
+  status: 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Cancelled';
   type: string;
   createdAt: string;
   startedAt: string | null;

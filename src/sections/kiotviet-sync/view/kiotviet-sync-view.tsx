@@ -76,6 +76,7 @@ export default function KiotVietSyncView() {
 
   const [currentTab, setCurrentTab] = useState('sync');
   const [syncLoading, setSyncLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   // Khoảng thời gian lấy dữ liệu giao dịch (Order/Return/SalesOrder). Mặc định 01/01/2026 → hiện tại.
   const [fromDate, setFromDate] = useState('2026-01-01');
@@ -114,6 +115,8 @@ export default function KiotVietSyncView() {
       enqueueSnackbar('Đồng bộ hoàn thành!', { variant: 'success' });
     } else if (syncJob?.status === 'Failed') {
       enqueueSnackbar(syncJob.error || 'Đồng bộ thất bại', { variant: 'error' });
+    } else if (syncJob?.status === 'Cancelled') {
+      enqueueSnackbar('Đã hủy tiến trình đồng bộ', { variant: 'warning' });
     }
   }, [syncJob?.status, syncJob?.error, enqueueSnackbar]);
 
@@ -171,13 +174,27 @@ export default function KiotVietSyncView() {
     }
   }, [startSyncSelected, enqueueSnackbar, fromDate, toDate, allSelected, selectedEntities, noneSelected]);
 
+  const handleCancel = useCallback(async () => {
+    if (!syncJob?.jobId) return;
+    setCancelLoading(true);
+    try {
+      await axios.post(endpoints.kiotViet.syncJobCancel(syncJob.jobId));
+      enqueueSnackbar('Đã gửi yêu cầu hủy, tiến trình sẽ dừng ở bước hiện tại', { variant: 'info' });
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? error?.message;
+      enqueueSnackbar(msg || 'Không thể hủy tiến trình', { variant: 'error' });
+    } finally {
+      setCancelLoading(false);
+    }
+  }, [syncJob?.jobId, enqueueSnackbar]);
+
   const renderJobStatus = (job: ISyncJobStatus | null, label: string) => {
     if (!job) return null;
 
     const statusColor =
       job.status === 'Completed'
         ? 'success'
-        : job.status === 'Failed'
+        : job.status === 'Failed' || job.status === 'Cancelled'
           ? 'error'
           : job.status === 'Running'
             ? 'info'
@@ -395,22 +412,37 @@ export default function KiotVietSyncView() {
                 ))}
               </FormGroup>
 
-              <LoadingButton
-                variant="contained"
-                color="primary"
-                size="large"
-                loading={syncLoading}
-                disabled={syncJob?.status === 'Running' || noneSelected}
-                startIcon={<Iconify icon="mdi:cloud-download" />}
-                onClick={handleSync}
-                sx={{ minWidth: 200, mt: 2 }}
-              >
-                {syncJob?.status === 'Running'
-                  ? 'Đang đồng bộ...'
-                  : allSelected
-                    ? 'Đồng bộ toàn bộ'
-                    : `Đồng bộ ${selectedEntities.length} mục đã chọn`}
-              </LoadingButton>
+              <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+                <LoadingButton
+                  variant="contained"
+                  color="primary"
+                  size="large"
+                  loading={syncLoading}
+                  disabled={syncJob?.status === 'Running' || noneSelected}
+                  startIcon={<Iconify icon="mdi:cloud-download" />}
+                  onClick={handleSync}
+                  sx={{ minWidth: 200 }}
+                >
+                  {syncJob?.status === 'Running'
+                    ? 'Đang đồng bộ...'
+                    : allSelected
+                      ? 'Đồng bộ toàn bộ'
+                      : `Đồng bộ ${selectedEntities.length} mục đã chọn`}
+                </LoadingButton>
+
+                {syncJob?.status === 'Running' && (
+                  <LoadingButton
+                    variant="outlined"
+                    color="error"
+                    size="large"
+                    loading={cancelLoading}
+                    startIcon={<Iconify icon="mdi:stop-circle-outline" />}
+                    onClick={handleCancel}
+                  >
+                    Hủy đồng bộ
+                  </LoadingButton>
+                )}
+              </Stack>
 
               {renderJobStatus(syncJob, 'Đồng bộ KiotViet')}
             </Card>

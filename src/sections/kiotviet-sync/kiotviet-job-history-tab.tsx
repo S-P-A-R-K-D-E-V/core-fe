@@ -34,6 +34,7 @@ const STATUS_COLOR: Record<string, 'default' | 'info' | 'warning' | 'success' | 
   Running: 'info',
   Completed: 'success',
   Failed: 'error',
+  Cancelled: 'warning',
 };
 
 function formatDuration(start: string | null, end: string | null): string | null {

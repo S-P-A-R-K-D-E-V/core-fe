@@ -318,6 +318,7 @@ export const endpoints = {
     syncPurchaseOrders: '/kiotviet/sync/purchase-orders',
     syncSelected: '/kiotviet/sync/selected',
     syncJobStatus: (jobId: string) => `/kiotviet/sync/jobs/${jobId}`,
+    syncJobCancel: (jobId: string) => `/kiotviet/sync/jobs/${jobId}/cancel`,
     syncRunning: '/kiotviet/sync/running',
     transform: '/kiotviet/transform',
     syncAndTransform: '/kiotviet/sync-and-transform',
