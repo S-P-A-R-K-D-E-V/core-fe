@@ -34,6 +34,7 @@ import { TableHeadCustom, TableNoData } from 'src/components/table';
 import { AppDatePicker } from 'src/components/date-time-picker';
 
 import { IShareholder, IRevenueChannel, IKiotVietBankAccount } from 'src/types/corecms-api';
+import { fDate } from 'src/utils/format-time';
 import { fPaymentMethod } from 'src/utils/payment-method-label';
 import { getBankAccounts } from 'src/api/bank-accounts';
 import {
@@ -50,6 +51,7 @@ const TABLE_HEAD = [
   { id: 'method', label: 'Phương thức' },
   { id: 'bank', label: 'Tài khoản ngân hàng' },
   { id: 'shareholder', label: 'Cổ đông nhận' },
+  { id: 'effectiveFrom', label: 'Hiệu lực từ', width: 120 },
   { id: 'status', label: 'Trạng thái', width: 120 },
   { id: '', width: 88 },
 ];
@@ -127,6 +129,19 @@ export default function RevenueChannelTab({ shareholders }: Props) {
 
   const watchedMethod = watch('paymentMethod');
 
+  // Nhóm các kênh cùng phương thức + tài khoản lại với nhau, sắp theo ngày hiệu lực tăng dần —
+  // dễ thấy kênh nào đang thắng (mới nhất) khi có nhiều kênh nối tiếp nhau theo thời gian.
+  const sortedChannels = useMemo(
+    () =>
+      [...channels].sort((a, b) => {
+        if (a.paymentMethod !== b.paymentMethod) return a.paymentMethod.localeCompare(b.paymentMethod);
+        if ((a.bankAccountId || '') !== (b.bankAccountId || ''))
+          return (a.bankAccountId || '').localeCompare(b.bankAccountId || '');
+        return a.effectiveFrom.localeCompare(b.effectiveFrom);
+      }),
+    [channels]
+  );
+
   useEffect(() => {
     reset(defaultValues);
   }, [defaultValues, reset]);
@@ -160,7 +175,7 @@ export default function RevenueChannelTab({ shareholders }: Props) {
       fetchData();
     } catch (error) {
       console.error(error);
-      enqueueSnackbar('Có lỗi xảy ra — kênh có thể đã được gán', { variant: 'error' });
+      enqueueSnackbar(error?.title || error?.message || 'Có lỗi xảy ra', { variant: 'error' });
     }
   });
 
@@ -182,7 +197,10 @@ export default function RevenueChannelTab({ shareholders }: Props) {
     <>
       <Alert severity="info" sx={{ mb: 2 }}>
         Doanh thu về kênh nào được tính là &quot;đã về túi&quot; cổ đông được gán kênh đó. Ví dụ:
-        Chuyển khoản + TK ACB → Chị Uyên; Tiền mặt → Mai. Kênh chưa gán sẽ chặn chốt sổ.
+        Chuyển khoản + TK ACB → Chị Uyên; Tiền mặt → Mai. Kênh chưa gán sẽ chặn chốt sổ. Mỗi
+        phương thức có thể tạo nhiều kênh nối tiếp nhau (đổi người nhận theo thời gian), miễn là
+        ngày hiệu lực không trùng nhau — hệ thống tự áp dụng kênh có hiệu lực gần nhất theo ngày
+        giao dịch.
       </Alert>
 
       <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
@@ -199,13 +217,14 @@ export default function RevenueChannelTab({ shareholders }: Props) {
         <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
           <Scrollbar>
             <Table sx={{ minWidth: 700 }}>
-              <TableHeadCustom headLabel={TABLE_HEAD} rowCount={channels.length} />
+              <TableHeadCustom headLabel={TABLE_HEAD} rowCount={sortedChannels.length} />
               <TableBody>
-                {channels.map((row) => (
+                {sortedChannels.map((row) => (
                   <TableRow key={row.id} hover>
                     <TableCell>{fPaymentMethod(row.paymentMethod)}</TableCell>
                     <TableCell>{row.bankAccountName || 'Tất cả'}</TableCell>
                     <TableCell>{row.shareholderName}</TableCell>
+                    <TableCell>{fDate(row.effectiveFrom)}</TableCell>
                     <TableCell>
                       <Label variant="soft" color={row.isActive ? 'success' : 'error'}>
                         {row.isActive ? 'Hoạt động' : 'Ngưng'}
