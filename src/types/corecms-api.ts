@@ -3029,8 +3029,9 @@ export interface ISettlementPreview {
   sheetStyle?: ISheetStyleComparison | null;
 }
 
-// Đối chiếu theo cách tính CŨ (gộp tiền hàng vào chi phí trước khi chia lời) — chỉ để xem so
-// sánh với sheet Google gốc, không dùng để chốt sổ.
+// Đối chiếu theo cách tính KHÔNG gộp tiền hàng vào chi phí trước khi chia lời (tiền hàng chỉ
+// hoàn qua khoản chi hộ) — chỉ để xem so sánh, không dùng để chốt sổ. Công thức CHÍNH THỨC (dùng
+// khi chốt sổ) đã gộp tiền hàng, khớp sổ Google Sheet gốc.
 export interface ISheetStyleComparison {
   profit: number;
   distributedProfit: number;

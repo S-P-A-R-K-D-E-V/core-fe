@@ -438,7 +438,7 @@ export default function SettlementPreviewView() {
                     onClick={sheetStyleOpen.onToggle}
                     sx={{ cursor: 'pointer' }}
                   >
-                    <Typography variant="h6">Đối chiếu cách tính cũ (gộp tiền hàng vào chi phí)</Typography>
+                    <Typography variant="h6">Đối chiếu: không gộp tiền hàng vào chi phí</Typography>
                     <Iconify
                       icon={sheetStyleOpen.value ? 'eva:chevron-up-fill' : 'eva:chevron-down-fill'}
                       width={22}
@@ -447,14 +447,16 @@ export default function SettlementPreviewView() {
                   <Collapse in={sheetStyleOpen.value}>
                     <Stack spacing={2} sx={{ mt: 2 }}>
                       <Alert severity="info">
-                        Chỉ để xem so sánh với sổ Google Sheet gốc — sổ này gộp tiền hàng nhập vào
-                        chi phí trước khi chia lời, khác với công thức chính thức (tách riêng, xem
-                        khối &quot;Chi phí hàng hóa&quot;). Không dùng số này để chốt sổ.
+                        Chỉ để xem so sánh — cách tính này KHÔNG trừ tiền hàng nhập khỏi lợi nhuận
+                        trước khi chia (tiền hàng chỉ được hoàn lại qua khoản chi hộ), khác với
+                        công thức chính thức (đã gộp tiền hàng vào chi phí trước khi chia lời,
+                        khớp sổ Google Sheet gốc — xem khối &quot;Chi phí hàng hóa&quot; để đối
+                        chiếu riêng). Không dùng số này để chốt sổ.
                       </Alert>
 
                       <Stack direction="row" spacing={4}>
                         <Typography variant="body2">
-                          Lợi nhuận (gộp tiền hàng):{' '}
+                          Lợi nhuận (không gộp tiền hàng):{' '}
                           <Typography
                             component="span"
                             variant="subtitle2"
@@ -500,7 +502,7 @@ export default function SettlementPreviewView() {
                       </TableContainer>
 
                       <Stack spacing={1}>
-                        <Typography variant="subtitle2">Ai trả ai (theo cách tính cũ)</Typography>
+                        <Typography variant="subtitle2">Ai trả ai (theo cách không gộp tiền hàng)</Typography>
                         {data.sheetStyle.transfers.length === 0 ? (
                           <Typography variant="body2" color="text.secondary">
                             Không cần chuyển tiền theo cách tính này.
