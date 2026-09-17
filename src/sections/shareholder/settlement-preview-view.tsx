@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid2';
@@ -145,9 +145,12 @@ export default function SettlementPreviewView() {
     }
   }, [fromDate, toDate, reserveAmount, enqueueSnackbar]);
 
-  useEffect(() => {
+  // Không tự fetch khi đổi ngày/quỹ giữ lại hay khi có việc khác xảy ra (vd vừa chốt sổ ở tab
+  // khác) — bắt buộc bấm "Tra cứu" mới load, để tránh hiển thị dữ liệu cũ/đã stale mà tưởng là
+  // mới. data=null nghĩa là CHƯA tra cứu lần nào, không phải "0đ".
+  const handleSearch = () => {
     fetchPreview();
-  }, [fetchPreview]);
+  };
 
   const handleOpenClose = () => {
     setPeriodName(`Kỳ ${fromDate} - ${toDate}`);
@@ -217,9 +220,25 @@ export default function SettlementPreviewView() {
                 sx={{ minWidth: 180 }}
                 helperText="Không chia, giữ lại tại cửa hàng"
               />
+              <LoadingButton
+                variant="contained"
+                loading={loading}
+                onClick={handleSearch}
+                startIcon={<Iconify icon="eva:search-fill" />}
+                sx={{ height: 'fit-content' }}
+              >
+                Tra cứu
+              </LoadingButton>
             </Stack>
           </CardContent>
         </Card>
+
+        {!data && !loading && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            Chọn khoảng ngày rồi bấm &quot;Tra cứu&quot; để xem đối chiếu — trang này không tự tải
+            lại, tránh nhầm dữ liệu cũ với dữ liệu mới.
+          </Alert>
+        )}
 
         {data && (
           <>
