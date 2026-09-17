@@ -268,18 +268,35 @@ export default function SettlementPreviewView() {
             )}
 
             {data.isOverlapping && (
-              <Alert severity="warning" sx={{ mb: 3 }}>
-                Khoảng thời gian này chồng lấn với một kỳ đã chốt sổ khác.
+              <Alert
+                severity="warning"
+                sx={{ mb: 3 }}
+                action={
+                  <Button
+                    component="a"
+                    href={paths.dashboard.pos.shareholder.settlements}
+                    color="inherit"
+                    size="small"
+                  >
+                    Xem kỳ đã chốt
+                  </Button>
+                }
+              >
+                Khoảng thời gian này chồng lấn với một kỳ đã chốt sổ khác — các số bên dưới{' '}
+                <strong>không đáng tin</strong> (chi phí/doanh thu vẫn bị tính lại dù giao dịch đã
+                khóa vào kỳ cũ). Xem số thật của kỳ đã chốt ở trang danh sách, không dùng số ở đây.
               </Alert>
             )}
 
-            {Math.abs(data.balanceCheck) > 1 && (
+            {!data.isOverlapping && Math.abs(data.balanceCheck) > 1 && (
               <Alert severity="warning" sx={{ mb: 3 }}>
                 Chênh lệch kiểm tra: {fCurrency(data.balanceCheck)} — có thể có chi phí/doanh thu chưa được
                 cổ đông nào &quot;nhận trách nhiệm&quot; bằng giao dịch vốn. Vẫn có thể chốt sổ.
               </Alert>
             )}
 
+            {!data.isOverlapping && (
+            <>
             <Grid container spacing={3} sx={{ mb: 3 }}>
               <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
                 <Card>
@@ -562,6 +579,8 @@ export default function SettlementPreviewView() {
                 Xác nhận chốt sổ
               </Button>
             </Stack>
+            </>
+            )}
           </>
         )}
       </Container>
