@@ -3071,6 +3071,80 @@ export interface ISettlementDetail {
   transfers: ISettlementTransfer[];
 }
 
+// Chi tiết nguồn gốc số liệu kỳ chốt sổ (popup khi bấm vào từng con số)
+export interface ISettlementCapitalFlow {
+  id: string;
+  date: string;
+  source: 'Capital' | 'CashCounter';
+  type: CapitalTransactionType | null;
+  shareholderName: string;
+  counterpartyName: string | null;
+  amount: number;
+  isGoodsPurchase: boolean;
+  note: string | null;
+}
+
+export interface ISettlementBreakdown {
+  fromDate: string;
+  toDate: string;
+  revenue: {
+    grossRevenue: number;
+    totalReturns: number;
+    netRevenue: number;
+    days: { date: string; orderCount: number; gross: number; returns: number; net: number }[];
+    byMethod: { method: string; amount: number }[];
+    orders: {
+      id: string;
+      code: string;
+      createdDate: string;
+      customerName: string | null;
+      method: string | null;
+      total: number;
+    }[];
+    returns: {
+      id: string;
+      code: string;
+      returnDate: string;
+      customerName: string | null;
+      returnTotal: number;
+    }[];
+  };
+  expense: {
+    total: number;
+    byCategory: { categoryName: string; count: number; amount: number }[];
+    items: {
+      id: string;
+      expenseDate: string;
+      categoryName: string;
+      amount: number;
+      note: string | null;
+      paidByShareholderName: string | null;
+    }[];
+  };
+  goods: {
+    paidTotal: number;
+    invoiceTotal: number;
+    paidItems: ISettlementCapitalFlow[];
+    invoices: {
+      id: string;
+      code: string;
+      date: string;
+      supplierName: string | null;
+      totalAmount: number;
+      paidByShareholderName: string | null;
+    }[];
+  };
+  shareholders: {
+    shareholderId: string;
+    shareholderName: string;
+    paidIn: ISettlementCapitalFlow[];
+    collectedByChannel: Record<string, number>;
+    collectedOut: ISettlementCapitalFlow[];
+    peerPaid: ISettlementCapitalFlow[];
+    peerReceived: ISettlementCapitalFlow[];
+  }[];
+}
+
 // --- Cleaning Schedule ---
 export type CleaningShiftBlock = 'Morning' | 'Afternoon' | 'Evening';
 export type CleaningTaskStatus = 'Pending' | 'Done' | 'Passed' | 'Failed';

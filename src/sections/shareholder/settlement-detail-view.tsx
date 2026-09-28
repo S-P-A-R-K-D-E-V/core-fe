@@ -6,7 +6,7 @@ import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Grid from '@mui/material/Grid2';
 import Table from '@mui/material/Table';
-import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
 import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -27,8 +27,10 @@ import { TableHeadCustom, TableNoData } from 'src/components/table';
 import { fCurrency, fPercent } from 'src/utils/format-number';
 import { fDate } from 'src/utils/format-time';
 
-import { ISettlementDetail } from 'src/types/corecms-api';
-import { getSettlementById, markTransferPaid } from 'src/api/shareholders';
+import { ISettlementDetail, ISettlementBreakdown } from 'src/types/corecms-api';
+import { getSettlementById, markTransferPaid, getSettlementBreakdown } from 'src/api/shareholders';
+
+import SettlementBreakdownDialog, { BreakdownTarget } from './settlement-breakdown-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -44,6 +46,35 @@ const LINE_HEAD = [
   { id: 'cumulative', label: 'Lũy kế', align: 'right' as const, width: 130 },
 ];
 
+// Con số bấm được để mở popup chi tiết nguồn gốc (gạch chân chấm như ô "Đã lấy ra" ở preview)
+function Clickable({
+  onClick,
+  children,
+  align = 'left',
+}: {
+  onClick: VoidFunction;
+  children: React.ReactNode;
+  align?: 'left' | 'right';
+}) {
+  return (
+    <ButtonBase
+      onClick={onClick}
+      sx={{
+        font: 'inherit',
+        color: 'inherit',
+        textAlign: align,
+        justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+        borderRadius: 0.5,
+        textDecoration: 'underline dotted',
+        textUnderlineOffset: 4,
+        '&:hover': { color: 'primary.main', textDecorationStyle: 'solid' },
+      }}
+    >
+      {children}
+    </ButtonBase>
+  );
+}
+
 type Props = {
   id: string;
 };
@@ -52,6 +83,27 @@ export default function SettlementDetailView({ id }: Props) {
   const { enqueueSnackbar } = useSnackbar();
   const [data, setData] = useState<ISettlementDetail | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [target, setTarget] = useState<BreakdownTarget | null>(null);
+  const [breakdown, setBreakdown] = useState<ISettlementBreakdown | null>(null);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+
+  // Chi tiết chỉ tải lần đầu mở popup (cần doanh thu/chi/giao dịch) rồi giữ lại cho các popup sau
+  const openBreakdown = useCallback(
+    async (next: BreakdownTarget) => {
+      setTarget(next);
+      if (next.kind === 'profit' || breakdown || breakdownLoading) return;
+      setBreakdownLoading(true);
+      try {
+        setBreakdown(await getSettlementBreakdown(id));
+      } catch (error) {
+        console.error(error);
+        enqueueSnackbar('Không thể tải chi tiết', { variant: 'error' });
+      } finally {
+        setBreakdownLoading(false);
+      }
+    },
+    [id, breakdown, breakdownLoading, enqueueSnackbar]
+  );
 
   const fetchData = useCallback(async () => {
     try {
@@ -117,7 +169,11 @@ export default function SettlementDetailView({ id }: Props) {
             <Grid container spacing={3}>
               <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
                 <Typography variant="subtitle2" color="text.secondary">Doanh thu thuần</Typography>
-                <Typography variant="h6">{fCurrency(data.totalRevenue)}</Typography>
+                <Typography variant="h6">
+                  <Clickable onClick={() => openBreakdown({ kind: 'revenue' })}>
+                    {fCurrency(data.totalRevenue)}
+                  </Clickable>
+                </Typography>
                 {data.totalReturns > 0 && (
                   <Typography variant="caption" color="text.secondary">
                     Đã trừ trả hàng {fCurrency(data.totalReturns)}
@@ -126,12 +182,18 @@ export default function SettlementDetailView({ id }: Props) {
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
                 <Typography variant="subtitle2" color="text.secondary">Tổng chi</Typography>
-                <Typography variant="h6">{fCurrency(data.totalExpense)}</Typography>
+                <Typography variant="h6">
+                  <Clickable onClick={() => openBreakdown({ kind: 'expense' })}>
+                    {fCurrency(data.totalExpense)}
+                  </Clickable>
+                </Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
                 <Typography variant="subtitle2" color="text.secondary">Lợi nhuận</Typography>
                 <Typography variant="h6" color={data.profit >= 0 ? 'success.main' : 'error.main'}>
-                  {fCurrency(data.profit)}
+                  <Clickable onClick={() => openBreakdown({ kind: 'profit' })}>
+                    {fCurrency(data.profit)}
+                  </Clickable>
                 </Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
@@ -164,11 +226,19 @@ export default function SettlementDetailView({ id }: Props) {
                 ))}
               <Stack direction="row" justifyContent="space-between">
                 <Typography variant="body2" color="text.secondary">Tổng tiền hàng thực trả</Typography>
-                <Typography variant="subtitle2">{fCurrency(data.goodsPaidTotal)}</Typography>
+                <Typography variant="subtitle2">
+                  <Clickable align="right" onClick={() => openBreakdown({ kind: 'goodsPaid' })}>
+                    {fCurrency(data.goodsPaidTotal)}
+                  </Clickable>
+                </Typography>
               </Stack>
               <Stack direction="row" justifyContent="space-between">
                 <Typography variant="body2" color="text.secondary">Tổng tiền hàng trên hóa đơn (KiotViet)</Typography>
-                <Typography variant="subtitle2">{fCurrency(data.goodsInvoiceTotal)}</Typography>
+                <Typography variant="subtitle2">
+                  <Clickable align="right" onClick={() => openBreakdown({ kind: 'goodsInvoice' })}>
+                    {fCurrency(data.goodsInvoiceTotal)}
+                  </Clickable>
+                </Typography>
               </Stack>
               <Stack direction="row" justifyContent="space-between">
                 <Typography variant="body2" color="text.secondary">Giảm giá hóa đơn</Typography>
@@ -193,13 +263,37 @@ export default function SettlementDetailView({ id }: Props) {
                         <TableCell>{line.shareholderName}</TableCell>
                         <TableCell align="right">{fPercent(line.equityPercentSnapshot)}</TableCell>
                         <TableCell align="right">{fCurrency(line.profitShare)}</TableCell>
-                        <TableCell align="right">{fCurrency(line.paidIn)}</TableCell>
-                        <TableCell align="right">{fCurrency(line.collectedOut)}</TableCell>
                         <TableCell align="right">
-                          {line.peerPaid > 0 && `+${fCurrency(line.peerPaid)}`}
-                          {line.peerPaid > 0 && line.peerReceived > 0 && ' / '}
-                          {line.peerReceived > 0 && `−${fCurrency(line.peerReceived)}`}
-                          {line.peerPaid === 0 && line.peerReceived === 0 && '—'}
+                          <Clickable
+                            align="right"
+                            onClick={() => openBreakdown({ kind: 'paidIn', shareholderId: line.shareholderId })}
+                          >
+                            {fCurrency(line.paidIn)}
+                          </Clickable>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Clickable
+                            align="right"
+                            onClick={() =>
+                              openBreakdown({ kind: 'collectedOut', shareholderId: line.shareholderId })
+                            }
+                          >
+                            {fCurrency(line.collectedOut)}
+                          </Clickable>
+                        </TableCell>
+                        <TableCell align="right">
+                          {line.peerPaid === 0 && line.peerReceived === 0 ? (
+                            '—'
+                          ) : (
+                            <Clickable
+                              align="right"
+                              onClick={() => openBreakdown({ kind: 'peer', shareholderId: line.shareholderId })}
+                            >
+                              {line.peerPaid > 0 && `+${fCurrency(line.peerPaid)}`}
+                              {line.peerPaid > 0 && line.peerReceived > 0 && ' / '}
+                              {line.peerReceived > 0 && `−${fCurrency(line.peerReceived)}`}
+                            </Clickable>
+                          )}
                         </TableCell>
                         <TableCell align="right">{fCurrency(line.priorBalance)}</TableCell>
                         <TableCell align="right">
@@ -275,6 +369,14 @@ export default function SettlementDetailView({ id }: Props) {
             )}
           </CardContent>
         </Card>
+
+        <SettlementBreakdownDialog
+          target={target}
+          onClose={() => setTarget(null)}
+          settlement={data}
+          breakdown={breakdown}
+          loading={breakdownLoading}
+        />
       </Container>
     </RoleBasedGuard>
   );

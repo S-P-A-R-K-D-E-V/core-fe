@@ -10,6 +10,7 @@ import {
   ISettlementPreview,
   ISettlementListItem,
   ISettlementDetail,
+  ISettlementBreakdown,
 } from 'src/types/corecms-api';
 
 // ========== Shareholder ==========
@@ -183,6 +184,22 @@ export async function getSettlements(): Promise<ISettlementListItem[]> {
 
 export async function getSettlementById(id: string): Promise<ISettlementDetail> {
   const response = await axios.get<ISettlementDetail>(endpoints.shareholders.settlementDetails(id));
+  return response.data;
+}
+
+export async function getSettlementBreakdown(id: string): Promise<ISettlementBreakdown> {
+  const response = await axios.get<ISettlementBreakdown>(endpoints.shareholders.settlementBreakdown(id));
+  return response.data;
+}
+
+export async function getSettlementPreviewBreakdown(params: {
+  fromDate: string;
+  toDate: string;
+}): Promise<ISettlementBreakdown> {
+  const response = await axios.get<ISettlementBreakdown>(
+    endpoints.shareholders.settlementPreviewBreakdown,
+    { params }
+  );
   return response.data;
 }
 

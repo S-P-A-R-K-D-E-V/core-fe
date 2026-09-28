@@ -453,6 +453,8 @@ export const endpoints = {
     settlementPreview: '/shareholders/settlements/preview',
     settlements: '/shareholders/settlements',
     settlementDetails: (id: string) => `/shareholders/settlements/${id}`,
+    settlementBreakdown: (id: string) => `/shareholders/settlements/${id}/breakdown`,
+    settlementPreviewBreakdown: '/shareholders/settlements/breakdown',
     markTransferPaid: (transferId: string) =>
       `/shareholders/settlements/transfers/${transferId}/mark-paid`,
   },
