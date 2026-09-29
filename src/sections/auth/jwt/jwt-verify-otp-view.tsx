@@ -18,6 +18,7 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { PATH_AFTER_LOGIN } from 'src/config-global';
+import { buildMobileRedirectUrl } from 'src/auth/utils/mobile-redirect';
 
 import Iconify from 'src/components/iconify';
 import FormProvider, { RHFTextField } from 'src/components/hook-form';
@@ -82,8 +83,9 @@ export default function JwtVerifyOtpView() {
       await verifyOtp?.(email, data.otpCode);
       if (isMobile && mobileRedirectUri) {
         const sessionToken = localStorage.getItem('sessionToken');
-        if (sessionToken) {
-          window.location.href = `${mobileRedirectUri}?sessionToken=${encodeURIComponent(sessionToken)}`;
+        const target = sessionToken ? buildMobileRedirectUrl(mobileRedirectUri, sessionToken) : null;
+        if (target) {
+          window.location.href = target;
           return;
         }
       }

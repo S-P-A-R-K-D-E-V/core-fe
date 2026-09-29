@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 import { SplashScreen } from 'src/components/loading-screen';
 
 import { useAuthContext } from '../hooks';
+import { buildMobileRedirectUrl } from '../utils/mobile-redirect';
 
 // ----------------------------------------------------------------------
 
@@ -42,8 +43,9 @@ function Container({ children }: Props) {
     if (isMobile && mobileRedirectUri) {
       const sessionToken =
         typeof window !== 'undefined' ? localStorage.getItem('sessionToken') : null;
-      if (sessionToken) {
-        window.location.href = `${mobileRedirectUri}?sessionToken=${encodeURIComponent(sessionToken)}`;
+      const target = sessionToken ? buildMobileRedirectUrl(mobileRedirectUri, sessionToken) : null;
+      if (target) {
+        window.location.href = target;
         return;
       }
     }

@@ -23,6 +23,7 @@ import { useBoolean } from 'src/hooks/use-boolean';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { PATH_AFTER_LOGIN } from 'src/config-global';
+import { buildMobileRedirectUrl } from 'src/auth/utils/mobile-redirect';
 
 import Iconify from 'src/components/iconify';
 import FormProvider, { RHFTextField } from 'src/components/hook-form';
@@ -46,7 +47,9 @@ export default function JwtLoginView() {
     if (!isMobile || !mobileRedirectUri) return false;
     const sessionToken = localStorage.getItem('sessionToken');
     if (!sessionToken) return false;
-    window.location.href = `${mobileRedirectUri}?sessionToken=${encodeURIComponent(sessionToken)}`;
+    const target = buildMobileRedirectUrl(mobileRedirectUri, sessionToken);
+    if (!target) return false;
+    window.location.href = target;
     return true;
   }
 
