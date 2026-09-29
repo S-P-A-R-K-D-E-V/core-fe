@@ -21,7 +21,7 @@ import KiotVietConnectionTab from './kiotviet-connection-tab';
 const TABS = [
   { value: 'branding', label: 'Thông tin cửa hàng', icon: 'solar:shop-bold' },
   { value: 'kiotviet', label: 'Kết nối KiotViet', icon: 'solar:link-round-bold' },
-  { value: 'agent-keys', label: 'Khoá API cho trợ lý AI', icon: 'solar:key-bold' },
+  { value: 'agent-keys', label: 'Kết nối MCP & khoá API', icon: 'solar:key-bold' },
 ] as const;
 
 type TabValue = (typeof TABS)[number]['value'];

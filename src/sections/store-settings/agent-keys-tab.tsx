@@ -43,7 +43,9 @@ import {
   getAgentPermissionCatalog,
 } from 'src/api/store-settings';
 
-import { buildAgentPrompt } from './agent-prompt';
+import { McpSessionsCard } from './mcp-sessions-card';
+import { CodeBlock, McpConnectCard } from './mcp-connect-card';
+import { mcpUrl, copyText, mcpPrompt, mcpSnippet, mcpServerName } from './mcp-connect';
 
 // ----------------------------------------------------------------------
 
@@ -56,20 +58,13 @@ function domainOf(permission: string, domains: string[]): string {
   );
 }
 
-/**
- * Nơi agent gọi /api/internal/*. Cửa hàng SaaS: chính tên miền cửa hàng. CiCi: ingress chỉ mở
- * /api/internal trên api.cici21chualang.vn (core-gitops k8s/ingress.yaml), tên miền chính đi thẳng core-fe.
- */
-function agentApiOrigin(isCiCi: boolean): string {
-  const { protocol, hostname, origin } = window.location;
-  return isCiCi && !hostname.startsWith('api.') && hostname.includes('.')
-    ? `${protocol}//api.${hostname}`
-    : origin;
-}
-
 export default function AgentKeysTab() {
   const { enqueueSnackbar } = useSnackbar();
-  const { brandName, isCiCi } = useStoreBrand();
+  const { brandName, isCiCi, tenantCode } = useStoreBrand();
+  const serverName = mcpServerName(isCiCi, tenantCode);
+  // MCP nằm ngay trên tên miền cửa hàng đang mở (<tên miền>/api/mcp). Lấy sau khi mount để không lệch SSR.
+  const [origin, setOrigin] = useState('');
+  useEffect(() => setOrigin(window.location.origin), []);
   const [keys, setKeys] = useState<IAgentKey[]>([]);
   const [catalog, setCatalog] = useState<{ domains: string[]; permissions: string[] }>({
     domains: [],
@@ -138,42 +133,29 @@ export default function AgentKeysTab() {
     }
   };
 
-  const agentPrompt = useMemo(
-    () =>
-      created
-        ? buildAgentPrompt({
-            storeName: brandName,
-            origin: agentApiOrigin(isCiCi),
-            apiKey: created.key,
-            expiresAt: created.details.expiresAt,
-            endpoints: created.endpoints ?? [],
-          })
-        : '',
-    [created, brandName, isCiCi]
-  );
+  const url = mcpUrl(origin);
 
   const copy = async (text: string, done: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      enqueueSnackbar(done);
-    } catch {
+    if (await copyText(text)) enqueueSnackbar(done);
+    else
       enqueueSnackbar('Không sao chép được — hãy bôi đen và sao chép thủ công', {
         variant: 'warning',
       });
-    }
   };
 
   return (
     <Stack spacing={3}>
-      <Alert severity="info">
-        Khoá API cho trợ lý AI / MCP (vd Claude, ChatGPT) truy cập dữ liệu{' '}
-        <b>của riêng cửa hàng này</b>, chỉ trong phạm vi quyền đã chọn. Mỗi khoá gắn với cửa hàng —
-        không dùng được ở cửa hàng khác.
-      </Alert>
+      {origin && <McpConnectCard origin={origin} storeName={brandName} serverName={serverName} />}
 
       <Card>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ p: 2.5 }}>
-          <Typography variant="h6">Khoá API</Typography>
+          <Stack spacing={0.5}>
+            <Typography variant="h6">Khoá API</Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Mỗi khoá gắn với cửa hàng này và chỉ dùng được trong phạm vi quyền đã chọn. Nên dùng
+              khoá Chỉ đọc cho agent hỏi đáp.
+            </Typography>
+          </Stack>
           <Button
             variant="contained"
             startIcon={<Iconify icon="mingcute:add-line" />}
@@ -237,6 +219,8 @@ export default function AgentKeysTab() {
           </Scrollbar>
         </TableContainer>
       </Card>
+
+      <McpSessionsCard />
 
       {/* Tạo khoá */}
       <Dialog open={openCreate} onClose={() => setOpenCreate(false)} fullWidth maxWidth="sm">
@@ -329,37 +313,32 @@ export default function AgentKeysTab() {
               </Button>
             </Stack>
 
-            <Stack spacing={1}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Typography variant="subtitle2">Hướng dẫn cho trợ lý AI</Typography>
-                <Button
-                  size="small"
-                  variant="soft"
-                  color="primary"
-                  startIcon={<Iconify icon="solar:copy-bold" />}
-                  onClick={() =>
-                    copy(
-                      agentPrompt,
-                      'Đã sao chép hướng dẫn — dán vào đoạn chat hoặc system prompt của agent'
-                    )
-                  }
-                >
-                  Sao chép hướng dẫn
-                </Button>
+            {created && origin && (
+              <Stack spacing={1}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                  <Typography variant="subtitle2">Kết nối agent bằng khoá này</Typography>
+                  <Button
+                    size="small"
+                    variant="soft"
+                    color="primary"
+                    startIcon={<Iconify icon="solar:copy-bold" />}
+                    onClick={() =>
+                      copy(
+                        mcpPrompt(brandName, serverName, url, created.key),
+                        'Đã sao chép prompt kèm khoá — dán vào Claude Code, Cursor…'
+                      )
+                    }
+                  >
+                    Sao chép prompt kèm khoá
+                  </Button>
+                </Stack>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  Dán prompt vào Claude Code, Cursor… để agent tự thêm MCP server {serverName}, hoặc
+                  chạy lệnh dưới đây trong terminal (Claude Code).
+                </Typography>
+                <CodeBlock text={mcpSnippet('claude-code', serverName, url, created.key)} />
               </Stack>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                Dán nguyên đoạn này vào Claude, ChatGPT hoặc agent của bạn: gồm địa chỉ, khoá, quy
-                tắc an toàn và {created?.endpoints?.length ?? 0} endpoint mà khoá được phép gọi.
-              </Typography>
-              <TextField
-                value={agentPrompt}
-                fullWidth
-                multiline
-                minRows={8}
-                maxRows={14}
-                InputProps={{ readOnly: true, sx: { fontFamily: 'monospace', fontSize: 12 } }}
-              />
-            </Stack>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>

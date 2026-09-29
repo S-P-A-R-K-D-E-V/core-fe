@@ -70,25 +70,53 @@ export async function listAgentKeys(): Promise<IAgentKey[]> {
   return res.data;
 }
 
-export async function getAgentPermissionCatalog(): Promise<{ domains: string[]; permissions: string[] }> {
+export async function getAgentPermissionCatalog(): Promise<{
+  domains: string[];
+  permissions: string[];
+}> {
   const res = await axios.get('/agent-keys/permissions');
   return res.data;
-}
-
-/** Endpoint Internal Agent API mà khoá gọi được (core-be dựng từ route + quyền của controller). */
-export interface IAgentEndpoint {
-  method: string;
-  path: string;
-  permission: string;
-  query: string[];
-  body: string[];
-  requiresConfirmation: boolean;
 }
 
 export interface ICreatedAgentKey {
   key: string;
   details: IAgentKey;
-  endpoints: IAgentEndpoint[];
+}
+
+/** Một phiên MCP (agent kết nối tới <tên miền cửa hàng>/api/mcp). */
+export interface IMcpSession {
+  id: string;
+  keyName: string;
+  keyPrefix: string;
+  clientName: string | null;
+  clientVersion: string | null;
+  ipAddress: string | null;
+  createdAt: string;
+  lastActivityAt: string;
+  closedAt: string | null;
+  callCount: number;
+  errorCount: number;
+}
+
+export interface IMcpCall {
+  id: string;
+  tool: string;
+  arguments: string | null;
+  status: 'ok' | 'error' | 'denied' | 'needs_confirm' | string;
+  httpStatus: number | null;
+  error: string | null;
+  durationMs: number;
+  createdAt: string;
+}
+
+export async function listMcpSessions(): Promise<IMcpSession[]> {
+  const res = await axios.get<IMcpSession[]>('/agent-keys/mcp-sessions');
+  return res.data;
+}
+
+export async function listMcpCalls(sessionId: string): Promise<IMcpCall[]> {
+  const res = await axios.get<IMcpCall[]>(`/agent-keys/mcp-sessions/${sessionId}/calls`);
+  return res.data;
 }
 
 export async function createAgentKey(data: {
