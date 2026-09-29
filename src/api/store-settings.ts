@@ -75,11 +75,27 @@ export async function getAgentPermissionCatalog(): Promise<{ domains: string[]; 
   return res.data;
 }
 
+/** Endpoint Internal Agent API mà khoá gọi được (core-be dựng từ route + quyền của controller). */
+export interface IAgentEndpoint {
+  method: string;
+  path: string;
+  permission: string;
+  query: string[];
+  body: string[];
+  requiresConfirmation: boolean;
+}
+
+export interface ICreatedAgentKey {
+  key: string;
+  details: IAgentKey;
+  endpoints: IAgentEndpoint[];
+}
+
 export async function createAgentKey(data: {
   name: string;
   permissions: string[];
   expiresInDays: number;
-}): Promise<{ key: string; details: IAgentKey }> {
+}): Promise<ICreatedAgentKey> {
   const res = await axios.post('/agent-keys', data);
   return res.data;
 }

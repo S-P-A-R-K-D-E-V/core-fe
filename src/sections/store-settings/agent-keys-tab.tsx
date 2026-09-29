@@ -31,49 +31,78 @@ import { apiErrorMessage } from 'src/utils/api-error';
 import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
+import { useStoreBrand } from 'src/components/branding';
 import { useSnackbar } from 'src/components/snackbar';
 
 import {
   type IAgentKey,
+  type ICreatedAgentKey,
   listAgentKeys,
   createAgentKey,
   revokeAgentKey,
   getAgentPermissionCatalog,
 } from 'src/api/store-settings';
 
+import { buildAgentPrompt } from './agent-prompt';
+
 // ----------------------------------------------------------------------
 
 const EXPIRY_OPTIONS = [30, 90, 180, 365];
 
 function domainOf(permission: string, domains: string[]): string {
-  return domains.filter((d) => permission.startsWith(`${d}.`)).sort((a, b) => b.length - a.length)[0] ?? 'khác';
+  return (
+    domains.filter((d) => permission.startsWith(`${d}.`)).sort((a, b) => b.length - a.length)[0] ??
+    'khác'
+  );
+}
+
+/**
+ * Nơi agent gọi /api/internal/*. Cửa hàng SaaS: chính tên miền cửa hàng. CiCi: ingress chỉ mở
+ * /api/internal trên api.cici21chualang.vn (core-gitops k8s/ingress.yaml), tên miền chính đi thẳng core-fe.
+ */
+function agentApiOrigin(isCiCi: boolean): string {
+  const { protocol, hostname, origin } = window.location;
+  return isCiCi && !hostname.startsWith('api.') && hostname.includes('.')
+    ? `${protocol}//api.${hostname}`
+    : origin;
 }
 
 export default function AgentKeysTab() {
   const { enqueueSnackbar } = useSnackbar();
+  const { brandName, isCiCi } = useStoreBrand();
   const [keys, setKeys] = useState<IAgentKey[]>([]);
-  const [catalog, setCatalog] = useState<{ domains: string[]; permissions: string[] }>({ domains: [], permissions: [] });
+  const [catalog, setCatalog] = useState<{ domains: string[]; permissions: string[] }>({
+    domains: [],
+    permissions: [],
+  });
 
   const [openCreate, setOpenCreate] = useState(false);
   const [name, setName] = useState('');
   const [permissions, setPermissions] = useState<string[]>([]);
   const [expiresInDays, setExpiresInDays] = useState(90);
   const [creating, setCreating] = useState(false);
-  const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [created, setCreated] = useState<ICreatedAgentKey | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<IAgentKey | null>(null);
 
   const load = useCallback(() => {
     listAgentKeys()
       .then(setKeys)
-      .catch((err) => enqueueSnackbar(apiErrorMessage(err, 'Không tải được danh sách khoá'), { variant: 'error' }));
+      .catch((err) =>
+        enqueueSnackbar(apiErrorMessage(err, 'Không tải được danh sách khoá'), { variant: 'error' })
+      );
   }, [enqueueSnackbar]);
 
   useEffect(() => {
     load();
-    getAgentPermissionCatalog().then(setCatalog).catch(() => {});
+    getAgentPermissionCatalog()
+      .then(setCatalog)
+      .catch(() => {});
   }, [load]);
 
-  const readOnly = useMemo(() => catalog.permissions.filter((p) => /\.read/.test(p)), [catalog.permissions]);
+  const readOnly = useMemo(
+    () => catalog.permissions.filter((p) => /\.read/.test(p)),
+    [catalog.permissions]
+  );
 
   const resetForm = () => {
     setName('');
@@ -87,7 +116,7 @@ export default function AgentKeysTab() {
       const res = await createAgentKey({ name: name.trim(), permissions, expiresInDays });
       setOpenCreate(false);
       resetForm();
-      setCreatedKey(res.key);
+      setCreated(res);
       load();
     } catch (err) {
       enqueueSnackbar(apiErrorMessage(err, 'Tạo khoá thất bại'), { variant: 'error' });
@@ -109,27 +138,47 @@ export default function AgentKeysTab() {
     }
   };
 
-  const copyKey = async () => {
-    if (!createdKey) return;
+  const agentPrompt = useMemo(
+    () =>
+      created
+        ? buildAgentPrompt({
+            storeName: brandName,
+            origin: agentApiOrigin(isCiCi),
+            apiKey: created.key,
+            expiresAt: created.details.expiresAt,
+            endpoints: created.endpoints ?? [],
+          })
+        : '',
+    [created, brandName, isCiCi]
+  );
+
+  const copy = async (text: string, done: string) => {
     try {
-      await navigator.clipboard.writeText(createdKey);
-      enqueueSnackbar('Đã sao chép khoá');
+      await navigator.clipboard.writeText(text);
+      enqueueSnackbar(done);
     } catch {
-      enqueueSnackbar('Không sao chép được — hãy bôi đen và sao chép thủ công', { variant: 'warning' });
+      enqueueSnackbar('Không sao chép được — hãy bôi đen và sao chép thủ công', {
+        variant: 'warning',
+      });
     }
   };
 
   return (
     <Stack spacing={3}>
       <Alert severity="info">
-        Khoá API cho trợ lý AI / MCP (vd Claude, ChatGPT) truy cập dữ liệu <b>của riêng cửa hàng này</b>, chỉ trong
-        phạm vi quyền đã chọn. Mỗi khoá gắn với cửa hàng — không dùng được ở cửa hàng khác.
+        Khoá API cho trợ lý AI / MCP (vd Claude, ChatGPT) truy cập dữ liệu{' '}
+        <b>của riêng cửa hàng này</b>, chỉ trong phạm vi quyền đã chọn. Mỗi khoá gắn với cửa hàng —
+        không dùng được ở cửa hàng khác.
       </Alert>
 
       <Card>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ p: 2.5 }}>
           <Typography variant="h6">Khoá API</Typography>
-          <Button variant="contained" startIcon={<Iconify icon="mingcute:add-line" />} onClick={() => setOpenCreate(true)}>
+          <Button
+            variant="contained"
+            startIcon={<Iconify icon="mingcute:add-line" />}
+            onClick={() => setOpenCreate(true)}
+          >
             Tạo khoá
           </Button>
         </Stack>
@@ -201,7 +250,12 @@ export default function AgentKeysTab() {
               inputProps={{ maxLength: 100 }}
               onChange={(e) => setName(e.target.value)}
             />
-            <TextField select label="Hạn dùng" value={expiresInDays} onChange={(e) => setExpiresInDays(Number(e.target.value))}>
+            <TextField
+              select
+              label="Hạn dùng"
+              value={expiresInDays}
+              onChange={(e) => setExpiresInDays(Number(e.target.value))}
+            >
               {EXPIRY_OPTIONS.map((d) => (
                 <MenuItem key={d} value={d}>
                   {d} ngày
@@ -221,7 +275,9 @@ export default function AgentKeysTab() {
                   {option}
                 </li>
               )}
-              renderInput={(params) => <TextField {...params} label="Quyền" placeholder="Chọn quyền" />}
+              renderInput={(params) => (
+                <TextField {...params} label="Quyền" placeholder="Chọn quyền" />
+              )}
               limitTags={4}
             />
             <Stack direction="row" spacing={1}>
@@ -248,24 +304,66 @@ export default function AgentKeysTab() {
       </Dialog>
 
       {/* Khoá vừa tạo — chỉ hiện 1 lần */}
-      <Dialog open={!!createdKey} fullWidth maxWidth="sm">
+      <Dialog open={!!created} fullWidth maxWidth="md">
         <DialogTitle>Lưu khoá này ngay</DialogTitle>
         <DialogContent>
           <Stack spacing={2}>
-            <Alert severity="warning">Khoá chỉ hiển thị một lần. Đóng hộp thoại này là không xem lại được nữa.</Alert>
-            <TextField
-              value={createdKey ?? ''}
-              fullWidth
-              InputProps={{ readOnly: true, sx: { fontFamily: 'monospace' } }}
-              onFocus={(e) => e.target.select()}
-            />
+            <Alert severity="warning">
+              Khoá chỉ hiển thị một lần. Đóng hộp thoại này là không xem lại được nữa. Không chụp
+              màn hình hay dán khoá vào nơi người khác đọc được.
+            </Alert>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <TextField
+                value={created?.key ?? ''}
+                fullWidth
+                size="small"
+                InputProps={{ readOnly: true, sx: { fontFamily: 'monospace' } }}
+                onFocus={(e) => e.target.select()}
+              />
+              <Button
+                sx={{ flexShrink: 0 }}
+                startIcon={<Iconify icon="solar:copy-bold" />}
+                onClick={() => created && copy(created.key, 'Đã sao chép khoá')}
+              >
+                Sao chép khoá
+              </Button>
+            </Stack>
+
+            <Stack spacing={1}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="subtitle2">Hướng dẫn cho trợ lý AI</Typography>
+                <Button
+                  size="small"
+                  variant="soft"
+                  color="primary"
+                  startIcon={<Iconify icon="solar:copy-bold" />}
+                  onClick={() =>
+                    copy(
+                      agentPrompt,
+                      'Đã sao chép hướng dẫn — dán vào đoạn chat hoặc system prompt của agent'
+                    )
+                  }
+                >
+                  Sao chép hướng dẫn
+                </Button>
+              </Stack>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                Dán nguyên đoạn này vào Claude, ChatGPT hoặc agent của bạn: gồm địa chỉ, khoá, quy
+                tắc an toàn và {created?.endpoints?.length ?? 0} endpoint mà khoá được phép gọi.
+              </Typography>
+              <TextField
+                value={agentPrompt}
+                fullWidth
+                multiline
+                minRows={8}
+                maxRows={14}
+                InputProps={{ readOnly: true, sx: { fontFamily: 'monospace', fontSize: 12 } }}
+              />
+            </Stack>
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button startIcon={<Iconify icon="solar:copy-bold" />} onClick={copyKey}>
-            Sao chép
-          </Button>
-          <Button variant="contained" onClick={() => setCreatedKey(null)}>
+          <Button variant="contained" onClick={() => setCreated(null)}>
             Tôi đã lưu khoá
           </Button>
         </DialogActions>
