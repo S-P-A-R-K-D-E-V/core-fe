@@ -107,11 +107,12 @@ export default function SsoStartView() {
       const res = await axios.post<{ redirectUrl: string }>(endpoints.auth.ssoHandoff(tenant!), {
         ...payload,
         state,
+        host: storeHost,
         returnTo,
       });
       window.location.assign(res.data.redirectUrl);
     },
-    [tenant, state, returnTo]
+    [tenant, state, returnTo, storeHost]
   );
 
   const showError = (err: any, fallback: string) => {
