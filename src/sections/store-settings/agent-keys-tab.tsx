@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import Card from '@mui/material/Card';
 import Alert from '@mui/material/Alert';
@@ -11,7 +11,6 @@ import Dialog from '@mui/material/Dialog';
 import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
-import Checkbox from '@mui/material/Checkbox';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
@@ -20,7 +19,6 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import DialogTitle from '@mui/material/DialogTitle';
-import Autocomplete from '@mui/material/Autocomplete';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import TableContainer from '@mui/material/TableContainer';
@@ -44,19 +42,13 @@ import {
 } from 'src/api/store-settings';
 
 import { McpSessionsCard } from './mcp-sessions-card';
+import AgentPermissionPicker from './agent-permission-picker';
 import { CodeBlock, McpConnectCard } from './mcp-connect-card';
 import { mcpUrl, copyText, mcpPrompt, mcpSnippet, mcpServerName } from './mcp-connect';
 
 // ----------------------------------------------------------------------
 
 const EXPIRY_OPTIONS = [30, 90, 180, 365];
-
-function domainOf(permission: string, domains: string[]): string {
-  return (
-    domains.filter((d) => permission.startsWith(`${d}.`)).sort((a, b) => b.length - a.length)[0] ??
-    'khác'
-  );
-}
 
 export default function AgentKeysTab() {
   const { enqueueSnackbar } = useSnackbar();
@@ -93,11 +85,6 @@ export default function AgentKeysTab() {
       .then(setCatalog)
       .catch(() => {});
   }, [load]);
-
-  const readOnly = useMemo(
-    () => catalog.permissions.filter((p) => /\.read/.test(p)),
-    [catalog.permissions]
-  );
 
   const resetForm = () => {
     setName('');
@@ -223,55 +210,39 @@ export default function AgentKeysTab() {
       <McpSessionsCard />
 
       {/* Tạo khoá */}
-      <Dialog open={openCreate} onClose={() => setOpenCreate(false)} fullWidth maxWidth="sm">
+      <Dialog open={openCreate} onClose={() => setOpenCreate(false)} fullWidth maxWidth="lg">
         <DialogTitle>Tạo khoá API</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ pt: 1 }}>
-            <TextField
-              label="Tên khoá"
-              placeholder="vd: Claude của chủ cửa hàng"
-              value={name}
-              inputProps={{ maxLength: 100 }}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <TextField
-              select
-              label="Hạn dùng"
-              value={expiresInDays}
-              onChange={(e) => setExpiresInDays(Number(e.target.value))}
-            >
-              {EXPIRY_OPTIONS.map((d) => (
-                <MenuItem key={d} value={d}>
-                  {d} ngày
-                </MenuItem>
-              ))}
-            </TextField>
-            <Autocomplete
-              multiple
-              disableCloseOnSelect
-              options={catalog.permissions}
-              groupBy={(p) => domainOf(p, catalog.domains)}
-              value={permissions}
-              onChange={(_, value) => setPermissions(value)}
-              renderOption={(props, option, { selected }) => (
-                <li {...props} key={option}>
-                  <Checkbox size="small" checked={selected} sx={{ mr: 1 }} />
-                  {option}
-                </li>
-              )}
-              renderInput={(params) => (
-                <TextField {...params} label="Quyền" placeholder="Chọn quyền" />
-              )}
-              limitTags={4}
-            />
-            <Stack direction="row" spacing={1}>
-              <Button size="small" onClick={() => setPermissions(readOnly)}>
-                Chỉ đọc (khuyên dùng)
-              </Button>
-              <Button size="small" onClick={() => setPermissions([])}>
-                Bỏ chọn
-              </Button>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                label="Tên khoá"
+                sx={{ flex: 1 }}
+                placeholder="vd: Claude của chủ cửa hàng"
+                value={name}
+                inputProps={{ maxLength: 100 }}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <TextField
+                select
+                label="Hạn dùng"
+                sx={{ minWidth: 160 }}
+                value={expiresInDays}
+                onChange={(e) => setExpiresInDays(Number(e.target.value))}
+              >
+                {EXPIRY_OPTIONS.map((d) => (
+                  <MenuItem key={d} value={d}>
+                    {d} ngày
+                  </MenuItem>
+                ))}
+              </TextField>
             </Stack>
+            <AgentPermissionPicker
+              domains={catalog.domains}
+              permissions={catalog.permissions}
+              value={permissions}
+              onChange={setPermissions}
+            />
           </Stack>
         </DialogContent>
         <DialogActions>
