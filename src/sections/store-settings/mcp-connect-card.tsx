@@ -7,8 +7,11 @@ import Tab from '@mui/material/Tab';
 import Card from '@mui/material/Card';
 import Tabs from '@mui/material/Tabs';
 import Alert from '@mui/material/Alert';
+import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
@@ -22,6 +25,8 @@ import {
   mcpSnippet,
   MCP_CLIENTS,
   type McpClientId,
+  MCP_PROMPT_TARGETS,
+  type McpPromptTarget,
 } from './mcp-connect';
 
 // ----------------------------------------------------------------------
@@ -63,34 +68,90 @@ export function CodeBlock({ text }: { text: string }) {
   );
 }
 
+/**
+ * Chọn loại prompt (Mặc định / Claude Code / Claude Desktop / Cursor / OpenClaw / Agent khác) rồi
+ * sao chép. Không truyền apiKey thì prompt để chỗ <API_KEY>.
+ */
+export function McpPromptCopy({
+  storeName,
+  serverName,
+  url,
+  apiKey,
+  target,
+  onTargetChange,
+  label = 'Sao chép prompt hướng dẫn',
+}: {
+  storeName: string;
+  serverName: string;
+  url: string;
+  apiKey?: string;
+  target: McpPromptTarget;
+  onTargetChange: (target: McpPromptTarget) => void;
+  label?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    setCopied(await copyText(mcpPrompt(storeName, serverName, url, apiKey, target)));
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  return (
+    <Stack direction="row" spacing={1} alignItems="center">
+      <TextField
+        select
+        size="small"
+        label="Prompt cho"
+        value={target}
+        onChange={(e) => onTargetChange(e.target.value as McpPromptTarget)}
+        sx={{ minWidth: 190 }}
+      >
+        {MCP_PROMPT_TARGETS.map((t) => (
+          <MenuItem key={t.id} value={t.id}>
+            {t.label}
+          </MenuItem>
+        ))}
+      </TextField>
+      <Button
+        variant="contained"
+        size="small"
+        sx={{ flexShrink: 0, height: 40 }}
+        startIcon={<Iconify icon={copied ? 'eva:checkmark-fill' : 'solar:copy-bold'} />}
+        onClick={copy}
+      >
+        {copied ? 'Đã sao chép' : label}
+      </Button>
+    </Stack>
+  );
+}
+
 type Props = { origin: string; storeName: string; serverName: string };
 
 export function McpConnectCard({ origin, storeName, serverName }: Props) {
   const url = mcpUrl(origin);
   const [client, setClient] = useState<McpClientId>('claude-code');
-  const [copied, setCopied] = useState(false);
+  const [target, setTarget] = useState<McpPromptTarget>('default');
   const current = MCP_CLIENTS.find((c) => c.id === client)!;
-
-  const copyPrompt = async () => {
-    setCopied(await copyText(mcpPrompt(storeName, serverName, url)));
-    setTimeout(() => setCopied(false), 2500);
-  };
 
   return (
     <Card>
       <CardHeader
         title="Kết nối MCP"
-        subheader="Cho agent ngoài (Claude, Cursor…) làm việc với dữ liệu của cửa hàng này qua MCP, bằng khoá API bên dưới — chỉ trong phạm vi quyền của khoá. Mọi phiên và lượt gọi được ghi ở mục Phiên gần đây."
+        subheader="Cho agent ngoài (Claude, Cursor, OpenClaw…) làm việc với dữ liệu của cửa hàng này qua MCP, bằng khoá API bên dưới — chỉ trong phạm vi quyền của khoá. Mọi phiên và lượt gọi được ghi ở mục Phiên gần đây."
         action={
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<Iconify icon={copied ? 'eva:checkmark-fill' : 'solar:copy-bold'} />}
-            onClick={copyPrompt}
-          >
-            {copied ? 'Đã sao chép prompt' : 'Sao chép prompt hướng dẫn'}
-          </Button>
+          <McpPromptCopy
+            storeName={storeName}
+            serverName={serverName}
+            url={url}
+            target={target}
+            onTargetChange={setTarget}
+          />
         }
+        sx={{
+          flexWrap: 'wrap',
+          rowGap: 2,
+          '& .MuiCardHeader-action': { alignSelf: 'center', m: 0 },
+        }}
       />
       <Box sx={{ p: 3, pt: 2 }}>
         <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
@@ -99,10 +160,10 @@ export function McpConnectCard({ origin, storeName, serverName }: Props) {
         <CodeBlock text={url} />
 
         <Alert severity="info" sx={{ mt: 2 }}>
-          Dán prompt vào Claude Code, Cursor… — agent sẽ tự thêm MCP server. Prompt để chỗ{' '}
-          <code>&lt;API_KEY&gt;</code>: tạo khoá ở bảng bên dưới (nên chọn <b>Chỉ đọc</b> cho agent
-          hỏi đáp) rồi điền vào, hoặc dùng nút &quot;Sao chép prompt kèm khoá&quot; ngay khi tạo.
-          Khoá chỉ dùng được tại <code>{origin}</code>.
+          Chọn loại prompt rồi dán vào Claude Code, Cursor, OpenClaw… — agent sẽ tự thêm MCP server.
+          Prompt để chỗ <code>&lt;API_KEY&gt;</code>: tạo khoá ở bảng bên dưới (nên chọn{' '}
+          <b>Chỉ đọc</b> cho agent hỏi đáp) rồi điền vào, hoặc dùng nút &quot;Sao chép prompt kèm
+          khoá&quot; ngay khi tạo. Khoá chỉ dùng được tại <code>{origin}</code>.
         </Alert>
 
         <Tabs

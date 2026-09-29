@@ -43,8 +43,15 @@ import {
 
 import { McpSessionsCard } from './mcp-sessions-card';
 import AgentPermissionPicker from './agent-permission-picker';
-import { CodeBlock, McpConnectCard } from './mcp-connect-card';
-import { mcpUrl, copyText, mcpPrompt, mcpSnippet, mcpServerName } from './mcp-connect';
+import { CodeBlock, McpPromptCopy, McpConnectCard } from './mcp-connect-card';
+import {
+  mcpUrl,
+  copyText,
+  mcpSnippet,
+  MCP_CLIENTS,
+  mcpServerName,
+  type McpPromptTarget,
+} from './mcp-connect';
 
 // ----------------------------------------------------------------------
 
@@ -69,6 +76,7 @@ export default function AgentKeysTab() {
   const [expiresInDays, setExpiresInDays] = useState(90);
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<ICreatedAgentKey | null>(null);
+  const [promptTarget, setPromptTarget] = useState<McpPromptTarget>('default');
   const [revokeTarget, setRevokeTarget] = useState<IAgentKey | null>(null);
 
   const load = useCallback(() => {
@@ -285,29 +293,39 @@ export default function AgentKeysTab() {
             </Stack>
 
             {created && origin && (
-              <Stack spacing={1}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Stack spacing={1.5}>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  alignItems={{ sm: 'center' }}
+                  justifyContent="space-between"
+                  spacing={1}
+                >
                   <Typography variant="subtitle2">Kết nối agent bằng khoá này</Typography>
-                  <Button
-                    size="small"
-                    variant="soft"
-                    color="primary"
-                    startIcon={<Iconify icon="solar:copy-bold" />}
-                    onClick={() =>
-                      copy(
-                        mcpPrompt(brandName, serverName, url, created.key),
-                        'Đã sao chép prompt kèm khoá — dán vào Claude Code, Cursor…'
-                      )
-                    }
-                  >
-                    Sao chép prompt kèm khoá
-                  </Button>
+                  <McpPromptCopy
+                    storeName={brandName}
+                    serverName={serverName}
+                    url={url}
+                    apiKey={created.key}
+                    target={promptTarget}
+                    onTargetChange={setPromptTarget}
+                    label="Sao chép prompt kèm khoá"
+                  />
                 </Stack>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  Dán prompt vào Claude Code, Cursor… để agent tự thêm MCP server {serverName}, hoặc
-                  chạy lệnh dưới đây trong terminal (Claude Code).
+                  Dán prompt vào agent để nó tự thêm MCP server {serverName}, hoặc tự chạy cấu hình
+                  dưới đây
+                  {promptTarget === 'default'
+                    ? ' (Claude Code).'
+                    : ` (${MCP_CLIENTS.find((c) => c.id === promptTarget)?.label}).`}
                 </Typography>
-                <CodeBlock text={mcpSnippet('claude-code', serverName, url, created.key)} />
+                <CodeBlock
+                  text={mcpSnippet(
+                    promptTarget === 'default' ? 'claude-code' : promptTarget,
+                    serverName,
+                    url,
+                    created.key
+                  )}
+                />
               </Stack>
             )}
           </Stack>
