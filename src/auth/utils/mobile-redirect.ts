@@ -6,10 +6,11 @@
  * chính app CiCi — mọi địa chỉ khác (https, javascript:, data:, //host...) đều bị bỏ qua, nếu không
  * một đường link giả là đủ để lấy token phiên của người đang đăng nhập.
  *
- * `corecms:` là scheme của core-mobile (app.json). `exp:`/`exp+cms:` của Expo Go chỉ được bật khi
+ * `corecms:` là scheme của app CiCi, `sparkstore:` của bản app cửa hàng SaaS (core-mobile
+ * app.config.ts, STORE_APP_SCHEME). `exp:`/`exp+cms:` của Expo Go chỉ được bật khi
  * đặt NEXT_PUBLIC_ALLOW_EXPO_REDIRECT=true (máy dev), vì app nào cũng mở được link exp://.
  */
-const APP_SCHEMES = ['corecms:'];
+const APP_SCHEMES = ['corecms:', 'sparkstore:'];
 const EXPO_SCHEMES = ['exp:', 'exp+cms:'];
 
 function allowedSchemes(): string[] {

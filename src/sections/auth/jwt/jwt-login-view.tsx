@@ -146,7 +146,7 @@ export default function JwtLoginView() {
         size="large"
         variant="outlined"
         color="inherit"
-        onClick={() => beginCentralLogin('google', returnTo)}
+        onClick={() => beginCentralLogin('google', returnTo, isMobile ? mobileRedirectUri : null)}
         startIcon={<Iconify icon="logos:google-icon" width={20} />}
       >
         Tiếp tục với Google
@@ -158,7 +158,7 @@ export default function JwtLoginView() {
           size="large"
           variant="contained"
           color="inherit"
-          onClick={() => beginCentralLogin('apple', returnTo)}
+          onClick={() => beginCentralLogin('apple', returnTo, isMobile ? mobileRedirectUri : null)}
           startIcon={<Iconify icon="mdi:apple" width={22} />}
         >
           Tiếp tục với Apple

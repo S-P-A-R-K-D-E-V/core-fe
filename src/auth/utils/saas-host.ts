@@ -62,13 +62,25 @@ export async function sha256Hex(value: string): Promise<string> {
 // state chống login CSRF: trang cửa hàng sinh ra, giữ trong sessionStorage của CHÍNH tên miền cửa
 // hàng; /sso/callback chỉ đổi mã khi state trên URL khớp.
 const SSO_STATE_KEY = 'ssoState';
+// App mobile mở trang đăng nhập với ?mobile=true&redirect_uri=<deep link>; phải nhớ deep link đó qua
+// chuyến đi sang auth.devbyspark.com để /sso/callback trả phiên về app thay vì vào dashboard web.
+const SSO_MOBILE_REDIRECT_KEY = 'ssoMobileRedirect';
 
-export function beginCentralLogin(provider: 'google' | 'apple' | null, returnTo: string | null) {
+export function beginCentralLogin(
+  provider: 'google' | 'apple' | null,
+  returnTo: string | null,
+  mobileRedirectUri?: string | null
+) {
   const code = tenantCodeFromHost(window.location.host);
   if (!code) return;
 
   const state = randomToken();
   sessionStorage.setItem(SSO_STATE_KEY, state);
+  if (mobileRedirectUri) {
+    sessionStorage.setItem(SSO_MOBILE_REDIRECT_KEY, mobileRedirectUri);
+  } else {
+    sessionStorage.removeItem(SSO_MOBILE_REDIRECT_KEY);
+  }
 
   const url = new URL(`https://${AUTH_HOST}/sso/start/`);
   url.searchParams.set('tenant', code);
@@ -82,4 +94,11 @@ export function takeCentralLoginState(): string | null {
   const state = sessionStorage.getItem(SSO_STATE_KEY);
   sessionStorage.removeItem(SSO_STATE_KEY);
   return state;
+}
+
+/** Deep link của app đã nhớ lúc bắt đầu đăng nhập (chưa kiểm tra — dùng buildMobileRedirectUrl). */
+export function takeCentralLoginMobileRedirect(): string | null {
+  const uri = sessionStorage.getItem(SSO_MOBILE_REDIRECT_KEY);
+  sessionStorage.removeItem(SSO_MOBILE_REDIRECT_KEY);
+  return uri;
 }

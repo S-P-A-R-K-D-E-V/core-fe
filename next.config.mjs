@@ -21,6 +21,8 @@ const BACKEND_API_PREFIXES = [
   'chatbot', 'messenger', 'expenses', 'shareholders', 'cleaning', 'media-library',
   'admin', 'kiosk', 'kiosk-pairing', 'kiosk-devices', 'face-tracking',
   'auth-hub', 'store-settings', 'agent-keys',
+  // API công khai của cửa hàng (thương hiệu, sản phẩm) — app mobile bản cửa hàng dùng để kiểm tra mã cửa hàng.
+  'public',
 ];
 
 const nextConfig = {

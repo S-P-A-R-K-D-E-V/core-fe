@@ -16,7 +16,8 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { PATH_AFTER_LOGIN } from 'src/config-global';
-import { safeReturnPath, takeCentralLoginState } from 'src/auth/utils/saas-host';
+import { buildMobileRedirectUrl } from 'src/auth/utils/mobile-redirect';
+import { safeReturnPath, takeCentralLoginState, takeCentralLoginMobileRedirect } from 'src/auth/utils/saas-host';
 
 // ----------------------------------------------------------------------
 
@@ -39,6 +40,7 @@ export default function SsoCallbackView() {
     const state = searchParams.get('state');
     const returnTo = safeReturnPath(searchParams.get('returnTo'), PATH_AFTER_LOGIN);
     const expectedState = takeCentralLoginState();
+    const mobileRedirectUri = takeCentralLoginMobileRedirect();
 
     // Bỏ mã khỏi thanh địa chỉ/lịch sử ngay, dù đổi được hay không.
     window.history.replaceState(null, '', window.location.pathname);
@@ -49,7 +51,16 @@ export default function SsoCallbackView() {
     }
 
     loginWithSso?.(code, state)
-      .then(() => router.replace(returnTo === '/' ? PATH_AFTER_LOGIN : returnTo))
+      .then(() => {
+        // Đăng nhập bắt đầu từ app mobile: trả phiên về deep link của app (chỉ scheme của app mình).
+        const sessionToken = localStorage.getItem('sessionToken');
+        const appTarget = mobileRedirectUri && sessionToken ? buildMobileRedirectUrl(mobileRedirectUri, sessionToken) : null;
+        if (appTarget) {
+          window.location.href = appTarget;
+          return;
+        }
+        router.replace(returnTo === '/' ? PATH_AFTER_LOGIN : returnTo);
+      })
       .catch((err: any) => {
         setErrorMsg(apiErrorMessage(err, 'Không đăng nhập được. Mã đăng nhập đã hết hạn, vui lòng thử lại.'));
       });

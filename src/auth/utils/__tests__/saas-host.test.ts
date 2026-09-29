@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { vi, describe, expect, it } from 'vitest';
 
 import { sha256Hex, randomToken, isAuthHost, safeReturnPath, tenantCodeFromHost } from '../saas-host';
 
@@ -55,5 +55,25 @@ describe('random/nonce helpers', () => {
 
   it('sha256Hex khớp SHA-256 chuẩn', async () => {
     expect(await sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  });
+});
+
+describe('beginCentralLogin', () => {
+  it('nhớ state và deep link app trên tên miền cửa hàng rồi chuyển sang auth host', async () => {
+    const { beginCentralLogin, takeCentralLoginState, takeCentralLoginMobileRedirect } = await import('../saas-host');
+    const assign = vi.fn();
+    vi.stubGlobal('location', { host: 'shop1.devbyspark.com', assign } as any);
+
+    beginCentralLogin('google', '/dashboard/pos', 'sparkstore://auth/callback');
+
+    const target = new URL(assign.mock.calls[0][0]);
+    expect(target.host).toBe('auth.devbyspark.com');
+    expect(target.searchParams.get('tenant')).toBe('shop1');
+    expect(target.searchParams.get('returnTo')).toBe('/dashboard/pos');
+    expect(target.searchParams.get('state')).toBe(takeCentralLoginState());
+    expect(takeCentralLoginMobileRedirect()).toBe('sparkstore://auth/callback');
+    expect(takeCentralLoginMobileRedirect()).toBeNull();
+
+    vi.unstubAllGlobals();
   });
 });
