@@ -43,6 +43,7 @@ import { IUserTableFilters, IUserTableFilterValue } from 'src/types/user';
 import { getAllUsers, deleteUser, changeUserStatus } from 'src/api/users';
 
 import UserTableRow from '../user-table-row';
+import UserAddStaffDialog from '../user-add-staff-dialog';
 import UserTableToolbar from '../user-table-toolbar';
 import UserTableFiltersResult from '../user-table-filters-result';
 
@@ -84,6 +85,7 @@ export default function UserListView() {
   const router = useRouter();
 
   const confirm = useBoolean();
+  const addStaffDialog = useBoolean();
 
   const [tableData, setTableData] = useState<IUser[]>([]);
 
@@ -194,10 +196,21 @@ export default function UserListView() {
             { name: 'User', href: paths.dashboard.user.root },
             { name: 'List' },
           ]}
+          action={
+            <Button
+              variant="contained"
+              startIcon={<Iconify icon="mingcute:add-line" />}
+              onClick={addStaffDialog.onTrue}
+            >
+              Thêm nhân viên
+            </Button>
+          }
           sx={{
             mb: { xs: 3, md: 5 },
           }}
         />
+
+        <UserAddStaffDialog open={addStaffDialog.value} onClose={addStaffDialog.onFalse} onAdded={fetchUsers} />
 
         <Card>
           <Tabs

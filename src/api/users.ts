@@ -106,3 +106,15 @@ export async function uploadMyAvatar(file: File): Promise<{ objectKey: string }>
   });
   return response.data;
 }
+
+/** [Admin/Manager] Thêm người vào cửa hàng (POST /users). Manager chỉ thêm được Staff. */
+export async function addStaff(data: {
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: 'Staff' | 'Manager' | 'Admin';
+  password?: string;
+}): Promise<{ userId: string; existingAccount: boolean }> {
+  const response = await axios.post(endpoints.users.list, data);
+  return response.data;
+}
