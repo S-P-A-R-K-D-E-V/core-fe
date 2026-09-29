@@ -112,8 +112,12 @@ export interface ILogoutRequest {
 }
 
 export interface IOAuthLoginRequest {
-  provider: 'google' | 'facebook';
+  provider: 'google' | 'facebook' | 'apple';
   token: string;
+  nonce?: string;
+  firstName?: string;
+  lastName?: string;
+  authorizationCode?: string;
 }
 
 // RBAC Types

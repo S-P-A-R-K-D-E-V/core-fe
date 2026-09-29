@@ -58,6 +58,9 @@ export const endpoints = {
     oauthConnections: '/auth/oauth-connections',
     oauthConnect: '/auth/oauth-connect',
     oauthDisconnect: (provider: string) => `/auth/oauth-connections/${provider}`,
+    ssoExchange: '/auth/sso/exchange',
+    ssoHandoff: (tenantCode: string) => `/auth-hub/${tenantCode}/handoff`,
+    deleteAccount: '/auth/account',
   },
   users: {
     list: '/users',

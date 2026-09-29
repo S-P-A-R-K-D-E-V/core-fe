@@ -1,7 +1,7 @@
 'use client';
 
 import * as Yup from 'yup';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { GoogleLogin } from '@react-oauth/google';
@@ -24,6 +24,7 @@ import { useBoolean } from 'src/hooks/use-boolean';
 import { useAuthContext } from 'src/auth/hooks';
 import { PATH_AFTER_LOGIN } from 'src/config-global';
 import { buildMobileRedirectUrl } from 'src/auth/utils/mobile-redirect';
+import { APPLE_SERVICES_ID, safeReturnPath, beginCentralLogin, tenantCodeFromHost } from 'src/auth/utils/saas-host';
 
 import Iconify from 'src/components/iconify';
 import FormProvider, { RHFTextField } from 'src/components/hook-form';
@@ -39,7 +40,13 @@ export default function JwtLoginView() {
 
   const searchParams = useSearchParams();
 
-  const returnTo = searchParams.get('returnTo');
+  const returnTo = safeReturnPath(searchParams.get('returnTo'), PATH_AFTER_LOGIN);
+
+  // Cửa hàng SaaS (<mã>.devbyspark.com): Google/Apple chạy ở auth.devbyspark.com (xem /sso/start).
+  const [saasTenant, setSaasTenant] = useState<string | null>(null);
+  useEffect(() => {
+    setSaasTenant(tenantCodeFromHost(window.location.host));
+  }, []);
   const isMobile = searchParams.get('mobile') === 'true';
   const mobileRedirectUri = searchParams.get('redirect_uri');
 
@@ -80,7 +87,7 @@ export default function JwtLoginView() {
     try {
       await login?.(data.email, data.password);
 
-      if (!handleMobileRedirect()) router.push(returnTo || PATH_AFTER_LOGIN);
+      if (!handleMobileRedirect()) router.push(returnTo);
     } catch (error) {
       console.error(error);
       const responseErrors = error?.errors;
@@ -117,20 +124,52 @@ export default function JwtLoginView() {
 
   const renderHead = (
     <Stack spacing={2} sx={{ mb: 5 }}>
-      <Typography variant="h4">Sign in to CiCi</Typography>
+      <Typography variant="h4">{saasTenant ? 'Đăng nhập' : 'Sign in to CiCi'}</Typography>
 
-      <Stack direction="row" spacing={0.5}>
-        <Typography variant="body2">New user?</Typography>
+      {/* Cửa hàng SaaS không cho tự đăng ký — quản trị viên cửa hàng mời nhân viên. */}
+      {!saasTenant && (
+        <Stack direction="row" spacing={0.5}>
+          <Typography variant="body2">New user?</Typography>
 
-        <Link component={RouterLink} href={paths.auth.jwt.register} variant="subtitle2">
-          Create an account
-        </Link>
-      </Stack>
+          <Link component={RouterLink} href={paths.auth.jwt.register} variant="subtitle2">
+            Create an account
+          </Link>
+        </Stack>
+      )}
+    </Stack>
+  );
+
+  const renderCentralLogin = (
+    <Stack spacing={1.5}>
+      <LoadingButton
+        fullWidth
+        size="large"
+        variant="outlined"
+        color="inherit"
+        onClick={() => beginCentralLogin('google', returnTo)}
+        startIcon={<Iconify icon="logos:google-icon" width={20} />}
+      >
+        Tiếp tục với Google
+      </LoadingButton>
+
+      {!!APPLE_SERVICES_ID && (
+        <LoadingButton
+          fullWidth
+          size="large"
+          variant="contained"
+          color="inherit"
+          onClick={() => beginCentralLogin('apple', returnTo)}
+          startIcon={<Iconify icon="mdi:apple" width={22} />}
+        >
+          Tiếp tục với Apple
+        </LoadingButton>
+      )}
     </Stack>
   );
 
   const renderForm = (
     <Stack spacing={2.5}>
+      {saasTenant ? renderCentralLogin : (
       <GoogleLogin
         onSuccess={async (resp) => {
           try {
@@ -143,7 +182,7 @@ export default function JwtLoginView() {
               // ignore decode failure — avatar stays default
             }
             await loginWithOAuth?.('google', resp.credential!, googleAvatar);
-            if (!handleMobileRedirect()) router.push(returnTo || PATH_AFTER_LOGIN);
+            if (!handleMobileRedirect()) router.push(returnTo);
           } catch (err: any) {
             const msg = err?.response?.data?.title || err?.response?.data?.detail || err?.message || 'Đăng nhập Google thất bại';
             setErrorMsg(msg);
@@ -156,6 +195,7 @@ export default function JwtLoginView() {
         size="large"
         locale="vi"
       />
+      )}
 
       <Divider sx={{ my: 0.5 }}>
         <Typography variant="body2" sx={{ color: 'text.disabled' }}>

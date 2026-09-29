@@ -375,7 +375,23 @@ export function AuthProvider({ children }: Props) {
   }, []);
 
   // OAUTH LOGIN (Google / Facebook)
-  const loginWithOAuth = useCallback(async (provider: 'google' | 'facebook', token: string, avatarUrl?: string) => {
+  // SSO — đổi mã dùng một lần từ auth.devbyspark.com lấy phiên (xem /sso/callback)
+  const loginWithSso = useCallback(async (code: string, state: string) => {
+    const res = await axios.post<IAuthResponse>(endpoints.auth.ssoExchange, { code, state });
+    const { token: accessToken, refreshToken, sessionToken } = res.data;
+
+    setSession(accessToken, refreshToken);
+
+    if (sessionToken) {
+      localStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
+    }
+
+    const user = buildUserFromResponse(res.data);
+    dispatch({ type: Types.LOGIN, payload: { user } });
+    fetchAndPatchAvatar(user);
+  }, [fetchAndPatchAvatar]);
+
+  const loginWithOAuth = useCallback(async (provider: 'google' | 'facebook' | 'apple', token: string, avatarUrl?: string) => {
     const data: IOAuthLoginRequest = { provider, token };
     const res = await axios.post<IAuthResponse>(endpoints.auth.oauthLogin, data);
     const { token: accessToken, refreshToken, sessionToken } = res.data;
@@ -481,11 +497,12 @@ export function AuthProvider({ children }: Props) {
       resendOtp,
       restoreSession,
       loginWithOAuth,
+      loginWithSso,
       pendingVerification,
       updateUser,
       refreshUser,
     }),
-    [login, logout, register, verifyOtp, resendOtp, restoreSession, loginWithOAuth, updateUser, refreshUser, state.user, status, pendingVerification]
+    [login, logout, register, verifyOtp, resendOtp, restoreSession, loginWithOAuth, loginWithSso, updateUser, refreshUser, state.user, status, pendingVerification]
   );
 
   return <AuthContext.Provider value={memoizedValue}>{children}</AuthContext.Provider>;

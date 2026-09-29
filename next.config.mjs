@@ -20,6 +20,7 @@ const BACKEND_API_PREFIXES = [
   'customers', 'sales-orders', 'bank-accounts', 'payment', 'reports',
   'chatbot', 'messenger', 'expenses', 'shareholders', 'cleaning', 'media-library',
   'admin', 'kiosk', 'kiosk-pairing', 'kiosk-devices', 'face-tracking',
+  'auth-hub', 'store-settings', 'agent-keys',
 ];
 
 const nextConfig = {
