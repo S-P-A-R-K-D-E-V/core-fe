@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 
 import Alert from '@mui/material/Alert';
@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography';
 import { useSearchParams } from 'src/routes/hooks';
 
 import axios, { endpoints } from 'src/utils/axios';
+import { apiErrorMessage } from 'src/utils/api-error';
 
 import {
   SAAS_ZONE,
@@ -72,15 +73,22 @@ export default function SsoStartView() {
   const state = searchParams.get('state');
   const returnTo = searchParams.get('returnTo');
 
+  // Host chỉ biết được ở trình duyệt; đọc sau khi mount để HTML render ở server và lần render đầu
+  // ở client giống nhau.
+  const [host, setHost] = useState<string | null>(null);
+  useEffect(() => {
+    setHost(window.location.host);
+  }, []);
+
   const invalidRequest = useMemo(() => {
-    if (typeof window !== 'undefined' && !isAuthHost(window.location.host)) {
+    if (host !== null && !isAuthHost(host)) {
       return `Trang này chỉ dùng tại ${AUTH_HOST}.`;
     }
     if (!isValidTenantCode(tenant) || !state || !STATE_PATTERN.test(state)) {
       return 'Liên kết đăng nhập không hợp lệ. Hãy mở lại trang đăng nhập của cửa hàng.';
     }
     return '';
-  }, [tenant, state]);
+  }, [host, tenant, state]);
 
   const handoff = useCallback(
     async (payload: {
@@ -103,7 +111,7 @@ export default function SsoStartView() {
 
   const showError = (err: any, fallback: string) => {
     setBusy(false);
-    setErrorMsg(err?.response?.data?.detail || err?.response?.data?.title || err?.message || fallback);
+    setErrorMsg(apiErrorMessage(err, fallback));
   };
 
   const handleApple = async () => {
@@ -137,6 +145,8 @@ export default function SsoStartView() {
       showError(err, 'Đăng nhập Apple thất bại');
     }
   };
+
+  if (host === null) return null;
 
   if (invalidRequest) {
     return <Alert severity="error">{invalidRequest}</Alert>;

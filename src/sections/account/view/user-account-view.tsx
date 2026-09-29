@@ -20,6 +20,7 @@ import AccountSocialLinks from '../account-social-links';
 import AccountNotifications from '../account-notifications';
 import AccountChangePassword from '../account-change-password';
 import AccountConnectedAccounts from '../account-connected-accounts';
+import AccountDelete from '../account-delete';
 
 // ----------------------------------------------------------------------
 
@@ -108,7 +109,12 @@ export default function AccountView() {
 
       {currentTab === 'social' && <AccountSocialLinks socialLinks={_userAbout.socialLinks} />}
 
-      {currentTab === 'security' && <AccountChangePassword />}
+      {currentTab === 'security' && (
+        <>
+          <AccountChangePassword />
+          <AccountDelete />
+        </>
+      )}
 
       {currentTab === 'connected' && <AccountConnectedAccounts />}
     </Container>

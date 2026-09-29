@@ -168,6 +168,14 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             ],
           },
 
+          // CÀI ĐẶT CỬA HÀNG (thương hiệu, KiotViet riêng, khoá API cho trợ lý AI)
+          {
+            title: 'Cài đặt cửa hàng',
+            path: paths.dashboard.storeSettings.root,
+            icon: ICONS.label,
+            roles: ['Admin'],
+          },
+
           // ROLE MANAGEMENT
           {
             title: t('role'),

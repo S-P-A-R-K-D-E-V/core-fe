@@ -170,6 +170,9 @@ export const paths = {
       root: `${ROOTS.DASHBOARD}/holiday-policy`,
       list: `${ROOTS.DASHBOARD}/holiday-policy/list`,
     },
+    storeSettings: {
+      root: `${ROOTS.DASHBOARD}/store-settings`,
+    },
     penaltyPolicy: {
       root: `${ROOTS.DASHBOARD}/penalty-policy`,
       list: `${ROOTS.DASHBOARD}/penalty-policy/list`,

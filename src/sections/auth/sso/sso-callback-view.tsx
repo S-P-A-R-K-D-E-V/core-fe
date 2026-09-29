@@ -12,6 +12,8 @@ import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 import { useRouter, useSearchParams } from 'src/routes/hooks';
 
+import { apiErrorMessage } from 'src/utils/api-error';
+
 import { useAuthContext } from 'src/auth/hooks';
 import { PATH_AFTER_LOGIN } from 'src/config-global';
 import { safeReturnPath, takeCentralLoginState } from 'src/auth/utils/saas-host';
@@ -49,11 +51,7 @@ export default function SsoCallbackView() {
     loginWithSso?.(code, state)
       .then(() => router.replace(returnTo === '/' ? PATH_AFTER_LOGIN : returnTo))
       .catch((err: any) => {
-        setErrorMsg(
-          err?.response?.data?.detail ||
-            err?.response?.data?.title ||
-            'Không đăng nhập được. Mã đăng nhập đã hết hạn, vui lòng thử lại.'
-        );
+        setErrorMsg(apiErrorMessage(err, 'Không đăng nhập được. Mã đăng nhập đã hết hạn, vui lòng thử lại.'));
       });
   }, [loginWithSso, router, searchParams]);
 
