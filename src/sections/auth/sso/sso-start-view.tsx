@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 
+import Link from '@mui/material/Link';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
@@ -142,7 +143,8 @@ export default function SsoStartView() {
         setBusy(false);
         return;
       }
-      showError(err, 'Đăng nhập Apple thất bại');
+      // Lỗi từ Apple JS là object { error: '<mã>' } — hiện mã để biết lỗi gì (không phải lỗi của cửa hàng).
+      showError(err, err?.error ? `Đăng nhập Apple thất bại (${err.error})` : 'Đăng nhập Apple thất bại');
     }
   };
 
@@ -197,6 +199,16 @@ export default function SsoStartView() {
           Tiếp tục với Apple
         </Button>
       )}
+
+      {/* Trang này chỉ lo Google/Apple (hai bên chỉ cho khai báo một tên miền). Đăng nhập bằng mật
+          khẩu nằm ở trang đăng nhập của chính cửa hàng. */}
+      <Link
+        href={`https://${tenant}.${SAAS_ZONE}/auth/jwt/login/${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`}
+        variant="body2"
+        sx={{ textAlign: 'center' }}
+      >
+        Đăng nhập bằng email và mật khẩu
+      </Link>
 
       <Typography variant="caption" sx={{ color: 'text.disabled', textAlign: 'center' }}>
         Chỉ tài khoản đã được cửa hàng mời mới đăng nhập được.
