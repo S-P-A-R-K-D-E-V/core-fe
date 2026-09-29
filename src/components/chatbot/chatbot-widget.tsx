@@ -20,6 +20,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Iconify from 'src/components/iconify';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { useStoreBrand } from 'src/components/branding';
 
 import { useChatbot } from 'src/hooks/use-chatbot';
 import { chatbotCallbackOrder } from 'src/api/chatbot';
@@ -53,6 +54,8 @@ type Props = {
 
 export default function ChatbotWidget({ defaultOpen = false }: Props) {
   const { user } = useAuthContext();
+  // Tên xưng hô trong khung chat theo cửa hàng đang mở (CiCi giữ "CiCi").
+  const { brandName } = useStoreBrand();
   const [open, setOpen] = useState(defaultOpen);
   const [draft, setDraft] = useState('');
 
@@ -147,7 +150,7 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
             </Avatar>
             <Box sx={{ flexGrow: 1 }}>
               <Typography variant="subtitle2" sx={{ lineHeight: 1.1 }}>
-                {isAdmin ? 'Internal Admin' : 'CiCi Customer Support'}
+                {isAdmin ? 'Internal Admin' : `${brandName} — Hỗ trợ khách hàng`}
               </Typography>
               <Typography variant="caption" sx={{ opacity: 0.8 }}>
                 {session?.sessionId ? `Session ${session.sessionId.slice(0, 8)}…` : 'Đang kết nối…'}
@@ -163,9 +166,9 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
 
           {needsGuestGate ? (
             <Stack spacing={1.5} sx={{ p: 2.5, flexGrow: 1, justifyContent: 'center' }}>
-              <Typography variant="subtitle2">Trước khi chat, cho CiCi biết bạn là ai nhé 👋</Typography>
+              <Typography variant="subtitle2">Trước khi chat, cho {brandName} biết bạn là ai nhé 👋</Typography>
               <Typography variant="caption" color="text.secondary">
-                Giúp CiCi hỗ trợ bạn tốt hơn — thông tin chỉ dùng trong phiên chat này.
+                Giúp {brandName} hỗ trợ bạn tốt hơn — thông tin chỉ dùng trong phiên chat này.
               </Typography>
               <TextField
                 size="small"
@@ -211,7 +214,7 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
             )}
             {ready && messages.length === 0 && (
               <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 4 }}>
-                Chào bạn! CiCi ở đây để hỗ trợ. Bạn có thể hỏi về sản phẩm, đơn hàng, giờ mở cửa…
+                Chào bạn! {brandName} ở đây để hỗ trợ. Bạn có thể hỏi về sản phẩm, đơn hàng, giờ mở cửa…
               </Typography>
             )}
             {messages.map((m) => (
@@ -302,7 +305,7 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
               <Stack direction="row" alignItems="center" spacing={1}>
                 <CircularProgress size={14} />
                 <Typography variant="caption" color="text.secondary">
-                  CiCi đang soạn tin…
+                  {brandName} đang soạn tin…
                 </Typography>
               </Stack>
             )}

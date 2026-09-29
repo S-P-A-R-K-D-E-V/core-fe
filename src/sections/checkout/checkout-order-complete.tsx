@@ -12,6 +12,7 @@ import Dialog, { DialogProps } from '@mui/material/Dialog';
 import { OrderCompleteIllustration } from 'src/assets/illustrations';
 
 import Iconify from 'src/components/iconify';
+import { useStoreBrand } from 'src/components/branding';
 import { varFade } from 'src/components/animate';
 
 // ----------------------------------------------------------------------
@@ -23,6 +24,8 @@ interface Props extends DialogProps {
 }
 
 export default function CheckoutOrderComplete({ open, orderId, onReset }: Props) {
+  const { brandName } = useStoreBrand();
+
   const renderContent = (
     <Stack
       spacing={5}
@@ -53,7 +56,7 @@ export default function CheckoutOrderComplete({ open, orderId, onReset }: Props)
         <br />
         Shop sẽ liên hệ xác nhận trong vòng 30 phút.
         <br />
-        Nếu có thắc mắc, nhắn tin cho CiCi qua Messenger nhé!
+        Nếu có thắc mắc, nhắn tin cho {brandName} qua Messenger nhé!
       </Typography>
 
       <Divider sx={{ borderStyle: 'dashed' }} />

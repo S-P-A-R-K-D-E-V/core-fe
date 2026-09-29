@@ -1,3 +1,5 @@
+'use client';
+
 import { forwardRef } from 'react';
 
 import Link from '@mui/material/Link';
@@ -5,6 +7,8 @@ import { useTheme } from '@mui/material/styles';
 import Box, { BoxProps } from '@mui/material/Box';
 
 import { RouterLink } from 'src/routes/components';
+
+import { useStoreBrand } from 'src/components/branding';
 
 // ----------------------------------------------------------------------
 
@@ -24,14 +28,40 @@ const Logo = forwardRef<HTMLDivElement, LogoProps>(
 
     const PRIMARY_DARK = theme.palette.primary.dark;
 
+    // Logo truyền vào > logo của cửa hàng đang mở > logo tĩnh (chỉ CiCi). Cửa hàng khác chưa có logo
+    // thì hiện chữ cái đầu tên cửa hàng, không dùng logo CiCi.
+    const brand = useStoreBrand();
+    const src = logoSrc || brand.logoUrl || (brand.isCiCi ? '/logo/logo_single.png' : null);
+
     // OR using local (public folder)
     // -------------------------------------------------------
-     const logo = (
+     const logo = src ? (
        <Box
          component="img"
-         src={logoSrc || '/logo/logo_single.png'}
+         src={src}
+         alt={brand.brandName}
          sx={{ width: 60, height: 40, cursor: 'pointer', objectFit: 'contain', ...sx }}
        />
+     ) : (
+       <Box
+         title={brand.brandName}
+         sx={{
+           width: 40,
+           height: 40,
+           borderRadius: 1.5,
+           cursor: 'pointer',
+           display: 'inline-flex',
+           alignItems: 'center',
+           justifyContent: 'center',
+           fontWeight: 700,
+           fontSize: 20,
+           color: 'common.white',
+           bgcolor: brand.primaryColor || PRIMARY_MAIN,
+           ...sx,
+         }}
+       >
+         {brand.brandName.trim().charAt(0).toUpperCase()}
+       </Box>
      );
 
     //const logo = (

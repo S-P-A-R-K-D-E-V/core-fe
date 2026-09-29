@@ -19,12 +19,14 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import Label from 'src/components/label';
 import { useSnackbar } from 'src/components/snackbar';
+import { useStoreBrand } from 'src/components/branding';
 
 import {
   disconnectKiotViet,
   type IKiotVietConnection,
   getKiotVietConnection,
   saveKiotVietConnection,
+  testKiotVietConnection,
 } from 'src/api/store-settings';
 
 // ----------------------------------------------------------------------
@@ -35,6 +37,9 @@ export default function KiotVietConnectionTab() {
   const [form, setForm] = useState({ retailer: '', clientId: '', clientSecret: '' });
   const [saving, setSaving] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [testing, setTesting] = useState<'current' | 'form' | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const { isCiCi } = useStoreBrand();
 
   const load = useCallback(() => {
     getKiotVietConnection()
@@ -62,6 +67,21 @@ export default function KiotVietConnectionTab() {
       enqueueSnackbar(apiErrorMessage(err, 'Kết nối KiotViet thất bại'), { variant: 'error' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Thử kết nối KiotViet, KHÔNG lưu: 'current' = bộ đang dùng; 'form' = thông tin vừa nhập.
+  const handleTest = async (which: 'current' | 'form') => {
+    setTesting(which);
+    setTestResult(null);
+    try {
+      const res = await testKiotVietConnection(which === 'form' ? form : undefined);
+      setTestResult({ ok: true, message: res.message });
+      if (which === 'current') load();
+    } catch (err) {
+      setTestResult({ ok: false, message: apiErrorMessage(err, 'Không kết nối được KiotViet') });
+    } finally {
+      setTesting(null);
     }
   };
 
@@ -103,68 +123,92 @@ export default function KiotVietConnectionTab() {
 
           {!!status?.lastError && <Alert severity="warning">{status.lastError}</Alert>}
 
+          {!!testResult && (
+            <Alert severity={testResult.ok ? 'success' : 'error'} onClose={() => setTestResult(null)}>
+              {testResult.message}
+            </Alert>
+          )}
+
+          {status?.connected && (
+            <Stack direction="row">
+              <LoadingButton variant="outlined" loading={testing === 'current'} onClick={() => handleTest('current')}>
+                Kiểm tra kết nối
+              </LoadingButton>
+            </Stack>
+          )}
+
           {isSystem && (
             <Alert severity="info">
-              Cửa hàng này dùng tài khoản KiotViet cấu hình trong hệ thống. Liên hệ quản trị hệ thống để thay đổi.
+              Đang dùng tài khoản KiotViet cấu hình trong hệ thống. Có thể chuyển sang quản lý tại đây bằng cách nhập
+              Client ID và Client Secret bên dưới (Client Secret được mã hoá). Nhập đúng tài khoản đang dùng thì webhook
+              và đồng bộ đơn hàng không bị gián đoạn.
             </Alert>
           )}
         </Stack>
       </Card>
 
-      {!isSystem && (
-        <Card sx={{ p: 3 }}>
-          <Stack spacing={2.5}>
-            <Stack spacing={0.5}>
-              <Typography variant="h6">{status?.connected ? 'Đổi tài khoản KiotViet' : 'Kết nối KiotViet'}</Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Lấy Client ID và Client Secret trong KiotViet: Thiết lập → Thiết lập cửa hàng → Thiết lập kết
-                nối API. Hệ thống thử đăng nhập trước, chỉ lưu khi thành công; Client Secret được mã hoá và không
-                hiển thị lại.
-              </Typography>
-            </Stack>
-
-            <TextField
-              label="Tên đăng nhập cửa hàng (retailer)"
-              placeholder="vd: tiemtocabc"
-              value={form.retailer}
-              onChange={(e) => setForm((f) => ({ ...f, retailer: e.target.value.trim() }))}
-            />
-            <TextField
-              label="Client ID"
-              value={form.clientId}
-              onChange={(e) => setForm((f) => ({ ...f, clientId: e.target.value.trim() }))}
-            />
-            <TextField
-              label="Client Secret"
-              type="password"
-              autoComplete="new-password"
-              value={form.clientSecret}
-              onChange={(e) => setForm((f) => ({ ...f, clientSecret: e.target.value }))}
-            />
-
-            <Stack direction="row" spacing={1.5} justifyContent="flex-end">
-              {status?.connected && (
-                <Button color="error" onClick={() => setConfirmDisconnect(true)}>
-                  Ngắt kết nối
-                </Button>
-              )}
-              <LoadingButton
-                variant="contained"
-                loading={saving}
-                disabled={!form.retailer || !form.clientId || !form.clientSecret}
-                onClick={handleSave}
-              >
-                Kiểm tra &amp; lưu
-              </LoadingButton>
-            </Stack>
+      <Card sx={{ p: 3 }}>
+        <Stack spacing={2.5}>
+          <Stack spacing={0.5}>
+            <Typography variant="h6">{status?.connected ? 'Đổi tài khoản KiotViet' : 'Kết nối KiotViet'}</Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Lấy Client ID và Client Secret trong KiotViet: Thiết lập → Thiết lập cửa hàng → Thiết lập kết
+              nối API. Hệ thống thử đăng nhập trước, chỉ lưu khi thành công; Client Secret được mã hoá và không
+              hiển thị lại.
+            </Typography>
           </Stack>
-        </Card>
-      )}
+
+          <TextField
+            label="Tên đăng nhập cửa hàng (retailer)"
+            placeholder="vd: tiemtocabc"
+            value={form.retailer}
+            onChange={(e) => setForm((f) => ({ ...f, retailer: e.target.value.trim() }))}
+          />
+          <TextField
+            label="Client ID"
+            value={form.clientId}
+            onChange={(e) => setForm((f) => ({ ...f, clientId: e.target.value.trim() }))}
+          />
+          <TextField
+            label="Client Secret"
+            type="password"
+            autoComplete="new-password"
+            value={form.clientSecret}
+            onChange={(e) => setForm((f) => ({ ...f, clientSecret: e.target.value }))}
+          />
+
+          <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+            {status?.connected && !isSystem && (
+              <Button color="error" onClick={() => setConfirmDisconnect(true)}>
+                {isCiCi ? 'Quay về cấu hình hệ thống' : 'Ngắt kết nối'}
+              </Button>
+            )}
+            <LoadingButton
+              variant="outlined"
+              loading={testing === 'form'}
+              disabled={!form.retailer || !form.clientId || !form.clientSecret}
+              onClick={() => handleTest('form')}
+            >
+              Kiểm tra
+            </LoadingButton>
+            <LoadingButton
+              variant="contained"
+              loading={saving}
+              disabled={!form.retailer || !form.clientId || !form.clientSecret}
+              onClick={handleSave}
+            >
+              Kiểm tra &amp; lưu
+            </LoadingButton>
+          </Stack>
+        </Stack>
+      </Card>
 
       <Dialog open={confirmDisconnect} onClose={() => setConfirmDisconnect(false)}>
-        <DialogTitle>Ngắt kết nối KiotViet?</DialogTitle>
+        <DialogTitle>{isCiCi ? 'Quay về cấu hình hệ thống?' : 'Ngắt kết nối KiotViet?'}</DialogTitle>
         <DialogContent>
-          Đồng bộ đơn hàng, hàng hoá và khách hàng từ KiotViet sẽ dừng. Dữ liệu đã đồng bộ vẫn được giữ.
+          {isCiCi
+            ? 'Xoá kết nối lưu trên giao diện; hệ thống dùng lại tài khoản KiotViet trong cấu hình máy chủ.'
+            : 'Đồng bộ đơn hàng, hàng hoá và khách hàng từ KiotViet sẽ dừng. Dữ liệu đã đồng bộ vẫn được giữ.'}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmDisconnect(false)}>Huỷ</Button>

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
+import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
@@ -13,7 +14,7 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import { useSnackbar } from 'src/components/snackbar';
 
-import { type IStoreBranding, getStoreBranding, saveStoreBranding } from 'src/api/store-settings';
+import { uploadStoreLogo, type IStoreBranding, getStoreBranding, saveStoreBranding } from 'src/api/store-settings';
 
 // ----------------------------------------------------------------------
 
@@ -35,6 +36,33 @@ export default function StoreBrandingTab() {
   const [form, setForm] = useState<IStoreBranding>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Logo lưu trong bucket của hệ thống (thư mục branding/ của cửa hàng) và dùng ngay.
+  const handleLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      enqueueSnackbar('Logo phải là ảnh PNG, JPEG hoặc WebP', { variant: 'error' });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      enqueueSnackbar('Logo tối đa 2 MB', { variant: 'error' });
+      return;
+    }
+    setUploading(true);
+    try {
+      const { logoUrl } = await uploadStoreLogo(file);
+      setForm((f) => ({ ...f, logoUrl }));
+      enqueueSnackbar('Đã tải logo lên');
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Tải logo thất bại'), { variant: 'error' });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     getStoreBranding()
@@ -84,7 +112,29 @@ export default function StoreBrandingTab() {
         </Stack>
 
         <TextField label="Tên cửa hàng" inputProps={{ maxLength: 200 }} {...field('storeName')} />
-        <TextField label="Link logo (https://…)" inputProps={{ maxLength: 500 }} {...field('logoUrl')} />
+        <Stack direction="row" spacing={1.5} alignItems="flex-start">
+          <TextField
+            label="Link logo"
+            helperText="Tải ảnh lên (PNG/JPEG/WebP, tối đa 2 MB) hoặc dán link ảnh có sẵn"
+            inputProps={{ maxLength: 500 }}
+            {...field('logoUrl')}
+          />
+          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={handleLogoFile} />
+          <LoadingButton
+            variant="outlined"
+            loading={uploading}
+            disabled={loading}
+            onClick={() => fileRef.current?.click()}
+            sx={{ flexShrink: 0, height: 56 }}
+          >
+            Tải ảnh lên
+          </LoadingButton>
+          {!!form.logoUrl && (
+            <Button color="inherit" sx={{ flexShrink: 0, height: 56 }} onClick={() => setForm((f) => ({ ...f, logoUrl: null }))}>
+              Bỏ logo
+            </Button>
+          )}
+        </Stack>
         <TextField
           label="Màu chủ đạo (#RRGGBB)"
           placeholder="#D81B60"

@@ -22,6 +22,8 @@ import { SettingsDrawer, SettingsProvider } from 'src/components/settings';
 import { CheckoutProvider } from 'src/sections/checkout/context';
 
 import { AuthProvider } from 'src/auth/context/jwt';
+import { BrandingProvider } from 'src/components/branding';
+import { getTenantBranding } from 'src/lib/tenant-branding';
 // import { AuthProvider } from 'src/auth/context/auth0';
 // import { AuthProvider } from 'src/auth/context/amplify';
 // import { AuthProvider } from 'src/auth/context/firebase';
@@ -36,7 +38,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export const metadata: Metadata = {
+const CICI_METADATA: Metadata = {
   title: {
     template: '%s | CiCi Accessories',
     default: 'CiCi Accessories — Phụ kiện thời trang nữ',
@@ -66,11 +68,36 @@ export const metadata: Metadata = {
   ],
 };
 
+// Tiêu đề/mô tả theo cửa hàng của tên miền đang mở; CiCi (hoặc không đọc được) giữ nguyên như cũ.
+export async function generateMetadata(): Promise<Metadata> {
+  const branding = await getTenantBranding();
+  if (!branding || branding.tenantCode === 'cici68' || !branding.storeName) return CICI_METADATA;
+
+  const name = branding.storeName;
+  return {
+    title: { template: `%s | ${name}`, default: name },
+    description: branding.shortDescription ?? name,
+    manifest: '/manifest.json',
+    openGraph: { type: 'website', locale: 'vi_VN', siteName: name, title: name },
+    icons: branding.logoUrl ? [{ rel: 'icon', url: branding.logoUrl }] : CICI_METADATA.icons,
+  };
+}
+
 type Props = {
   children: React.ReactNode;
 };
 
-export default function RootLayout({ children }: Props) {
+export default async function RootLayout({ children }: Props) {
+  const branding = await getTenantBranding();
+  const brand = branding
+    ? {
+        tenantCode: branding.tenantCode,
+        storeName: branding.storeName,
+        logoUrl: branding.logoUrl,
+        primaryColor: branding.primaryColor,
+      }
+    : null;
+
   return (
     <html
       lang="vi"
@@ -78,6 +105,7 @@ export default function RootLayout({ children }: Props) {
       suppressHydrationWarning
     >
       <body>
+        <BrandingProvider value={brand}>
         <AuthProvider>
           <LocalizationProvider>
             <SettingsProvider
@@ -108,6 +136,7 @@ export default function RootLayout({ children }: Props) {
             </SettingsProvider>
           </LocalizationProvider>
         </AuthProvider>
+        </BrandingProvider>
       </body>
     </html>
   );

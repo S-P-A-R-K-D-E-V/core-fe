@@ -91,3 +91,23 @@ export async function revokeAgentKey(id: string): Promise<void> {
 export async function deleteMyAccount(): Promise<void> {
   await axios.delete('/auth/account', { data: { confirm: true } });
 }
+
+/** Tải logo lên bucket (thư mục branding/ của cửa hàng) và dùng làm logo luôn. */
+export async function uploadStoreLogo(file: File): Promise<{ logoUrl: string }> {
+  const form = new FormData();
+  form.append('logo', file);
+  const res = await axios.post('/store-settings/branding/logo', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data;
+}
+
+/** Thử kết nối KiotViet không lưu. Không truyền gì = thử bộ đang dùng. */
+export async function testKiotVietConnection(data?: {
+  retailer: string;
+  clientId: string;
+  clientSecret: string;
+}): Promise<{ ok: boolean; branchCount: number; message: string }> {
+  const res = await axios.post('/kiotviet/connection/test', data ?? {});
+  return res.data;
+}
