@@ -22,6 +22,7 @@ import {
   isValidTenantCode,
   APPLE_SERVICES_ID,
   AUTH_HOST,
+  tenantCodeFromHost,
 } from 'src/auth/utils/saas-host';
 
 import Iconify from 'src/components/iconify';
@@ -73,6 +74,9 @@ export default function SsoStartView() {
   const tenant = searchParams.get('tenant');
   const state = searchParams.get('state');
   const returnTo = searchParams.get('returnTo');
+  // Tên miền cửa hàng người dùng đang dùng; chỉ tin khi đúng là tên miền của mã cửa hàng này.
+  const hostParam = searchParams.get('host');
+  const storeHost = hostParam && tenantCodeFromHost(hostParam) === tenant ? hostParam.split(':')[0] : `${tenant}.${SAAS_ZONE}`;
 
   // Host chỉ biết được ở trình duyệt; đọc sau khi mount để HTML render ở server và lần render đầu
   // ở client giống nhau.
@@ -161,7 +165,7 @@ export default function SsoStartView() {
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           Vào cửa hàng{' '}
           <Typography component="span" variant="subtitle2" sx={{ color: 'text.primary' }}>
-            {tenant}.{SAAS_ZONE}
+            {storeHost}
           </Typography>
         </Typography>
       </Stack>
@@ -203,7 +207,7 @@ export default function SsoStartView() {
       {/* Trang này chỉ lo Google/Apple (hai bên chỉ cho khai báo một tên miền). Đăng nhập bằng mật
           khẩu nằm ở trang đăng nhập của chính cửa hàng. */}
       <Link
-        href={`https://${tenant}.${SAAS_ZONE}/auth/jwt/login/${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`}
+        href={`https://${storeHost}/auth/jwt/login/${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`}
         variant="body2"
         sx={{ textAlign: 'center' }}
       >

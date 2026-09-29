@@ -8,6 +8,8 @@ describe('tenantCodeFromHost', () => {
     ['SHOPABC.devbyspark.com', 'shopabc'],
     ['demo.devbyspark.com:443', 'demo'],
     ['tiem-toc-2.devbyspark.com', 'tiem-toc-2'],
+    ['ducna.store.devbyspark.com', 'ducna'],
+    ['DEMO.store.devbyspark.com:443', 'demo'],
   ])('%s → %s', (host, code) => {
     expect(tenantCodeFromHost(host)).toBe(code);
   });
@@ -20,6 +22,9 @@ describe('tenantCodeFromHost', () => {
     'a.b.devbyspark.com',
     'evil-devbyspark.com',
     'shop.devbyspark.com.evil.example',
+    'store.devbyspark.com',
+    'a.b.store.devbyspark.com',
+    'ducna.finance.devbyspark.com',
   ])('%s không phải cửa hàng SaaS', (host) => {
     expect(tenantCodeFromHost(host)).toBeNull();
   });
@@ -69,6 +74,7 @@ describe('beginCentralLogin', () => {
     const target = new URL(assign.mock.calls[0][0]);
     expect(target.host).toBe('auth.devbyspark.com');
     expect(target.searchParams.get('tenant')).toBe('shop1');
+    expect(target.searchParams.get('host')).toBe('shop1.devbyspark.com');
     expect(target.searchParams.get('returnTo')).toBe('/dashboard/pos');
     expect(target.searchParams.get('state')).toBe(takeCentralLoginState());
     expect(takeCentralLoginMobileRedirect()).toBe('sparkstore://auth/callback');

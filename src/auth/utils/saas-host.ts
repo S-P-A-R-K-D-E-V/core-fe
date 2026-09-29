@@ -1,12 +1,20 @@
 // ----------------------------------------------------------------------
-// Nhận diện tên miền cửa hàng SaaS (<mã>.devbyspark.com) và trang đăng nhập tập trung
-// (auth.devbyspark.com). CiCi (cici21chualang.vn) và localhost không thuộc vùng này nên giữ
-// nguyên luồng đăng nhập cũ.
+// Nhận diện tên miền cửa hàng SaaS (<mã>.store.devbyspark.com; cửa hàng tạo trước đó còn ở
+// <mã>.devbyspark.com) và trang đăng nhập tập trung (auth.devbyspark.com). CiCi
+// (cici21chualang.vn) và localhost không thuộc vùng nào nên giữ nguyên luồng đăng nhập cũ.
+// Phải khớp Tenancy:SaasZones của core-be (vùng đầu = vùng cấp tên miền cho cửa hàng mới).
 // ----------------------------------------------------------------------
 
-export const SAAS_ZONE = process.env.NEXT_PUBLIC_SAAS_ZONE || 'devbyspark.com';
+export const SAAS_ZONES = (process.env.NEXT_PUBLIC_SAAS_ZONES || process.env.NEXT_PUBLIC_SAAS_ZONE || 'store.devbyspark.com,devbyspark.com')
+  .split(',')
+  .map((z) => z.trim().toLowerCase())
+  .filter(Boolean);
 
-export const AUTH_HOST = process.env.NEXT_PUBLIC_AUTH_HOST || `auth.${SAAS_ZONE}`;
+/** Vùng cấp tên miền cho cửa hàng mới. */
+export const SAAS_ZONE = SAAS_ZONES[0];
+
+// Đã khai báo với Google/Apple — không đổi theo vùng cửa hàng.
+export const AUTH_HOST = process.env.NEXT_PUBLIC_AUTH_HOST || 'auth.devbyspark.com';
 
 /** Services ID của Sign in with Apple cho web. Rỗng = ẩn nút Apple. */
 export const APPLE_SERVICES_ID = process.env.NEXT_PUBLIC_APPLE_SERVICES_ID || '';
@@ -21,11 +29,19 @@ export function isAuthHost(host: string): boolean {
   return host.toLowerCase() === AUTH_HOST;
 }
 
-/** Mã cửa hàng nếu host là <mã>.devbyspark.com (không tính auth.devbyspark.com), ngược lại null. */
+/**
+ * Mã cửa hàng nếu host là <mã>.<một vùng SaaS> (không tính auth host), ngược lại null. Vùng dài
+ * hơn được xét trước: ducna.store.devbyspark.com là "ducna", không phải "ducna.store".
+ */
 export function tenantCodeFromHost(host: string): string | null {
   const h = host.toLowerCase().split(':')[0];
-  if (isAuthHost(h) || !h.endsWith(`.${SAAS_ZONE}`)) return null;
-  const code = h.slice(0, -(SAAS_ZONE.length + 1));
+  if (isAuthHost(host) || isAuthHost(h) || SAAS_ZONES.includes(h)) return null;
+
+  const zones = [...SAAS_ZONES].sort((a, b) => b.length - a.length);
+  const zone = zones.find((z) => h.endsWith(`.${z}`));
+  if (!zone) return null;
+
+  const code = h.slice(0, -(zone.length + 1));
   return isValidTenantCode(code) ? code : null;
 }
 
@@ -84,6 +100,8 @@ export function beginCentralLogin(
 
   const url = new URL(`https://${AUTH_HOST}/sso/start/`);
   url.searchParams.set('tenant', code);
+  // Tên miền đang dùng (vùng mới hay cũ) để trang auth hiển thị và quay về đúng chỗ.
+  url.searchParams.set('host', window.location.host.toLowerCase());
   url.searchParams.set('state', state);
   if (provider) url.searchParams.set('provider', provider);
   if (returnTo) url.searchParams.set('returnTo', returnTo);
