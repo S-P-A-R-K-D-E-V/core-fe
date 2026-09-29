@@ -224,6 +224,7 @@ export function AuthProvider({ children }: Props) {
       const res = await axios.get(endpoints.users.me);
       const profileImageUrl: string | undefined = res.data?.profileImageUrl;
       const hasFaceEmbedding: boolean | undefined = res.data?.hasFaceEmbedding;
+      const enabledFeatures: string[] | undefined = res.data?.enabledFeatures;
       dispatch({
         type: Types.LOGIN,
         payload: {
@@ -231,6 +232,7 @@ export function AuthProvider({ children }: Props) {
             ...baseUser,
             ...(profileImageUrl ? { photoURL: getStorageUrl(profileImageUrl) } : null),
             hasFaceEmbedding: !!hasFaceEmbedding,
+            enabledFeatures: enabledFeatures ?? [],
           },
         },
       });
@@ -420,6 +422,7 @@ export function AuthProvider({ children }: Props) {
       const res = await axios.get(endpoints.users.me);
       const profileImageUrl: string | undefined = res.data?.profileImageUrl;
       const hasFaceEmbedding: boolean | undefined = res.data?.hasFaceEmbedding;
+      const enabledFeatures: string[] | undefined = res.data?.enabledFeatures;
       dispatch({
         type: Types.LOGIN,
         payload: {
@@ -427,6 +430,7 @@ export function AuthProvider({ children }: Props) {
             ...merged,
             ...(profileImageUrl ? { photoURL: getStorageUrl(profileImageUrl) } : null),
             hasFaceEmbedding: !!hasFaceEmbedding,
+            enabledFeatures: enabledFeatures ?? (merged as any).enabledFeatures ?? [],
           },
         },
       });

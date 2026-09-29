@@ -17,7 +17,7 @@ import NavToggleButton from '../common/nav-toggle-button';
 export default function NavMini() {
   const { user } = useAuthContext();
 
-  const navData = useNavData(user?.role);
+  const navData = useNavData(user?.role, user?.enabledFeatures);
 
   return (
     <Box

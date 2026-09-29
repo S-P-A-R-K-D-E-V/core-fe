@@ -39,7 +39,7 @@ export default function NavVertical({ openNav, onCloseNav }: Props) {
 
   const lgUp = useResponsive('up', 'lg');
 
-  const navData = useNavData(user?.role);
+  const navData = useNavData(user?.role, user?.enabledFeatures);
 
   const favoritesDialog = useBoolean();
   const { favorites, isFull, toggleFavorite } = useNavFavorites();

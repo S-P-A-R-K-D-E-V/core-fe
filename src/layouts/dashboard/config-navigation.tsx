@@ -47,20 +47,23 @@ const ICONS = {
 
 // ----------------------------------------------------------------------
 
-/** Lọc nav item theo role của user hiện tại (đệ quy vào children) */
-function filterByRole<T extends { roles?: string[]; children?: T[] }>(
+/** Lọc nav item theo role VÀ theo feature key đang bật cho tenant hiện tại (đệ quy vào children).
+ * Item không khai báo featureKey luôn hiện (không phải mọi mục đều gắn với 1 feature có thể tắt). */
+function filterByRoleAndFeature<T extends { roles?: string[]; featureKey?: string; children?: T[] }>(
   items: T[],
-  userRole: string
+  userRole: string,
+  enabledFeatures: string[]
 ): T[] {
   return items
     .filter((item) => !item.roles || item.roles.includes(userRole))
+    .filter((item) => !item.featureKey || enabledFeatures.includes(item.featureKey))
     .map((item) => ({
       ...item,
-      children: item.children ? filterByRole(item.children, userRole) : undefined,
+      children: item.children ? filterByRoleAndFeature(item.children, userRole, enabledFeatures) : undefined,
     }));
 }
 
-export function useNavData(userRole?: string) {
+export function useNavData(userRole?: string, enabledFeatures?: string[]) {
   const { t } = useTranslate();
 
   const data = useMemo(
@@ -87,18 +90,21 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.attendance.checkin,
             icon: ICONS.job,
             roles: ['Admin', 'Manager', 'Staff'],
+            featureKey: 'workforce.attendance',
           },
           {
             title: t('mySchedule'),
             path: paths.dashboard.attendance.mySchedule,
             icon: ICONS.calendar,
             roles: ['Admin', 'Manager', 'Staff'],
+            featureKey: 'workforce.shift-scheduling',
           },
           {
             title: t('faceEnrollment'),
             path: paths.dashboard.attendance.faceEnrollment,
             icon: ICONS.user,
             roles: ['Admin', 'Manager', 'Staff'],
+            featureKey: 'workforce.attendance',
           },
           {
             title: 'Thiết bị Kiosk',
@@ -117,6 +123,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.attendance.shiftRegistration,
             icon: ICONS.label,
             roles: ['Admin', 'Manager', 'Staff'],
+            featureKey: 'workforce.shift-scheduling',
           },
           // MY PAYROLL (Staff, and also available to Admin/Manager)
           {
@@ -124,6 +131,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.payroll.myPayroll,
             icon: ICONS.banking,
             roles: ['Admin', 'Manager', 'Staff'],
+            featureKey: 'payroll.core',
           },
         ]
       },
@@ -139,6 +147,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.chatbotAdmin,
             icon: ICONS.chat,
             roles: ['Admin'],
+            featureKey: 'notifications.chatbot',
           },
 
           // INTERNAL MESSENGER
@@ -177,6 +186,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.shift.root,
             icon: ICONS.calendar,
             roles: ['Admin', 'Manager'],
+            featureKey: 'workforce.shift-scheduling',
             children: [
               {
                 title: t('shiftTemplates'),
@@ -200,6 +210,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.cleaning.root,
             icon: ICONS.calendar,
             roles: ['Admin', 'Manager', 'Staff'],
+            featureKey: 'workforce.cleaning',
             children: [
               { title: t('cleaningMyChecklist'), path: paths.dashboard.cleaning.myChecklist },
               { title: t('cleaningTaskLibrary'), path: paths.dashboard.cleaning.taskLibrary, roles: ['Admin', 'Manager'] },
@@ -224,6 +235,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.attendance.root,
             icon: ICONS.booking,
             roles: ['Admin', 'Manager'],
+            featureKey: 'workforce.attendance',
             children: [
               { title: t('assignmentsAttendance'), path: paths.dashboard.attendance.assignments },
               { title: t('logsAttendance'), path: paths.dashboard.attendance.logs },
@@ -242,12 +254,12 @@ export function useNavData(userRole?: string) {
             icon: ICONS.banking,
             roles: ['Admin', 'Manager'],
             children: [
-              { title: t('salaryConfiguration'), path: paths.dashboard.salary.configuration },
-              { title: t('salaryHistory'), path: paths.dashboard.salary.history },
-              { title: t('holidayPolicy'), path: paths.dashboard.holidayPolicy.list },
-              { title: t('penaltyPolicy'), path: paths.dashboard.penaltyPolicy.list },
-              { title: t('payrollCycle'), path: paths.dashboard.payroll.cycles },
-              { title: t('payrollBatch'), path: paths.dashboard.payroll.batch },
+              { title: t('salaryConfiguration'), path: paths.dashboard.salary.configuration, featureKey: 'payroll.core' },
+              { title: t('salaryHistory'), path: paths.dashboard.salary.history, featureKey: 'payroll.core' },
+              { title: t('holidayPolicy'), path: paths.dashboard.holidayPolicy.list, featureKey: 'payroll.core' },
+              { title: t('penaltyPolicy'), path: paths.dashboard.penaltyPolicy.list, featureKey: 'payroll.penalty' },
+              { title: t('payrollCycle'), path: paths.dashboard.payroll.cycles, featureKey: 'payroll.core' },
+              { title: t('payrollBatch'), path: paths.dashboard.payroll.batch, featureKey: 'payroll.core' },
             ],
           },
           
@@ -258,6 +270,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.shiftPool.root,
             icon: ICONS.job,
             roles: ['Admin', 'Manager', 'Staff'],
+            featureKey: 'workforce.shift-scheduling',
           },
 
           // SHIFT AUDIT LOG (Admin, Manager)
@@ -266,6 +279,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.shiftAudit.root,
             icon: ICONS.file,
             roles: ['Admin', 'Manager'],
+            featureKey: 'workforce.shift-scheduling',
           },
 
           // PHIÊN CHAT AGENT (Admin, Manager) — theo dõi phiên đang hoạt động + nhận trả lời tay
@@ -274,6 +288,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.agentSessions.root,
             icon: ICONS.chat,
             roles: ['Admin', 'Manager'],
+            featureKey: 'notifications.chatbot',
           },
 
           // NOTIFICATION CONFIG (Admin only)
@@ -289,6 +304,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.kiotVietSync.root,
             icon: ICONS.ecommerce,
             roles: ['Admin'],
+            featureKey: 'commerce.retail.kiotviet-sync',
           },
           // SYSTEM JOBS (Admin only)
           {
@@ -310,6 +326,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.pos.product.root,
             icon: ICONS.product,
             roles: ['Admin'],
+            featureKey: 'commerce.retail.inventory',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.product.list },
               { title: 'Thêm mới', path: paths.dashboard.pos.product.new },
@@ -320,6 +337,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.pos.category.root,
             icon: ICONS.folder,
             roles: ['Admin'],
+            featureKey: 'commerce.retail.inventory',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.category.list },
               { title: 'Thêm mới', path: paths.dashboard.pos.category.new },
@@ -330,6 +348,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.pos.inventory.root,
             icon: ICONS.ecommerce,
             roles: ['Admin'],
+            featureKey: 'commerce.retail.inventory',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.inventory.list },
               { title: 'Sắp hết hàng', path: paths.dashboard.pos.inventory.lowStock },
@@ -341,6 +360,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.pos.warehouse.root,
             icon: ICONS.banking,
             roles: ['Admin'],
+            featureKey: 'commerce.retail.inventory',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.warehouse.list },
             ],
@@ -350,6 +370,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.pos.unitOfMeasure.root,
             icon: ICONS.label,
             roles: ['Admin'],
+            featureKey: 'commerce.retail.inventory',
             children: [
               { title: 'Đơn vị tính', path: paths.dashboard.pos.unitOfMeasure.list },
               { title: 'Thuộc tính biến thể', path: paths.dashboard.pos.variantAttribute.list },
@@ -360,6 +381,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.pos.supplier.root,
             icon: ICONS.user,
             roles: ['Admin'],
+            featureKey: 'commerce.retail.inventory',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.supplier.list },
               { title: 'Thêm mới', path: paths.dashboard.pos.supplier.new },
@@ -370,6 +392,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.pos.purchaseOrder.root,
             icon: ICONS.order,
             roles: ['Admin'],
+            featureKey: 'commerce.retail.inventory',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.purchaseOrder.list },
               { title: 'Tạo đơn', path: paths.dashboard.pos.purchaseOrder.new },
@@ -380,6 +403,7 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.pos.customer.root,
             icon: ICONS.user,
             roles: ['Admin'],
+            featureKey: 'commerce.retail.pos',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.customer.list },
               { title: 'Thêm mới', path: paths.dashboard.pos.customer.new },
@@ -390,12 +414,14 @@ export function useNavData(userRole?: string) {
             path: paths.dashboard.pos.sale.root,
             icon: ICONS.ecommerce,
             roles: ['Admin'],
+            featureKey: 'commerce.retail.pos',
           },
           {
             title: 'Đơn bán hàng',
             path: paths.dashboard.pos.salesOrder.root,
             icon: ICONS.banking,
             roles: ['Admin'],
+            featureKey: 'commerce.retail.pos',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.salesOrder.list },
               { title: 'Tạo đơn', path: paths.dashboard.pos.salesOrder.new },
@@ -451,16 +477,18 @@ export function useNavData(userRole?: string) {
       // Nếu user chưa load hoặc chưa có role → trả nguyên (SplashScreen đang hiện)
       if (!userRole) return fullNav;
 
-      // Lọc từng group theo role, bỏ group rỗng
+      // Lọc từng group theo role + feature đang bật cho tenant, bỏ group rỗng.
+      // enabledFeatures undefined (chưa fetch xong /users/me) → coi như chưa bật gì, tránh
+      // nháy hiện rồi ẩn khi tenant có feature bị tắt.
       return fullNav
         .map((group) => ({
           ...group,
-          items: filterByRole(group.items as any[], userRole),
+          items: filterByRoleAndFeature(group.items as any[], userRole, enabledFeatures ?? []),
         }))
         .filter((group) => group.items.length > 0);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, userRole]
+    [t, userRole, enabledFeatures]
   );
 
   return data;
