@@ -11,6 +11,7 @@ import {
   ISettlementListItem,
   ISettlementDetail,
   ISettlementBreakdown,
+  SettlementDuplicateKind,
 } from 'src/types/corecms-api';
 
 // ========== Shareholder ==========
@@ -212,6 +213,15 @@ export async function closeSettlement(data: {
 }): Promise<{ id: string }> {
   const response = await axios.post(endpoints.shareholders.settlements, data);
   return response.data;
+}
+
+// Tích/bỏ tích "Đưa vào sao kê" cho 1 khoản bị cảnh báo trùng — khoản thuộc kỳ đã chốt bị từ chối
+export async function setSettlementInclusion(data: {
+  kind: SettlementDuplicateKind;
+  sourceId: string;
+  include: boolean;
+}): Promise<void> {
+  await axios.put(endpoints.shareholders.settlementInclusion, data);
 }
 
 export async function markTransferPaid(transferId: string): Promise<{ paidTransactionId: string }> {

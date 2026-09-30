@@ -3031,6 +3031,24 @@ export interface ISettlementPreview {
   canClose: boolean;
   isOverlapping: boolean;
   sheetStyle?: ISheetStyleComparison | null;
+  duplicateWarnings?: ISettlementDuplicateWarning[] | null;
+}
+
+// Khoản có thể bị tính trùng khi chốt sổ — tích/bỏ tích "Đưa vào sao kê" (includedInSettlement).
+// ShiftCashWithdrawal: rút quầy tiền mặt cho cổ đông đang nhận doanh thu Tiền mặt qua Kênh thu tiền;
+// Expense: chi phí tự sinh từ mẫu định kỳ / trùng danh mục + số tiền với khoản khác trong kỳ.
+export type SettlementDuplicateKind = 'ShiftCashWithdrawal' | 'Expense';
+
+export interface ISettlementDuplicateWarning {
+  kind: SettlementDuplicateKind;
+  sourceId: string;
+  date: string;
+  amount: number;
+  description: string;
+  reason: string;
+  shareholderId?: string | null;
+  shareholderName?: string | null;
+  includedInSettlement: boolean;
 }
 
 // Đối chiếu theo cách tính KHÔNG gộp tiền hàng vào chi phí trước khi chia lời (tiền hàng chỉ

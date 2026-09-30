@@ -23,6 +23,7 @@ import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Collapse from '@mui/material/Collapse';
+import Checkbox from '@mui/material/Checkbox';
 import LoadingButton from '@mui/lab/LoadingButton';
 
 import { paths } from 'src/routes/paths';
@@ -35,11 +36,16 @@ import { useSnackbar } from 'src/components/snackbar';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import { AppDatePicker } from 'src/components/date-time-picker';
 import { TableHeadCustom, TableNoData } from 'src/components/table';
+import { fDate } from 'src/utils/format-time';
 import { fCurrency, fPercent } from 'src/utils/format-number';
 import { fPaymentMethod } from 'src/utils/payment-method-label';
 
-import { ISettlementPreview, ICollectedOutBreakdown } from 'src/types/corecms-api';
-import { getSettlementPreview, closeSettlement } from 'src/api/shareholders';
+import {
+  ISettlementPreview,
+  ICollectedOutBreakdown,
+  ISettlementDuplicateWarning,
+} from 'src/types/corecms-api';
+import { getSettlementPreview, closeSettlement, setSettlementInclusion } from 'src/api/shareholders';
 
 // ----------------------------------------------------------------------
 
@@ -87,6 +93,80 @@ function CollectedOutCell({
   );
 }
 
+const DUPLICATE_KIND_LABEL: Record<ISettlementDuplicateWarning['kind'], string> = {
+  ShiftCashWithdrawal: 'Rút quầy',
+  Expense: 'Chi phí',
+};
+
+// Khoản có thể bị tính trùng — bỏ tích "Đưa vào sao kê" để loại khỏi phép tính chốt sổ. Đổi tích
+// xong tải lại preview để mọi số (Tổng chi, Đã lấy ra, Lũy kế, ai trả ai) cập nhật theo.
+function DuplicateWarningsCard({
+  warnings,
+  pendingId,
+  onToggle,
+}: {
+  warnings: ISettlementDuplicateWarning[];
+  pendingId: string | null;
+  onToggle: (warning: ISettlementDuplicateWarning) => void;
+}) {
+  const excludedCount = warnings.filter((w) => !w.includedInSettlement).length;
+
+  return (
+    <Card sx={{ mb: 3 }}>
+      <CardContent>
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          <Typography variant="subtitle2">
+            {warnings.length} khoản có thể bị tính trùng
+            {excludedCount > 0 && ` — đang loại ${excludedCount} khoản khỏi sao kê`}
+          </Typography>
+          <Typography variant="body2">
+            Bỏ tích &quot;Đưa vào sao kê&quot; nếu khoản đó đã được tính ở nơi khác (vd tiền mặt đã
+            nằm trong doanh thu Tiền mặt của cổ đông, hoặc chi phí đã ghi ở sổ gốc). Khoản bị loại
+            vẫn còn trong Chi phí / Kiểm tiền quầy, chỉ không tính khi chốt sổ.
+          </Typography>
+        </Alert>
+        <Stack divider={<Divider flexItem />}>
+          {warnings.map((w) => (
+            <Stack
+              key={`${w.kind}-${w.sourceId}`}
+              direction="row"
+              alignItems="flex-start"
+              spacing={1.5}
+              sx={{ py: 1, opacity: w.includedInSettlement ? 1 : 0.6 }}
+            >
+              <Tooltip title="Đưa vào sao kê">
+                <Checkbox
+                  checked={w.includedInSettlement}
+                  disabled={pendingId !== null}
+                  onChange={() => onToggle(w)}
+                  sx={{ mt: -0.5 }}
+                />
+              </Tooltip>
+              <Stack sx={{ flex: 1, minWidth: 0 }} spacing={0.25}>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                  <Typography variant="caption" color="text.secondary">
+                    {fDate(w.date)} · {DUPLICATE_KIND_LABEL[w.kind] ?? w.kind}
+                  </Typography>
+                  <Typography variant="subtitle2">{w.description}</Typography>
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  {w.reason}
+                </Typography>
+              </Stack>
+              <Typography
+                variant="subtitle2"
+                sx={{ whiteSpace: 'nowrap', textDecoration: w.includedInSettlement ? 'none' : 'line-through' }}
+              >
+                {fCurrency(w.amount)}
+              </Typography>
+            </Stack>
+          ))}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
 const LINE_HEAD = [
   { id: 'shareholder', label: 'Cổ đông' },
   { id: 'equity', label: '%', align: 'right' as const, width: 70 },
@@ -131,6 +211,7 @@ export default function SettlementPreviewView() {
   const [periodName, setPeriodName] = useState('');
   const [note, setNote] = useState('');
   const [closing, setClosing] = useState(false);
+  const [pendingInclusionId, setPendingInclusionId] = useState<string | null>(null);
 
   const fetchPreview = useCallback(async () => {
     setLoading(true);
@@ -150,6 +231,23 @@ export default function SettlementPreviewView() {
   // mới. data=null nghĩa là CHƯA tra cứu lần nào, không phải "0đ".
   const handleSearch = () => {
     fetchPreview();
+  };
+
+  const handleToggleInclusion = async (warning: ISettlementDuplicateWarning) => {
+    setPendingInclusionId(warning.sourceId);
+    try {
+      await setSettlementInclusion({
+        kind: warning.kind,
+        sourceId: warning.sourceId,
+        include: !warning.includedInSettlement,
+      });
+      await fetchPreview();
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar('Không đổi được — khoản này có thể thuộc kỳ đã chốt sổ', { variant: 'error' });
+    } finally {
+      setPendingInclusionId(null);
+    }
   };
 
   const handleOpenClose = () => {
@@ -297,6 +395,14 @@ export default function SettlementPreviewView() {
 
             {!data.isOverlapping && (
             <>
+            {!!data.duplicateWarnings?.length && (
+              <DuplicateWarningsCard
+                warnings={data.duplicateWarnings}
+                pendingId={pendingInclusionId}
+                onToggle={handleToggleInclusion}
+              />
+            )}
+
             <Grid container spacing={3} sx={{ mb: 3 }}>
               <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
                 <Card>
