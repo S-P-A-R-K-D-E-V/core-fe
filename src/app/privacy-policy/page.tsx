@@ -1,14 +1,37 @@
+import type { Metadata } from 'next';
+import { headers } from 'next/headers';
+
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 
+import { isAuthHost, tenantCodeFromHost } from 'src/auth/utils/saas-host';
+import { SAAS_PRIVACY, SAAS_PRODUCT_NAME } from 'src/sections/legal/saas-privacy-content';
+
+// ----------------------------------------------------------------------
+// CiCi (cici21chualang.vn) giữ nguyên chính sách cũ. Tên miền nền tảng cửa hàng (auth.devbyspark.com,
+// <mã>.store.devbyspark.com) hiện chính sách trung tính của app Spark Store, tiếng Anh + tiếng Việt —
+// đây là URL khai với App Store Connect.
 // ----------------------------------------------------------------------
 
-export const metadata = {
-  title: 'Chính sách quyền riêng tư – CiCi',
-  description: 'Chính sách quyền riêng tư của ứng dụng CiCi',
-};
+function isSaasRequest(): boolean {
+  const host = (headers().get('host') ?? '').split(':')[0].toLowerCase();
+  return isAuthHost(host) || tenantCodeFromHost(host) !== null;
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  if (isSaasRequest()) {
+    return {
+      title: { absolute: `${SAAS_PRODUCT_NAME} — Privacy Policy` },
+      description: `Privacy Policy of ${SAAS_PRODUCT_NAME}`,
+    };
+  }
+  return {
+    title: 'Chính sách quyền riêng tư – CiCi',
+    description: 'Chính sách quyền riêng tư của ứng dụng CiCi',
+  };
+}
 
 const SECTIONS = [
   {
@@ -112,7 +135,61 @@ const SECTIONS = [
 
 // ----------------------------------------------------------------------
 
+function SaasPrivacyPolicy() {
+  return (
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 6, md: 10 } }}>
+      <Container maxWidth="md">
+        <Box sx={{ mb: 5, textAlign: 'center' }}>
+          <Typography variant="overline" sx={{ color: 'primary.main' }}>
+            {SAAS_PRODUCT_NAME}
+          </Typography>
+          <Typography variant="h3" sx={{ fontWeight: 700, mb: 1.5 }}>
+            Privacy Policy
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            <a href="#en">English</a> · <a href="#vi">Tiếng Việt</a>
+          </Typography>
+        </Box>
+
+        {SAAS_PRIVACY.map((language, languageIndex) => (
+          <Box key={language.lang} id={language.lang} lang={language.lang} sx={{ scrollMarginTop: 24 }}>
+            {languageIndex > 0 && <Divider sx={{ my: 6 }} />}
+            <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+              {language.heading}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
+              {language.updated}
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 4, lineHeight: 1.8 }}>
+              {language.intro}
+            </Typography>
+            {language.sections.map((section) => (
+              <Box key={section.title} sx={{ mb: 3.5 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
+                  {section.title}
+                </Typography>
+                {section.content.map((line, i) => (
+                  <Typography
+                    // eslint-disable-next-line react/no-array-index-key
+                    key={i}
+                    variant="body1"
+                    sx={{ color: 'text.secondary', mb: 1, lineHeight: 1.8 }}
+                  >
+                    {line}
+                  </Typography>
+                ))}
+              </Box>
+            ))}
+          </Box>
+        ))}
+      </Container>
+    </Box>
+  );
+}
+
 export default function PrivacyPolicyPage() {
+  if (isSaasRequest()) return <SaasPrivacyPolicy />;
+
   return (
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 6, md: 10 } }}>
       <Container maxWidth="md">
