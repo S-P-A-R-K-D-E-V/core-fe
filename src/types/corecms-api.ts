@@ -2976,6 +2976,8 @@ export interface ICollectedOutBreakdown {
   byChannelMethod: Record<string, number>;
   manualCollected: number;
   cashCounter: number;
+  // Chênh "Doanh thu thuần − Tiền khách thực trả qua kênh" dồn cho người giữ tiền mặt (quy ước sổ gốc)
+  revenueAdjustment?: number;
 }
 
 export interface ISettlementLine {

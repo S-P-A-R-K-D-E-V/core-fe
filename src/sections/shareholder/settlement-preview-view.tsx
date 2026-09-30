@@ -66,6 +66,8 @@ function CollectedOutCell({
     });
     if (source.manualCollected) parts.push({ label: 'Thu tay / rút vốn', value: source.manualCollected });
     if (source.cashCounter) parts.push({ label: 'Rút quầy tiền mặt', value: source.cashCounter });
+    if (source.revenueAdjustment)
+      parts.push({ label: 'Chênh doanh thu − tiền thực thu', value: source.revenueAdjustment });
   }
 
   if (parts.length === 0) {
