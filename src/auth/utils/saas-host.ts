@@ -1,6 +1,6 @@
 // ----------------------------------------------------------------------
 // Nhận diện tên miền cửa hàng SaaS (<mã>.store.devbyspark.com; cửa hàng tạo trước đó còn ở
-// <mã>.devbyspark.com) và trang đăng nhập tập trung (auth.devbyspark.com). CiCi
+// <mã>.devbyspark.com) và trang đăng nhập tập trung (AUTH_HOST + các tên miền auth phụ). CiCi
 // (cici21chualang.vn) và localhost không thuộc vùng nào nên giữ nguyên luồng đăng nhập cũ.
 // Phải khớp Tenancy:SaasZones của core-be (vùng đầu = vùng cấp tên miền cho cửa hàng mới).
 // ----------------------------------------------------------------------
@@ -13,8 +13,17 @@ export const SAAS_ZONES = (process.env.NEXT_PUBLIC_SAAS_ZONES || process.env.NEX
 /** Vùng cấp tên miền cho cửa hàng mới. */
 export const SAAS_ZONE = SAAS_ZONES[0];
 
-// Đã khai báo với Google/Apple — không đổi theo vùng cửa hàng.
-export const AUTH_HOST = process.env.NEXT_PUBLIC_AUTH_HOST || 'auth.devbyspark.com';
+// Trang đăng nhập tập trung: tên miền khai báo với Google (Authorized JavaScript origins) và Apple
+// (Services ID → Domains/Return URLs). Link MỚI (web cửa hàng, app) luôn trỏ về AUTH_HOST.
+// AUTH_HOST_ALIASES: tên miền auth khác vẫn phục vụ đầy đủ trong lúc chuyển tên miền (link cũ, app đã
+// cài) — mỗi tên miền ở đây cũng phải còn khai báo với Google/Apple. Đang chuyển
+// auth.devbyspark.com → auth.store.devbyspark.com (tách khỏi các app khác dưới devbyspark.com).
+export const AUTH_HOST = (process.env.NEXT_PUBLIC_AUTH_HOST || 'auth.devbyspark.com').trim().toLowerCase();
+
+export const AUTH_HOST_ALIASES = (process.env.NEXT_PUBLIC_AUTH_HOST_ALIASES ?? 'auth.store.devbyspark.com')
+  .split(',')
+  .map((h) => h.trim().toLowerCase())
+  .filter((h) => h && h !== AUTH_HOST);
 
 /** Services ID của Sign in with Apple cho web. Rỗng = ẩn nút Apple. */
 export const APPLE_SERVICES_ID = process.env.NEXT_PUBLIC_APPLE_SERVICES_ID || '';
@@ -26,7 +35,8 @@ export function isValidTenantCode(code: string | null | undefined): code is stri
 }
 
 export function isAuthHost(host: string): boolean {
-  return host.toLowerCase() === AUTH_HOST;
+  const h = host.toLowerCase().replace(/:\d+$/, '');
+  return h === AUTH_HOST || AUTH_HOST_ALIASES.includes(h);
 }
 
 /**

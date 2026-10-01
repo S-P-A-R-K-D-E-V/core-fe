@@ -33,6 +33,13 @@ describe('tenantCodeFromHost', () => {
     expect(isAuthHost('auth.devbyspark.com')).toBe(true);
     expect(isAuthHost('shop.devbyspark.com')).toBe(false);
   });
+
+  it('tên miền auth phụ (đang chuyển sang auth.store.devbyspark.com) cũng là auth host, không phải cửa hàng "auth"', () => {
+    expect(isAuthHost('auth.store.devbyspark.com')).toBe(true);
+    expect(isAuthHost('AUTH.store.devbyspark.com:443')).toBe(true);
+    expect(tenantCodeFromHost('auth.store.devbyspark.com')).toBeNull();
+    expect(isAuthHost('auth.store.devbyspark.com.evil.example')).toBe(false);
+  });
 });
 
 describe('safeReturnPath', () => {

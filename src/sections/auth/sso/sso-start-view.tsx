@@ -181,7 +181,8 @@ export default function SsoStartView() {
       window.AppleID!.auth.init({
         clientId: APPLE_SERVICES_ID,
         scope: 'name email',
-        redirectURI: `https://${AUTH_HOST}/sso/start/`,
+        // Tên miền auth đang mở (chính hoặc phụ) — mỗi tên miền đều phải khai báo Return URL với Apple.
+        redirectURI: `https://${window.location.host}/sso/start/`,
         nonce: await sha256Hex(rawNonce),
         usePopup: true,
       });
