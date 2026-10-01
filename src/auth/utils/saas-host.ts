@@ -35,8 +35,10 @@ export function isValidTenantCode(code: string | null | undefined): code is stri
 }
 
 export function isAuthHost(host: string): boolean {
-  const h = host.toLowerCase().replace(/:\d+$/, '');
-  return h === AUTH_HOST || AUTH_HOST_ALIASES.includes(h);
+  const h = host.toLowerCase();
+  const known = [AUTH_HOST, ...AUTH_HOST_ALIASES];
+  // So cả bản có cổng (máy dev: localhost:3004) lẫn bản bỏ cổng (host:443).
+  return known.includes(h) || known.includes(h.replace(/:\d+$/, ''));
 }
 
 /**

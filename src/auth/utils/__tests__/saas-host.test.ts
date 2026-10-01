@@ -40,6 +40,19 @@ describe('tenantCodeFromHost', () => {
     expect(tenantCodeFromHost('auth.store.devbyspark.com')).toBeNull();
     expect(isAuthHost('auth.store.devbyspark.com.evil.example')).toBe(false);
   });
+
+  it('auth host cấu hình kèm cổng (máy dev) vẫn khớp', async () => {
+    vi.resetModules();
+    vi.stubEnv('NEXT_PUBLIC_AUTH_HOST', 'localhost:3004');
+    try {
+      const dev = await import('../saas-host');
+      expect(dev.isAuthHost('localhost:3004')).toBe(true);
+      expect(dev.isAuthHost('localhost:3005')).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
+  });
 });
 
 describe('safeReturnPath', () => {

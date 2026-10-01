@@ -7,6 +7,7 @@ import Tabs from '@mui/material/Tabs';
 import Container from '@mui/material/Container';
 
 import { paths } from 'src/routes/paths';
+import { useSearchParams } from 'src/routes/hooks';
 
 import { _userAbout, _userPlans, _userPayment, _userInvoices, _userAddressBook } from 'src/_mock';
 
@@ -62,7 +63,13 @@ const TABS = [
 export default function AccountView() {
   const settings = useSettingsContext();
 
-  const [currentTab, setCurrentTab] = useState('general');
+  const searchParams = useSearchParams();
+
+  // ?tab=connected: trang auth chuyển về đây sau khi liên kết Google/Apple.
+  const tabParam = searchParams.get('tab');
+  const [currentTab, setCurrentTab] = useState(
+    TABS.some((tab) => tab.value === tabParam) ? (tabParam as string) : 'general'
+  );
 
   const handleChangeTab = useCallback((event: React.SyntheticEvent, newValue: string) => {
     setCurrentTab(newValue);

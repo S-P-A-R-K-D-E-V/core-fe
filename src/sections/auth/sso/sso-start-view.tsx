@@ -17,8 +17,6 @@ import { apiErrorMessage } from 'src/utils/api-error';
 import {
   SAAS_ZONE,
   isAuthHost,
-  sha256Hex,
-  randomToken,
   isValidTenantCode,
   APPLE_SERVICES_ID,
   AUTH_HOST,
@@ -29,37 +27,10 @@ import { parseMobileRedirectUri } from 'src/auth/utils/mobile-redirect';
 
 import Iconify from 'src/components/iconify';
 
+import SsoLinkView from './sso-link-view';
+import { signInWithAppleWeb } from './apple-web';
+
 // ----------------------------------------------------------------------
-
-type AppleSignInResponse = {
-  authorization: { id_token: string; code: string };
-  user?: { name?: { firstName?: string; lastName?: string }; email?: string };
-};
-
-declare global {
-  interface Window {
-    AppleID?: {
-      auth: {
-        init: (config: Record<string, unknown>) => void;
-        signIn: () => Promise<AppleSignInResponse>;
-      };
-    };
-  }
-}
-
-const APPLE_SDK = 'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/vi_VN/appleid.auth.js';
-
-function loadAppleSdk(): Promise<void> {
-  if (window.AppleID) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = APPLE_SDK;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Không tải được Sign in with Apple'));
-    document.head.appendChild(script);
-  });
-}
 
 const STATE_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 // PKCE S256 của app: base64url(SHA-256(verifier)) = 43 ký tự.
@@ -88,11 +59,20 @@ const APP_TEXT = {
 } as const;
 
 /**
- * Chạy trên auth.devbyspark.com — tên miền DUY NHẤT đăng ký với Google/Apple cho mọi cửa hàng SaaS.
- * Xác minh Google/Apple cho cửa hàng trong ?tenant=, backend trả URL /sso/callback của đúng cửa
- * hàng đó kèm mã dùng một lần. Trang này không giữ phiên đăng nhập nào.
+ * Trang auth (AUTH_HOST + tên miền auth phụ) — nơi DUY NHẤT khai báo với Google/Apple cho mọi cửa hàng
+ * SaaS và app. ?link=1: liên kết thêm Google/Apple cho tài khoản đang đăng nhập (SsoLinkView); còn lại là
+ * đăng nhập. Trang này không giữ phiên đăng nhập nào.
  */
 export default function SsoStartView() {
+  const searchParams = useSearchParams();
+  return searchParams.get('link') === '1' ? <SsoLinkView /> : <SsoSignInView />;
+}
+
+/**
+ * Xác minh Google/Apple cho cửa hàng trong ?tenant=, backend trả URL /sso/callback của đúng cửa hàng đó
+ * kèm mã dùng một lần. Chế độ app (?app=1): trả mã về deep link của app.
+ */
+function SsoSignInView() {
   const searchParams = useSearchParams();
   const [errorMsg, setErrorMsg] = useState('');
   const [busy, setBusy] = useState(false);
@@ -176,25 +156,8 @@ export default function SsoStartView() {
     setErrorMsg('');
     setBusy(true);
     try {
-      await loadAppleSdk();
-      const rawNonce = randomToken(24);
-      window.AppleID!.auth.init({
-        clientId: APPLE_SERVICES_ID,
-        scope: 'name email',
-        // Tên miền auth đang mở (chính hoặc phụ) — mỗi tên miền đều phải khai báo Return URL với Apple.
-        redirectURI: `https://${window.location.host}/sso/start/`,
-        nonce: await sha256Hex(rawNonce),
-        usePopup: true,
-      });
-      const res = await window.AppleID!.auth.signIn();
-      await handoff({
-        provider: 'apple',
-        token: res.authorization.id_token,
-        nonce: rawNonce,
-        authorizationCode: res.authorization.code,
-        firstName: res.user?.name?.firstName,
-        lastName: res.user?.name?.lastName,
-      });
+      const apple = await signInWithAppleWeb();
+      await handoff({ provider: 'apple', ...apple });
     } catch (err: any) {
       // Người dùng tự đóng cửa sổ Apple: không báo lỗi.
       if (err?.error === 'popup_closed_by_user') {
