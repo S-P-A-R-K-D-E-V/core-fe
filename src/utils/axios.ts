@@ -60,6 +60,9 @@ export const endpoints = {
     oauthDisconnect: (provider: string) => `/auth/oauth-connections/${provider}`,
     ssoExchange: '/auth/sso/exchange',
     ssoHandoff: (tenantCode: string) => `/auth-hub/${tenantCode}/handoff`,
+    // Gọi thẳng /api/app-hub trên auth host (ingress → core-api), KHÔNG qua rewrite của Next: giới hạn
+    // tần suất app-hub tính theo IP client, đi qua core-fe thì mọi người dùng chung IP của ingress.
+    appWebHandoff: '/api/app-hub/web-handoff',
     deleteAccount: '/auth/account',
   },
   users: {

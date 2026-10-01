@@ -25,6 +25,8 @@ import {
   tenantCodeFromHost,
 } from 'src/auth/utils/saas-host';
 
+import { parseMobileRedirectUri } from 'src/auth/utils/mobile-redirect';
+
 import Iconify from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
@@ -60,6 +62,30 @@ function loadAppleSdk(): Promise<void> {
 }
 
 const STATE_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+// PKCE S256 của app: base64url(SHA-256(verifier)) = 43 ký tự.
+const CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+// Chữ của chế độ app (?app=1) — app gửi kèm ngôn ngữ đang dùng (lang=en|vi).
+const APP_TEXT = {
+  vi: {
+    title: 'Đăng nhập',
+    subtitle: 'Đăng nhập một lần — ứng dụng sẽ tự tìm các cửa hàng của bạn.',
+    apple: 'Tiếp tục với Apple',
+    invited: 'Chỉ tài khoản đã được cửa hàng mời mới vào được cửa hàng.',
+    invalid: 'Liên kết đăng nhập không hợp lệ. Hãy quay lại ứng dụng và thử lại.',
+    googleFailed: 'Đăng nhập Google thất bại',
+    appleFailed: 'Đăng nhập Apple thất bại',
+  },
+  en: {
+    title: 'Sign in',
+    subtitle: 'Sign in once — the app will find your stores.',
+    apple: 'Continue with Apple',
+    invited: 'Only accounts invited by a store can open that store.',
+    invalid: 'This sign-in link is not valid. Go back to the app and try again.',
+    googleFailed: 'Google sign-in failed',
+    appleFailed: 'Apple sign-in failed',
+  },
+} as const;
 
 /**
  * Chạy trên auth.devbyspark.com — tên miền DUY NHẤT đăng ký với Google/Apple cho mọi cửa hàng SaaS.
@@ -73,6 +99,15 @@ export default function SsoStartView() {
 
   const tenant = searchParams.get('tenant');
   const state = searchParams.get('state');
+  // Chế độ app: app cửa hàng mở trang này để đăng nhập Google/Apple (app không tự làm được), nhận mã
+  // dùng một lần qua deep link redirect_uri rồi tự đổi mã (kèm PKCE verifier) lấy danh sách cửa hàng.
+  const appMode = searchParams.get('app') === '1';
+  const challenge = searchParams.get('challenge');
+  const appRedirectRaw = searchParams.get('redirect_uri');
+  const appRedirect = useMemo(() => parseMobileRedirectUri(appRedirectRaw), [appRedirectRaw]);
+  const appProvider = searchParams.get('provider');
+  const appLang = searchParams.get('lang') === 'en' ? 'en' : 'vi';
+  const text = APP_TEXT[appLang];
   const returnTo = searchParams.get('returnTo');
   // Tên miền cửa hàng người dùng đang dùng; chỉ tin khi đúng là tên miền của mã cửa hàng này.
   const hostParam = searchParams.get('host');
@@ -89,11 +124,16 @@ export default function SsoStartView() {
     if (host !== null && !isAuthHost(host)) {
       return `Trang này chỉ dùng tại ${AUTH_HOST}.`;
     }
+    if (appMode) {
+      return !state || !STATE_PATTERN.test(state) || !challenge || !CHALLENGE_PATTERN.test(challenge) || !appRedirect
+        ? text.invalid
+        : '';
+    }
     if (!isValidTenantCode(tenant) || !state || !STATE_PATTERN.test(state)) {
       return 'Liên kết đăng nhập không hợp lệ. Hãy mở lại trang đăng nhập của cửa hàng.';
     }
     return '';
-  }, [host, tenant, state]);
+  }, [host, tenant, state, appMode, challenge, appRedirect, text]);
 
   const handoff = useCallback(
     async (payload: {
@@ -104,6 +144,18 @@ export default function SsoStartView() {
       lastName?: string;
       authorizationCode?: string;
     }) => {
+      if (appMode) {
+        const res = await axios.post<{ code: string }>(`${window.location.origin}${endpoints.auth.appWebHandoff}`, {
+          ...payload,
+          state,
+          codeChallenge: challenge,
+        });
+        const back = new URL(appRedirect!.toString());
+        back.searchParams.set('code', res.data.code);
+        back.searchParams.set('state', state!);
+        window.location.assign(back.toString());
+        return;
+      }
       const res = await axios.post<{ redirectUrl: string }>(endpoints.auth.ssoHandoff(tenant!), {
         ...payload,
         state,
@@ -112,7 +164,7 @@ export default function SsoStartView() {
       });
       window.location.assign(res.data.redirectUrl);
     },
-    [tenant, state, returnTo, storeHost]
+    [tenant, state, returnTo, storeHost, appMode, challenge, appRedirect]
   );
 
   const showError = (err: any, fallback: string) => {
@@ -149,7 +201,8 @@ export default function SsoStartView() {
         return;
       }
       // Lỗi từ Apple JS là object { error: '<mã>' } — hiện mã để biết lỗi gì (không phải lỗi của cửa hàng).
-      showError(err, err?.error ? `Đăng nhập Apple thất bại (${err.error})` : 'Đăng nhập Apple thất bại');
+      const appleFailed = appMode ? text.appleFailed : 'Đăng nhập Apple thất bại';
+      showError(err, err?.error ? `${appleFailed} (${err.error})` : appleFailed);
     }
   };
 
@@ -157,6 +210,61 @@ export default function SsoStartView() {
 
   if (invalidRequest) {
     return <Alert severity="error">{invalidRequest}</Alert>;
+  }
+
+  if (appMode) {
+    const showGoogle = appProvider !== 'apple';
+    const showApple = !!APPLE_SERVICES_ID && appProvider !== 'google';
+    return (
+      <Stack spacing={3}>
+        <Stack spacing={1}>
+          <Typography variant="h4">{text.title}</Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            {text.subtitle}
+          </Typography>
+        </Stack>
+
+        {!!errorMsg && <Alert severity="error">{errorMsg}</Alert>}
+
+        {showGoogle && (
+          <GoogleLogin
+            onSuccess={async (resp) => {
+              setErrorMsg('');
+              setBusy(true);
+              try {
+                await handoff({ provider: 'google', token: resp.credential! });
+              } catch (err: any) {
+                showError(err, text.googleFailed);
+              }
+            }}
+            onError={() => setErrorMsg(text.googleFailed)}
+            width="100%"
+            text="continue_with"
+            shape="rectangular"
+            size="large"
+            locale={appLang}
+          />
+        )}
+
+        {showApple && (
+          <Button
+            fullWidth
+            size="large"
+            color="inherit"
+            variant="contained"
+            disabled={busy}
+            onClick={handleApple}
+            startIcon={<Iconify icon="mdi:apple" width={22} />}
+          >
+            {text.apple}
+          </Button>
+        )}
+
+        <Typography variant="caption" sx={{ color: 'text.disabled', textAlign: 'center' }}>
+          {text.invited}
+        </Typography>
+      </Stack>
+    );
   }
 
   return (
