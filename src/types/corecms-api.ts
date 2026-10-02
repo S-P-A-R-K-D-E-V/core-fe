@@ -108,7 +108,8 @@ export interface IRefreshTokenRequest {
 }
 
 export interface ILogoutRequest {
-  userId: string;
+  userId: string; // BE mới lấy user từ JWT, bỏ qua trường này — giữ cho BE cũ còn bind được
+  sessionToken?: string; // có → chỉ đóng phiên đăng nhập này; không có → đóng mọi phiên (cách cũ)
 }
 
 export interface IOAuthLoginRequest {

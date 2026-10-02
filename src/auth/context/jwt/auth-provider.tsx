@@ -463,7 +463,10 @@ export function AuthProvider({ children }: Props) {
       const refreshToken = getRefreshToken();
 
       if (userId && refreshToken) {
-        const logoutData: ILogoutRequest = { userId };
+        // Gửi sessionToken của trình duyệt này → BE chỉ đóng phiên đăng nhập này, không đăng xuất
+        // các thiết bị / cửa hàng khác. BE lấy user từ JWT; userId giữ lại cho BE cũ.
+        const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
+        const logoutData: ILogoutRequest = sessionToken ? { userId, sessionToken } : { userId };
         await axios.post(endpoints.auth.logout, logoutData);
       }
     } catch (error) {
