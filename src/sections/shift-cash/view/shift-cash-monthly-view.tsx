@@ -26,6 +26,8 @@ import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
+import RoleBasedGuard from 'src/auth/guard/role-based-guard';
+
 import { IShiftCashTransaction, IShareholder } from 'src/types/corecms-api';
 import { getShiftCashTransactions, updateShiftCashTransaction } from 'src/api/shiftCash';
 import { getShareholders } from 'src/api/shareholders';
@@ -70,7 +72,17 @@ function suggestShareholder(
   );
 }
 
+// Thu chi cả tháng = xem lại ngày cũ → chỉ Admin (BE cũng chặn GET ngày khác hôm nay với vai trò khác).
+// Tách component con để người không đủ quyền không gọi API.
 export default function ShiftCashMonthlyView() {
+  return (
+    <RoleBasedGuard hasContent roles={['Admin']}>
+      <ShiftCashMonthlyContent />
+    </RoleBasedGuard>
+  );
+}
+
+function ShiftCashMonthlyContent() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
 

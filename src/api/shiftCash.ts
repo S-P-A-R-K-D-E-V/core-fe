@@ -14,13 +14,38 @@ import {
   IKiotVietBankAccount,
   IVietQRBank,
 } from 'src/types/corecms-api';
+import { ShiftCashGeo, shiftCashGeoHeaders } from 'src/utils/shift-cash-access';
+
+// ======================================================================
+// Vị trí GPS đã qua cổng Kiểm quầy (ShiftCashAccessGate đặt / cập nhật / xoá).
+// Gửi kèm X-Geo-* trên MỌI lời gọi /shift-cash/* và KiotViet của trang kiểm quầy để BE kiểm geofence.
+// Admin, hoặc cửa hàng chưa có toạ độ chi nhánh → null → không gửi header.
+// ======================================================================
+
+let currentGeo: ShiftCashGeo | null = null;
+
+export function setShiftCashGeo(geo: ShiftCashGeo | null): void {
+  currentGeo = geo;
+}
+
+const geoConfig = () => ({ headers: shiftCashGeoHeaders(currentGeo) });
+
+// responseType 'blob' → body lỗi (vd. 403 { error, message }) cũng là Blob: đọc ra JSON để hiện đúng thông điệp.
+async function blobErrorBody(err: unknown): Promise<unknown> {
+  if (typeof Blob === 'undefined' || !(err instanceof Blob)) return err;
+  try {
+    return JSON.parse(await err.text());
+  } catch {
+    return err;
+  }
+}
 
 // ======================================================================
 // Summary
 // ======================================================================
 
 export async function getShiftCashSummary(date: string): Promise<IShiftCashSummary> {
-  const res = await axios.get(endpoints.shiftCash.summary, { params: { date } });
+  const res = await axios.get(endpoints.shiftCash.summary, { params: { date }, ...geoConfig() });
   return res.data;
 }
 
@@ -32,14 +57,17 @@ export async function getShiftCashTransactions(
   date: string,
   toDate?: string
 ): Promise<IShiftCashTransaction[]> {
-  const res = await axios.get(endpoints.shiftCash.transactions, { params: { date, toDate } });
+  const res = await axios.get(endpoints.shiftCash.transactions, {
+    params: { date, toDate },
+    ...geoConfig(),
+  });
   return res.data;
 }
 
 export async function addShiftCashTransaction(
   data: IAddShiftCashTransactionRequest
 ): Promise<{ id: string }> {
-  const res = await axios.post(endpoints.shiftCash.transactions, data);
+  const res = await axios.post(endpoints.shiftCash.transactions, data, geoConfig());
   return res.data;
 }
 
@@ -47,11 +75,11 @@ export async function updateShiftCashTransaction(
   id: string,
   data: IUpdateShiftCashTransactionRequest
 ): Promise<void> {
-  await axios.put(endpoints.shiftCash.transactionDetail(id), data);
+  await axios.put(endpoints.shiftCash.transactionDetail(id), data, geoConfig());
 }
 
 export async function deleteShiftCashTransaction(id: string): Promise<void> {
-  await axios.delete(endpoints.shiftCash.transactionDetail(id));
+  await axios.delete(endpoints.shiftCash.transactionDetail(id), geoConfig());
 }
 
 // ======================================================================
@@ -59,28 +87,31 @@ export async function deleteShiftCashTransaction(id: string): Promise<void> {
 // ======================================================================
 
 export async function getShiftCashDenominations(date: string): Promise<IShiftCashDenomination[]> {
-  const res = await axios.get(endpoints.shiftCash.denominations, { params: { date } });
+  const res = await axios.get(endpoints.shiftCash.denominations, {
+    params: { date },
+    ...geoConfig(),
+  });
   return res.data;
 }
 
 export async function updateDenomination(data: IUpdateDenominationRequest): Promise<void> {
-  await axios.put(endpoints.shiftCash.denominations, data);
+  await axios.put(endpoints.shiftCash.denominations, data, geoConfig());
 }
 
 export async function updateDenominationBatch(data: IUpdateDenominationBatchRequest): Promise<void> {
-  await axios.put(endpoints.shiftCash.denominationsBatch, data);
+  await axios.put(endpoints.shiftCash.denominationsBatch, data, geoConfig());
 }
 
 export async function finalizeShiftCash(data: {
   date: string;
   items: { denomination: number; quantity: number }[];
 }): Promise<{ id: string; closingBalance: number; isFinalized: boolean }> {
-  const res = await axios.post(endpoints.shiftCash.finalize, data);
+  const res = await axios.post(endpoints.shiftCash.finalize, data, geoConfig());
   return res.data;
 }
 
 export async function openCounter(date: string): Promise<void> {
-  await axios.post(endpoints.shiftCash.open, { date });
+  await axios.post(endpoints.shiftCash.open, { date }, geoConfig());
 }
 
 // ======================================================================
@@ -88,7 +119,7 @@ export async function openCounter(date: string): Promise<void> {
 // ======================================================================
 
 export async function getShiftCashLogs(date: string): Promise<IShiftCashLog[]> {
-  const res = await axios.get(endpoints.shiftCash.logs, { params: { date } });
+  const res = await axios.get(endpoints.shiftCash.logs, { params: { date }, ...geoConfig() });
   return res.data;
 }
 
@@ -96,7 +127,10 @@ export async function getShiftCashAuditLogs(
   date: string,
   limit = 200
 ): Promise<IAuditLogEntry[]> {
-  const res = await axios.get(endpoints.shiftCash.auditLogs, { params: { date, limit } });
+  const res = await axios.get(endpoints.shiftCash.auditLogs, {
+    params: { date, limit },
+    ...geoConfig(),
+  });
   return res.data;
 }
 
@@ -105,27 +139,36 @@ export async function getShiftCashAuditLogs(
 // ======================================================================
 
 export async function getKiotVietDailySummary(date: string): Promise<IKiotVietDailySummary> {
-  const res = await axios.get(endpoints.kiotViet.dailySummary, { params: { date } });
+  const res = await axios.get(endpoints.kiotViet.dailySummary, {
+    params: { date },
+    ...geoConfig(),
+  });
   return res.data;
 }
 
 export async function getKiotVietInvoiceDetail(
   id: number
 ): Promise<IKiotVietInvoiceDetailResponse> {
-  const res = await axios.get(endpoints.kiotViet.invoiceDetail(id));
+  const res = await axios.get(endpoints.kiotViet.invoiceDetail(id), geoConfig());
   return res.data;
 }
 
 export async function getKiotVietBankAccounts(): Promise<IKiotVietBankAccount[]> {
-  const res = await axios.get(endpoints.kiotViet.bankAccounts);
+  const res = await axios.get(endpoints.kiotViet.bankAccounts, geoConfig());
   return res.data;
 }
 
 export async function exportKiotVietExcel(date: string): Promise<void> {
-  const res = await axios.get(endpoints.kiotViet.exportExcel, {
-    params: { date },
-    responseType: 'blob',
-  });
+  let res;
+  try {
+    res = await axios.get(endpoints.kiotViet.exportExcel, {
+      params: { date },
+      responseType: 'blob',
+      ...geoConfig(),
+    });
+  } catch (err) {
+    throw await blobErrorBody(err);
+  }
   const url = window.URL.createObjectURL(new Blob([res.data]));
   const link = document.createElement('a');
   link.href = url;

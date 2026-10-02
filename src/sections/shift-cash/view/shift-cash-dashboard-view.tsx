@@ -53,6 +53,15 @@ import { usePageTours } from 'src/hooks/use-tour';
 import type { TourDefinition } from 'src/hooks/use-tour';
 
 import {
+  vnToday,
+  shiftCashDenial,
+  isShiftCashBypass,
+  isShiftCashLocationDenial,
+} from 'src/utils/shift-cash-access';
+
+import ShiftCashAccessGate, { useShiftCashAccess } from '../shift-cash-access-gate';
+
+import {
   IShiftCashSummary,
   IShiftCashTransaction,
   IShiftCashDenomination,
@@ -104,6 +113,12 @@ function parseAmountInput(value: string): string {
   return value.replace(/\D/g, '');
 }
 
+// "2026-10-02" -> "02/10/2026"
+function formatDateVN(date: string): string {
+  const [y, m, d] = date.split('-');
+  return d && m && y ? `${d}/${m}/${y}` : date;
+}
+
 // ======================================================================
 // Tour definitions
 // ======================================================================
@@ -116,8 +131,9 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
       {
         element: '#tour-date-picker',
         popover: {
-          title: 'Chọn ngày',
-          description: 'Chọn ngày bạn muốn xem hoặc kiểm tiền. Mặc định là hôm nay.',
+          title: 'Ngày kiểm tiền',
+          description:
+            'Ngày đang kiểm tiền (theo giờ Việt Nam), mặc định là hôm nay. Nhân viên / quản lý chỉ kiểm quầy ngày hôm nay; Admin chọn được ngày cũ để xem lại.',
           side: 'bottom' as const,
           align: 'start' as const,
         },
@@ -163,7 +179,7 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
         popover: {
           title: 'Các tab chi tiết',
           description:
-            'Trang có 3 tab: Thu chi quầy, Bán hàng KiotViet, và Nhật ký chỉnh sửa.',
+            'Trang có các tab: Thu chi quầy, Bán hàng KiotViet (Admin có thêm Nhật ký chỉnh sửa).',
           side: 'top' as const,
           align: 'start' as const,
         },
@@ -227,20 +243,26 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
 
 // ======================================================================
 
+// Staff / Manager phải qua cổng (có ca hôm nay + GPS ở cửa hàng) mới thấy trang; Admin vào thẳng.
 export default function ShiftCashDashboardView() {
+  return (
+    <ShiftCashAccessGate>
+      <ShiftCashDashboardContent />
+    </ShiftCashAccessGate>
+  );
+}
+
+function ShiftCashDashboardContent() {
   const theme = useTheme();
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
   const { user } = useAuthContext();
+  const access = useShiftCashAccess();
   const txDialog = useBoolean();
   const confirmDelete = useBoolean();
 
-  const [currentDate, setCurrentDate] = useState(() => {
-    const now = new Date();
-    const offset = now.getTimezoneOffset();
-    const local = new Date(now.getTime() - offset * 60 * 1000);
-    return local.toISOString().split('T')[0];
-  });
+  // Ngày theo giờ VN (BE so "hôm nay" theo múi VN). Không phải Admin thì luôn là hôm nay.
+  const [currentDate, setCurrentDate] = useState(() => vnToday());
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<IShiftCashSummary | null>(null);
   const [logs, setLogs] = useState<IShiftCashLog[]>([]);
@@ -282,14 +304,11 @@ export default function ShiftCashDashboardView() {
   // Delete
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const todayDate = (() => {
-    const now = new Date();
-    const offset = now.getTimezoneOffset();
-    return new Date(now.getTime() - offset * 60 * 1000).toISOString().split('T')[0];
-  })();
+  const todayDate = vnToday();
 
   const isToday = currentDate === todayDate;
-  const isAdmin = user?.roles?.includes('Admin') || user?.role === 'Admin';
+  // Chỉ Admin: chọn ngày cũ, xem nhật ký / audit, xem theo tháng (Manager theo luật của Staff)
+  const isAdmin = isShiftCashBypass(user);
   const canEdit = isToday || isAdmin;
   const hasOpenedToday = (summary?.denominations ?? []).length > 0;
 
@@ -304,13 +323,43 @@ export default function ShiftCashDashboardView() {
   } = usePageTours({ tours: SHIFT_CASH_TOURS });
   const [tourMenuAnchor, setTourMenuAnchor] = useState<null | HTMLElement>(null);
 
+  // 403 ShiftCash.* từ BE (không có ca / ngoài cửa hàng / ngày cũ). Trả true nếu đã xử lý.
+  //  - Tải dữ liệu bị chặn → về màn chặn của cổng với đúng thông điệp BE.
+  //  - Thao tác (lưu / chốt / xoá…) bị chặn vì vị trí → chỉ báo lỗi, giữ nguyên số đang nhập để bấm lại khi
+  //    GPS ổn; hết ca / ngày cũ thì cũng về màn chặn.
+  const handleDenied = useCallback(
+    (err: unknown, kind: 'load' | 'action') => {
+      const denial = shiftCashDenial(err);
+      if (!denial) return false;
+      if (kind === 'action' && isShiftCashLocationDenial(denial.code)) {
+        enqueueSnackbar(denial.message, { variant: 'error' });
+      } else {
+        access.deny(denial.message);
+      }
+      return true;
+    },
+    [access, enqueueSnackbar]
+  );
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      // Nhật ký chỉnh sửa / audit chỉ Admin xem (BE chặn audit-logs với vai trò khác).
+      // Lỗi nhật ký không được làm hỏng cả trang.
       const [summaryData, logsData, auditLogsData] = await Promise.all([
         getShiftCashSummary(currentDate),
-        getShiftCashLogs(currentDate),
-        getShiftCashAuditLogs(currentDate),
+        isAdmin
+          ? getShiftCashLogs(currentDate).catch((err) => {
+              console.error('Shift-cash logs error:', err);
+              return [] as IShiftCashLog[];
+            })
+          : Promise.resolve([] as IShiftCashLog[]),
+        isAdmin
+          ? getShiftCashAuditLogs(currentDate).catch((err) => {
+              console.error('Shift-cash audit-logs error:', err);
+              return [] as IAuditLogEntry[];
+            })
+          : Promise.resolve([] as IAuditLogEntry[]),
       ]);
       setSummary(summaryData);
       setLogs(logsData);
@@ -331,15 +380,17 @@ export default function ShiftCashDashboardView() {
         .catch((err) => {
           console.error('KiotViet fetch error:', err);
           setKiotData(null);
+          handleDenied(err, 'load');
         })
         .finally(() => setKiotLoading(false));
     } catch (error) {
       console.error(error);
+      if (handleDenied(error, 'load')) return;
       enqueueSnackbar('Không tải được dữ liệu', { variant: 'error' });
     } finally {
       setLoading(false);
     }
-  }, [currentDate, enqueueSnackbar]);
+  }, [currentDate, isAdmin, enqueueSnackbar, handleDenied]);
 
   useEffect(() => {
     fetchData();
@@ -392,6 +443,9 @@ export default function ShiftCashDashboardView() {
       results.forEach((r, idx) => {
         if (r.status === 'fulfilled') {
           success[r.value.id] = r.value.detail;
+        } else if (shiftCashDenial(r.reason)) {
+          // BE chặn Kiểm quầy (hết quyền / ngoài cửa hàng) — dừng tải, không retry vô ích
+          batchAbortRef.current = true;
         } else {
           failed.push(ids[idx]);
         }
@@ -474,6 +528,7 @@ export default function ShiftCashDashboardView() {
       fetchData();
     } catch (error) {
       console.error(error);
+      if (handleDenied(error, 'action')) return;
       enqueueSnackbar('Lưu mệnh giá thất bại', { variant: 'error' });
     } finally {
       setSavingDenom(false);
@@ -493,6 +548,7 @@ export default function ShiftCashDashboardView() {
       fetchData();
     } catch (error) {
       console.error(error);
+      if (handleDenied(error, 'action')) return;
       enqueueSnackbar('Chốt tiền thất bại', { variant: 'error' });
     } finally {
       setSavingDenom(false);
@@ -549,6 +605,7 @@ export default function ShiftCashDashboardView() {
       txDialog.onFalse();
       fetchData();
     } catch (error: any) {
+      if (handleDenied(error, 'action')) return;
       enqueueSnackbar(error?.message || 'Thất bại', { variant: 'error' });
     } finally {
       setTxSaving(false);
@@ -564,6 +621,7 @@ export default function ShiftCashDashboardView() {
       setDeleteId(null);
       fetchData();
     } catch (error) {
+      if (handleDenied(error, 'action')) return;
       enqueueSnackbar('Xoá thất bại', { variant: 'error' });
     }
   };
@@ -574,6 +632,7 @@ export default function ShiftCashDashboardView() {
       enqueueSnackbar('Đã mở quầy!', { variant: 'success' });
       fetchData();
     } catch (error) {
+      if (handleDenied(error, 'action')) return;
       enqueueSnackbar('Mở quầy thất bại', { variant: 'error' });
     }
   };
@@ -595,6 +654,7 @@ export default function ShiftCashDashboardView() {
       invoiceDetailDialog.onTrue();
     } catch (error) {
       console.error(error);
+      if (handleDenied(error, 'action')) return;
       enqueueSnackbar('Không tải được chi tiết hóa đơn', { variant: 'error' });
     } finally {
       setInvoiceDetailLoading(null);
@@ -639,15 +699,17 @@ export default function ShiftCashDashboardView() {
           ]}
           action={
             <>
-              <Button
-                component={RouterLink}
-                href={paths.dashboard.shiftCash.monthly}
-                variant="outlined"
-                startIcon={<Iconify icon="solar:calendar-bold" />}
-                sx={{ mr: 1 }}
-              >
-                Xem theo tháng
-              </Button>
+              {isAdmin && (
+                <Button
+                  component={RouterLink}
+                  href={paths.dashboard.shiftCash.monthly}
+                  variant="outlined"
+                  startIcon={<Iconify icon="solar:calendar-bold" />}
+                  sx={{ mr: 1 }}
+                >
+                  Xem theo tháng
+                </Button>
+              )}
               <Tooltip title="Hướng dẫn sử dụng">
                 <IconButton onClick={(e) => setTourMenuAnchor(e.currentTarget)}>
                   <Iconify icon="solar:question-circle-bold" width={24} />
@@ -695,15 +757,24 @@ export default function ShiftCashDashboardView() {
           sx={{ mb: { xs: 3, md: 5 } }}
         />
 
-        {/* Date picker */}
+        {/* Date picker — chỉ Admin chọn được ngày cũ; Staff / Manager cố định ngày hôm nay */}
         <Card id="tour-date-picker" sx={{ mb: 3, p: 2.5 }}>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <AppDatePicker
-              label="Ngày"
-              value={currentDate}
-              onChange={setCurrentDate}
-              sx={{ width: 200 }}
-            />
+          <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+            {isAdmin ? (
+              <AppDatePicker
+                label="Ngày"
+                value={currentDate}
+                onChange={setCurrentDate}
+                sx={{ width: 200 }}
+              />
+            ) : (
+              <Chip
+                icon={<Iconify icon="solar:calendar-date-bold" width={18} />}
+                label={`Hôm nay · ${formatDateVN(currentDate)}`}
+                color="primary"
+                variant="soft"
+              />
+            )}
             {isToday ? (
               <Button
                 variant="outlined"
@@ -717,10 +788,16 @@ export default function ShiftCashDashboardView() {
               <Button
                 variant="outlined"
                 size="small"
-                onClick={() => setCurrentDate(todayDate)}
+                // Staff / Manager qua ngày mới khi trang vẫn mở → kiểm lại ca + vị trí cho ngày mới
+                onClick={() => (isAdmin ? setCurrentDate(todayDate) : access.recheck())}
               >
                 Hôm nay
               </Button>
+            )}
+            {!isAdmin && (
+              <Typography variant="caption" color="text.secondary">
+                Chỉ kiểm quầy được ngày hôm nay khi đang có ca và có mặt tại cửa hàng.
+              </Typography>
             )}
           </Stack>
         </Card>
@@ -730,7 +807,7 @@ export default function ShiftCashDashboardView() {
             <Stack direction="row" spacing={1} alignItems="center">
               <Iconify icon="solar:lock-keyhole-bold" width={20} sx={{ color: 'warning.main' }} />
               <Typography variant="body2" color="warning.dark">
-                Bạn đang xem ngày cũ. Chỉ Admin mới có quyền chỉnh sửa dữ liệu ngày cũ.
+                Đã sang ngày mới. Bấm &quot;Hôm nay&quot; để kiểm quầy ngày {formatDateVN(todayDate)} — dữ liệu ngày cũ chỉ Admin xem / sửa.
               </Typography>
             </Stack>
           </Card>
@@ -1116,17 +1193,20 @@ export default function ShiftCashDashboardView() {
                     </Stack>
                   }
                 />
-                <Tab
-                  label={
-                    <Stack direction="row" spacing={0.5} alignItems="center">
-                      <Iconify icon="solar:document-text-bold-duotone" width={20} />
-                      <span>Nhật ký chỉnh sửa</span>
-                      {auditLogs.length > 0 && (
-                        <Chip label={auditLogs.length} size="small" variant="outlined" />
-                      )}
-                    </Stack>
-                  }
-                />
+                {/* Nhật ký chỉnh sửa (ai sửa gì, toạ độ GPS) — chỉ Admin */}
+                {isAdmin && (
+                  <Tab
+                    label={
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Iconify icon="solar:document-text-bold-duotone" width={20} />
+                        <span>Nhật ký chỉnh sửa</span>
+                        {auditLogs.length > 0 && (
+                          <Chip label={auditLogs.length} size="small" variant="outlined" />
+                        )}
+                      </Stack>
+                    }
+                  />
+                )}
               </Tabs>
 
               <Box sx={{ p: 2.5 }}>
@@ -1323,6 +1403,7 @@ export default function ShiftCashDashboardView() {
                                 enqueueSnackbar('Đã tải xuống báo cáo Excel');
                               } catch (err) {
                                 console.error(err);
+                                if (handleDenied(err, 'action')) return;
                                 enqueueSnackbar('Tải xuống thất bại', { variant: 'error' });
                               }
                             }}
@@ -1569,8 +1650,8 @@ export default function ShiftCashDashboardView() {
                   </>
                 )}
 
-                {/* Tab 2: Nhật ký chỉnh sửa (MongoDB audit logs) */}
-                {tab === 2 && (
+                {/* Tab 2: Nhật ký chỉnh sửa (MongoDB audit logs) — chỉ Admin */}
+                {tab === 2 && isAdmin && (
                   <Scrollbar>
                     <TableContainer>
                       <Table size="small" sx={{ minWidth: 720 }}>

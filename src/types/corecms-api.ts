@@ -542,6 +542,7 @@ export interface IBranchLocation {
   latitude?: number;
   longitude?: number;
   geofenceRadius: number;
+  isActive?: boolean; // BE chỉ tính geofence với chi nhánh đang hoạt động
 }
 
 // --- Salary Configuration ---
