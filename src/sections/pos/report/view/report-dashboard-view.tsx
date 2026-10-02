@@ -17,6 +17,7 @@ import { fCurrency, fPercent, fShortenNumber } from 'src/utils/format-number';
 import { AppDatePicker } from 'src/components/date-time-picker';
 import Chart, { useChart } from 'src/components/chart';
 import RoleBasedGuard from 'src/auth/guard/role-based-guard';
+import { useAuthContext } from 'src/auth/hooks';
 
 import { IRevenueReport, IExpenseReport, IBreakEvenAnalysis } from 'src/types/corecms-api';
 import { getRevenueReport, getExpenseReport, getBreakEvenAnalysis } from 'src/api/reports';
@@ -44,7 +45,12 @@ export default function ReportDashboardView() {
   const [prevRevenue, setPrevRevenue] = useState<IRevenueReport | null>(null);
   const [prevExpense, setPrevExpense] = useState<IExpenseReport | null>(null);
 
+  const { user } = useAuthContext();
+  // Trang chỉ Admin (RoleBasedGuard bên dưới): vai trò khác không gọi API — các báo cáo chi phí / hoà vốn trả 403.
+  const isAdmin = (user?.roles || [user?.role]).includes('Admin');
+
   const fetchData = useCallback(async () => {
+    if (!isAdmin) return;
     try {
       // Kỳ trước = khoảng cùng độ dài ngay trước [fromDate, toDate] (để so sánh MoM)
       const msPerDay = 86_400_000;
@@ -72,7 +78,7 @@ export default function ReportDashboardView() {
       console.error(error);
       enqueueSnackbar('Không thể tải dashboard tài chính', { variant: 'error' });
     }
-  }, [fromDate, toDate, enqueueSnackbar]);
+  }, [fromDate, toDate, enqueueSnackbar, isAdmin]);
 
   useEffect(() => {
     fetchData();

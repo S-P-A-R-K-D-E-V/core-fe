@@ -466,7 +466,8 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             icon: ICONS.analytics,
             roles: ['Admin', 'Manager'],
             children: [
-              { title: 'Tổng quan', path: paths.dashboard.pos.report.dashboard },
+              // Tổng quan tài chính gọi /reports/expenses + /reports/break-even (chỉ Admin) → Manager không thấy mục này.
+              { title: 'Tổng quan', path: paths.dashboard.pos.report.dashboard, roles: ['Admin'] },
               { title: 'Doanh thu', path: paths.dashboard.pos.report.revenue },
               { title: 'SP bán chạy', path: paths.dashboard.pos.report.productSales },
               { title: 'Khách hàng', path: paths.dashboard.pos.report.customers },
