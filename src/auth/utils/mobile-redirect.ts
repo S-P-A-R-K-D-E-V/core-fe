@@ -33,6 +33,34 @@ export function parseMobileRedirectUri(raw: string | null | undefined): URL | nu
   return allowedSchemes().includes(url.protocol) ? url : null;
 }
 
+// ----------------------------------------------------------------------
+// Trang liên kết Google/Apple (/sso/start/?link=1&app=1) trả kết quả về app:
+//   <redirect_uri>?status=<s>&result=<s>[&provider=<p>][&reason=<mã>]
+// App cũ đọc `status`; `result` cùng giá trị theo hợp đồng mới. `reason` chỉ là mã cố định — app tự dịch,
+// không hiện nguyên văn. Không truyền provider / reason thì xoá luôn tham số cùng tên có sẵn trong
+// redirect_uri, để app không đọc nhầm giá trị cũ.
+
+export type AppLinkStatus = 'linked' | 'error' | 'cancelled';
+
+/** Mỗi tài khoản chỉ một Google + một Apple: BE trả 409 Auth.ProviderAlreadyLinked. */
+export type AppLinkFailureReason = 'provider_already_linked';
+
+export function buildAppLinkResultUrl(
+  redirect: URL,
+  status: AppLinkStatus,
+  provider?: string,
+  reason?: AppLinkFailureReason
+): string {
+  const back = new URL(redirect.toString());
+  back.searchParams.set('status', status);
+  back.searchParams.set('result', status);
+  if (provider) back.searchParams.set('provider', provider);
+  else back.searchParams.delete('provider');
+  if (reason) back.searchParams.set('reason', reason);
+  else back.searchParams.delete('reason');
+  return back.toString();
+}
+
 /** Dựng URL quay về app kèm sessionToken, hoặc null nếu redirect_uri không hợp lệ. */
 export function buildMobileRedirectUrl(
   raw: string | null | undefined,

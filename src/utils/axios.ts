@@ -57,7 +57,7 @@ export const endpoints = {
     oauthLogin: '/auth/oauth-login',
     oauthConnections: '/auth/oauth-connections',
     oauthConnect: '/auth/oauth-connect',
-    // Gỡ theo id liên kết (một tài khoản gắn được nhiều Google/Apple); tên nhà cung cấp vẫn nhận.
+    // Gỡ theo id liên kết (tài khoản cũ có thể còn >1 cùng loại; liên kết mới chỉ 1/loại); tên nhà cung cấp vẫn nhận.
     oauthDisconnect: (idOrProvider: string) => `/auth/oauth-connections/${idOrProvider}`,
     // Xin vé liên kết Google/Apple (đã đăng nhập) rồi mở trang auth /sso/start/?link=1#t=<vé>.
     oauthLinkStart: '/auth/oauth-link/start',

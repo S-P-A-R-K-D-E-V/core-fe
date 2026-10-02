@@ -15,7 +15,12 @@ import axios, { endpoints } from 'src/utils/axios';
 import { apiErrorMessage, hasApiErrorCode } from 'src/utils/api-error';
 
 import { AUTH_HOST, isAuthHost, APPLE_SERVICES_ID } from 'src/auth/utils/saas-host';
-import { parseMobileRedirectUri } from 'src/auth/utils/mobile-redirect';
+import {
+  AppLinkStatus,
+  AppLinkFailureReason,
+  buildAppLinkResultUrl,
+  parseMobileRedirectUri,
+} from 'src/auth/utils/mobile-redirect';
 
 import Iconify from 'src/components/iconify';
 
@@ -69,9 +74,6 @@ type Credential = {
 
 const PROVIDER_LABEL: Record<Credential['provider'], string> = { google: 'Google', apple: 'Apple' };
 
-/** Lý do lỗi gửi về app (?reason=…) — chỉ mã cố định, app đối chiếu danh sách đã biết. */
-type LinkFailureReason = 'provider_already_linked';
-
 /**
  * /sso/start/?link=1&provider=google|apple[&app=1&redirect_uri=sparkstore://…][&lang=en]#t=<vé>
  *
@@ -100,7 +102,7 @@ export default function SsoLinkView() {
   // Lỗi đã biết lý do (app mode) — nút "Quay lại ứng dụng" gửi kèm để app báo đúng.
   const [appFailure, setAppFailure] = useState<{
     provider: string;
-    reason: LinkFailureReason;
+    reason: AppLinkFailureReason;
   } | null>(null);
 
   const tokenRef = useRef<string | null>(null);
@@ -123,19 +125,13 @@ export default function SsoLinkView() {
     return '';
   }, [host, provider, linkToken, appMode, appRedirect, text]);
 
-  // Về app: ?status=…&result=…[&provider=…][&reason=…]. App cũ đọc `status`; `result` là cùng giá trị theo
-  // hợp đồng mới. `reason` chỉ là mã cố định (provider_already_linked) — app tự dịch, không hiện nguyên văn.
+  // Về app: ?status=…&result=…[&provider=…][&reason=…] (xem buildAppLinkResultUrl).
   const backToApp = (
-    status: 'linked' | 'error' | 'cancelled',
+    status: AppLinkStatus,
     linkedProvider?: string,
-    reason?: LinkFailureReason
+    reason?: AppLinkFailureReason
   ) => {
-    const back = new URL(appRedirect!.toString());
-    back.searchParams.set('status', status);
-    back.searchParams.set('result', status);
-    if (linkedProvider) back.searchParams.set('provider', linkedProvider);
-    if (reason) back.searchParams.set('reason', reason);
-    window.location.assign(back.toString());
+    window.location.assign(buildAppLinkResultUrl(appRedirect!, status, linkedProvider, reason));
   };
 
   const link = async (credential: Credential) => {
