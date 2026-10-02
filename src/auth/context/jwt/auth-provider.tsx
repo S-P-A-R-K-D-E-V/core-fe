@@ -23,7 +23,8 @@ import { AuthUserType, ActionMapType, AuthStateType } from '../../types';
 /**
  * Core CMS Backend Integration
  * Integrated with .NET Core backend API at http://localhost:2510
- * Supports: OTP email verification, login sessions (7-day persistence)
+ * Supports: OTP email verification, login sessions (phiên thiết bị trượt 30 ngày — mỗi lần
+ * restore-session BE gia hạn thêm 30 ngày; đăng xuất chỉ đóng phiên của trình duyệt này)
  */
 // ----------------------------------------------------------------------
 
@@ -192,7 +193,7 @@ export function AuthProvider({ children }: Props) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [pendingVerification, setPendingVerification] = useState<{ email: string } | null>(null);
 
-  // Try to restore session from localStorage (7-day persistence)
+  // Try to restore session from localStorage (trượt 30 ngày: mỗi lần restore BE gia hạn phiên)
   const tryRestoreSession = useCallback(async (): Promise<boolean> => {
     try {
       const savedSessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
@@ -253,7 +254,7 @@ export function AuthProvider({ children }: Props) {
         return;
       }
 
-      // No valid access token — try to restore from login session (7-day cookie)
+      // No valid access token — try to restore from login session (sessionToken, trượt 30 ngày)
       // NOTE: này là async — user có thể login trong lúc chờ API
       const restored = await tryRestoreSession();
       if (restored) return;
