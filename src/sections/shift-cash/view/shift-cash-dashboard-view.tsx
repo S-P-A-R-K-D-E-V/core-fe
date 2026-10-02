@@ -399,14 +399,15 @@ function ShiftCashDashboardContent() {
     batchAbortRef.current = true;
   }, [fetchData]);
 
-  // Load VietQR banks + KiotViet bank accounts + cổ đông once on mount
+  // Load VietQR banks + KiotViet bank accounts + cổ đông once on mount.
+  // GET /shareholders chỉ Admin (BE [Authorize(Roles = "Admin")]) — vai trò khác không gọi, khỏi 403 thừa.
   useEffect(() => {
     Promise.allSettled([
       // getVietQRBanks().then((banks) => setVietQRBanks(banks)),
       getKiotVietBankAccounts().then((accounts) => setKiotBankAccounts(accounts)),
-      getShareholders(true).then((list) => setShareholders(list)),
+      ...(isAdmin ? [getShareholders(true).then((list) => setShareholders(list))] : []),
     ]);
-  }, []);
+  }, [isAdmin]);
 
   // Lazy-load all invoice details when kiotData is available
   useEffect(() => {
@@ -1929,21 +1930,25 @@ function ShiftCashDashboardContent() {
               multiline
               rows={2}
             />
-            <TextField
-              select
-              fullWidth
-              label={txType === 'Thu' ? 'Thu từ cổ đông (nếu có)' : 'Chi cho cổ đông (nếu có)'}
-              value={txShareholderId}
-              onChange={(e) => setTxShareholderId(e.target.value)}
-              helperText="Chỉ để đối chiếu với hoạch toán cổ đông, không tự động ghi sổ"
-            >
-              <MenuItem value="">— Không —</MenuItem>
-              {shareholders.map((s) => (
-                <MenuItem key={s.id} value={s.id}>
-                  {s.name}
-                </MenuItem>
-              ))}
-            </TextField>
+            {/* Gắn cổ đông: chỉ Admin (danh sách cổ đông chỉ Admin đọc được). Vai trò khác sửa khoản đã
+                gắn thì giữ nguyên cổ đông cũ — txShareholderId vẫn gửi lại như cũ. */}
+            {isAdmin && (
+              <TextField
+                select
+                fullWidth
+                label={txType === 'Thu' ? 'Thu từ cổ đông (nếu có)' : 'Chi cho cổ đông (nếu có)'}
+                value={txShareholderId}
+                onChange={(e) => setTxShareholderId(e.target.value)}
+                helperText="Chỉ để đối chiếu với hoạch toán cổ đông, không tự động ghi sổ"
+              >
+                <MenuItem value="">— Không —</MenuItem>
+                {shareholders.map((s) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {s.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
