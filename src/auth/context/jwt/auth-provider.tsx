@@ -93,6 +93,14 @@ const reducer = (state: AuthStateType, action: ActionsType) => {
 const STORAGE_KEY = 'accessToken';
 const SESSION_TOKEN_KEY = 'sessionToken';
 
+// axios (src/utils/axios.ts) reject bằng body: BE từ chối phiên → ProblemDetails có status 4xx
+// (400 User.InvalidSession / AccountNotActive, 404 User.NotFound). Mất mạng / body rỗng / HTML của cổng →
+// chuỗi; lỗi máy chủ → status 5xx. Chỉ trường hợp đầu mới là phiên hỏng thật.
+function isSessionRejected(err: any): boolean {
+  const status = err && typeof err === 'object' ? err.status : undefined;
+  return typeof status === 'number' && status >= 400 && status < 500;
+}
+
 type Props = {
   children: React.ReactNode;
 };
@@ -214,8 +222,10 @@ export function AuthProvider({ children }: Props) {
       dispatch({ type: Types.INITIAL, payload: { user } });
       return true;
     } catch (error) {
-      // Session expired or invalid, clean up
-      localStorage.removeItem(SESSION_TOKEN_KEY);
+      // Chỉ bỏ sessionToken khi BE đã trả lời từ chối (4xx: phiên hết hạn / bị thu hồi / tài khoản khoá).
+      // Mất mạng, 5xx, cổng lỗi trả HTML… → giữ lại để lần mở sau tự khôi phục: phiên thiết bị trượt 30
+      // ngày không được mất chỉ vì một lần mạng chập chờn lúc mở trang.
+      if (isSessionRejected(error)) localStorage.removeItem(SESSION_TOKEN_KEY);
       return false;
     }
   }, []);
