@@ -12,7 +12,7 @@ import { paths } from 'src/routes/paths';
 import { useSearchParams } from 'src/routes/hooks';
 
 import axios, { endpoints } from 'src/utils/axios';
-import { apiErrorMessage } from 'src/utils/api-error';
+import { apiErrorMessage, hasApiErrorCode } from 'src/utils/api-error';
 
 import { AUTH_HOST, isAuthHost, APPLE_SERVICES_ID } from 'src/auth/utils/saas-host';
 import { parseMobileRedirectUri } from 'src/auth/utils/mobile-redirect';
@@ -29,9 +29,12 @@ const TEXT = {
     google: 'Đăng nhập Google để thêm làm cách đăng nhập nhanh cho tài khoản của bạn.',
     apple: 'Đăng nhập Apple để thêm làm cách đăng nhập nhanh cho tài khoản của bạn.',
     appleButton: 'Tiếp tục với Apple',
-    note: 'Email đăng nhập của bạn giữ nguyên. Có thể liên kết nhiều tài khoản Google/Apple.',
+    note: 'Email đăng nhập của bạn giữ nguyên. Mỗi tài khoản liên kết được một Google và một Apple.',
     invalid: 'Liên kết không hợp lệ hoặc đã được dùng. Quay lại trang tài khoản và thử lại.',
-    retry: 'Mỗi liên kết chỉ dùng một lần — quay lại trang tài khoản (hoặc ứng dụng) và bấm Liên kết lần nữa.',
+    retry:
+      'Mỗi liên kết chỉ dùng một lần — quay lại trang tài khoản (hoặc ứng dụng) và bấm Liên kết lần nữa.',
+    alreadyLinked:
+      'Tài khoản của bạn đã liên kết một tài khoản {p} khác. Gỡ liên kết đó ở trang tài khoản (hoặc trong ứng dụng) rồi liên kết lại.',
     googleFailed: 'Liên kết Google thất bại',
     appleFailed: 'Liên kết Apple thất bại',
     backToApp: 'Quay lại ứng dụng',
@@ -42,9 +45,12 @@ const TEXT = {
     google: 'Sign in with Google to add it as a quick way to sign in to your account.',
     apple: 'Sign in with Apple to add it as a quick way to sign in to your account.',
     appleButton: 'Continue with Apple',
-    note: 'Your sign-in email stays the same. You can link several Google/Apple accounts.',
-    invalid: 'This link is not valid or was already used. Go back to your account page and try again.',
+    note: 'Your sign-in email stays the same. You can link one Google and one Apple account.',
+    invalid:
+      'This link is not valid or was already used. Go back to your account page and try again.',
     retry: 'Each link works once — go back to your account page (or the app) and tap Link again.',
+    alreadyLinked:
+      'Your account already has a different {p} account linked. Remove it on your account page (or in the app), then link again.',
     googleFailed: 'Linking Google failed',
     appleFailed: 'Linking Apple failed',
     backToApp: 'Back to the app',
@@ -54,7 +60,17 @@ const TEXT = {
 
 const HOST_PATTERN = /^[a-z0-9.-]+(:\d+)?$/;
 
-type Credential = { provider: 'google' | 'apple'; token: string; nonce?: string; authorizationCode?: string };
+type Credential = {
+  provider: 'google' | 'apple';
+  token: string;
+  nonce?: string;
+  authorizationCode?: string;
+};
+
+const PROVIDER_LABEL: Record<Credential['provider'], string> = { google: 'Google', apple: 'Apple' };
+
+/** Lý do lỗi gửi về app (?reason=…) — chỉ mã cố định, app đối chiếu danh sách đã biết. */
+type LinkFailureReason = 'provider_already_linked';
 
 /**
  * /sso/start/?link=1&provider=google|apple[&app=1&redirect_uri=sparkstore://…][&lang=en]#t=<vé>
@@ -63,6 +79,8 @@ type Credential = { provider: 'google' | 'apple'; token: string; nonce?: string;
  * trang này — tên miền duy nhất khai báo với Google/Apple. Đăng nhập Google/Apple xong, trang gửi vé +
  * token tới /api/app-hub/link: danh tính được gắn vào tài khoản trong vé, rồi chuyển về trang tài khoản
  * của cửa hàng (web) hoặc deep link của app. Vé chỉ đi qua fragment (#t=…) để không lên server/log.
+ * Mỗi tài khoản chỉ một Google + một Apple: đã có cái khác cùng loại thì BE trả 409
+ * Auth.ProviderAlreadyLinked → web báo gỡ cái cũ trước; app nhận ?status=error&provider=…&reason=provider_already_linked.
  */
 export default function SsoLinkView() {
   const searchParams = useSearchParams();
@@ -79,6 +97,11 @@ export default function SsoLinkView() {
   // Vé đã gửi đi (đúng hay sai đều bị đốt) — không cho bấm lại.
   const [spent, setSpent] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  // Lỗi đã biết lý do (app mode) — nút "Quay lại ứng dụng" gửi kèm để app báo đúng.
+  const [appFailure, setAppFailure] = useState<{
+    provider: string;
+    reason: LinkFailureReason;
+  } | null>(null);
 
   const tokenRef = useRef<string | null>(null);
   useEffect(() => {
@@ -100,10 +123,18 @@ export default function SsoLinkView() {
     return '';
   }, [host, provider, linkToken, appMode, appRedirect, text]);
 
-  const backToApp = (status: 'linked' | 'error' | 'cancelled', linked?: string) => {
+  // Về app: ?status=…&result=…[&provider=…][&reason=…]. App cũ đọc `status`; `result` là cùng giá trị theo
+  // hợp đồng mới. `reason` chỉ là mã cố định (provider_already_linked) — app tự dịch, không hiện nguyên văn.
+  const backToApp = (
+    status: 'linked' | 'error' | 'cancelled',
+    linkedProvider?: string,
+    reason?: LinkFailureReason
+  ) => {
     const back = new URL(appRedirect!.toString());
     back.searchParams.set('status', status);
-    if (linked) back.searchParams.set('provider', linked);
+    back.searchParams.set('result', status);
+    if (linkedProvider) back.searchParams.set('provider', linkedProvider);
+    if (reason) back.searchParams.set('reason', reason);
     window.location.assign(back.toString());
   };
 
@@ -126,6 +157,22 @@ export default function SsoLinkView() {
         `https://${returnHost}${paths.dashboard.user.account}/?tab=connected&linked=${encodeURIComponent(res.data.provider)}`
       );
     } catch (err: any) {
+      // Mỗi tài khoản chỉ một Google + một Apple: đã có cái khác cùng loại thì BE trả 409. Bấm lại vô ích
+      // (vé đã đốt, và vẫn bị chặn) — app nhận mã lý do để tự báo; web báo cách gỡ, không kèm "thử lại".
+      if (hasApiErrorCode(err, 'Auth.ProviderAlreadyLinked')) {
+        setBusy(false);
+        setErrorMsg(text.alreadyLinked.replaceAll('{p}', PROVIDER_LABEL[credential.provider]));
+        if (appMode) {
+          // Vẫn hiện lời báo + nút "Quay lại ứng dụng" (mang cùng lý do) phòng khi deep link không mở được.
+          const failure = {
+            provider: credential.provider,
+            reason: 'provider_already_linked' as const,
+          };
+          setAppFailure(failure);
+          backToApp('error', failure.provider, failure.reason);
+        }
+        return;
+      }
       setBusy(false);
       const failed = credential.provider === 'google' ? text.googleFailed : text.appleFailed;
       setErrorMsg(`${apiErrorMessage(err, failed)} ${text.retry}`);
@@ -199,7 +246,11 @@ export default function SsoLinkView() {
       )}
 
       {spent && !busy && appMode && (
-        <Button variant="outlined" color="inherit" onClick={() => backToApp('error')}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={() => backToApp('error', appFailure?.provider, appFailure?.reason)}
+        >
           {text.backToApp}
         </Button>
       )}

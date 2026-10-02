@@ -13,7 +13,7 @@ import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 
 import axiosInstance, { endpoints } from 'src/utils/axios';
-import { apiErrorMessage } from 'src/utils/api-error';
+import { apiErrorMessage, hasApiErrorCode } from 'src/utils/api-error';
 
 import { FACEBOOK_APP_ID } from 'src/config-global';
 import { useAuthContext } from 'src/auth/hooks';
@@ -38,9 +38,11 @@ const PROVIDERS: Record<string, { label: string; icon: string }> = {
 };
 
 /**
- * Một tài khoản = một email đăng nhập; liên kết thêm được nhiều Google/Apple (kể cả nhiều tài khoản
- * Google) để đăng nhập nhanh. Google/Apple liên kết qua trang auth (tên miền duy nhất khai báo với
- * Google/Apple): xin vé một lần rồi mở /sso/start/?link=1 — trang đó gắn xong chuyển về đây với
+ * Một tài khoản = một email đăng nhập; liên kết được MỘT tài khoản cho mỗi loại (một Google, một Apple,
+ * một Facebook) để đăng nhập nhanh — đã liên kết loại nào thì ẩn nút loại đó (BE cũng chặn: 409
+ * Auth.ProviderAlreadyLinked). Muốn đổi tài khoản: gỡ cái cũ rồi liên kết lại. Dữ liệu cũ đã có >1 cùng
+ * loại vẫn hiện đủ và gỡ được từng cái. Google/Apple liên kết qua trang auth (tên miền duy nhất khai báo
+ * với Google/Apple): xin vé một lần rồi mở /sso/start/?link=1 — trang đó gắn xong chuyển về đây với
  * ?tab=connected&linked=<nhà cung cấp>. Facebook (chỉ CiCi) vẫn gắn ngay tại trang này.
  */
 export default function AccountConnectedAccounts() {
@@ -77,7 +79,11 @@ export default function AccountConnectedAccounts() {
       setSuccessMsg(`Đã liên kết ${PROVIDERS[linked]?.label ?? linked}.`);
       params.delete('linked');
       const query = params.toString();
-      window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+      window.history.replaceState(
+        null,
+        '',
+        `${window.location.pathname}${query ? `?${query}` : ''}`
+      );
     }
   }, [fetchConnections]);
 
@@ -94,6 +100,8 @@ export default function AccountConnectedAccounts() {
     } catch (err) {
       setErrorMsg(apiErrorMessage(err, 'Không bắt đầu liên kết được. Thử lại sau.'));
       setActionLoading(null);
+      // BE có thể chặn sớm khi đã có loại này (409) — tải lại danh sách để ẩn nút.
+      if (hasApiErrorCode(err, 'Auth.ProviderAlreadyLinked')) await fetchConnections();
     }
   };
 
@@ -107,10 +115,18 @@ export default function AccountConnectedAccounts() {
       await fetchConnections();
     } catch (err) {
       setErrorMsg(apiErrorMessage(err, 'Không thể liên kết Facebook'));
+      // Đã có Facebook khác (409, vd. vừa gắn ở tab khác) — tải lại danh sách để ẩn nút.
+      if (hasApiErrorCode(err, 'Auth.ProviderAlreadyLinked')) await fetchConnections();
     } finally {
       setActionLoading(null);
     }
   };
+
+  // Ẩn nút liên kết khi đã có loại đó (hoặc chưa tải xong danh sách — tránh nháy nút rồi ẩn).
+  const hasLinked = (p: string) => connections.some((c) => c.provider.toLowerCase() === p);
+  const canLinkGoogle = !loading && !hasLinked('google');
+  const canLinkApple = !!APPLE_SERVICES_ID && !loading && !hasLinked('apple');
+  const canLinkFacebook = showFacebook && !loading && !hasLinked('facebook');
 
   const confirmRemove = async () => {
     const target = pendingRemove;
@@ -135,9 +151,14 @@ export default function AccountConnectedAccounts() {
       <Stack spacing={0.5} sx={{ mb: 3 }}>
         <Typography variant="h6">Tài khoản liên kết</Typography>
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          Email đăng nhập{user?.email ? ` (${user.email})` : ''} giữ nguyên. Liên kết thêm Google/Apple để
-          đăng nhập nhanh — có thể liên kết nhiều tài khoản.
+          Email đăng nhập{user?.email ? ` (${user.email})` : ''} giữ nguyên. Liên kết Google/Apple
+          để đăng nhập nhanh — mỗi loại liên kết được một tài khoản.
         </Typography>
+        {connections.length > 0 && (
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            Muốn đổi sang tài khoản khác? Gỡ liên kết hiện tại rồi liên kết lại.
+          </Typography>
+        )}
       </Stack>
 
       {!!errorMsg && (
@@ -159,9 +180,19 @@ export default function AccountConnectedAccounts() {
 
       <Stack divider={<Divider sx={{ borderStyle: 'dashed' }} />}>
         {connections.map((c) => {
-          const meta = PROVIDERS[c.provider.toLowerCase()] ?? { label: c.provider, icon: 'mdi:link-variant' };
+          const meta = PROVIDERS[c.provider.toLowerCase()] ?? {
+            label: c.provider,
+            icon: 'mdi:link-variant',
+          };
           return (
-            <Stack key={c.id} direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ py: 2 }}>
+            <Stack
+              key={c.id}
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              spacing={2}
+              sx={{ py: 2 }}
+            >
               <Stack direction="row" alignItems="center" spacing={2} sx={{ minWidth: 0 }}>
                 <Box
                   sx={{
@@ -203,52 +234,56 @@ export default function AccountConnectedAccounts() {
         })}
       </Stack>
 
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 2 }}>
-        <LoadingButton
-          variant="outlined"
-          color="inherit"
-          loading={actionLoading === 'google'}
-          disabled={!!actionLoading}
-          onClick={() => startLink('google')}
-          startIcon={<Iconify icon="devicon:google" width={18} />}
-        >
-          Liên kết Google
-        </LoadingButton>
+      {(canLinkGoogle || canLinkApple || canLinkFacebook) && (
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 2 }}>
+          {canLinkGoogle && (
+            <LoadingButton
+              variant="outlined"
+              color="inherit"
+              loading={actionLoading === 'google'}
+              disabled={!!actionLoading}
+              onClick={() => startLink('google')}
+              startIcon={<Iconify icon="devicon:google" width={18} />}
+            >
+              Liên kết Google
+            </LoadingButton>
+          )}
 
-        {!!APPLE_SERVICES_ID && (
-          <LoadingButton
-            variant="outlined"
-            color="inherit"
-            loading={actionLoading === 'apple'}
-            disabled={!!actionLoading}
-            onClick={() => startLink('apple')}
-            startIcon={<Iconify icon="mdi:apple" width={18} />}
-          >
-            Liên kết Apple
-          </LoadingButton>
-        )}
+          {canLinkApple && (
+            <LoadingButton
+              variant="outlined"
+              color="inherit"
+              loading={actionLoading === 'apple'}
+              disabled={!!actionLoading}
+              onClick={() => startLink('apple')}
+              startIcon={<Iconify icon="mdi:apple" width={18} />}
+            >
+              Liên kết Apple
+            </LoadingButton>
+          )}
 
-        {showFacebook && (
-          <FacebookLogin
-            appId={FACEBOOK_APP_ID}
-            fields="name,email,first_name,last_name,picture"
-            callback={(resp: any) => {
-              if (resp?.accessToken) connectFacebook(resp.accessToken);
-            }}
-            render={(renderProps: any) => (
-              <Button
-                variant="outlined"
-                startIcon={<Iconify icon="logos:facebook" width={18} />}
-                onClick={renderProps.onClick}
-                disabled={renderProps.isDisabled || !!actionLoading}
-                sx={{ borderColor: '#1877F2', color: '#1877F2' }}
-              >
-                Liên kết Facebook
-              </Button>
-            )}
-          />
-        )}
-      </Stack>
+          {canLinkFacebook && (
+            <FacebookLogin
+              appId={FACEBOOK_APP_ID}
+              fields="name,email,first_name,last_name,picture"
+              callback={(resp: any) => {
+                if (resp?.accessToken) connectFacebook(resp.accessToken);
+              }}
+              render={(renderProps: any) => (
+                <Button
+                  variant="outlined"
+                  startIcon={<Iconify icon="logos:facebook" width={18} />}
+                  onClick={renderProps.onClick}
+                  disabled={renderProps.isDisabled || !!actionLoading}
+                  sx={{ borderColor: '#1877F2', color: '#1877F2' }}
+                >
+                  Liên kết Facebook
+                </Button>
+              )}
+            />
+          )}
+        </Stack>
+      )}
 
       <ConfirmDialog
         open={!!pendingRemove}
