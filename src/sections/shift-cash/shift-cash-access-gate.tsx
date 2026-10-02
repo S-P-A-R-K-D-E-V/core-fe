@@ -12,9 +12,11 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
+import { hasApiErrorCode } from 'src/utils/api-error';
 import {
   vnToday,
   hasShiftOn,
+  canUseShiftCash,
   ShiftCashGeoError,
   geofenceBranches,
   isShiftCashBypass,
@@ -34,7 +36,7 @@ import { useAuthContext } from 'src/auth/hooks';
 
 // ----------------------------------------------------------------------
 // Cổng vào trang Kiểm tiền quầy (web) — cùng luật với app và BE (ShiftCashAccess):
-//  - Admin: vào thẳng, không hỏi GPS.
+//  - Admin: vào thẳng, không hỏi GPS. Vai trò ngoài Admin/Manager/Staff: chặn ngay.
 //  - Staff / Manager: 1) có ca hôm nay (giờ VN, qua /shift-assignments/my-schedule)
 //                     2) tải toạ độ chi nhánh — lỗi thì CHẶN, không mở cổng khi không kiểm được
 //                     3) GPS trình duyệt (độ chính xác cao) trong bán kính một chi nhánh, sai số ≤ 200 m.
@@ -104,6 +106,23 @@ function geoFailureState(err: unknown): GateState {
   }
 }
 
+// Không tải được lịch làm. Cửa hàng chưa bật xếp ca (RequireFeature → 403 { error: 'feature_disabled' })
+// thì không ai ngoài Admin có ca để kiểm quầy — báo đúng lý do, đừng bảo "kiểm tra mạng".
+function scheduleFailureState(err: unknown): GateState {
+  if (hasApiErrorCode(err, 'feature_disabled')) {
+    return blocked(
+      'solar:calendar-search-bold-duotone',
+      'Cửa hàng chưa bật xếp ca',
+      'Kiểm quầy cần lịch làm để biết bạn có ca hôm nay, nhưng cửa hàng chưa bật tính năng xếp ca — hiện chỉ Admin kiểm quầy được. Hãy báo chủ cửa hàng.'
+    );
+  }
+  return blocked(
+    'solar:calendar-search-bold-duotone',
+    'Không kiểm tra được ca làm',
+    'Không tải được lịch làm hôm nay. Kiểm tra mạng rồi bấm Thử lại.'
+  );
+}
+
 // ----------------------------------------------------------------------
 
 type Props = {
@@ -114,6 +133,7 @@ export default function ShiftCashAccessGate({ children }: Props) {
   const settings = useSettingsContext();
   const { user } = useAuthContext();
   const bypass = isShiftCashBypass(user);
+  const allowedRole = canUseShiftCash(user);
 
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<GateState>(
@@ -139,6 +159,17 @@ export default function ShiftCashAccessGate({ children }: Props) {
       return undefined;
     }
 
+    if (!allowedRole) {
+      setState(
+        blocked(
+          'solar:shield-cross-bold-duotone',
+          'Tài khoản không có quyền kiểm quầy',
+          'Kiểm quầy chỉ dành cho nhân viên, quản lý và Admin của cửa hàng.'
+        )
+      );
+      return undefined;
+    }
+
     (async () => {
       setState({ step: 'checking-shift' });
       const today = vnToday();
@@ -149,15 +180,7 @@ export default function ShiftCashAccessGate({ children }: Props) {
         assignments = await getMySchedule(today, today);
       } catch (error) {
         console.error('Shift-cash gate: my-schedule failed', error);
-        if (!cancelled) {
-          setState(
-            blocked(
-              'solar:calendar-search-bold-duotone',
-              'Không kiểm tra được ca làm',
-              'Không tải được lịch làm hôm nay. Kiểm tra mạng rồi bấm Thử lại.'
-            )
-          );
-        }
+        if (!cancelled) setState(scheduleFailureState(error));
         return;
       }
       if (cancelled) return;
@@ -241,7 +264,7 @@ export default function ShiftCashAccessGate({ children }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [bypass, attempt]);
+  }, [bypass, allowedRole, attempt]);
 
   // ── Đã qua cổng: cập nhật vị trí gửi kèm (người dùng mở trang cả ca) ──
   // Chỉ nhận điểm đủ chính xác; không tự khoá trang khi GPS chập chờn — BE quyết định khi bật geofence.

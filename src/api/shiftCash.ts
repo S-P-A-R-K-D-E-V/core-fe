@@ -30,11 +30,22 @@ export function setShiftCashGeo(geo: ShiftCashGeo | null): void {
 
 const geoConfig = () => ({ headers: shiftCashGeoHeaders(currentGeo) });
 
+// Blob.text() chưa có trên Safari < 14 (và jsdom) → dùng FileReader.
+function readBlobText(blob: Blob): Promise<string> {
+  if (typeof blob.text === 'function') return blob.text();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(blob);
+  });
+}
+
 // responseType 'blob' → body lỗi (vd. 403 { error, message }) cũng là Blob: đọc ra JSON để hiện đúng thông điệp.
 async function blobErrorBody(err: unknown): Promise<unknown> {
   if (typeof Blob === 'undefined' || !(err instanceof Blob)) return err;
   try {
-    return JSON.parse(await err.text());
+    return JSON.parse(await readBlobText(err));
   } catch {
     return err;
   }

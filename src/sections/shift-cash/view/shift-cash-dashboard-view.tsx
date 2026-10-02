@@ -770,7 +770,8 @@ function ShiftCashDashboardContent() {
             ) : (
               <Chip
                 icon={<Iconify icon="solar:calendar-date-bold" width={18} />}
-                label={`Hôm nay · ${formatDateVN(currentDate)}`}
+                // Trang mở qua nửa đêm: ngày đang xem không còn là hôm nay (banner bên dưới nhắc bấm "Hôm nay")
+                label={`${isToday ? 'Hôm nay' : 'Ngày'} · ${formatDateVN(currentDate)}`}
                 color="primary"
                 variant="soft"
               />

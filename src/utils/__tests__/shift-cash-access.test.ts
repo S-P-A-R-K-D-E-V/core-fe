@@ -1,14 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { IBranchLocation, IShiftAssignment } from 'src/types/corecms-api';
 
 import {
   vnToday,
   hasShiftOn,
+  canUseShiftCash,
   shiftCashDenial,
   isShiftCashBypass,
   shiftCashGeoHeaders,
   checkShiftCashGeofence,
+  ShiftCashGeoError,
+  acquireShiftCashPosition,
   isShiftCashLocationDenial,
 } from '../shift-cash-access';
 
@@ -29,6 +32,17 @@ describe('isShiftCashBypass', () => {
     expect(isShiftCashBypass({ roles: ['Manager'] })).toBe(false);
     expect(isShiftCashBypass({ roles: ['Staff'], role: 'Staff' })).toBe(false);
     expect(isShiftCashBypass(null)).toBe(false);
+  });
+});
+
+describe('canUseShiftCash', () => {
+  it('chỉ Admin / Manager / Staff — vai trò khác (User tự đăng ký) bị chặn', () => {
+    expect(canUseShiftCash({ roles: ['Admin'] })).toBe(true);
+    expect(canUseShiftCash({ roles: ['Manager'] })).toBe(true);
+    expect(canUseShiftCash({ role: 'Staff' })).toBe(true);
+    expect(canUseShiftCash({ roles: ['User'], role: 'User' })).toBe(false);
+    expect(canUseShiftCash({ roles: [] })).toBe(false);
+    expect(canUseShiftCash(null)).toBe(false);
   });
 });
 
@@ -159,5 +173,88 @@ describe('shiftCashDenial', () => {
     expect(isShiftCashLocationDenial('ShiftCash.OutsideStore')).toBe(true);
     expect(isShiftCashLocationDenial('ShiftCash.NoShiftToday')).toBe(false);
     expect(isShiftCashLocationDenial('ShiftCash.PastDateAdminOnly')).toBe(false);
+  });
+});
+
+// ----------------------------------------------------------------------
+// acquireShiftCashPosition: chờ điểm ≤ 200 m; hết giờ thì trả điểm tốt nhất (để cổng báo "chưa đủ chính
+// xác" kèm con số), chưa có điểm nào thì lỗi; từ chối quyền → lỗi 'denied' ngay.
+
+type FakeFix = { latitude: number; longitude: number; accuracy: number };
+
+function fakeGeolocation(events: Array<FakeFix | 'denied' | 'unavailable'>) {
+  const geolocation = {
+    watchPosition: vi.fn((success: PositionCallback, error?: PositionErrorCallback | null) => {
+      events.forEach((ev, i) => {
+        setTimeout(
+          () => {
+            if (ev === 'denied' || ev === 'unavailable') {
+              error?.({
+                code: ev === 'denied' ? 1 : 2,
+                PERMISSION_DENIED: 1,
+                POSITION_UNAVAILABLE: 2,
+                TIMEOUT: 3,
+              } as GeolocationPositionError);
+            } else {
+              success({ coords: ev, timestamp: Date.now() } as unknown as GeolocationPosition);
+            }
+          },
+          (i + 1) * 1000
+        );
+      });
+      return 7;
+    }),
+    clearWatch: vi.fn(),
+    getCurrentPosition: vi.fn(),
+  };
+  Object.defineProperty(navigator, 'geolocation', { value: geolocation, configurable: true });
+  return geolocation;
+}
+
+describe('acquireShiftCashPosition', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('trả ngay điểm đủ chính xác đầu tiên và dừng theo dõi', async () => {
+    vi.useFakeTimers();
+    const geo = fakeGeolocation([
+      { latitude: 1, longitude: 1, accuracy: 900 },
+      { latitude: 2, longitude: 2, accuracy: 30 },
+    ]);
+    const p = acquireShiftCashPosition(15000);
+    await vi.advanceTimersByTimeAsync(2000);
+    await expect(p).resolves.toEqual({ latitude: 2, longitude: 2, accuracy: 30 });
+    expect(geo.clearWatch).toHaveBeenCalledWith(7);
+  });
+
+  it('hết giờ mà chưa có điểm ≤ 200 m → trả điểm tốt nhất để báo sai số', async () => {
+    vi.useFakeTimers();
+    fakeGeolocation([
+      { latitude: 1, longitude: 1, accuracy: 1500 },
+      { latitude: 2, longitude: 2, accuracy: 600 },
+    ]);
+    const p = acquireShiftCashPosition(5000);
+    await vi.advanceTimersByTimeAsync(5000);
+    await expect(p).resolves.toEqual({ latitude: 2, longitude: 2, accuracy: 600 });
+  });
+
+  it('từ chối quyền vị trí → lỗi denied ngay', async () => {
+    vi.useFakeTimers();
+    fakeGeolocation(['denied']);
+    const p = acquireShiftCashPosition(15000);
+    const assertion = expect(p).rejects.toMatchObject({ reason: 'denied' });
+    await vi.advanceTimersByTimeAsync(1000);
+    await assertion;
+  });
+
+  it('không có điểm nào tới hết giờ → lỗi (unavailable / timeout)', async () => {
+    vi.useFakeTimers();
+    fakeGeolocation(['unavailable']);
+    const p = acquireShiftCashPosition(5000);
+    const assertion = expect(p).rejects.toBeInstanceOf(ShiftCashGeoError);
+    await vi.advanceTimersByTimeAsync(5000);
+    await assertion;
+    await expect(p).rejects.toMatchObject({ reason: 'unavailable' });
   });
 });

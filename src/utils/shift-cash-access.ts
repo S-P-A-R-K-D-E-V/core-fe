@@ -16,6 +16,10 @@ import { apiErrorMessage } from './api-error';
 // Vai trò được bỏ qua mọi kiểm tra. Manager theo đúng luật của Staff (chủ đã chốt).
 export const SHIFT_CASH_BYPASS_ROLES = ['Admin'];
 
+// Vai trò được dùng Kiểm quầy (BE: ShiftCashController [Authorize(Roles = "Admin,Manager,Staff")]).
+// Vai trò khác (vd. User tự đăng ký) mở thẳng URL thì chặn ngay — không gọi API, không hỏi GPS.
+export const SHIFT_CASH_ROLES = ['Admin', 'Manager', 'Staff'];
+
 // Độ chính xác GPS tối đa chấp nhận (mét) — cùng ngưỡng BE.
 export const SHIFT_CASH_MAX_ACCURACY_M = 200;
 
@@ -32,9 +36,18 @@ export type ShiftCashGeo = {
   accuracy?: number | null;
 };
 
+function userRoles(user: Record<string, any> | null | undefined): string[] {
+  return [...(user?.roles ?? []), user?.role].filter(Boolean);
+}
+
 export function isShiftCashBypass(user: Record<string, any> | null | undefined): boolean {
-  const roles: string[] = [...(user?.roles ?? []), user?.role].filter(Boolean);
+  const roles = userRoles(user);
   return SHIFT_CASH_BYPASS_ROLES.some((r) => roles.includes(r));
+}
+
+export function canUseShiftCash(user: Record<string, any> | null | undefined): boolean {
+  const roles = userRoles(user);
+  return SHIFT_CASH_ROLES.some((r) => roles.includes(r));
 }
 
 // Ngày hôm nay theo giờ Việt Nam (UTC+7, không có giờ mùa hè), dạng yyyy-MM-dd.

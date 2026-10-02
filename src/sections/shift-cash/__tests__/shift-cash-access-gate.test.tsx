@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
@@ -50,7 +50,9 @@ vi.mock('src/api/shiftCash', () => ({
 
 // Imported after the mocks above so the gate picks up the mocked modules.
 import { vnToday } from 'src/utils/shift-cash-access';
-import ShiftCashAccessGate from 'src/sections/shift-cash/shift-cash-access-gate';
+import ShiftCashAccessGate, {
+  useShiftCashAccess,
+} from 'src/sections/shift-cash/shift-cash-access-gate';
 
 const STORE = {
   id: 'b1',
@@ -88,13 +90,24 @@ function mockGeolocation(
   return geolocation;
 }
 
-function renderGate() {
+function renderGate(children: React.ReactNode = <div>NỘI DUNG KIỂM QUẦY</div>) {
   return render(
     <ThemeProvider theme={createTheme()}>
-      <ShiftCashAccessGate>
-        <div>NỘI DUNG KIỂM QUẦY</div>
-      </ShiftCashAccessGate>
+      <ShiftCashAccessGate>{children}</ShiftCashAccessGate>
     </ThemeProvider>
+  );
+}
+
+// Trang con gặp 403 ShiftCash.* từ BE → gọi deny(message) của cổng
+function DenyingPage() {
+  const { deny } = useShiftCashAccess();
+  return (
+    <div>
+      NỘI DUNG KIỂM QUẦY
+      <button type="button" onClick={() => deny('Thông điệp từ BE: bạn đã hết ca.')}>
+        giả lập 403
+      </button>
+    </div>
   );
 }
 
@@ -189,5 +202,45 @@ describe('ShiftCashAccessGate', () => {
 
     await waitFor(() => expect(screen.getByText('NỘI DUNG KIỂM QUẦY')).toBeInTheDocument());
     expect(geo.watchPosition).not.toHaveBeenCalled();
+  });
+
+  it('vai trò ngoài Admin/Manager/Staff → chặn ngay, không gọi API, không hỏi GPS', async () => {
+    mockUser = { role: 'User', roles: ['User'] };
+    const geo = mockGeolocation({ latitude: 0, longitude: 0, accuracy: 10 });
+
+    renderGate();
+
+    expect(await screen.findByText('Tài khoản không có quyền kiểm quầy')).toBeInTheDocument();
+    expect(getMySchedule).not.toHaveBeenCalled();
+    expect(getBranchLocations).not.toHaveBeenCalled();
+    expect(geo.watchPosition).not.toHaveBeenCalled();
+  });
+
+  it('cửa hàng chưa bật xếp ca (403 feature_disabled) → báo đúng lý do, không bảo kiểm tra mạng', async () => {
+    getMySchedule.mockRejectedValue({ error: 'feature_disabled', message: 'x' });
+
+    renderGate();
+
+    expect(await screen.findByText('Cửa hàng chưa bật xếp ca')).toBeInTheDocument();
+    expect(getBranchLocations).not.toHaveBeenCalled();
+  });
+
+  it('BE từ chối (deny) → về màn chặn với thông điệp BE, xoá vị trí; Thử lại → kiểm lại từ đầu', async () => {
+    getMySchedule.mockResolvedValue([{ id: 'a1', date: vnToday() }]);
+    getBranchLocations.mockResolvedValue([STORE]);
+    mockGeolocation({ latitude: STORE.latitude, longitude: STORE.longitude, accuracy: 25 });
+
+    renderGate(<DenyingPage />);
+    fireEvent.click(await screen.findByText('giả lập 403'));
+
+    expect(await screen.findByText('Thông điệp từ BE: bạn đã hết ca.')).toBeInTheDocument();
+    expect(screen.queryByText('giả lập 403')).not.toBeInTheDocument();
+    expect(setShiftCashGeo).toHaveBeenLastCalledWith(null);
+
+    getMySchedule.mockClear();
+    fireEvent.click(screen.getByText('Thử lại'));
+
+    expect(await screen.findByText('giả lập 403')).toBeInTheDocument();
+    expect(getMySchedule).toHaveBeenCalledTimes(1);
   });
 });
