@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
@@ -48,8 +48,20 @@ vi.mock('src/api/shiftCash', () => ({
   setShiftCashGeo: (...args: any[]) => setShiftCashGeo(...args),
 }));
 
+// Lấy vị trí khi kiểm lại (quay lại tab): mặc định chạy thật trên navigator.geolocation giả; test đặt
+// `acquire.override` để trả ngay một kết quả (khỏi chờ 15 s hết giờ khi sai số lớn).
+const acquire = vi.hoisted(() => ({ override: null as null | (() => Promise<unknown>) }));
+vi.mock('src/utils/shift-cash-access', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('src/utils/shift-cash-access')>();
+  return {
+    ...actual,
+    acquireShiftCashPosition: (...args: Parameters<typeof actual.acquireShiftCashPosition>) =>
+      acquire.override ? acquire.override() : actual.acquireShiftCashPosition(...args),
+  };
+});
+
 // Imported after the mocks above so the gate picks up the mocked modules.
-import { vnToday } from 'src/utils/shift-cash-access';
+import { vnToday, ShiftCashGeoError } from 'src/utils/shift-cash-access';
 import ShiftCashAccessGate, {
   useShiftCashAccess,
 } from 'src/sections/shift-cash/shift-cash-access-gate';
@@ -111,12 +123,39 @@ function DenyingPage() {
   );
 }
 
+// Giả lập chuyển tab đi rồi quay lại (visibilitychange)
+function switchTabAwayAndBack() {
+  Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+  document.dispatchEvent(new Event('visibilitychange'));
+  Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+  document.dispatchEvent(new Event('visibilitychange'));
+}
+
+// Staff có ca, đứng trong cửa hàng → đã qua cổng
+async function renderPassedStaffGate() {
+  getMySchedule.mockResolvedValue([{ id: 'a1', date: vnToday() }]);
+  getBranchLocations.mockResolvedValue([STORE]);
+  const geo = mockGeolocation({
+    latitude: STORE.latitude,
+    longitude: STORE.longitude,
+    accuracy: 25,
+  });
+  renderGate();
+  expect(await screen.findByText('NỘI DUNG KIỂM QUẦY')).toBeInTheDocument();
+  // Theo dõi vị trí sau khi qua cổng đã bắt đầu
+  await waitFor(() => expect(geo.watchPosition).toHaveBeenCalledTimes(2));
+  setShiftCashGeo.mockClear();
+  return geo;
+}
+
 beforeEach(() => {
   mockUser = { role: 'Staff', roles: ['Staff'] };
+  acquire.override = null;
 });
 
 afterEach(() => {
   vi.clearAllMocks();
+  Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
 });
 
 describe('ShiftCashAccessGate', () => {
@@ -242,5 +281,94 @@ describe('ShiftCashAccessGate', () => {
 
     expect(await screen.findByText('giả lập 403')).toBeInTheDocument();
     expect(getMySchedule).toHaveBeenCalledTimes(1);
+  });
+
+  it('quay lại tab, điểm mới đủ chính xác ở ngoài cửa hàng → chặn lại, xoá vị trí (như app về foreground)', async () => {
+    await renderPassedStaffGate();
+    acquire.override = () =>
+      Promise.resolve({
+        latitude: STORE.latitude + 0.01,
+        longitude: STORE.longitude,
+        accuracy: 20,
+      });
+
+    act(() => switchTabAwayAndBack());
+
+    expect(await screen.findByText('Bạn đang ở ngoài cửa hàng')).toBeInTheDocument();
+    expect(screen.queryByText('NỘI DUNG KIỂM QUẦY')).not.toBeInTheDocument();
+    expect(setShiftCashGeo).toHaveBeenLastCalledWith(null);
+  });
+
+  it('quay lại tab, vẫn trong cửa hàng → giữ trang, cập nhật vị trí gửi kèm', async () => {
+    await renderPassedStaffGate();
+    const fix = { latitude: STORE.latitude + 0.0002, longitude: STORE.longitude, accuracy: 15 };
+    acquire.override = () => Promise.resolve(fix);
+
+    act(() => switchTabAwayAndBack());
+
+    await waitFor(() => expect(setShiftCashGeo).toHaveBeenCalledWith(fix));
+    expect(screen.getByText('NỘI DUNG KIỂM QUẦY')).toBeInTheDocument();
+  });
+
+  it('quay lại tab, sai số lớn / tạm mất GPS → không khoá trang đang thao tác', async () => {
+    await renderPassedStaffGate();
+    const inaccurate = {
+      latitude: STORE.latitude + 0.05,
+      longitude: STORE.longitude,
+      accuracy: 900,
+    };
+    acquire.override = vi.fn(() => Promise.resolve(inaccurate));
+
+    act(() => switchTabAwayAndBack());
+    await waitFor(() => expect(acquire.override).toHaveBeenCalledTimes(1));
+
+    acquire.override = vi.fn(() => Promise.reject(new ShiftCashGeoError('timeout')));
+    act(() => switchTabAwayAndBack());
+    await waitFor(() => expect(acquire.override).toHaveBeenCalledTimes(1));
+
+    expect(screen.getByText('NỘI DUNG KIỂM QUẦY')).toBeInTheDocument();
+    expect(setShiftCashGeo).not.toHaveBeenCalledWith(inaccurate);
+    expect(setShiftCashGeo).not.toHaveBeenCalledWith(null);
+  });
+
+  it('quay lại tab mà đã thu hồi quyền vị trí → chặn lại với hướng dẫn bật quyền', async () => {
+    await renderPassedStaffGate();
+    acquire.override = () => Promise.reject(new ShiftCashGeoError('denied'));
+
+    act(() => switchTabAwayAndBack());
+
+    expect(await screen.findByText('Chưa cho phép truy cập vị trí')).toBeInTheDocument();
+    expect(setShiftCashGeo).toHaveBeenLastCalledWith(null);
+  });
+
+  it('đang ở trang mà bị thu hồi quyền vị trí (watchPosition báo PERMISSION_DENIED) → chặn lại', async () => {
+    const geo = await renderPassedStaffGate();
+    const trackError = geo.watchPosition.mock.calls[1][1] as PositionErrorCallback;
+
+    act(() =>
+      trackError({
+        code: 1,
+        PERMISSION_DENIED: 1,
+        POSITION_UNAVAILABLE: 2,
+        TIMEOUT: 3,
+      } as GeolocationPositionError)
+    );
+
+    expect(await screen.findByText('Chưa cho phép truy cập vị trí')).toBeInTheDocument();
+    expect(setShiftCashGeo).toHaveBeenLastCalledWith(null);
+  });
+
+  it('Admin không bị kiểm lại vị trí khi quay lại tab', async () => {
+    mockUser = { role: 'Admin', roles: ['Admin'] };
+    const geo = mockGeolocation({ latitude: 0, longitude: 0, accuracy: 10 });
+    acquire.override = vi.fn(() => Promise.reject(new ShiftCashGeoError('denied')));
+
+    renderGate();
+    expect(await screen.findByText('NỘI DUNG KIỂM QUẦY')).toBeInTheDocument();
+    act(() => switchTabAwayAndBack());
+
+    expect(acquire.override).not.toHaveBeenCalled();
+    expect(geo.watchPosition).not.toHaveBeenCalled();
+    expect(screen.getByText('NỘI DUNG KIỂM QUẦY')).toBeInTheDocument();
   });
 });

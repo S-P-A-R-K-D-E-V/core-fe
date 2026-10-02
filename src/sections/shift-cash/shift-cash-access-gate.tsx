@@ -1,6 +1,14 @@
 'use client';
 
-import { useMemo, useState, useEffect, useContext, useCallback, createContext } from 'react';
+import {
+  useRef,
+  useMemo,
+  useState,
+  useEffect,
+  useContext,
+  useCallback,
+  createContext,
+} from 'react';
 
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
@@ -23,6 +31,7 @@ import {
   checkShiftCashGeofence,
   acquireShiftCashPosition,
   SHIFT_CASH_MAX_ACCURACY_M,
+  type ShiftCashGeofenceResult,
 } from 'src/utils/shift-cash-access';
 
 import { setShiftCashGeo } from 'src/api/shiftCash';
@@ -34,6 +43,8 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
 import { useAuthContext } from 'src/auth/hooks';
 
+import type { IBranchLocation } from 'src/types/corecms-api';
+
 // ----------------------------------------------------------------------
 // Cổng vào trang Kiểm tiền quầy (web) — cùng luật với app và BE (ShiftCashAccess):
 //  - Admin: vào thẳng, không hỏi GPS. Vai trò ngoài Admin/Manager/Staff: chặn ngay.
@@ -42,6 +53,7 @@ import { useAuthContext } from 'src/auth/hooks';
 //                     3) GPS trình duyệt (độ chính xác cao) trong bán kính một chi nhánh, sai số ≤ 200 m.
 //    Chưa chi nhánh nào có toạ độ → bỏ qua bước GPS (giống chấm công).
 // Qua cổng: vị trí đặt vào src/api/shiftCash (header X-Geo-*), và tiếp tục cập nhật khi người dùng di chuyển.
+// Quay lại tab → kiểm lại vị trí ngầm (như app khi về foreground): ra ngoài cửa hàng / thu hồi quyền → chặn lại.
 // Trang con gặp 403 ShiftCash.* từ BE → gọi deny(message) để quay lại màn chặn với đúng thông điệp BE.
 // ----------------------------------------------------------------------
 
@@ -106,6 +118,20 @@ function geoFailureState(err: unknown): GateState {
   }
 }
 
+function outsideStoreState(
+  result: Extract<ShiftCashGeofenceResult, { status: 'outside' }>
+): GateState {
+  const where =
+    result.branchName && result.distance != null
+      ? ` Chi nhánh gần nhất: ${result.branchName}, cách khoảng ${result.distance} m (bán kính ${result.radius} m).`
+      : '';
+  return blocked(
+    'solar:map-point-wave-bold-duotone',
+    'Bạn đang ở ngoài cửa hàng',
+    `Chỉ kiểm quầy được khi có mặt tại cửa hàng.${where}`
+  );
+}
+
 // Không tải được lịch làm. Cửa hàng chưa bật xếp ca (RequireFeature → 403 { error: 'feature_disabled' })
 // thì không ai ngoài Admin có ca để kiểm quầy — báo đúng lý do, đừng bảo "kiểm tra mạng".
 function scheduleFailureState(err: unknown): GateState {
@@ -139,6 +165,8 @@ export default function ShiftCashAccessGate({ children }: Props) {
   const [state, setState] = useState<GateState>(
     bypass ? { step: 'passed', trackLocation: false } : { step: 'checking-shift' }
   );
+  // Chi nhánh có toạ độ lúc qua cổng — để kiểm lại vị trí khi người dùng quay lại tab.
+  const branchesRef = useRef<IBranchLocation[]>([]);
 
   const recheck = useCallback(() => setAttempt((n) => n + 1), []);
 
@@ -243,20 +271,11 @@ export default function ShiftCashAccessGate({ children }: Props) {
         return;
       }
       if (result.status === 'outside') {
-        const where =
-          result.branchName && result.distance != null
-            ? ` Chi nhánh gần nhất: ${result.branchName}, cách khoảng ${result.distance} m (bán kính ${result.radius} m).`
-            : '';
-        setState(
-          blocked(
-            'solar:map-point-wave-bold-duotone',
-            'Bạn đang ở ngoài cửa hàng',
-            `Chỉ kiểm quầy được khi có mặt tại cửa hàng.${where}`
-          )
-        );
+        setState(outsideStoreState(result));
         return;
       }
 
+      branchesRef.current = branches;
       setShiftCashGeo(geo);
       setState({ step: 'passed', trackLocation: true });
     })();
@@ -268,6 +287,7 @@ export default function ShiftCashAccessGate({ children }: Props) {
 
   // ── Đã qua cổng: cập nhật vị trí gửi kèm (người dùng mở trang cả ca) ──
   // Chỉ nhận điểm đủ chính xác; không tự khoá trang khi GPS chập chờn — BE quyết định khi bật geofence.
+  // Riêng bị thu hồi quyền vị trí giữa chừng → chặn lại, không gửi mãi toạ độ cũ đã xác minh.
   const trackLocation = state.step === 'passed' && state.trackLocation;
   useEffect(() => {
     if (!trackLocation || typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -283,10 +303,56 @@ export default function ShiftCashAccessGate({ children }: Props) {
           });
         }
       },
-      (error) => console.warn('Shift-cash gate: watchPosition', error),
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          setShiftCashGeo(null);
+          setState(geoFailureState(new ShiftCashGeoError('denied')));
+          return;
+        }
+        console.warn('Shift-cash gate: watchPosition', error);
+      },
       { enableHighAccuracy: true, maximumAge: 30000 }
     );
     return () => navigator.geolocation.clearWatch(id);
+  }, [trackLocation]);
+
+  // ── Quay lại tab (gập máy / chuyển tab rồi mở lại) → kiểm lại vị trí ngầm, như app khi về foreground ──
+  // Có điểm đủ chính xác mà ở ngoài mọi chi nhánh, hoặc đã thu hồi quyền vị trí → chặn lại (BE chưa bật
+  // geofence thì đây là chốt chặn duy nhất sau khi đã vào trang). Sai số lớn / tạm mất GPS không phải bằng
+  // chứng đã rời cửa hàng → giữ vị trí đã xác minh, không khoá trang đang thao tác.
+  useEffect(() => {
+    if (!trackLocation || typeof document === 'undefined') return undefined;
+    let disposed = false;
+    let running = false;
+
+    const revalidate = async () => {
+      if (document.visibilityState !== 'visible' || running) return;
+      running = true;
+      try {
+        const geo = await acquireShiftCashPosition();
+        if (disposed) return;
+        const result = checkShiftCashGeofence(geo, branchesRef.current);
+        if (result.status === 'outside') {
+          setShiftCashGeo(null);
+          setState(outsideStoreState(result));
+        } else if (result.status === 'inside') {
+          setShiftCashGeo(geo);
+        }
+      } catch (error) {
+        if (!disposed && error instanceof ShiftCashGeoError && error.reason === 'denied') {
+          setShiftCashGeo(null);
+          setState(geoFailureState(error));
+        }
+      } finally {
+        running = false;
+      }
+    };
+
+    document.addEventListener('visibilitychange', revalidate);
+    return () => {
+      disposed = true;
+      document.removeEventListener('visibilitychange', revalidate);
+    };
   }, [trackLocation]);
 
   // Rời trang → không để vị trí cũ dính vào lời gọi khác
