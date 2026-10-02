@@ -5,6 +5,8 @@ import LoadingButton from '@mui/lab/LoadingButton';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 import { _addressBooks } from 'src/_mock';
 
 import Iconify from 'src/components/iconify';
@@ -18,6 +20,8 @@ import { AddressItem, AddressNewForm } from '../address';
 
 // ----------------------------------------------------------------------
 
+const STORE_ROLES = ['Admin', 'Manager', 'Staff'];
+
 export default function CheckoutBillingAddress() {
   const checkout = useCheckoutContext();
 
@@ -27,7 +31,19 @@ export default function CheckoutBillingAddress() {
 
   const submitting = useBoolean();
 
+  // POST /sales-orders chỉ nhận vai trò cửa hàng (Admin/Manager/Staff) — tài khoản khách (User) bị 403.
+  // Shop web chưa nhận đặt hàng trực tuyến: báo rõ, không gọi API rồi bảo "thử lại".
+  const { user } = useAuthContext();
+  const userRoles: string[] = [...(user?.roles ?? []), user?.role].filter(Boolean);
+  const canPlaceOrder = STORE_ROLES.some((r) => userRoles.includes(r));
+
   const handleSelectAddress = async (address: IAddressItem) => {
+    if (!canPlaceOrder) {
+      enqueueSnackbar('Cửa hàng chưa nhận đặt hàng trực tuyến, vui lòng liên hệ cửa hàng để đặt hàng', {
+        variant: 'warning',
+      });
+      return;
+    }
     submitting.onTrue();
     try {
       await checkout.onCreateBilling(address);
