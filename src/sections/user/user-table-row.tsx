@@ -10,6 +10,8 @@ import ListItemText from '@mui/material/ListItemText';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
@@ -44,6 +46,11 @@ export default function UserTableRow({
   const { fullName, profileImageUrl, roles, status, email, phoneNumber } = row;
 
   const { enqueueSnackbar } = useSnackbar();
+
+  // Gán vai trò chỉ Admin: BE POST /roles/assign [Admin], GET /permissions/user/{id} của người khác chỉ
+  // Admin (Manager → 403) — Manager không thấy mục "Manage Roles".
+  const { user } = useAuthContext();
+  const isAdmin = user?.role === 'Admin' || (user?.roles ?? []).includes('Admin');
 
   const confirm = useBoolean();
 
@@ -132,12 +139,14 @@ export default function UserTableRow({
 
       <UserQuickEditForm currentUser={row} open={quickEdit.value} onClose={quickEdit.onFalse} onRefresh={onRefresh} />
 
-      <UserRolesDialog
-        open={rolesDialog.value}
-        onClose={rolesDialog.onFalse}
-        userId={row.id}
-        userName={fullName}
-      />
+      {isAdmin && (
+        <UserRolesDialog
+          open={rolesDialog.value}
+          onClose={rolesDialog.onFalse}
+          userId={row.id}
+          userName={fullName}
+        />
+      )}
 
       <CustomPopover
         open={popover.open}
@@ -155,15 +164,17 @@ export default function UserTableRow({
           Edit
         </MenuItem>
 
-        <MenuItem
-          onClick={() => {
-            rolesDialog.onTrue();
-            popover.onClose();
-          }}
-        >
-          <Iconify icon="solar:shield-keyhole-bold" />
-          Manage Roles
-        </MenuItem>
+        {isAdmin && (
+          <MenuItem
+            onClick={() => {
+              rolesDialog.onTrue();
+              popover.onClose();
+            }}
+          >
+            <Iconify icon="solar:shield-keyhole-bold" />
+            Manage Roles
+          </MenuItem>
+        )}
 
         {status !== 'Active' && (
           <MenuItem
