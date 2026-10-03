@@ -7,6 +7,7 @@ import { useTranslate } from 'src/locales';
 import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
 import SvgColor from 'src/components/svg-color';
+import { useStoreBrand } from 'src/components/branding';
 
 // ----------------------------------------------------------------------
 
@@ -65,6 +66,8 @@ function filterByRoleAndFeature<T extends { roles?: string[]; featureKey?: strin
 
 export function useNavData(userRole?: string, enabledFeatures?: string[]) {
   const { t } = useTranslate();
+
+  const { isCiCi } = useStoreBrand();
 
   const data = useMemo(
     () => {
@@ -314,13 +317,18 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             roles: ['Admin'],
             featureKey: 'commerce.retail.kiotviet-sync',
           },
-          // SYSTEM JOBS (Admin only)
-          {
-            title: 'System Jobs',
-            path: paths.dashboard.systemJobs.root,
-            icon: ICONS.job,
-            roles: ['Admin'],
-          },
+          // SYSTEM JOBS (chỉ Admin của CiCi) — core-be chỉ mở /admin/workers cho cửa hàng CiCi,
+          // cửa hàng khác nhận 404 nên không hiện mục này (kể cả trong ô tìm kiếm / mục yêu thích).
+          ...(isCiCi
+            ? [
+                {
+                  title: 'System Jobs',
+                  path: paths.dashboard.systemJobs.root,
+                  icon: ICONS.job,
+                  roles: ['Admin'],
+                },
+              ]
+            : []),
         ],
       },
       // POS / INVENTORY
@@ -497,7 +505,7 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
         .filter((group) => group.items.length > 0);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, userRole, enabledFeatures]
+    [t, userRole, enabledFeatures, isCiCi]
   );
 
   return data;

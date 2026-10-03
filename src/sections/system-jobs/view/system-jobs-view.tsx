@@ -23,8 +23,10 @@ import { paths } from 'src/routes/paths';
 import { fDateTime, fToNow } from 'src/utils/format-time';
 
 import { RoleBasedGuard } from 'src/auth/guard';
+import { useStoreBrand } from 'src/components/branding';
 import { useSettingsContext } from 'src/components/settings';
 import { useSnackbar } from 'src/components/snackbar';
+import EmptyContent from 'src/components/empty-content';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
@@ -51,7 +53,36 @@ const HEALTH_COLOR: Record<WorkerHealth, 'default' | 'success' | 'warning' | 'er
   Error: 'error',
 };
 
+// core-be chỉ mở GET/POST /admin/workers cho Admin của cửa hàng CiCi — cửa hàng khác nhận 404.
+// Cửa hàng khác mở thẳng đường dẫn thì báo "không áp dụng", không gọi API nên không có toast lỗi.
 export default function SystemJobsView() {
+  const { isCiCi } = useStoreBrand();
+
+  return isCiCi ? <SystemJobsDashboard /> : <SystemJobsUnavailable />;
+}
+
+function SystemJobsUnavailable() {
+  const settings = useSettingsContext();
+
+  return (
+    <Container maxWidth={settings.themeStretch ? false : 'lg'}>
+      <CustomBreadcrumbs
+        heading="System Jobs"
+        links={[{ name: 'Dashboard', href: paths.dashboard.root }, { name: 'System Jobs' }]}
+        sx={{ mb: { xs: 3, md: 5 } }}
+      />
+
+      <EmptyContent
+        filled
+        title="Không áp dụng cho cửa hàng này"
+        description="Màn System Jobs theo dõi tiến trình chạy nền chung của hệ thống, chỉ dành cho quản trị viên CiCi."
+        sx={{ py: 10 }}
+      />
+    </Container>
+  );
+}
+
+function SystemJobsDashboard() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
 
