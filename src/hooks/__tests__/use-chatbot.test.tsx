@@ -858,6 +858,31 @@ describe('useChatbot — lỗi', () => {
   });
 });
 
+describe('useChatbot — mất kết nối lúc rảnh', () => {
+  it('kết nối đóng hẳn khi không có gì đang chờ → báo nhẹ; có mạng lại thì tự nối lại và xoá lỗi', async () => {
+    const view = await mountReady();
+
+    act(() => {
+      lastConnection().state = 'Disconnected';
+      lastConnection().closed?.();
+    });
+    expect(view.result.current.connection).toBe('error');
+    expect(view.result.current.error).toMatch(/Sẽ tự kết nối lại/);
+    expect(view.result.current.turnFailed).toBe(false);
+
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(view.result.current.connection).toBe('ready'));
+    expect(view.result.current.error).toBeNull();
+    expect(
+      lastConnection().invoked.filter((call: any[]) => call[0] === 'JoinSession')
+    ).toHaveLength(2);
+  });
+});
+
 describe('useChatbot — im lặng quá lâu', () => {
   it('không có sự kiện nào trong 120 giây → hỏi lại REST, vẫn chưa xong thì dừng quay + báo lỗi', async () => {
     const view = await mountReady();

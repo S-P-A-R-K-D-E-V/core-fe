@@ -305,7 +305,9 @@ function EmptyState({ greeting, starters, disabled, expanded, onPick }: EmptySta
   return (
     <Stack
       alignItems="center"
-      sx={{ pt: 2, pb: 1, mx: 'auto', maxWidth: 560, textAlign: 'center' }}
+      justifyContent="center"
+      // Khung cao (mở rộng / màn nhỏ) thì canh giữa theo chiều dọc; khung thấp thì cuộn bình thường.
+      sx={{ py: 1, mx: 'auto', minHeight: 1, maxWidth: 560, textAlign: 'center' }}
     >
       <Box
         sx={{
@@ -476,11 +478,14 @@ export default function ChatbotMessages({
   }, [lastId, lastRole]);
 
   // Mở khung (component vừa mount), có tin mới, đang stream (messages đổi theo từng chunk) → cuộn
-  // xuống cuối, trừ khi người dùng đã kéo lên đọc lại.
+  // xuống cuối, trừ khi người dùng đã kéo lên đọc lại. Chưa có tin nào thì ở đầu (thấy lời chào).
+  const isEmpty = messages.length === 0;
   useEffect(() => {
     const el = scrollRef.current;
-    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
-  }, [messages, ready, busy, activity, error, turnFailed]);
+    if (!el) return;
+    if (isEmpty) el.scrollTop = 0;
+    else if (stickRef.current) el.scrollTop = el.scrollHeight;
+  }, [messages, isEmpty, ready, busy, activity, error, turnFailed]);
 
   const online = ready && !offline;
   const showError = !!error || turnFailed;

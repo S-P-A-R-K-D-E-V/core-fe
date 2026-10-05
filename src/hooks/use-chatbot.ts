@@ -58,8 +58,11 @@ const JOIN_WAIT_MS = 8_000;
 const BOOT_ERROR = 'Không kết nối được trợ lý. Vui lòng thử lại.';
 const NEW_SESSION_ERROR = 'Không tạo được cuộc trò chuyện mới. Vui lòng thử lại.';
 const SEND_ERROR = 'Không gửi được tin nhắn. Vui lòng thử lại.';
+/** Mất kênh SignalR lúc đang chờ câu trả lời / lúc gửi câu hỏi. */
 const HUB_ERROR =
   'Mất kết nối trực tiếp tới trợ lý nên chưa nhận được câu trả lời. Vui lòng thử lại.';
+/** Mất kênh SignalR lúc không có gì đang chờ — tự nối lại khi gửi tin, khi có mạng lại, khi quay lại tab. */
+const HUB_IDLE_ERROR = 'Mất kết nối tới trợ lý. Sẽ tự kết nối lại khi bạn gửi tin nhắn.';
 const TIMEOUT_ERROR = 'Trợ lý phản hồi quá lâu. Vui lòng thử lại.';
 const REPLY_ERROR = 'Câu trả lời bị gián đoạn. Vui lòng thử lại.';
 const EMPTY_REPLY_ERROR = 'Trợ lý chưa trả lời được câu này. Bạn thử hỏi lại theo cách khác nhé.';
@@ -722,7 +725,7 @@ export function useChatbot(opts?: {
       console.error('[Chatbot] SignalR không vào được nhóm của phiên', reason);
       setConnection('error');
       // Không còn kênh nhận câu trả lời: câu đang chờ sẽ không bao giờ tới → dừng quay, báo lỗi.
-      if (!failPending(HUB_ERROR, 'connection')) setError(HUB_ERROR);
+      if (!failPending(HUB_ERROR, 'connection')) setError(HUB_IDLE_ERROR);
     };
 
     const ensureJoined = (): Promise<boolean> => {
@@ -743,7 +746,7 @@ export function useChatbot(opts?: {
           if (accepted === false) throw new Error('JoinSession bị từ chối');
           if (disposed) return false;
           setConnection('ready');
-          setError((prev) => (prev === HUB_ERROR ? null : prev));
+          setError((prev) => (prev === HUB_ERROR || prev === HUB_IDLE_ERROR ? null : prev));
           return true;
         } catch (err) {
           hubFailed(err);
@@ -778,11 +781,22 @@ export function useChatbot(opts?: {
       hubFailed(new Error('kết nối SignalR đã đóng'));
     });
 
+    // Kết nối đã đóng hẳn (hết lượt tự nối lại: máy ngủ, mất mạng lâu) → có mạng lại / quay lại tab
+    // thì nối lại, không đợi người dùng gửi tin.
+    const retryWhenBack = () => {
+      if (disposed || document.visibilityState === 'hidden') return;
+      if (connection.state === signalR.HubConnectionState.Disconnected) void ensureJoined();
+    };
+    window.addEventListener('online', retryWhenBack);
+    document.addEventListener('visibilitychange', retryWhenBack);
+
     hubRef.current = { sessionId, ensureJoined };
     void ensureJoined();
 
     return () => {
       disposed = true;
+      window.removeEventListener('online', retryWhenBack);
+      document.removeEventListener('visibilitychange', retryWhenBack);
       if (hubRef.current && hubRef.current.sessionId === sessionId) hubRef.current = null;
       // Rời nhóm của phiên cũ rồi đóng kết nối (đóng kết nối thì server cũng tự gỡ khỏi nhóm).
       if (connection.state === signalR.HubConnectionState.Connected) {

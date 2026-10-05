@@ -306,9 +306,27 @@ export default function ChatbotComposer({
                       sx={{ flexShrink: 0, color: selected ? 'primary.main' : 'text.secondary' }}
                     />
                     <Box sx={{ minWidth: 0, flexGrow: 1 }}>
-                      <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
-                        {command.title}
-                      </Typography>
+                      {/* Dòng 1: tên hiển thị + cách gõ; dòng 2: mô tả (được trọn bề ngang). */}
+                      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, minWidth: 0 }}>
+                        <Typography
+                          variant="body2"
+                          noWrap
+                          sx={{ flex: '1 1 auto', minWidth: 0, fontWeight: 600 }}
+                        >
+                          {command.title}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            flexShrink: 0,
+                            fontFamily: 'monospace',
+                            whiteSpace: 'nowrap',
+                            color: selected ? 'primary.main' : 'text.secondary',
+                          }}
+                        >
+                          {commandUsage(command)}
+                        </Typography>
+                      </Box>
                       <Typography
                         variant="caption"
                         color="text.secondary"
@@ -318,20 +336,6 @@ export default function ChatbotComposer({
                         {command.description}
                       </Typography>
                     </Box>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        flexShrink: 0,
-                        maxWidth: '50%',
-                        fontFamily: 'monospace',
-                        color: selected ? 'primary.main' : 'text.secondary',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {commandUsage(command)}
-                    </Typography>
                   </Stack>
                 );
               })}

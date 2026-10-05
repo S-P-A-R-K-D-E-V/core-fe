@@ -1,6 +1,6 @@
 import remarkGfm from 'remark-gfm';
-import { memo, useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
+import { memo, useMemo, Children, isValidElement, type ReactNode } from 'react';
 
 import Box from '@mui/material/Box';
 
@@ -12,8 +12,24 @@ import { isHttpUrl, stripUiFence } from './chatbot-blocks';
 //   - ảnh markdown ![alt](url) KHÔNG tự tải (URL tuỳ ý = lộ thông tin người xem) → hiện thành link;
 //     ảnh thật đi qua khối image đã được server kiểm host (chatbot-message-blocks);
 //   - bảng nằm trong hộp cuộn ngang riêng, khối mã cuộn ngang riêng → khung chat không bao giờ có
-//     thanh cuộn ngang.
+//     thanh cuộn ngang. Ô bảng ngắn (số tiền, ngày, tên) không xuống dòng — bảng rộng thì cuộn ngang
+//     trong hộp của nó; chỉ ô chữ dài (ghi chú) mới tự xuống dòng ở bề rộng vừa phải.
 // ----------------------------------------------------------------------
+
+/** Ô bảng dài hơn ngần này ký tự thì cho xuống dòng. */
+const LONG_CELL_CHARS = 32;
+
+function textLength(children: ReactNode): number {
+  let total = 0;
+  Children.forEach(children, (child) => {
+    if (typeof child === 'string' || typeof child === 'number') {
+      total += String(child).length;
+    } else if (isValidElement(child)) {
+      total += textLength((child.props as { children?: ReactNode }).children);
+    }
+  });
+  return total;
+}
 
 const MARKDOWN_COMPONENTS: Components = {
   a({ node: _node, href, children, ...other }) {
@@ -37,6 +53,14 @@ const MARKDOWN_COMPONENTS: Components = {
       <div className="chatbot-md-table">
         <table {...other} />
       </div>
+    );
+  },
+  td({ node: _node, children, ...other }) {
+    if (textLength(children) <= LONG_CELL_CHARS) return <td {...other}>{children}</td>;
+    return (
+      <td {...other}>
+        <div className="chatbot-md-long-cell">{children}</div>
+      </td>
     );
   },
 };
@@ -109,9 +133,9 @@ function ChatbotMarkdown({ text }: Props) {
         '& table': {
           borderCollapse: 'collapse',
           fontSize: 13,
+          // Rộng theo nội dung (ít nhất bằng bong bóng); rộng hơn bong bóng thì hộp ngoài cuộn ngang.
           width: 'max-content',
           minWidth: '100%',
-          maxWidth: 'max(100%, 640px)',
         },
         '& th, & td': {
           border: '1px solid',
@@ -119,8 +143,10 @@ function ChatbotMarkdown({ text }: Props) {
           p: '4px 8px',
           textAlign: 'left',
           verticalAlign: 'top',
+          whiteSpace: 'nowrap',
         },
-        '& th': { fontWeight: 600, whiteSpace: 'nowrap', bgcolor: 'action.hover' },
+        '& th': { fontWeight: 600, bgcolor: 'action.hover' },
+        '& .chatbot-md-long-cell': { width: 'max-content', maxWidth: 260, whiteSpace: 'normal' },
         '& blockquote': {
           borderLeft: '3px solid',
           borderColor: 'primary.main',
