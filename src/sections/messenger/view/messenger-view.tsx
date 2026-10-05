@@ -28,6 +28,8 @@ import { sendMessage as apiSendMessage, sendAttachment } from 'src/api/messenger
 import { useMessengerStore } from 'src/store/messenger-store';
 import { useMessengerCtx } from 'src/components/messenger/messenger-provider';
 import MessageBubble from 'src/components/messenger/message-bubble';
+import { SystemChannelAvatar } from 'src/components/messenger/system-avatar';
+import { isSystemUserId, isSystemConversation, resolveMessengerUser } from 'src/utils/messenger-system';
 
 import NewConversationDialog from '../new-conversation-dialog';
 
@@ -99,7 +101,7 @@ export default function MessengerView() {
     if (!c) return '';
     if (c.type === 'Group') return c.name ?? `Nhóm ${c.participantIds.length} thành viên`;
     const otherId = c.participantIds.find((id) => id !== currentUserId);
-    return otherId ? userCache[otherId]?.fullName ?? otherId : 'Chat';
+    return otherId ? resolveMessengerUser(otherId, userCache[otherId]).name : 'Chat';
   };
 
   const convAvatar = (convId: string) => {
@@ -191,21 +193,26 @@ export default function MessengerView() {
                 onClick={() => handleSelectConv(c.id)}
                 sx={{ py: 1.5, px: { xs: 1, sm: 1.5 } }}
               >
-                <Badge
-                  overlap="circular"
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                  badgeContent={
-                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: online ? 'success.main' : 'text.disabled', border: '2px solid', borderColor: 'background.paper' }} />
-                  }
-                  sx={{ mr: { xs: 0, sm: 1.5 } }}
-                >
-                  <Avatar
-                    src={convAvatar(c.id) ?? undefined}
-                    sx={{ width: 40, height: 40, bgcolor: colorFor(c.id) }}
+                {isSystemConversation(c) ? (
+                  // Kênh cảnh báo của hệ thống: avatar chuông, không có chấm online
+                  <SystemChannelAvatar size={40} sx={{ mr: { xs: 0, sm: 1.5 } }} />
+                ) : (
+                  <Badge
+                    overlap="circular"
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    badgeContent={
+                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: online ? 'success.main' : 'text.disabled', border: '2px solid', borderColor: 'background.paper' }} />
+                    }
+                    sx={{ mr: { xs: 0, sm: 1.5 } }}
                   >
-                    {convInitial(c.id)}
-                  </Avatar>
-                </Badge>
+                    <Avatar
+                      src={convAvatar(c.id) ?? undefined}
+                      sx={{ width: 40, height: 40, bgcolor: colorFor(c.id) }}
+                    >
+                      {convInitial(c.id)}
+                    </Avatar>
+                  </Badge>
+                )}
                 <Box sx={{ display: { xs: 'none', sm: 'block' }, minWidth: 0, flex: 1 }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Typography
@@ -241,23 +248,31 @@ export default function MessengerView() {
             <>
               {/* Chat header */}
               <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-                <Badge
-                  overlap="circular"
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                  badgeContent={
-                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: convOnline(activeId!) ? 'success.main' : 'text.disabled', border: '2px solid', borderColor: 'background.paper' }} />
-                  }
-                >
-                  <Avatar src={convAvatar(activeId!) ?? undefined} sx={{ width: 40, height: 40, bgcolor: colorFor(activeId!) }}>
-                    {convInitial(activeId!)}
-                  </Avatar>
-                </Badge>
+                {isSystemConversation(activeConv) ? (
+                  <SystemChannelAvatar size={40} />
+                ) : (
+                  <Badge
+                    overlap="circular"
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    badgeContent={
+                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: convOnline(activeId!) ? 'success.main' : 'text.disabled', border: '2px solid', borderColor: 'background.paper' }} />
+                    }
+                  >
+                    <Avatar src={convAvatar(activeId!) ?? undefined} sx={{ width: 40, height: 40, bgcolor: colorFor(activeId!) }}>
+                      {convInitial(activeId!)}
+                    </Avatar>
+                  </Badge>
+                )}
                 <Stack sx={{ flex: 1, minWidth: 0 }}>
                   <Typography fontWeight={600} noWrap>{convTitle(activeId!)}</Typography>
                   <Typography variant="caption" color={convOnline(activeId!) ? 'success.main' : 'text.secondary'}>
-                    {activeConv.type === 'Group'
-                      ? `${activeConv.participantIds.length} thành viên`
-                      : convOnline(activeId!) ? 'Đang online' : 'Offline'}
+                    {/* Kênh cảnh báo: "Trợ lý hệ thống" chỉ là người gửi, không tính là người nhận */}
+                    {isSystemConversation(activeConv) &&
+                      `Cảnh báo tự động · ${activeConv.participantIds.filter((id) => !isSystemUserId(id)).length} người nhận`}
+                    {!isSystemConversation(activeConv) &&
+                      (activeConv.type === 'Group'
+                        ? `${activeConv.participantIds.length} thành viên`
+                        : convOnline(activeId!) ? 'Đang online' : 'Offline')}
                   </Typography>
                 </Stack>
               </Stack>

@@ -10,6 +10,8 @@ export type QuickChatNotif = {
   convId: string;
   senderName: string;
   preview: string;
+  /** Tin của người gửi hệ thống ("Trợ lý hệ thống") → toast hiện avatar bot thay cho chữ cái đầu. */
+  system?: boolean;
   at: number; // Date.now()
 };
 

@@ -13,6 +13,7 @@ import {
   markRead,
 } from 'src/api/messenger';
 import { useMessengerStore } from 'src/store/messenger-store';
+import { incomingMessageNotice } from 'src/utils/messenger-system';
 
 import QuickChatLayer from './quick-chat-layer';
 
@@ -85,13 +86,12 @@ export default function MessengerProvider({ children }: Props) {
       const uid = currentUserIdRef.current;
       if (ev.senderId === uid) return; // own message, skip notifications
 
-      const sender = s.userCache[ev.senderId];
-      const senderName = sender?.fullName ?? 'Tin nhắn mới';
-      const preview = ev.content.slice(0, 80);
+      // Người gửi hệ thống ("Trợ lý hệ thống") có tên riêng kể cả khi danh bạ không có mục của nó.
+      const { senderName, preview, system } = incomingMessageNotice(ev, s.userCache);
 
       // In-app toast when quick-chat window is NOT open
       if (!s.openQuickChats.includes(ev.conversationId)) {
-        s.pushNotif({ convId: ev.conversationId, senderName, preview });
+        s.pushNotif({ convId: ev.conversationId, senderName, preview, system });
       }
 
       // Desktop notification when user is on another tab (document.hidden)

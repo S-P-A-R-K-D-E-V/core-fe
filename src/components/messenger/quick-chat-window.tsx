@@ -20,8 +20,10 @@ import Scrollbar from 'src/components/scrollbar';
 
 import { sendMessage as apiSendMessage, sendAttachment } from 'src/api/messenger';
 import { useMessengerStore } from 'src/store/messenger-store';
+import { isSystemConversation, resolveMessengerUser } from 'src/utils/messenger-system';
 import { useMessengerCtx } from './messenger-provider';
 import MessageBubble from './message-bubble';
+import { SystemChannelAvatar } from './system-avatar';
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB — đồng bộ giới hạn BE
 
@@ -62,7 +64,7 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
   const title =
     conv?.type === 'Group'
       ? conv?.name ?? `Nhóm ${conv.participantIds.length} thành viên`
-      : (otherUserId ? userCache[otherUserId]?.fullName ?? otherUserId : 'Chat');
+      : (otherUserId ? resolveMessengerUser(otherUserId, userCache[otherUserId]).name : 'Chat');
 
   useEffect(() => {
     openConversation(convId).catch(() => {});
@@ -176,9 +178,13 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
                 ) : null
               }
             >
-              <Avatar sx={{ width: 28, height: 28, fontSize: 13, bgcolor: 'primary.dark' }}>
-                {title.charAt(0).toUpperCase()}
-              </Avatar>
+              {isSystemConversation(conv) ? (
+                <SystemChannelAvatar size={28} />
+              ) : (
+                <Avatar sx={{ width: 28, height: 28, fontSize: 13, bgcolor: 'primary.dark' }}>
+                  {title.charAt(0).toUpperCase()}
+                </Avatar>
+              )}
             </Badge>
           </Tooltip>
 
