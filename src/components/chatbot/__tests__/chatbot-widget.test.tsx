@@ -505,7 +505,7 @@ describe('ChatbotWidget', () => {
     expect(api.sendChatbotMessage).not.toHaveBeenCalled();
     const confirm = await screen.findByRole('dialog', { name: 'Chốt kỳ lương tháng 9?' });
 
-    await user.click(within(confirm).getByRole('button', { name: 'Cancel' }));
+    await user.click(within(confirm).getByRole('button', { name: 'Huỷ' }));
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Chốt kỳ lương tháng 9?' })).toBeNull()
     );

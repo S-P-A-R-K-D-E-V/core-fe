@@ -342,6 +342,40 @@ describe('friendlyToolLabel', () => {
       'Đang tra cứu đơn hàng'
     );
   });
+
+  it('nhãn mặc định của Gateway (tên tool đổi "_" thành dấu cách + hậu tố trạng thái) vẫn là tên thô', () => {
+    // Hậu tố "— hoàn tất" có dấu tiếng Việt nhưng phần còn lại chỉ là tên tool.
+    expect(friendlyToolLabel('employees_list', 'employees list — hoàn tất')).toBe(
+      'Đang tra cứu nhân viên'
+    );
+    expect(friendlyToolLabel('attendance_report', 'attendance report — hoàn tất')).toBe(
+      'Đang tra cứu chấm công'
+    );
+    expect(friendlyToolLabel('analytics_revenue', 'analytics revenue')).toBe('Đang xem báo cáo');
+    expect(friendlyToolLabel('staff_my_schedule', 'staff my schedule — lỗi')).toBe(
+      'Đang tra cứu ca làm'
+    );
+    // Không có tên tool đi kèm: phần lõi không có dấu tiếng Việt → nhãn chung.
+    expect(friendlyToolLabel(null, 'some tool — hoàn tất')).toBe('Đang tra cứu dữ liệu');
+    expect(
+      summarizeSteps([
+        {
+          id: 's1',
+          kind: 'tool',
+          name: 'employees_list',
+          label: 'employees list — hoàn tất',
+          state: 'done',
+        },
+        {
+          id: 's2',
+          kind: 'tool',
+          name: 'attendance_report',
+          label: 'attendance report — hoàn tất',
+          state: 'done',
+        },
+      ])
+    ).toBe('Đã tra cứu nhân viên, tra cứu chấm công');
+  });
 });
 
 describe('progressLabel / summarizeSteps', () => {

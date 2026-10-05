@@ -270,10 +270,24 @@ const VI_DIACRITICS = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻ
 /** Chuỗi kiểu định danh máy: snake_case hoặc có dấu chấm (analytics_revenue_read, orders.read). */
 const RAW_IDENTIFIER = /[a-z0-9]+[_.][a-z0-9_.-]+/i;
 
-/** Nhãn server gửi là câu chữ cho người đọc (có dấu tiếng Việt, không lẫn tên tool)? */
+/** Hậu tố trạng thái Gateway nối vào nhãn mặc định khi bước kết thúc: "analytics revenue — hoàn tất". */
+const STATE_SUFFIX = /\s*[—–-]\s*(hoàn tất|xong|lỗi|thất bại)\s*$/i;
+
+const spaced = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[_.-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/**
+ * Nhãn server gửi là câu chữ cho người đọc (có dấu tiếng Việt, không lẫn tên tool)? Nhãn mặc định của
+ * Gateway là TÊN TOOL đổi "_" thành dấu cách (+ hậu tố trạng thái có dấu) — vẫn là tên thô, không dùng.
+ */
 function isHumanLabel(label: string, name?: string | null): boolean {
-  if (!label || !VI_DIACRITICS.test(label) || RAW_IDENTIFIER.test(label)) return false;
-  if (name && label.toLowerCase().includes(name.toLowerCase())) return false;
+  const core = label.replace(STATE_SUFFIX, '');
+  if (!core || !VI_DIACRITICS.test(core) || RAW_IDENTIFIER.test(core)) return false;
+  if (name && spaced(core).includes(spaced(name))) return false;
   return true;
 }
 

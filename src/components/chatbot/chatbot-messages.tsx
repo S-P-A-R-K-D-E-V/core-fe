@@ -4,10 +4,14 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Paper from '@mui/material/Paper';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
 import Tooltip from '@mui/material/Tooltip';
 import ButtonBase from '@mui/material/ButtonBase';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
 import { alpha, keyframes } from '@mui/material/styles';
 import CircularProgress from '@mui/material/CircularProgress';
 
@@ -18,7 +22,6 @@ import { getStorageUrl } from 'src/utils/storage';
 import type { ChatbotMessage } from 'src/api/chatbot';
 
 import Iconify from 'src/components/iconify';
-import { ConfirmDialog } from 'src/components/custom-dialog';
 
 import ChatbotMarkdown from './chatbot-markdown';
 import ChatbotMessageBlocks from './chatbot-message-blocks';
@@ -590,14 +593,18 @@ export default function ChatbotMessages({
         </Stack>
       )}
 
-      <ConfirmDialog
+      {/* Hộp xác nhận riêng của khung chat: ConfirmDialog dùng chung ghi cứng nút "Cancel". */}
+      <Dialog
+        fullWidth
+        maxWidth="xs"
         open={toolDialog.open}
         onClose={handleCloseTool}
         // Khung chat nằm ở zIndex 1400, cao hơn modal mặc định (1300).
         sx={{ zIndex: (theme) => theme.zIndex.modal + 200 }}
-        title={toolAction?.confirm.title ?? ''}
-        content={
-          toolAction ? (
+      >
+        <DialogTitle sx={{ pb: 2 }}>{toolAction?.confirm.title ?? ''}</DialogTitle>
+        <DialogContent sx={{ typography: 'body2' }}>
+          {toolAction ? (
             <>
               {toolAction.confirm.message}
               {toolAction.confirm.message !== toolAction.prompt && (
@@ -618,14 +625,17 @@ export default function ChatbotMessages({
                 </Box>
               )}
             </>
-          ) : null
-        }
-        action={
+          ) : null}
+        </DialogContent>
+        <DialogActions>
           <Button variant="contained" onClick={handleConfirmTool}>
             Gửi yêu cầu
           </Button>
-        }
-      />
+          <Button variant="outlined" color="inherit" onClick={handleCloseTool}>
+            Huỷ
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
