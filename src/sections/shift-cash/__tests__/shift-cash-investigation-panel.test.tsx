@@ -546,6 +546,21 @@ describe('ShiftCashInvestigationPanel', () => {
     expect(getShiftCashInvestigation).toHaveBeenCalledTimes(1);
   });
 
+  it('?investigate=1&date=… → chờ trang chuyển sang đúng ngày trên URL rồi mới tự kiểm tra (không chạy nhầm cho hôm nay)', async () => {
+    query = `investigate=1&date=${OTHER_DAY}`;
+    getShiftCashInvestigation.mockResolvedValue(ok(RESULT));
+
+    // Trang mở ở hôm nay trước, effect của trang đổi sang ngày trên URL ngay sau đó.
+    const { update } = renderPanel();
+    expect(getShiftCashInvestigation).not.toHaveBeenCalled();
+
+    update({ date: OTHER_DAY });
+
+    expect(await screen.findByText('Thiếu 350.000đ')).toBeInTheDocument();
+    expect(getShiftCashInvestigation).toHaveBeenCalledTimes(1);
+    expect(getShiftCashInvestigation).toHaveBeenCalledWith(OTHER_DAY);
+  });
+
   it('?investigate=1 dưới React StrictMode (effect chạy 2 lần) vẫn chỉ gọi API 1 lần', async () => {
     query = 'investigate=1';
     getShiftCashInvestigation.mockResolvedValue(ok(RESULT));

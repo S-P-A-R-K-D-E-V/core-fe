@@ -153,6 +153,10 @@ export default function ShiftCashInvestigationPanel({ date, summary, sx }: Props
   // không gọi API.
   const isAdmin = isShiftCashBypass(user);
   const autoRun = searchParams.get('investigate') === '1';
+  // Link từ thông báo có thể kèm ?date=yyyy-MM-dd (trang tự chuyển sang ngày đó): chờ trang đổi ngày
+  // xong rồi mới tự kiểm tra — không thì chạy nhầm cho hôm nay.
+  const urlDateParam = searchParams.get('date');
+  const urlDate = urlDateParam && /^\d{4}-\d{2}-\d{2}$/.test(urlDateParam) ? urlDateParam : null;
 
   const [forbidden, setForbidden] = useState(false);
   const [state, setState] = useState<PanelState>({ date, view: IDLE, loading: null });
@@ -208,9 +212,10 @@ export default function ShiftCashInvestigationPanel({ date, summary, sx }: Props
       return;
     }
     if (!isAdmin || !date || autoRanRef.current) return;
+    if (urlDate && date !== urlDate) return;
     autoRanRef.current = true;
     run(date);
-  }, [autoRun, isAdmin, date, run]);
+  }, [autoRun, isAdmin, date, urlDate, run]);
 
   if (!isAdmin || forbidden) return null;
 
