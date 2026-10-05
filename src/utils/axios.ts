@@ -317,6 +317,7 @@ export const endpoints = {
     open: '/shift-cash/open',
     logs: '/shift-cash/logs',
     auditLogs: '/shift-cash/audit-logs',
+    investigation: '/shift-cash/investigation',
   },
   kiotViet: {
     dailySummary: '/kiotviet/daily-summary',

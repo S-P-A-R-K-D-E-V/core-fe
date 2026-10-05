@@ -112,6 +112,12 @@ const CALLS: Array<{
     url: '/shift-cash/audit-logs',
   },
   {
+    name: 'investigation',
+    run: () => api.getShiftCashInvestigation('2026-10-02'),
+    method: 'get',
+    url: '/shift-cash/investigation',
+  },
+  {
     name: 'kiotviet daily-summary',
     run: () => api.getKiotVietDailySummary('2026-10-02'),
     method: 'get',
@@ -173,5 +179,79 @@ describe('src/api/shiftCash — header X-Geo-*', () => {
       code: 'ShiftCash.OutsideStore',
       message: 'Bạn đang ở ngoài cửa hàng.',
     });
+  });
+});
+
+// ----------------------------------------------------------------------
+// Hợp đồng GET /shift-cash/investigation (chỉ Admin): 200 = kết quả;
+// 404 { error: 'ShiftCash.NotFinalized' } = ngày chưa chốt; 404 khác = BE chưa có endpoint;
+// 403 = không phải Admin. Interceptor của axios reject bằng BODY (403 / 404 trơn có body rỗng → mất
+// mã HTTP) nên lời gọi này tự giữ 403 / 404 bằng validateStatus.
+// ----------------------------------------------------------------------
+
+describe('src/api/shiftCash — getShiftCashInvestigation', () => {
+  const DATE = '2026-10-02';
+
+  it('200 → ok kèm kết quả, gửi đúng ngày', async () => {
+    const result = { date: DATE, finalized: true, findings: [] };
+    http.get.mockResolvedValueOnce({ status: 200, data: result });
+
+    await expect(api.getShiftCashInvestigation(DATE)).resolves.toEqual({ status: 'ok', result });
+    expect(http.get.mock.calls[0][0]).toBe('/shift-cash/investigation');
+    expect(http.get.mock.calls[0][1]).toMatchObject({ params: { date: DATE } });
+  });
+
+  it('404 { error: ShiftCash.NotFinalized } → not-finalized', async () => {
+    http.get.mockResolvedValueOnce({
+      status: 404,
+      data: {
+        error: 'ShiftCash.NotFinalized',
+        message: 'Ngày 02/10/2026 chưa chốt tiền quầy nên chưa có chênh lệch để kiểm tra.',
+      },
+    });
+
+    await expect(api.getShiftCashInvestigation(DATE)).resolves.toEqual({ status: 'not-finalized' });
+  });
+
+  it.each([
+    ['body rỗng', ''],
+    ['ProblemDetails không kèm mã lỗi', { title: 'Not Found', status: 404 }],
+    ['mã lỗi khác', { error: 'ShiftCash.SomethingElse', message: 'x' }],
+  ])('404 %s (BE chưa có endpoint) → unavailable', async (_name, data) => {
+    http.get.mockResolvedValueOnce({ status: 404, data });
+
+    await expect(api.getShiftCashInvestigation(DATE)).resolves.toEqual({ status: 'unavailable' });
+  });
+
+  it('403 → forbidden', async () => {
+    http.get.mockResolvedValueOnce({ status: 403, data: '' });
+
+    await expect(api.getShiftCashInvestigation(DATE)).resolves.toEqual({ status: 'forbidden' });
+  });
+
+  it('chỉ giữ lại 2xx / 403 / 404 — 401 và lỗi khác vẫn reject qua interceptor', async () => {
+    await api.getShiftCashInvestigation(DATE);
+
+    const { validateStatus } = http.get.mock.calls[0][1];
+    expect([200, 204, 403, 404].map((status) => validateStatus(status))).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect([302, 400, 401, 409, 500, 503].map((status) => validateStatus(status))).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it('lỗi khác (interceptor reject bằng body) → ném tiếp cho nơi gọi', async () => {
+    http.get.mockRejectedValueOnce('Something went wrong');
+
+    await expect(api.getShiftCashInvestigation(DATE)).rejects.toBe('Something went wrong');
   });
 });

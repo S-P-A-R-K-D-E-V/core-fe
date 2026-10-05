@@ -37,6 +37,7 @@ import { useTheme, alpha } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
+import { useSearchParams } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
@@ -60,6 +61,7 @@ import {
 } from 'src/utils/shift-cash-access';
 
 import ShiftCashAccessGate, { useShiftCashAccess } from '../shift-cash-access-gate';
+import ShiftCashInvestigationPanel from '../shift-cash-investigation-panel';
 
 import {
   IShiftCashSummary,
@@ -309,6 +311,18 @@ function ShiftCashDashboardContent() {
   const isToday = currentDate === todayDate;
   // Chỉ Admin: chọn ngày cũ, xem nhật ký / audit, xem theo tháng (Manager theo luật của Staff)
   const isAdmin = isShiftCashBypass(user);
+
+  // Link từ thông báo "Kiểm tra chênh lệch quầy": ?date=yyyy-MM-dd mở thẳng ngày đó (chỉ Admin được xem ngày
+  // cũ; ngày tương lai / sai định dạng thì bỏ qua). Chỉ áp một lần cho mỗi giá trị trên URL.
+  const searchParams = useSearchParams();
+  const urlDate = searchParams.get('date');
+  const appliedUrlDateRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isAdmin || !urlDate || appliedUrlDateRef.current === urlDate) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(urlDate) || urlDate > todayDate) return;
+    appliedUrlDateRef.current = urlDate;
+    setCurrentDate(urlDate);
+  }, [isAdmin, urlDate, todayDate]);
   const canEdit = isToday || isAdmin;
   const hasOpenedToday = (summary?.denominations ?? []).length > 0;
 
@@ -814,6 +828,9 @@ function ShiftCashDashboardContent() {
             </Stack>
           </Card>
         )}
+
+        {/* Kiểm tra chênh lệch của ngày đang chọn — chỉ Admin (component tự ẩn với vai trò khác) */}
+        <ShiftCashInvestigationPanel date={currentDate} summary={summary} sx={{ mb: 3 }} />
 
         {loading ? (
           <Box display="flex" justifyContent="center" py={6}>
