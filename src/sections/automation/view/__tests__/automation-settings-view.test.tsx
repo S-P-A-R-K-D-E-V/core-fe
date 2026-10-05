@@ -261,8 +261,8 @@ describe('AutomationSettingsView — hiển thị', () => {
   it('khoá chưa biết vẫn hiện theo kiểu giá trị với nhãn là tên khoá, và lưu được', async () => {
     const user = userEvent.setup();
     const future = makeRule('inventory.low-stock', 'Sắp hết hàng', {
-      lowStockThreshold: 5,
-      skipWhenNoActivity: true,
+      futureThreshold: 5,
+      futureSwitch: true,
       quietFrom: '22:30',
       note: 'kho chính',
       channels: CHANNELS,
@@ -280,8 +280,8 @@ describe('AutomationSettingsView — hiển thị', () => {
     // Tiền tố chưa biết → nhóm "Khác" ở cuối.
     expect(screen.getAllByRole('heading', { level: 2 }).at(-1)).toHaveTextContent('Khác');
 
-    const threshold = within(card).getByRole('textbox', { name: 'lowStockThreshold' });
-    const skip = within(card).getByRole('checkbox', { name: 'skipWhenNoActivity' });
+    const threshold = within(card).getByRole('textbox', { name: 'futureThreshold' });
+    const skip = within(card).getByRole('checkbox', { name: 'futureSwitch' });
     expect(threshold).toHaveValue('5');
     expect(skip).toBeChecked();
     expect(within(card).getByLabelText('quietFrom')).toHaveValue('22:30');
@@ -296,7 +296,7 @@ describe('AutomationSettingsView — hiển thị', () => {
     await user.click(saveButton(card));
 
     expect(updateAutomationRule).toHaveBeenCalledWith('inventory.low-stock', {
-      settings: { lowStockThreshold: 8, skipWhenNoActivity: false },
+      settings: { futureThreshold: 8, futureSwitch: false },
     });
   });
 });

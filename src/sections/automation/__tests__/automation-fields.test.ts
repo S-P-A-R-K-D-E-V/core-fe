@@ -170,8 +170,8 @@ describe('buildRuleFields — khoá chưa biết vẽ theo kiểu giá trị, nh
   it('số → ô số, true/false → công tắc, "HH:mm" → ô giờ, chuỗi khác → ô chữ', () => {
     const fields = buildRuleFields(
       rule('daily.summary', {
-        lowStockThreshold: 5,
-        skipWhenNoActivity: true,
+        futureThreshold: 5,
+        futureSwitch: true,
         quietFrom: '22:30',
         note: 'ghi chú',
         notATime: '25:99',
@@ -180,8 +180,8 @@ describe('buildRuleFields — khoá chưa biết vẽ theo kiểu giá trị, nh
     );
 
     expect(fields.map((f) => [f.path, f.kind, f.label])).toEqual([
-      ['lowStockThreshold', 'decimal', 'lowStockThreshold'],
-      ['skipWhenNoActivity', 'boolean', 'skipWhenNoActivity'],
+      ['futureThreshold', 'decimal', 'futureThreshold'],
+      ['futureSwitch', 'boolean', 'futureSwitch'],
       ['quietFrom', 'time', 'quietFrom'],
       ['note', 'text', 'note'],
       ['notATime', 'text', 'notATime'],
@@ -189,7 +189,7 @@ describe('buildRuleFields — khoá chưa biết vẽ theo kiểu giá trị, nh
       ['channels.messenger', 'boolean', 'Messenger nội bộ'],
       ['channels.zalo', 'boolean', 'channels.zalo'],
     ]);
-    expect(fields.find((f) => f.path === 'lowStockThreshold')?.unit).toBeUndefined();
+    expect(fields.find((f) => f.path === 'futureThreshold')?.unit).toBeUndefined();
   });
 
   it('quy tắc mới dùng lại khoá quen (time, weekday, minAmount) vẫn có nhãn và kiểu ô đúng', () => {
@@ -198,7 +198,7 @@ describe('buildRuleFields — khoá chưa biết vẽ theo kiểu giá trị, nh
         time: '07:00',
         weekday: 1,
         minAmount: 50000,
-        lowStockThreshold: 3,
+        futureThreshold: 3,
       })
     );
 
@@ -206,7 +206,7 @@ describe('buildRuleFields — khoá chưa biết vẽ theo kiểu giá trị, nh
       ['time', 'time', 'Giờ chạy'],
       ['weekday', 'weekday', 'Thứ trong tuần'],
       ['minAmount', 'money', 'Số tiền tối thiểu'],
-      ['lowStockThreshold', 'decimal', 'lowStockThreshold'],
+      ['futureThreshold', 'decimal', 'futureThreshold'],
     ]);
   });
 

@@ -100,6 +100,16 @@ const RULE_FIELDS: Record<string, Record<string, KnownField>> = {
       label: 'Giờ gửi tóm tắt',
       helperText: `${VIETNAM_TIME} Bản tóm tắt là của ngày hôm trước.`,
     },
+    lowStockThreshold: {
+      kind: 'integer',
+      label: 'Ngưỡng tồn kho thấp',
+      helperText: 'Hàng bán chạy 7 ngày qua còn tồn từ mức này trở xuống sẽ được nhắc.',
+    },
+    skipWhenNoActivity: {
+      kind: 'boolean',
+      label: 'Bỏ qua ngày không có hoạt động',
+      helperText: 'Ngày không có hoá đơn và không ai chấm công thì không gửi tóm tắt.',
+    },
   },
   'attendance.missing-checkout': {
     graceMinutes: {
