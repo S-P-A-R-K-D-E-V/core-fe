@@ -348,6 +348,11 @@ export const endpoints = {
     enable: (name: string) => `/admin/workers/${name}/enable`,
     disable: (name: string) => `/admin/workers/${name}/disable`,
   },
+  // Quy tắc cảnh báo tự động của cửa hàng (chỉ Admin) — mã quy tắc dạng "till.discrepancy"
+  automation: {
+    rules: '/automation/rules',
+    rule: (code: string) => `/automation/rules/${encodeURIComponent(code)}`,
+  },
   shiftRegistrations: {
     register: '/shift-registrations/register',
     unregister: '/shift-registrations/unregister',
