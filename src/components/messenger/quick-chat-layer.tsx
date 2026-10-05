@@ -15,6 +15,7 @@ import Iconify from 'src/components/iconify';
 import { useMessengerStore } from 'src/store/messenger-store';
 
 import QuickChatWindow from './quick-chat-window';
+import { SystemSenderAvatar } from './system-avatar';
 
 // ----------------------------------------------------------------------
 
@@ -101,9 +102,13 @@ export default function QuickChatLayer({ currentUserId }: Props) {
                   openQuickChat(notif.convId);
                 }}
               >
-                <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main' }}>
-                  {notif.senderName.charAt(0).toUpperCase()}
-                </Avatar>
+                {notif.system ? (
+                  <SystemSenderAvatar size={36} />
+                ) : (
+                  <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main' }}>
+                    {notif.senderName.charAt(0).toUpperCase()}
+                  </Avatar>
+                )}
                 <Stack sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="subtitle2" noWrap>{notif.senderName}</Typography>
                   <Typography variant="caption" color="text.secondary" noWrap>

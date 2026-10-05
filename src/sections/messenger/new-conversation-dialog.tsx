@@ -13,6 +13,11 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { createGroupConversation, openPrivateConversation } from 'src/api/messenger';
+import { isSystemUserId, messengerErrorMessage } from 'src/utils/messenger-system';
+
+// Cùng câu core-be trả về (400 code "system_sender") — chặn ngay ở đây để khỏi gọi API.
+const SYSTEM_SENDER_NOT_A_CONTACT =
+  'Trợ lý hệ thống chỉ gửi cảnh báo tự động — không nhắn riêng hoặc thêm vào hội thoại được.';
 
 // ----------------------------------------------------------------------
 
@@ -43,6 +48,7 @@ export default function NewConversationDialog({ open, onClose, onCreated }: Prop
     try {
       if (mode === 'private') {
         if (!otherUserId.trim()) throw new Error('Nhập UserId của đối phương');
+        if (isSystemUserId(otherUserId.trim())) throw new Error(SYSTEM_SENDER_NOT_A_CONTACT);
         const conv = await openPrivateConversation(otherUserId.trim());
         await onCreated(conv.id);
       } else {
@@ -51,12 +57,14 @@ export default function NewConversationDialog({ open, onClose, onCreated }: Prop
           .map((s) => s.trim())
           .filter(Boolean);
         if (members.length < 1) throw new Error('Thêm ít nhất 1 thành viên khác');
+        if (members.some(isSystemUserId)) throw new Error(SYSTEM_SENDER_NOT_A_CONTACT);
         const conv = await createGroupConversation(groupName.trim() || null, members);
         await onCreated(conv.id);
       }
       reset();
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? err?.message ?? 'Lỗi không xác định');
+      // axios reject bằng body của response: thao tác bị từ chối là 400 { error, code } với error tiếng Việt.
+      setError(messengerErrorMessage(err, 'Lỗi không xác định'));
     } finally {
       setSubmitting(false);
     }

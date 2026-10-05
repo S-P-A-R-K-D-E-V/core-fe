@@ -309,6 +309,13 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             icon: ICONS.mail,
             roles: ['Admin'],
           },
+          // CẢNH BÁO TỰ ĐỘNG (Admin only) — bật/tắt + ngưỡng các cảnh báo hệ thống tự gửi cho Admin
+          {
+            title: 'Cảnh báo tự động',
+            path: paths.dashboard.automation.root,
+            icon: <Iconify icon="solar:bell-bold-duotone" sx={{ width: 1, height: 1 }} />,
+            roles: ['Admin'],
+          },
           // KIOTVIET SYNC (Admin only)
           {
             title: 'Đồng bộ KiotViet',

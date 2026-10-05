@@ -50,3 +50,17 @@ describe('useNavData — System Jobs', () => {
     expect(navPaths('Admin')).toContain(paths.dashboard.notificationConfig.root);
   });
 });
+
+// Mục "Cảnh báo tự động" chỉ dành cho Admin (core-be: AutomationController chỉ cho vai trò Admin), ở mọi cửa hàng.
+describe('useNavData — Cảnh báo tự động', () => {
+  it('Admin thấy, kể cả ở cửa hàng không phải CiCi', () => {
+    expect(navPaths('Admin')).toContain(paths.dashboard.automation.root);
+
+    brand.isCiCi = false;
+    expect(navPaths('Admin')).toContain(paths.dashboard.automation.root);
+  });
+
+  it.each(['Manager', 'Staff'])('%s không thấy', (role) => {
+    expect(navPaths(role)).not.toContain(paths.dashboard.automation.root);
+  });
+});

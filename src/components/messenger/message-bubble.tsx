@@ -9,6 +9,9 @@ import Typography from '@mui/material/Typography';
 import Iconify from 'src/components/iconify';
 import { fTimeShort } from 'src/utils/format-time';
 import { getStorageUrl } from 'src/utils/storage';
+import { resolveMessengerUser } from 'src/utils/messenger-system';
+
+import { SystemSenderAvatar } from './system-avatar';
 
 import type { DirectMessage, InternalUser, MessageAttachment } from 'src/api/messenger';
 
@@ -92,8 +95,10 @@ type Props = {
 };
 
 export default function MessageBubble({ message, mine, senderUser, showName, compact, currentUserId }: Props) {
-  const initial = (senderUser?.fullName ?? message.senderId).charAt(0).toUpperCase();
-  const displayName = senderUser?.fullName ?? message.senderId;
+  // Người gửi hệ thống ("Trợ lý hệ thống") có tên + avatar bot riêng, kể cả khi danh bạ chưa có mục của nó.
+  const sender = resolveMessengerUser(message.senderId, senderUser);
+  const displayName = sender.name;
+  const initial = displayName.charAt(0).toUpperCase();
 
   const seenBy = (message.readBy ?? []).filter((r) => r.userId !== message.senderId);
   const isRead = seenBy.length > 0;
@@ -110,12 +115,16 @@ export default function MessageBubble({ message, mine, senderUser, showName, com
       {/* Sender avatar (hidden for compact mine) */}
       {!mine && (
         <Tooltip title={displayName} placement="left">
-          <Avatar
-            src={senderUser?.avatarUrl ?? undefined}
-            sx={{ width: avatarSize, height: avatarSize, fontSize: avatarSize * 0.45, bgcolor: colorFor(message.senderId), flexShrink: 0 }}
-          >
-            {initial}
-          </Avatar>
+          {sender.isSystem ? (
+            <SystemSenderAvatar size={avatarSize} />
+          ) : (
+            <Avatar
+              src={senderUser?.avatarUrl ?? undefined}
+              sx={{ width: avatarSize, height: avatarSize, fontSize: avatarSize * 0.45, bgcolor: colorFor(message.senderId), flexShrink: 0 }}
+            >
+              {initial}
+            </Avatar>
+          )}
         </Tooltip>
       )}
       {mine && <Box sx={{ width: avatarSize, flexShrink: 0 }} />}
@@ -128,8 +137,9 @@ export default function MessageBubble({ message, mine, senderUser, showName, com
           </Typography>
         )}
 
-        {/* Bubble */}
+        {/* Bubble — chữ thuần: giữ xuống dòng (tin cảnh báo nhiều dòng), dòng dài tự ngắt trong bong bóng */}
         <Box
+          className="messenger-bubble"
           sx={{
             px: compact ? 1.25 : 1.5,
             py: compact ? 0.75 : 1,

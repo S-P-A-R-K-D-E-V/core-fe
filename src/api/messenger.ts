@@ -16,6 +16,8 @@ export type Conversation = {
   lastMessageAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Khác null = hội thoại do hệ thống quản lý, vd "admin-alerts" (kênh "Cảnh báo hệ thống"). */
+  systemKey?: string | null;
 };
 
 export type ConversationSummary = {
@@ -27,6 +29,8 @@ export type ConversationSummary = {
   lastMessageSenderId: string | null;
   lastMessageAt: string | null;
   unreadCount: number;
+  /** Khác null = hội thoại do hệ thống quản lý, vd "admin-alerts" (kênh "Cảnh báo hệ thống"). */
+  systemKey?: string | null;
 };
 
 export type MessageAttachment = {
@@ -55,6 +59,8 @@ export type InternalUser = {
   email: string;
   avatarUrl: string | null;
   online: boolean;
+  /** true = người gửi hệ thống ("Trợ lý hệ thống") — không phải người để nhắn tin / thêm vào nhóm. */
+  isSystem?: boolean;
 };
 
 export async function fetchConversations(): Promise<ConversationSummary[]> {

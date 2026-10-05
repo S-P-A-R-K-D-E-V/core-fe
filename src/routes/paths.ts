@@ -224,6 +224,9 @@ export const paths = {
     notificationConfig: {
       root: `${ROOTS.DASHBOARD}/notification-config`,
     },
+    automation: {
+      root: `${ROOTS.DASHBOARD}/automation`,
+    },
     kiotVietSync: {
       root: `${ROOTS.DASHBOARD}/kiotviet-sync`,
     },

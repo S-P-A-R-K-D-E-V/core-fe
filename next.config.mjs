@@ -20,7 +20,7 @@ const BACKEND_API_PREFIXES = [
   'customers', 'sales-orders', 'bank-accounts', 'payment', 'reports',
   'chatbot', 'messenger', 'expenses', 'shareholders', 'cleaning', 'media-library',
   'admin', 'kiosk', 'kiosk-pairing', 'kiosk-devices', 'face-tracking',
-  'auth-hub', 'store-settings', 'agent-keys',
+  'auth-hub', 'store-settings', 'agent-keys', 'automation',
   // API công khai của cửa hàng (thương hiệu, sản phẩm) — app mobile bản cửa hàng dùng để kiểm tra mã cửa hàng.
   'public',
 ];
