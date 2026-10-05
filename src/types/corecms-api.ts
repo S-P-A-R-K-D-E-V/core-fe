@@ -1395,6 +1395,107 @@ export interface IUpdateDenominationBatchRequest {
   items: { denomination: number; quantity: number }[];
 }
 
+// --- Kiểm tra chênh lệch chốt quầy: GET /shift-cash/investigation?date=yyyy-MM-dd (chỉ Admin) ---
+// Khớp ShiftCashInvestigationResult của core-be
+// (CoreCms.Api/Services/ShiftCashInvestigation/ShiftCashInvestigationModels.cs).
+// JSON camelCase; enum là CHUỖI tên thành viên (JsonStringEnumConverter); tiền là số (đồng); mốc thời
+// gian là ISO 8601 UTC có hậu tố "Z"; trường nullable luôn có mặt với giá trị null (BE không lược).
+
+/** Độ mạnh của phát hiện: Gợi ý / Có thể / Khả năng cao. */
+export type ShiftCashFindingStrength = 'Weak' | 'Medium' | 'Strong';
+
+/** Phát hiện giải thích phía nào của chênh lệch: làm quỹ thiếu (Shortage) hay thừa (Overage). */
+export type ShiftCashFindingDirection = 'Unknown' | 'Shortage' | 'Overage';
+
+/** Loại mốc đếm: số chép sang lúc mở quầy / một đợt đếm / người thật chốt / hệ thống tự chốt. */
+export type ShiftCashCheckpointKind = 'Open' | 'Count' | 'Finalize' | 'AutoFinalize';
+
+export interface IShiftCashFinding {
+  /** Mã ổn định: STALE_COUNT, UNPAID_AS_CASH, LATE_CHANGE, AMOUNT_MATCH… */
+  code: string;
+  strength: ShiftCashFindingStrength;
+  title: string;
+  detail: string;
+  /** Số tiền (dương) phát hiện này giải thích được. */
+  amount: number;
+  direction: ShiftCashFindingDirection;
+  /** Mã hoá đơn / phiếu trả hàng liên quan. */
+  refs: string[];
+  /** Mốc thời gian chính của phát hiện (UTC), nếu có. */
+  at: string | null;
+  /** Có bằng chứng rơi đúng vào khoảng thời gian phát sinh lệch. */
+  inDriftWindow: boolean;
+}
+
+/** Chênh lệch đếm − dự kiến tại một mốc đếm. */
+export interface IShiftCashCountCheckpoint {
+  at: string;
+  counted: number;
+  expected: number;
+  /** counted − expected (dương = thừa, âm = thiếu). */
+  difference: number;
+  kind: ShiftCashCheckpointKind;
+  actors: string[];
+}
+
+/** Khoảng thời gian lệch xuất hiện: giữa mốc cuối cùng còn khớp và mốc đầu tiên đã lệch. */
+export interface IShiftCashDriftWindow {
+  /** null = không có mốc khớp nào trước đó (tính từ đầu ngày). */
+  from: string | null;
+  to: string;
+  /** Lệch đã có ngay ở lần đếm đầu tiên sau khi mở quầy. */
+  fromOpening: boolean;
+  differenceAtFrom: number | null;
+  differenceAtTo: number;
+  /** Nhân viên có ca / chấm công trong khoảng này. */
+  staffOnShift: string[];
+  checkpoints: IShiftCashCountCheckpoint[];
+}
+
+export interface IShiftCashInvestigationNumbers {
+  openingBalance: number;
+  countedCash: number;
+  cashFromSales: number;
+  manualIncome: number;
+  manualExpense: number;
+  /** Dự kiến tính lại bây giờ = tồn đầu + bán tiền mặt + thu − chi. */
+  expectedCash: number;
+  /** Chênh lệch tính lại bây giờ (dương = thừa, âm = thiếu) — con số các phát hiện đi giải thích. */
+  difference: number;
+  /** Dự kiến và chênh lệch đã lưu lúc chốt. */
+  expectedAtFinalize: number;
+  differenceAtFinalize: number;
+  /** Dung sai (đồng): lệch dưới mức này coi như khớp. */
+  tolerance: number;
+}
+
+export interface IShiftCashInvestigationResult {
+  /** yyyy-MM-dd */
+  date: string;
+  /** Endpoint chỉ trả 200 khi ngày đã chốt (chưa chốt → 404 ShiftCash.NotFinalized). */
+  finalized: boolean;
+  dailyId: string | null;
+  finalizedAt: string | null;
+  isAutoFinalized: boolean;
+  finalizedByName: string | null;
+  numbers: IShiftCashInvestigationNumbers;
+  /** Đã xếp sẵn: mạnh → yếu, rồi gần số chênh lệch nhất. */
+  findings: IShiftCashFinding[];
+  /** null = không khoanh được (xem driftNote). */
+  driftWindow: IShiftCashDriftWindow | null;
+  driftNote: string | null;
+  /** Mọi mốc đếm trong ngày kèm chênh lệch tại mốc đó. */
+  checkpoints: IShiftCashCountCheckpoint[];
+  /** Số đếm dùng để chốt là số cũ (sau đó còn phát sinh tiền mặt mà không đếm lại). */
+  countIsStale: boolean;
+  lastCountAt: string | null;
+  /** Những gì đã kiểm tra — để nói rõ khi không tìm thấy gì. */
+  checked: string[];
+  /** Tiêu đề + nội dung thông báo BE đã dựng sẵn. */
+  title: string;
+  message: string;
+}
+
 // --- KiotViet Integration ---
 
 export interface IKiotVietInvoice {

@@ -60,6 +60,7 @@ import {
 } from 'src/utils/shift-cash-access';
 
 import ShiftCashAccessGate, { useShiftCashAccess } from '../shift-cash-access-gate';
+import ShiftCashInvestigationPanel from '../shift-cash-investigation-panel';
 
 import {
   IShiftCashSummary,
@@ -814,6 +815,9 @@ function ShiftCashDashboardContent() {
             </Stack>
           </Card>
         )}
+
+        {/* Kiểm tra chênh lệch của ngày đang chọn — chỉ Admin (component tự ẩn với vai trò khác) */}
+        <ShiftCashInvestigationPanel date={currentDate} summary={summary} sx={{ mb: 3 }} />
 
         {loading ? (
           <Box display="flex" justifyContent="center" py={6}>

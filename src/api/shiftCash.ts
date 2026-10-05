@@ -13,7 +13,9 @@ import {
   IKiotVietInvoiceDetailResponse,
   IKiotVietBankAccount,
   IVietQRBank,
+  IShiftCashInvestigationResult,
 } from 'src/types/corecms-api';
+import { hasApiErrorCode } from 'src/utils/api-error';
 import { ShiftCashGeo, shiftCashGeoHeaders } from 'src/utils/shift-cash-access';
 
 // ======================================================================
@@ -143,6 +145,43 @@ export async function getShiftCashAuditLogs(
     ...geoConfig(),
   });
   return res.data;
+}
+
+// ======================================================================
+// Kiểm tra chênh lệch (chỉ Admin)
+// ======================================================================
+
+// Kết quả đã phân loại của GET /shift-cash/investigation. Interceptor của axios reject bằng BODY nên
+// mất mã HTTP, mà 403 và 404 "trơn" của endpoint này có body rỗng → giữ lại 403 / 404 bằng
+// validateStatus để tự phân loại ở đây. 401 và lỗi khác (5xx, mất mạng) vẫn reject qua interceptor
+// như mọi lời gọi khác.
+export type ShiftCashInvestigationOutcome =
+  | { status: 'ok'; result: IShiftCashInvestigationResult }
+  // 404 { error: 'ShiftCash.NotFinalized', message }: ngày đó chưa chốt quầy lần nào
+  | { status: 'not-finalized' }
+  // 404 không kèm mã lỗi đó: BE chưa có endpoint (giao diện lên trước BE)
+  | { status: 'unavailable' }
+  // 403: không phải Admin
+  | { status: 'forbidden' };
+
+const INVESTIGATION_NOT_FINALIZED = 'ShiftCash.NotFinalized';
+
+export async function getShiftCashInvestigation(
+  date: string
+): Promise<ShiftCashInvestigationOutcome> {
+  const res = await axios.get(endpoints.shiftCash.investigation, {
+    params: { date },
+    validateStatus: (status) => (status >= 200 && status < 300) || status === 403 || status === 404,
+    ...geoConfig(),
+  });
+
+  if (res.status === 403) return { status: 'forbidden' };
+  if (res.status === 404) {
+    return hasApiErrorCode(res.data, INVESTIGATION_NOT_FINALIZED)
+      ? { status: 'not-finalized' }
+      : { status: 'unavailable' };
+  }
+  return { status: 'ok', result: res.data };
 }
 
 // ======================================================================
