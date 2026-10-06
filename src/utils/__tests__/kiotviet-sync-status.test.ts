@@ -103,6 +103,18 @@ describe('kiotVietSyncDisplay', () => {
 });
 
 describe('isFromKiotViet', () => {
+  it('core-be trả kiotVietId: có id là từ KiotViet, id null là hoá đơn của hệ thống — không suy đoán theo số hoá đơn', () => {
+    // Số hoá đơn giống của hệ thống nhưng có id KiotViet → vẫn là hoá đơn kéo về
+    expect(isFromKiotViet({ orderNumber: SYSTEM_NUMBER, kiotVietId: 123 })).toBe(true);
+    // Hoá đơn cửa hàng mẫu: None, số kiểu khác, không có id KiotViet → không phải từ KiotViet
+    expect(isFromKiotViet({ orderNumber: 'HD261006001', kiotVietId: null })).toBe(false);
+    expect(kiotVietSyncDisplay({ orderNumber: 'HD261006001', kiotVietId: null }).label).toBe(
+      'Không đẩy KiotViet'
+    );
+    // Trạng thái khác None không bao giờ là hoá đơn kéo về, kể cả khi có id (đã đẩy lên)
+    expect(isFromKiotViet({ kiotVietSyncStatus: 'Synced', kiotVietId: 123 })).toBe(false);
+  });
+
   it('None + số hoá đơn KiotViet + chưa từng đẩy → kéo về từ KiotViet', () => {
     expect(isFromKiotViet(PULLED)).toBe(true);
     // Số hoá đơn KiotViet của bản đã sửa (đuôi .01)

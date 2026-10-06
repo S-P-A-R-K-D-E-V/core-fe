@@ -2641,12 +2641,14 @@ export interface ISalesOrder {
   updatedAt?: string;
   items: ISalesOrderItem[];
   payments: IPayment[];
+  /** Id hoá đơn trên KiotViet — có giá trị = hoá đơn kéo về từ KiotViet; core-be cũ chưa trả field này */
+  kiotVietId?: number | null;
   /** Trạng thái đẩy đơn lên KiotViet: None|Pending|Pushing|Synced|Failed|NotPushed */
   kiotVietSyncStatus?: KiotVietSyncStatusValue;
   kiotVietSyncError?: string;
   kiotVietSyncAttempts?: number;
   kiotVietSyncedAt?: string;
-  /** Mã đơn KiotViet trả về khi hệ thống đẩy hoá đơn lên — API chưa trả id KiotViet của hoá đơn kéo về */
+  /** Mã đơn KiotViet trả về khi hệ thống đẩy hoá đơn lên */
   kiotVietOrderCode?: string;
 }
 

@@ -23,6 +23,7 @@ type SyncFields = Partial<
   Pick<
     ISalesOrder,
     | 'orderNumber'
+    | 'kiotVietId'
     | 'kiotVietSyncStatus'
     | 'kiotVietSyncError'
     | 'kiotVietSyncAttempts'
@@ -42,15 +43,16 @@ const SYSTEM_ORDER_NUMBER = /^HD-\d{8}-\d+$/;
 /**
  * Hoá đơn kéo về từ KiotViet (đã có id KiotViet), không phải hoá đơn tạo trong hệ thống?
  *
- * API hoá đơn CHƯA trả id KiotViet của hoá đơn (kiotVietOrderCode chỉ có ở hoá đơn hệ thống đã đẩy lên), và
- * trạng thái "None" không đủ để kết luận: hoá đơn Pending/Failed bị huỷ cũng về "None". Tín hiệu tốt nhất đang
- * có là dấu vết của hoá đơn tạo trong hệ thống — số hoá đơn do hệ thống sinh, hoặc đã từng thử đẩy (số lần đẩy
- * > 0, còn lỗi đẩy). Hoá đơn "None" không có dấu vết nào → coi là kéo về từ KiotViet.
- * Khi core-be trả id KiotViet của hoá đơn thì thay phần suy đoán này bằng field đó.
+ * Core-be trả kiotVietId của hoá đơn: có id = hoá đơn kéo về từ KiotViet. Core-be cũ chưa trả field này
+ * (undefined) thì suy từ dấu vết của hoá đơn tạo trong hệ thống — số hoá đơn do hệ thống sinh, hoặc đã từng thử
+ * đẩy (số lần đẩy > 0, còn lỗi đẩy); trạng thái "None" một mình không đủ vì hoá đơn Pending/Failed bị huỷ cũng
+ * về "None".
  */
 export function isFromKiotViet(order: SyncFields): boolean {
   // Mọi trạng thái khác None chỉ được gán cho hoá đơn tạo trong hệ thống
   if ((order.kiotVietSyncStatus || 'None') !== 'None') return false;
+
+  if (order.kiotVietId !== undefined) return order.kiotVietId !== null;
 
   const createdInSystem =
     SYSTEM_ORDER_NUMBER.test(order.orderNumber ?? '') ||
