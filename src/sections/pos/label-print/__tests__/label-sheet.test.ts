@@ -150,7 +150,7 @@ describe('chia trang — giấy cuộn', () => {
     // Mọi trang là con trực tiếp của body, không có gì khác chen giữa
     expect(Array.from(doc.body.children).every((child) => child.classList.contains('pg'))).toBe(true);
     // Mỗi trang ngắt sang trang in mới; khung trang không vượt khổ 74 × 22
-    expect(html).toMatch(/\.pg\{[^}]*width:73\.75mm;height:21\.75mm;overflow:hidden;break-after:page/);
+    expect(html).toMatch(/\.pg\{[^}]*width:73.5mm;height:21.5mm;overflow:hidden;break-after:page/);
     expect(html).toContain('.pg:last-child{break-after:auto');
     expect(html).toMatch(/\.lb\{[^}]*width:35mm;height:22mm/);
   });
@@ -208,7 +208,7 @@ describe('chia trang — giấy tờ (lưới hàng × cột)', () => {
     const roll = renderLabelSheetHtml(job([{ ...shirt, quantity: 70 }]), TWO_UP, DEFAULT_CALIBRATION);
 
     expect(sheet).toContain('@page{size:210mm 297mm;margin:0}');
-    expect(sheet).toMatch(/\.pg\{[^}]*width:209\.75mm;height:296\.75mm;overflow:hidden;break-after:page/);
+    expect(sheet).toMatch(/\.pg\{[^}]*width:209.5mm;height:296.5mm;overflow:hidden;break-after:page/);
     expect(sheet).toMatch(/\.lb\{[^}]*width:38mm;height:21mm/);
     expect(roll).toContain('@page{size:74mm 22mm;margin:0}');
     expect(parse(roll).querySelectorAll('.pg')).toHaveLength(35);

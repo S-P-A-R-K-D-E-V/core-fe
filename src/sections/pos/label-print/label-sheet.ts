@@ -226,10 +226,14 @@ export function planLabelSheet(
 
 const FONT_STACK = 'Arial,"Segoe UI",Tahoma,sans-serif';
 
-// Khung của mỗi trang nhỏ hơn khổ trang 0,25 mm mỗi chiều: nếu trình duyệt làm tròn khổ giấy xuống một
+// Khung của mỗi trang nhỏ hơn khổ trang 0,5 mm mỗi chiều: nếu trình duyệt làm tròn khổ giấy xuống một
 // chút thì nội dung vẫn không tràn (tràn dọc → thêm một trang trắng sau mỗi trang; tràn ngang → trình
 // duyệt tự thu nhỏ cả trang, làm lệch vạch). Vị trí các tem không đổi vì chúng đặt tuyệt đối theo mm.
-const PAGE_SAFETY_MM = 0.25;
+// Chrome làm tròn khổ @page về điểm in rồi về điểm của máy in: trang 74×22 mm đo được 74,083×21,844 mm,
+// trường hợp xấu hụt ~0,26 mm. Khung trang phải nhỏ hơn mức đó, không thì sau mỗi hàng tem thừa ra một tem trắng.
+const PAGE_SAFETY_MM = 0.5;
+// Nét của khung căn chỉnh và vạch chia cột — không liên quan tới lề an toàn của trang.
+const MARK_LINE_MM = 0.25;
 
 /** Khung của bản in thử cách mép tem bấy nhiêu mm về mỗi phía. */
 export const MARK_INSET_MM = 0.5;
@@ -252,8 +256,8 @@ function sheetCss(template: LabelTemplate, layout: LabelLayout | null): string {
     `.lb{position:absolute;width:${cssMm(template.labelWidthMm)};height:${cssMm(template.labelHeightMm)};overflow:hidden}`,
     '.bc{position:absolute;display:block}',
     // Khung in thử nằm LÙI vào trong mép tem MARK_INSET_MM để cả 4 cạnh luôn in ra, không bị mép trang cắt.
-    `.mk{position:absolute;left:${cssMm(MARK_INSET_MM)};top:${cssMm(MARK_INSET_MM)};right:${cssMm(MARK_INSET_MM)};bottom:${cssMm(MARK_INSET_MM)};border:${cssMm(PAGE_SAFETY_MM)} solid #000}`,
-    `.pz{position:absolute;top:0;height:100%;border-left:${cssMm(PAGE_SAFETY_MM)} dashed #000}`,
+    `.mk{position:absolute;left:${cssMm(MARK_INSET_MM)};top:${cssMm(MARK_INSET_MM)};right:${cssMm(MARK_INSET_MM)};bottom:${cssMm(MARK_INSET_MM)};border:${cssMm(MARK_LINE_MM)} solid #000}`,
+    `.pz{position:absolute;top:0;height:100%;border-left:${cssMm(MARK_LINE_MM)} dashed #000}`,
     `.ct{position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:1mm;font-size:${template.namePt}pt;font-weight:700}`,
   ];
 
