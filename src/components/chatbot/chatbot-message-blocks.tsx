@@ -37,30 +37,51 @@ function ImageGrid({ images }: { images: ChatbotUiImage[] }) {
       }}
     >
       {visible.map((img) => (
-        <Box
-          key={img.src}
-          component="a"
-          href={img.src}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={img.alt ? `Mở ảnh: ${img.alt}` : 'Mở ảnh trong tab mới'}
-          sx={{
-            display: 'block',
-            overflow: 'hidden',
-            borderRadius: 1,
-            bgcolor: 'action.hover',
-            aspectRatio: single ? '16 / 10' : '1 / 1',
-            '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main' },
-          }}
-        >
+        <Box key={img.src} component="figure" sx={{ m: 0, minWidth: 0 }}>
           <Box
-            component="img"
-            src={img.src}
-            alt={img.alt ?? ''}
-            loading="lazy"
-            onError={() => setFailed((prev) => [...prev, img.src])}
-            sx={{ width: 1, height: 1, objectFit: 'cover', display: 'block' }}
-          />
+            component="a"
+            href={img.src}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={img.alt ? `Mở ảnh: ${img.alt}` : 'Mở ảnh trong tab mới'}
+            sx={{
+              display: 'block',
+              overflow: 'hidden',
+              borderRadius: 1,
+              bgcolor: 'action.hover',
+              aspectRatio: single ? '16 / 10' : '1 / 1',
+              '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main' },
+            }}
+          >
+            <Box
+              component="img"
+              src={img.src}
+              alt={img.alt ?? ''}
+              loading="lazy"
+              onError={() => setFailed((prev) => [...prev, img.src])}
+              sx={{ width: 1, height: 1, objectFit: 'cover', display: 'block' }}
+            />
+          </Box>
+          {/* Chú thích (tên sản phẩm / nhân viên / việc vệ sinh): nhiều ảnh mà không có chữ thì không biết ảnh nào là gì. */}
+          {img.alt && (
+            <Typography
+              component="figcaption"
+              variant="caption"
+              title={img.alt}
+              sx={{
+                mt: 0.25,
+                display: '-webkit-box',
+                overflow: 'hidden',
+                color: 'text.secondary',
+                lineHeight: 1.3,
+                wordBreak: 'break-word',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+              }}
+            >
+              {img.alt}
+            </Typography>
+          )}
         </Box>
       ))}
     </Box>
