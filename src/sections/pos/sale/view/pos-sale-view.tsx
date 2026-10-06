@@ -41,6 +41,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 import { fCurrency } from 'src/utils/format-number';
+import { salesOrderCreatedMessage } from 'src/utils/kiotviet-sync-status';
 import { useAuthContext } from 'src/auth/hooks';
 
 import { IProduct, IProductListItem, IProductChild, ICustomer, IWarehouse } from 'src/types/corecms-api';
@@ -622,7 +623,7 @@ export default function PosSaleView() {
       if (!selectedWarehouse) return;
 
       try {
-        await createSalesOrder({
+        const created = await createSalesOrder({
           customerId: activeOrder.customerId || undefined,
           discount: activeOrder.discountAmount,
           totalPayment: grandTotal > 0 ? grandTotal : 0,
@@ -650,7 +651,10 @@ export default function PosSaleView() {
             })),
         });
 
-        enqueueSnackbar('Đã tạo đơn — đang đồng bộ KiotViet', { variant: 'success' });
+        // Chỉ nhắc KiotViet khi hoá đơn được xếp hàng đẩy (Pending); NotPushed chỉ lưu trong hệ thống
+        enqueueSnackbar(salesOrderCreatedMessage(created?.kiotVietSyncStatus), {
+          variant: 'success',
+        });
         setPaymentDrawerOpen(false);
 
         // Reset current order and relabel

@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
+import Alert from '@mui/material/Alert';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -15,6 +16,7 @@ import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 import { fCurrency } from 'src/utils/format-number';
 import { fDateTime } from 'src/utils/format-time';
+import { kiotVietRetryError } from 'src/utils/kiotviet-sync-status';
 
 import { getFailedPushes } from 'src/api/kiotviet';
 import { retryPushSalesOrder } from 'src/api/sales-orders';
@@ -26,12 +28,15 @@ export default function KiotVietPendingPushTab() {
   const [orders, setOrders] = useState<IKiotVietFailedPush[]>([]);
   const [loading, setLoading] = useState(true);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  // Cửa hàng có đẩy hoá đơn sang KiotViet không — false: đơn lỗi cũ vẫn liệt kê nhưng không đẩy lại được
+  const [pushEnabled, setPushEnabled] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const page = await getFailedPushes();
       setOrders(page.data);
+      setPushEnabled(page.pushEnabled !== false);
     } catch (error: any) {
       enqueueSnackbar(error?.message || 'Không tải được danh sách đơn chờ đẩy', { variant: 'error' });
     } finally {
@@ -51,7 +56,10 @@ export default function KiotVietPendingPushTab() {
         enqueueSnackbar('Đã gửi yêu cầu đồng bộ lại', { variant: 'success' });
         fetchData();
       } catch (error: any) {
-        enqueueSnackbar(error?.message || 'Không thể đồng bộ lại', { variant: 'error' });
+        const rejection = kiotVietRetryError(error);
+        enqueueSnackbar(rejection.message, { variant: rejection.pushDisabled ? 'info' : 'error' });
+        if (rejection.pushDisabled) setPushEnabled(false);
+        else if (rejection.fromServer) fetchData();
       } finally {
         setRetryingId(null);
       }
@@ -74,6 +82,14 @@ export default function KiotVietPendingPushTab() {
           </IconButton>
         </Tooltip>
       </Stack>
+
+      {!pushEnabled && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Cửa hàng hiện không đẩy hoá đơn sang KiotViet — hoá đơn mới chỉ lưu trong hệ thống.
+          {orders.length > 0 &&
+            ' Các hoá đơn dưới đây đẩy lỗi từ trước và sẽ không được đẩy lại; nếu cần có trên KiotViet, hãy nhập tay.'}
+        </Alert>
+      )}
 
       {!loading && orders.length === 0 && (
         <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
@@ -102,15 +118,17 @@ export default function KiotVietPendingPushTab() {
                 </Typography>
               )}
             </Box>
-            <Tooltip title="Đẩy lại lên KiotViet">
-              <IconButton
-                color="primary"
-                disabled={retryingId === order.id}
-                onClick={() => handleRetry(order.id)}
-              >
-                <Iconify icon="solar:refresh-bold" />
-              </IconButton>
-            </Tooltip>
+            {pushEnabled && (
+              <Tooltip title="Đẩy lại lên KiotViet">
+                <IconButton
+                  color="primary"
+                  disabled={retryingId === order.id}
+                  onClick={() => handleRetry(order.id)}
+                >
+                  <Iconify icon="solar:refresh-bold" />
+                </IconButton>
+              </Tooltip>
+            )}
           </Stack>
         ))}
       </Stack>

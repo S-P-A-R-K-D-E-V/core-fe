@@ -29,6 +29,8 @@ import Iconify from 'src/components/iconify';
 import { ISalesOrder } from 'src/types/corecms-api';
 import { getSalesOrderById, cancelSalesOrder } from 'src/api/sales-orders';
 
+import KiotVietSyncLabel from '../kiotviet-sync-label';
+
 // ----------------------------------------------------------------------
 
 const STATUS_COLOR_MAP: Record<string, 'default' | 'info' | 'success' | 'error' | 'warning'> = {
@@ -161,6 +163,10 @@ export default function SalesOrderDetailView({ id }: Props) {
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">Người tạo</Typography>
               <Typography variant="body2">{order.createdByName}</Typography>
+            </Stack>
+            <Stack spacing={0.5}>
+              <Typography variant="caption" color="text.secondary">KiotViet</Typography>
+              <Box><KiotVietSyncLabel order={order} /></Box>
             </Stack>
           </Box>
           {order.note && (

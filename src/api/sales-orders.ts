@@ -3,6 +3,7 @@ import {
   ISalesOrder,
   ISalesOrderPagedResponse,
   ICreateSalesOrderRequest,
+  ICreateSalesOrderResponse,
   IAddPaymentRequest,
   IUpdateSalesOrderRequest,
 } from 'src/types/corecms-api';
@@ -56,8 +57,11 @@ export async function getSalesOrderById(id: string): Promise<ISalesOrder> {
   return response.data;
 }
 
-export async function createSalesOrder(data: ICreateSalesOrderRequest): Promise<{ id: string }> {
-  const response = await axios.post<{ id: string }>(endpoints.salesOrders.create, data);
+/** Tạo hoá đơn. kiotVietSyncStatus trả về cho biết hoá đơn có được xếp hàng đẩy sang KiotViet không. */
+export async function createSalesOrder(
+  data: ICreateSalesOrderRequest
+): Promise<ICreateSalesOrderResponse> {
+  const response = await axios.post<ICreateSalesOrderResponse>(endpoints.salesOrders.create, data);
   return response.data;
 }
 
@@ -77,7 +81,11 @@ export async function addPayment(id: string, data: IAddPaymentRequest): Promise<
   return response.data;
 }
 
-/** Đẩy lại đơn bán lên KiotViet (đơn ở trạng thái Failed/Pending) */
+/**
+ * Đẩy lại đơn bán lên KiotViet — chỉ đơn ở trạng thái Failed. Core-be từ chối bằng
+ * { message, code, title, errorCodes }: 409 KiotVietSalesOrder.PushDisabled khi cửa hàng không đẩy hoá đơn,
+ * 400 với các trạng thái khác (xem kiotVietRetryError ở src/utils/kiotviet-sync-status).
+ */
 export async function retryPushSalesOrder(id: string): Promise<{ jobId: string }> {
   const response = await axios.post<{ jobId: string }>(endpoints.kiotViet.pushRetry(id));
   return response.data;

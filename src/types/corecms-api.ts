@@ -2061,7 +2061,7 @@ export interface IKiotVietFailedPush {
   total: number;
   customerName?: string;
   createdDate: string;
-  kiotVietSyncStatus: string;
+  kiotVietSyncStatus: KiotVietSyncStatusValue;
   kiotVietSyncAttempts: number;
   kiotVietSyncError?: string;
 }
@@ -2070,6 +2070,11 @@ export interface IKiotVietFailedPushPagedResponse {
   total: number;
   page: number;
   pageSize: number;
+  /**
+   * Cửa hàng có đang đẩy hoá đơn sang KiotViet không (KiotViet:Push:Enabled bật VÀ đã nối KiotViet).
+   * false → đơn Failed cũ vẫn được liệt kê nhưng đẩy lại luôn bị từ chối (409). Core-be cũ không trả field này.
+   */
+  pushEnabled?: boolean;
   data: IKiotVietFailedPush[];
 }
 
@@ -2596,6 +2601,18 @@ export interface IUpdateCustomerRequest {
 }
 
 // ==================== SalesOrder ====================
+
+/**
+ * Trạng thái đẩy hoá đơn sang KiotViet (core-be: KiotVietPushStatuses):
+ *  - None: hoá đơn kéo về từ KiotViet, hoặc hoá đơn Pending/Failed đã bị huỷ
+ *  - Pending: đã xếp hàng đẩy · Pushing: đang đẩy · Synced: đã đẩy · Failed: đẩy lỗi (xem kiotVietSyncError)
+ *  - NotPushed: chỉ lưu trong hệ thống, không gửi sang KiotViet — trạng thái bình thường, không phải lỗi
+ */
+export type KiotVietSyncStatus = 'None' | 'Pending' | 'Pushing' | 'Synced' | 'Failed' | 'NotPushed';
+
+/** Giá trị nhận từ API: chuỗi tự do — core-be mới hơn có thể thêm trạng thái ngoài các giá trị đã biết. */
+export type KiotVietSyncStatusValue = KiotVietSyncStatus | (string & {});
+
 export interface ISalesOrderPagedResponse {
   totalCount: number;
   pageNumber: number;
@@ -2624,12 +2641,20 @@ export interface ISalesOrder {
   updatedAt?: string;
   items: ISalesOrderItem[];
   payments: IPayment[];
-  /** Trạng thái đẩy đơn lên KiotViet: None|Pending|Pushing|Synced|Failed */
-  kiotVietSyncStatus?: string;
+  /** Trạng thái đẩy đơn lên KiotViet: None|Pending|Pushing|Synced|Failed|NotPushed */
+  kiotVietSyncStatus?: KiotVietSyncStatusValue;
   kiotVietSyncError?: string;
   kiotVietSyncAttempts?: number;
   kiotVietSyncedAt?: string;
+  /** Mã đơn KiotViet trả về khi hệ thống đẩy hoá đơn lên — API chưa trả id KiotViet của hoá đơn kéo về */
   kiotVietOrderCode?: string;
+}
+
+/** POST /sales-orders — kiotVietSyncStatus: "Pending" (đã xếp hàng đẩy KiotViet) hoặc "NotPushed" */
+export interface ICreateSalesOrderResponse {
+  id: string;
+  /** Core-be cũ không trả field này */
+  kiotVietSyncStatus?: KiotVietSyncStatusValue;
 }
 
 export interface ISalesOrderItem {

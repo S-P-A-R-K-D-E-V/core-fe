@@ -40,10 +40,13 @@ import {
 
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { parseDateStr, toDateStr } from 'src/utils/format-time';
+import { kiotVietRetryError, canRetryKiotVietPush } from 'src/utils/kiotviet-sync-status';
 
 import { ISalesOrder, IKiotVietBankAccount } from 'src/types/corecms-api';
 import { getAllSalesOrders, exportSalesOrdersExcel, retryPushSalesOrder } from 'src/api/sales-orders';
 import { getBankAccounts } from 'src/api/bank-accounts';
+
+import KiotVietSyncLabel from '../kiotviet-sync-label';
 
 // ----------------------------------------------------------------------
 
@@ -89,22 +92,6 @@ const TABLE_HEAD = [
   { id: '', width: 100 },
 ];
 
-const KIOTVIET_SYNC_COLOR: Record<string, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
-  None: 'default',
-  Pending: 'warning',
-  Pushing: 'info',
-  Synced: 'success',
-  Failed: 'error',
-};
-
-const KIOTVIET_SYNC_LABEL: Record<string, string> = {
-  None: 'Từ KiotViet',
-  Pending: 'Chờ đồng bộ',
-  Pushing: 'Đang đồng bộ',
-  Synced: 'Đã đồng bộ',
-  Failed: 'Lỗi đồng bộ',
-};
-
 // ----------------------------------------------------------------------
 
 export default function SalesOrderListView() {
@@ -123,6 +110,8 @@ export default function SalesOrderListView() {
   const [bankAccountId, setBankAccountId] = useState('');
   const [bankAccounts, setBankAccounts] = useState<IKiotVietBankAccount[]>([]);
   const [exporting, setExporting] = useState(false);
+  // Core-be đã báo cửa hàng không đẩy hoá đơn sang KiotViet (409) → thôi hiện nút đẩy lại
+  const [pushDisabled, setPushDisabled] = useState(false);
 
   const buildExportParams = useCallback(() => ({
     keyword: filterName || undefined,
@@ -193,7 +182,10 @@ export default function SalesOrderListView() {
       enqueueSnackbar('Đã gửi yêu cầu đồng bộ lại lên KiotViet', { variant: 'success' });
       fetchData();
     } catch (error: any) {
-      enqueueSnackbar(error?.message || 'Không thể đồng bộ lại', { variant: 'error' });
+      const rejection = kiotVietRetryError(error);
+      enqueueSnackbar(rejection.message, { variant: rejection.pushDisabled ? 'info' : 'error' });
+      if (rejection.pushDisabled) setPushDisabled(true);
+      if (rejection.fromServer) fetchData();
     }
   }, [enqueueSnackbar, fetchData]);
 
@@ -312,17 +304,8 @@ export default function SalesOrderListView() {
                       </Label>
                     </TableCell>
                     <TableCell>
-                      <Tooltip title={row.kiotVietSyncError || row.kiotVietOrderCode || ''}>
-                        <span>
-                          <Label
-                            variant="soft"
-                            color={KIOTVIET_SYNC_COLOR[row.kiotVietSyncStatus || 'None']}
-                          >
-                            {KIOTVIET_SYNC_LABEL[row.kiotVietSyncStatus || 'None'] || row.kiotVietSyncStatus}
-                          </Label>
-                        </span>
-                      </Tooltip>
-                      {(row.kiotVietSyncStatus === 'Failed' || row.kiotVietSyncStatus === 'Pending') && (
+                      <KiotVietSyncLabel order={row} />
+                      {canRetryKiotVietPush(row.kiotVietSyncStatus) && !pushDisabled && (
                         <Tooltip title="Đẩy lại lên KiotViet">
                           <IconButton
                             size="small"
