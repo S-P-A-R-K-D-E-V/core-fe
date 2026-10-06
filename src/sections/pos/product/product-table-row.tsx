@@ -116,6 +116,8 @@ type Props = {
   onDeleteRow: VoidFunction;
   onEditRow: (id: string) => void;
   onAddSameCategory: VoidFunction;
+  // In tem cho đúng MỘT mã hàng đang mở chi tiết (hàng cha hoặc một hàng con)
+  onPrintLabel: (product: IProduct) => void;
   visibleColumns: ColumnKey[];
   totalColSpan: number;
 };
@@ -127,6 +129,7 @@ export default function ProductTableRow({
   onDeleteRow,
   onEditRow,
   onAddSameCategory,
+  onPrintLabel,
   visibleColumns,
   totalColSpan,
 }: Props) {
@@ -397,6 +400,7 @@ export default function ProductTableRow({
                   onEdit={onEditRow}
                   onDelete={() => confirm.onTrue()}
                   onAddSameCategory={onAddSameCategory}
+                  onPrintLabel={onPrintLabel}
                 />
               )}
               {!detailProduct && loadingDetail && (
@@ -425,6 +429,7 @@ export default function ProductTableRow({
             onEditRow={onEditRow}
             onDelete={() => confirm.onTrue()}
             onAddSameCategory={onAddSameCategory}
+            onPrintLabel={onPrintLabel}
           />
 
           {/* Child sub-rows */}
@@ -442,6 +447,7 @@ export default function ProductTableRow({
               onEditRow={onEditRow}
               onDelete={() => confirm.onTrue()}
               onAddSameCategory={onAddSameCategory}
+              onPrintLabel={onPrintLabel}
             />
           ))}
         </>
@@ -472,6 +478,7 @@ function ExpandedSubRow({
   onEditRow,
   onDelete,
   onAddSameCategory,
+  onPrintLabel,
 }: {
   isExpanded: boolean;
   isLoadingDetail: boolean;
@@ -484,6 +491,7 @@ function ExpandedSubRow({
   onEditRow: (id: string) => void;
   onDelete: VoidFunction;
   onAddSameCategory: VoidFunction;
+  onPrintLabel: (product: IProduct) => void;
 }) {
   return (
     <>
@@ -523,6 +531,7 @@ function ExpandedSubRow({
                   onEdit={onEditRow}
                   onDelete={onDelete}
                   onAddSameCategory={onAddSameCategory}
+                  onPrintLabel={onPrintLabel}
                 />
               )}
             </Collapse>
@@ -541,12 +550,14 @@ function ProductExpandedDetail({
   onEdit,
   onDelete,
   onAddSameCategory,
+  onPrintLabel,
 }: {
   row: IProduct;
   loading?: boolean;
   onEdit: (id: string) => void;
   onDelete: VoidFunction;
   onAddSameCategory: VoidFunction;
+  onPrintLabel: (product: IProduct) => void;
 }) {
   const [tab, setTab] = useState(0);
 
@@ -727,7 +738,7 @@ function ProductExpandedDetail({
         <Button size="small" variant="contained" startIcon={<Iconify icon="solar:pen-bold" width={18} />} onClick={() => onEdit(row.id)}>
           Chỉnh sửa
         </Button>
-        <Button size="small" variant="outlined" startIcon={<Iconify icon="solar:printer-bold" width={18} />}>
+        <Button size="small" variant="outlined" startIcon={<Iconify icon="solar:printer-bold" width={18} />} onClick={() => onPrintLabel(row)}>
           In tem mã
         </Button>
         <Button size="small" variant="outlined" startIcon={<Iconify icon="mingcute:add-line" width={18} />} onClick={onAddSameCategory}>

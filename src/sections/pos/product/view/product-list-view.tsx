@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
@@ -30,10 +30,15 @@ import {
 
 import { useContext } from 'react';
 
-import { IProductListItem, ICategory } from 'src/types/corecms-api';
+import { IProduct, IProductListItem, ICategory } from 'src/types/corecms-api';
 import { getAllProducts, deleteProduct } from 'src/api/products';
 import { SyncNotificationContext } from 'src/hooks/use-sync-notification';
 import { getAllCategories } from 'src/api/categories';
+
+import type { LabelSource } from 'src/sections/pos/label-print/label-sheet';
+import LabelPrintDialog from 'src/sections/pos/label-print/label-print-dialog';
+import { labelSourceFromProduct, labelSourcesFromProducts } from 'src/sections/pos/label-print/label-sources';
+
 import ProductTableToolbar from '../product-table-toolbar';
 import ProductTableRow from '../product-table-row';
 import ProductEditDialog from '../product-edit-dialog';
@@ -115,6 +120,10 @@ export default function ProductListView() {
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(getInitialVisibleColumns);
   const editDialog = useBoolean();
   const [editProductId, setEditProductId] = useState<string | undefined>(undefined);
+  // In tem mã: null = đóng hộp thoại; mảng = các mã hàng đưa vào hộp thoại
+  const [labelSources, setLabelSources] = useState<LabelSource[] | null>(null);
+  // Các dòng đã tải (mọi trang đã xem) — hàng đã tick ở trang khác vẫn in tem được
+  const loadedRows = useRef(new Map<string, IProductListItem>());
 
   const handleToggleColumn = useCallback((columnId: ColumnKey) => {
     setVisibleColumns((prev) => {
@@ -144,6 +153,7 @@ export default function ProductListView() {
         getAllCategories(),
       ]);
       setTableData(pagedResult.items);
+      pagedResult.items.forEach((item) => loadedRows.current.set(item.id, item));
       setTotalCount(pagedResult.totalCount);
       setCategories(cats);
     } catch (error) {
@@ -205,6 +215,18 @@ export default function ProductListView() {
     handleDialogClose();
     fetchData();
   }, [handleDialogClose, fetchData]);
+
+  const handlePrintLabel = useCallback((product: IProduct) => {
+    setLabelSources([labelSourceFromProduct(product)]);
+  }, []);
+
+  // Hàng có biến thể / đơn vị quy đổi: mỗi mã con là một dòng riêng trong hộp thoại
+  const handlePrintSelectedLabels = useCallback(() => {
+    const products = table.selected
+      .map((id) => loadedRows.current.get(id))
+      .filter((item): item is IProductListItem => !!item);
+    setLabelSources(labelSourcesFromProducts(products));
+  }, [table.selected]);
 
   const handleAddSameCategory = useCallback((product: IProductListItem) => {
     router.push(`${paths.dashboard.pos.product.new}?categoryId=${product.id}`);
@@ -277,7 +299,14 @@ export default function ProductListView() {
               numSelected={table.selected.length}
               rowCount={tableData.length}
               onSelectAllRows={(checked) => table.onSelectAllRows(checked, tableData.map((row) => row.id))}
-              action={<Button color="error" onClick={confirm.onTrue}>Xóa</Button>}
+              action={
+                <Stack direction="row" spacing={1}>
+                  <Button color="primary" startIcon={<Iconify icon="solar:printer-bold" width={18} />} onClick={handlePrintSelectedLabels}>
+                    In tem mã
+                  </Button>
+                  <Button color="error" onClick={confirm.onTrue}>Xóa</Button>
+                </Stack>
+              }
             />
             <Scrollbar>
               <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 960 }}>
@@ -300,6 +329,7 @@ export default function ProductListView() {
                       onDeleteRow={() => handleDeleteRow(row.id)}
                       onEditRow={handleEditRow}
                       onAddSameCategory={() => handleAddSameCategory(row)}
+                      onPrintLabel={handlePrintLabel}
                       visibleColumns={visibleColumns}
                       totalColSpan={totalColSpan}
                     />
@@ -334,6 +364,12 @@ export default function ProductListView() {
         onClose={handleDialogClose}
         productId={editProductId}
         onSaved={handleDialogSaved}
+      />
+
+      <LabelPrintDialog
+        open={!!labelSources}
+        onClose={() => setLabelSources(null)}
+        sources={labelSources ?? []}
       />
     </>
   );
