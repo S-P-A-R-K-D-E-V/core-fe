@@ -29,6 +29,8 @@ import Iconify from 'src/components/iconify';
 import { ISalesOrder } from 'src/types/corecms-api';
 import { getSalesOrderById, cancelSalesOrder } from 'src/api/sales-orders';
 
+import ReceiptPrintDialog from 'src/sections/pos/receipt-print/receipt-print-dialog';
+
 import KiotVietSyncLabel from '../kiotviet-sync-label';
 
 // ----------------------------------------------------------------------
@@ -78,6 +80,7 @@ export default function SalesOrderDetailView({ id }: Props) {
   const [order, setOrder] = useState<ISalesOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -124,6 +127,14 @@ export default function SalesOrderDetailView({ id }: Props) {
             <Label color={PAYMENT_STATUS_COLOR[order.paymentStatus]}>{PAYMENT_STATUS_LABEL[order.paymentStatus] || order.paymentStatus}</Label>
           </Stack>
           <Stack direction="row" spacing={1}>
+            {/* In được cả hoá đơn đã huỷ — phiếu khi đó có chữ "ĐÃ HUỶ" */}
+            <Button
+              variant="outlined"
+              onClick={() => setPrintOpen(true)}
+              startIcon={<Iconify icon="solar:printer-minimalistic-bold" />}
+            >
+              In hoá đơn
+            </Button>
             {canCancel && order.status !== 'Cancelled' && (
               <>
                 <Button
@@ -141,6 +152,7 @@ export default function SalesOrderDetailView({ id }: Props) {
             )}
           </Stack>
         </Stack>
+        <ReceiptPrintDialog open={printOpen} onClose={() => setPrintOpen(false)} orderId={id} />
       </Grid>
 
       {/* Info */}

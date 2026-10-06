@@ -2739,6 +2739,111 @@ export interface IUpdateSalesOrderRequest {
   items?: IUpdateSalesOrderItemRequest[];
 }
 
+// ========== Phiếu thanh toán (GET /sales-orders/{id}/receipt) ==========
+// Mọi số tiền là VND đã làm tròn tới đồng; `quantity` có thể lẻ. Ngày giờ "…Local" đã theo múi giờ
+// cửa hàng, dạng "dd/MM/yyyy HH:mm" — in nguyên văn.
+
+export interface ISalesOrderReceiptStore {
+  name: string;
+  address: string | null;
+  phone: string | null;
+  taxCode: string | null;
+  logoUrl: string | null;
+}
+
+/** Chỉ hoá đơn kéo về từ KiotViet mới có chi nhánh; hoá đơn tạo trong hệ thống luôn là null. */
+export interface ISalesOrderReceiptBranch {
+  name: string;
+  address: string | null;
+  phone: string | null;
+}
+
+export interface ISalesOrderReceiptInvoice {
+  id: string;
+  code: string;
+  createdAtUtc: string;
+  createdAtLocal: string;
+  /** Múi giờ IANA đã dùng, vd. "Asia/Ho_Chi_Minh" */
+  timezone: string;
+  cashierName: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  note: string | null;
+  /** Chữ trạng thái có sẵn ("Completed", "Đã hủy"…) — muốn biết đã huỷ thì dùng isCancelled */
+  status: string;
+  isCancelled: boolean;
+}
+
+export interface ISalesOrderReceiptLine {
+  lineNo: number;
+  name: string;
+  code: string | null;
+  unit: string | null;
+  quantity: number;
+  unitPrice: number;
+  /** Giảm giá của riêng dòng này (0 nếu không có) */
+  discount: number;
+  /** quantity × unitPrice − discount */
+  lineTotal: number;
+  note: string | null;
+}
+
+export interface ISalesOrderReceiptTotals {
+  /** Tổng quantity × unitPrice, TRƯỚC mọi giảm giá */
+  subTotal: number;
+  /** Giảm giá cấp hoá đơn chưa nằm trong các dòng */
+  discount: number;
+  /** Mọi giảm giá cộng lại = max(0, subTotal − total); đã gồm giảm giá dòng và `discount` */
+  discountTotal: number;
+  /** Khách cần trả */
+  total: number;
+  /** Khách đã trả */
+  paid: number;
+  /** max(0, total − paid) */
+  remaining: number;
+}
+
+export interface ISalesOrderReceiptPayment {
+  /** Giá trị gốc: "Cash", "Transfer", "Card"… */
+  method: string;
+  methodLabel: string;
+  /** Số thu ngân đã nhập — tổng các dòng có thể khác `totals.paid` (vd. khách đưa dư tiền mặt) */
+  amount: number;
+  reference: string | null;
+  paidAtLocal: string | null;
+}
+
+/** Mã QR chuyển khoản cho phần còn phải trả; null khi đã huỷ, đã trả đủ hoặc chưa xác định được tài khoản nhận. */
+export interface ISalesOrderReceiptTransferQr {
+  /** Chuỗi EMVCo / VietQR — vẽ thành mã QR nguyên văn */
+  payload: string;
+  bankName: string | null;
+  accountNumber: string;
+  /** Tên cửa hàng tự đặt cho tài khoản (không chắc là tên chủ tài khoản) */
+  accountName: string | null;
+  /** = totals.remaining */
+  amount: number;
+  /** Nội dung chuyển khoản = mã hoá đơn đã chuẩn hoá cho ngân hàng */
+  content: string;
+}
+
+export interface ISalesOrderReceipt {
+  /** Luôn là "PHIẾU THANH TOÁN" */
+  title: string;
+  store: ISalesOrderReceiptStore;
+  branch: ISalesOrderReceiptBranch | null;
+  invoice: ISalesOrderReceiptInvoice;
+  /** Thứ tự ổn định giữa các lần in lại nhưng KHÔNG phải thứ tự thu ngân nhập hàng */
+  lines: ISalesOrderReceiptLine[];
+  totals: ISalesOrderReceiptTotals;
+  /** Theo thời gian thanh toán; có thể rỗng dù paid > 0 */
+  payments: ISalesOrderReceiptPayment[];
+  transferQr: ISalesOrderReceiptTransferQr | null;
+  /** Lời chào cuối phiếu (Cài đặt cửa hàng) */
+  footer: string | null;
+  printedAtLocal: string;
+}
+
 // ========== QR Payment (VietQR Quick Link) ==========
 
 export interface ICreateQrPaymentRequest {

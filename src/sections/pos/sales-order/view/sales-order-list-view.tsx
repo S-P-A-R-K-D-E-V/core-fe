@@ -46,6 +46,8 @@ import { ISalesOrder, IKiotVietBankAccount } from 'src/types/corecms-api';
 import { getAllSalesOrders, exportSalesOrdersExcel, retryPushSalesOrder } from 'src/api/sales-orders';
 import { getBankAccounts } from 'src/api/bank-accounts';
 
+import ReceiptPrintDialog from 'src/sections/pos/receipt-print/receipt-print-dialog';
+
 import KiotVietSyncLabel from '../kiotviet-sync-label';
 
 // ----------------------------------------------------------------------
@@ -89,7 +91,7 @@ const TABLE_HEAD = [
   { id: 'kiotVietSyncStatus', label: 'KiotViet', width: 130 },
   { id: 'createdByName', label: 'Người tạo', width: 150 },
   { id: 'createdAt', label: 'Ngày tạo', width: 170 },
-  { id: '', width: 100 },
+  { id: '', width: 140 },
 ];
 
 // ----------------------------------------------------------------------
@@ -112,6 +114,8 @@ export default function SalesOrderListView() {
   const [exporting, setExporting] = useState(false);
   // Core-be đã báo cửa hàng không đẩy hoá đơn sang KiotViet (409) → thôi hiện nút đẩy lại
   const [pushDisabled, setPushDisabled] = useState(false);
+  // Hoá đơn đang mở hộp thoại "In hoá đơn"
+  const [printOrderId, setPrintOrderId] = useState<string | null>(null);
 
   const buildExportParams = useCallback(() => ({
     keyword: filterName || undefined,
@@ -318,7 +322,12 @@ export default function SalesOrderListView() {
                     </TableCell>
                     <TableCell>{row.createdByName}</TableCell>
                     <TableCell>{fDateTime(row.createdAt)}</TableCell>
-                    <TableCell align="right">
+                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                      <Tooltip title="In hoá đơn">
+                        <IconButton onClick={(e) => { e.stopPropagation(); setPrintOrderId(row.id); }}>
+                          <Iconify icon="solar:printer-minimalistic-bold" />
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title="Chỉnh sửa">
                         <IconButton onClick={(e) => { e.stopPropagation(); handleEditRow(row.id); }}>
                           <Iconify icon="solar:pen-bold" />
@@ -348,6 +357,12 @@ export default function SalesOrderListView() {
           onChangeDense={table.onChangeDense}
         />
       </Card>
+
+      <ReceiptPrintDialog
+        open={!!printOrderId}
+        onClose={() => setPrintOrderId(null)}
+        orderId={printOrderId}
+      />
     </Container>
   );
 }

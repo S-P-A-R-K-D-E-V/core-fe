@@ -6,6 +6,7 @@ import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
@@ -27,6 +28,9 @@ const EMPTY: IStoreBranding = {
   messengerLink: null,
   zaloLink: null,
   contactInfoJson: null,
+  phone: null,
+  taxCode: null,
+  receiptFooter: null,
 };
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
@@ -35,6 +39,7 @@ export default function StoreBrandingTab() {
   const { enqueueSnackbar } = useSnackbar();
   const [form, setForm] = useState<IStoreBranding>(EMPTY);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -66,7 +71,10 @@ export default function StoreBrandingTab() {
 
   useEffect(() => {
     getStoreBranding()
-      .then((data) => setForm({ ...EMPTY, ...data }))
+      .then((data) => {
+        setForm({ ...EMPTY, ...data });
+        setLoaded(true);
+      })
       .catch((err) => enqueueSnackbar(apiErrorMessage(err, 'Không tải được thông tin cửa hàng'), { variant: 'error' }))
       .finally(() => setLoading(false));
   }, [enqueueSnackbar]);
@@ -83,7 +91,11 @@ export default function StoreBrandingTab() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await saveStoreBranding(form);
+      // Ba field của phiếu thanh toán: không gửi key = core-be giữ nguyên giá trị đang lưu. Chưa tải được
+      // dữ liệu thì không biết đang lưu gì → chỉ gửi khi người dùng đã nhập, để không xoá nhầm.
+      const { phone, taxCode, receiptFooter, ...olderFields } = form;
+      const sendReceiptFields = loaded || !!phone || !!taxCode || !!receiptFooter;
+      await saveStoreBranding(sendReceiptFields ? form : olderFields);
       enqueueSnackbar('Đã lưu thông tin cửa hàng');
     } catch (err) {
       enqueueSnackbar(apiErrorMessage(err, 'Lưu thất bại'), { variant: 'error' });
@@ -148,6 +160,28 @@ export default function StoreBrandingTab() {
           <TextField label="Link Messenger" {...field('messengerLink')} />
           <TextField label="Link Zalo" {...field('zaloLink')} />
         </Stack>
+
+        <Divider sx={{ borderStyle: 'dashed' }} />
+
+        <Stack spacing={0.5}>
+          <Typography variant="subtitle1">Phiếu thanh toán (in hoá đơn)</Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            In ở đầu phiếu cùng với tên cửa hàng và địa chỉ ở trên; lời chào in ở cuối phiếu.
+          </Typography>
+        </Stack>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+          <TextField label="Số điện thoại" inputProps={{ maxLength: 50 }} {...field('phone')} />
+          <TextField label="Mã số thuế" inputProps={{ maxLength: 20 }} {...field('taxCode')} />
+        </Stack>
+        <TextField
+          label="Lời chào cuối hoá đơn"
+          placeholder="Cảm ơn quý khách, hẹn gặp lại!"
+          multiline
+          minRows={2}
+          inputProps={{ maxLength: 200 }}
+          helperText={`${(form.receiptFooter ?? '').length}/200 ký tự`}
+          {...field('receiptFooter')}
+        />
 
         <Stack direction="row" justifyContent="flex-end">
           <LoadingButton variant="contained" loading={saving} disabled={loading || colorInvalid} onClick={handleSave}>

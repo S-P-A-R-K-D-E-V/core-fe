@@ -499,6 +499,7 @@ export const endpoints = {
     update: (id: string) => `/sales-orders/${id}`,
     cancel: (id: string) => `/sales-orders/${id}/cancel`,
     payment: (id: string) => `/sales-orders/${id}/payment`,
+    receipt: (id: string) => `/sales-orders/${id}/receipt`,
     exportExcel: '/sales-orders/export-excel',
   },
   bankAccounts: {

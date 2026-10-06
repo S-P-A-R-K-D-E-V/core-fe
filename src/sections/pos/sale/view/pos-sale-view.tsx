@@ -50,6 +50,8 @@ import { getAllCustomers } from 'src/api/customers';
 import { getAllWarehouses } from 'src/api/warehouses';
 import { createSalesOrder } from 'src/api/sales-orders';
 
+import ReceiptPrintDialog from 'src/sections/pos/receipt-print/receipt-print-dialog';
+
 import PosDiscountPopover from '../pos-discount-popover';
 import PosProductDetailDrawer from '../pos-product-detail-drawer';
 import PosVariantPickerDrawer from '../pos-variant-picker-drawer';
@@ -207,6 +209,10 @@ export default function PosSaleView() {
   const [quickDiscountInput, setQuickDiscountInput] = useState<string>('');
   const [quickPaymentLoading, setQuickPaymentLoading] = useState(false);
   const [quickQrPaymentCompleted, setQuickQrPaymentCompleted] = useState(false);
+
+  // In hoá đơn: hoá đơn vừa bán gần nhất (nút máy in trên thanh trên cùng)
+  const [lastSaleId, setLastSaleId] = useState<string | null>(null);
+  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
 
   // Current time
   const [now, setNow] = useState(new Date());
@@ -655,6 +661,7 @@ export default function PosSaleView() {
         enqueueSnackbar(salesOrderCreatedMessage(created?.kiotVietSyncStatus), {
           variant: 'success',
         });
+        if (created?.id) setLastSaleId(created.id);
         setPaymentDrawerOpen(false);
 
         // Reset current order and relabel
@@ -680,6 +687,17 @@ export default function PosSaleView() {
     },
     [activeOrder, activeOrderId, selectedWarehouse, sellerName, enqueueSnackbar]
   );
+
+  // Nút máy in: in phiếu thanh toán của hoá đơn vừa bán (không tự in sau khi bán)
+  const handlePrintLastSale = useCallback(() => {
+    if (!lastSaleId) {
+      enqueueSnackbar('Chưa có hoá đơn vừa bán để in. Hoá đơn cũ in ở trang Đơn bán hàng.', {
+        variant: 'info',
+      });
+      return;
+    }
+    setReceiptDialogOpen(true);
+  }, [lastSaleId, enqueueSnackbar]);
 
   // Quick sale payment
   const handleQuickPayment = useCallback(async () => {
@@ -970,9 +988,13 @@ export default function PosSaleView() {
           <IconButton sx={{ color: 'white' }}>
             <Iconify icon="solar:refresh-bold" />
           </IconButton>
-          <IconButton sx={{ color: 'white' }}>
-            <Iconify icon="solar:printer-bold" />
-          </IconButton>
+          <Tooltip title={lastSaleId ? 'In hoá đơn vừa bán' : 'In hoá đơn (chưa có hoá đơn vừa bán)'}>
+            <IconButton sx={{ color: 'white' }} onClick={handlePrintLastSale}>
+              <Badge color="warning" variant="dot" invisible={!lastSaleId}>
+                <Iconify icon="solar:printer-bold" />
+              </Badge>
+            </IconButton>
+          </Tooltip>
           <Typography variant="caption" sx={{ opacity: 0.8 }}>
             {selectedWarehouse?.name || 'Chọn kho'}
           </Typography>
@@ -1814,6 +1836,13 @@ export default function PosSaleView() {
           activeOrder.items.find((i) => getItemKey(i) === discountItemId)?.discountAmount || 0
         }
         onApply={handleItemDiscount}
+      />
+
+      {/* In hoá đơn vừa bán */}
+      <ReceiptPrintDialog
+        open={receiptDialogOpen}
+        onClose={() => setReceiptDialogOpen(false)}
+        orderId={lastSaleId}
       />
     </Box>
   );

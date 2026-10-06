@@ -13,6 +13,11 @@ export interface IStoreBranding {
   messengerLink: string | null;
   zaloLink: string | null;
   contactInfoJson: string | null;
+  // In trên phiếu thanh toán. Core-be cũ không trả và bỏ qua ba field này khi lưu.
+  phone?: string | null;
+  taxCode?: string | null;
+  /** Lời chào cuối phiếu thanh toán */
+  receiptFooter?: string | null;
 }
 
 export interface IKiotVietConnection {
@@ -43,6 +48,10 @@ export async function getStoreBranding(): Promise<IStoreBranding> {
   return res.data;
 }
 
+/**
+ * Tám field cũ ghi đè toàn bộ. Ba field của phiếu thanh toán (phone, taxCode, receiptFooter): không gửi
+ * key = giữ nguyên giá trị đang lưu; gửi null / chuỗi trắng = xoá; có chữ = lưu (core-be tự cắt khoảng trắng).
+ */
 export async function saveStoreBranding(data: IStoreBranding): Promise<void> {
   await axios.put('/store-settings/branding', data);
 }
