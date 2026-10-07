@@ -175,6 +175,7 @@ export const paths = {
     },
     fnb: {
       root: `${ROOTS.DASHBOARD}/fnb`,
+      pos: `${ROOTS.DASHBOARD}/fnb/pos`,
     },
     penaltyPolicy: {
       root: `${ROOTS.DASHBOARD}/penalty-policy`,

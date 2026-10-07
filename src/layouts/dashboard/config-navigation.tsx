@@ -457,6 +457,13 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             roles: ['Admin'],
             featureKey: 'commerce.retail.pos',
           },
+          // BÁN HÀNG F&B (sơ đồ bàn, gọi món, gửi bar, thanh toán) — mọi vai trò, trong phạm vi chi nhánh được phân công.
+          {
+            title: 'Bán hàng F&B',
+            path: paths.dashboard.fnb.pos,
+            icon: ICONS.ecommerce,
+            featureKey: 'commerce.fnb.pos',
+          },
           {
             title: 'Đơn bán hàng',
             path: paths.dashboard.pos.salesOrder.root,

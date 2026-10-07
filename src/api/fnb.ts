@@ -1,6 +1,16 @@
 import axios, { endpoints } from 'src/utils/axios';
 
-import type { IFnbMenu, IDiningArea, IDiningTable, IFnbQuickNote } from 'src/types/fnb';
+import type {
+  IFnbMenu,
+  IFnbFloor,
+  IOpenOrder,
+  IDiningArea,
+  IDiningTable,
+  IFnbQuickNote,
+  IOrderCommandResult,
+} from 'src/types/fnb';
+
+import type { FnbCommand } from 'src/sections/fnb-pos/lib/commands';
 
 // ----------------------------------------------------------------------
 // F&B — thiết lập (khu vực, bàn, thực đơn, ghi chú nhanh). Thêm/sửa/xoá cần Admin hoặc Quản lý; đọc thì nhân viên
@@ -90,4 +100,23 @@ export async function updateFnbQuickNote(id: string, data: { text: string; categ
 
 export async function deleteFnbQuickNote(id: string) {
   await axios.delete(endpoints.fnb.quickNote(id));
+}
+
+// ---------------------------------------------------------------------- Bán hàng F&B (web)
+
+/** GET /fnb/floor — sơ đồ bàn + đơn đang mở của chi nhánh. */
+export async function getFnbFloor(branchId: string): Promise<IFnbFloor> {
+  const res = await axios.get<IFnbFloor>(endpoints.fnb.floor, { params: { branchId } });
+  return res.data;
+}
+
+export async function getFnbOrder(orderId: string): Promise<IOpenOrder> {
+  const res = await axios.get<IOpenOrder>(endpoints.fnb.order(orderId));
+  return res.data;
+}
+
+/** Gửi một lệnh ghi lên đơn (lib/commands.ts) — lỗi bị reject bằng body problem+json (đọc bằng lib/errors.ts). */
+export async function runFnbCommand(command: FnbCommand): Promise<IOrderCommandResult> {
+  const res = await axios.request<IOrderCommandResult>({ method: command.method, url: command.path, data: command.body });
+  return res.data;
 }
