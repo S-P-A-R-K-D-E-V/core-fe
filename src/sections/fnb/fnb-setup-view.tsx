@@ -20,6 +20,7 @@ import { IBranchLocation } from 'src/types/corecms-api';
 import { getBranchLocations } from 'src/api/attendance';
 
 import FnbMenuTab from './fnb-menu-tab';
+import FnbRecipeTab from './fnb-recipe-tab';
 import FnbFloorTab from './fnb-floor-tab';
 import FnbQuickNotesTab from './fnb-quick-notes-tab';
 
@@ -32,6 +33,7 @@ import FnbQuickNotesTab from './fnb-quick-notes-tab';
 const TABS = [
   { value: 'floor', label: 'Khu vực & bàn', icon: 'solar:sofa-bold' },
   { value: 'menu', label: 'Thực đơn', icon: 'solar:cup-hot-bold' },
+  { value: 'recipes', label: 'Định lượng', icon: 'solar:scale-bold' },
   { value: 'notes', label: 'Ghi chú nhanh', icon: 'solar:notes-bold' },
 ] as const;
 
@@ -96,6 +98,7 @@ export default function FnbSetupView() {
 
       {tab === 'floor' && branchId && <FnbFloorTab key={branchId} branchId={branchId} />}
       {tab === 'menu' && branchId && <FnbMenuTab key={branchId} branchId={branchId} />}
+      {tab === 'recipes' && branchId && <FnbRecipeTab key={branchId} branchId={branchId} />}
       {tab === 'notes' && <FnbQuickNotesTab />}
     </Container>
   );

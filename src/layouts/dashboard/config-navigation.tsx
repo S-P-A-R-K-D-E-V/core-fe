@@ -464,6 +464,13 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             icon: ICONS.ecommerce,
             featureKey: 'commerce.fnb.pos',
           },
+          // KHO NGUYÊN LIỆU F&B (tồn, số ngày còn đủ, số phần món còn pha được, kiểm kê / xuất huỷ).
+          {
+            title: 'Kho nguyên liệu',
+            path: paths.dashboard.fnb.stock,
+            icon: ICONS.product,
+            featureKey: 'commerce.fnb.pos',
+          },
           {
             title: 'Đơn bán hàng',
             path: paths.dashboard.pos.salesOrder.root,

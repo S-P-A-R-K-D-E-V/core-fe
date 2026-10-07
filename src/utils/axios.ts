@@ -209,6 +209,11 @@ export const endpoints = {
     orderCheckout: (id: string) => `/fnb/orders/${id}/checkout`,
     orderCancel: (id: string) => `/fnb/orders/${id}/cancel`,
     ticketPrintResult: (id: string) => `/fnb/kitchen-tickets/${id}/print-result`,
+    // Kho nguyên liệu: định lượng, tồn + số phần món còn pha được, kiểm kê / xuất huỷ.
+    recipes: '/fnb/recipes',
+    recipe: (productId: string) => `/fnb/recipes/${productId}`,
+    stock: '/fnb/stock',
+    stockAdjustments: '/fnb/stock/adjustments',
   },
   salary: {
     list: '/salary-configurations',

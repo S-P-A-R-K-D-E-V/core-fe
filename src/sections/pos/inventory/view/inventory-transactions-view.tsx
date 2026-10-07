@@ -53,6 +53,9 @@ const TYPE_LABELS: Record<string, { label: string; color: 'success' | 'error' | 
   Sale: { label: 'Bán hàng', color: 'info' },
   Return: { label: 'Trả hàng', color: 'default' },
   StockCheck: { label: 'Kiểm kho', color: 'default' },
+  Damage: { label: 'Xuất huỷ', color: 'error' },
+  InternalUse: { label: 'Dùng nội bộ', color: 'warning' },
+  FnbUsage: { label: 'Pha chế', color: 'info' },
 };
 
 // ----------------------------------------------------------------------

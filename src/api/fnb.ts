@@ -7,6 +7,10 @@ import type {
   IDiningArea,
   IDiningTable,
   IFnbQuickNote,
+  IFnbRecipeBook,
+  IFnbRecipeLine,
+  FnbStockReason,
+  IFnbStockReport,
   IOrderCommandResult,
 } from 'src/types/fnb';
 
@@ -119,4 +123,32 @@ export async function getFnbOrder(orderId: string): Promise<IOpenOrder> {
 export async function runFnbCommand(command: FnbCommand): Promise<IOrderCommandResult> {
   const res = await axios.request<IOrderCommandResult>({ method: command.method, url: command.path, data: command.body });
   return res.data;
+}
+
+// ── Kho nguyên liệu ─────────────────────────────────────────────────────
+
+export async function getFnbRecipes(branchId: string): Promise<IFnbRecipeBook> {
+  const response = await axios.get<IFnbRecipeBook>(endpoints.fnb.recipes, { params: { branchId } });
+  return response.data;
+}
+
+export async function setFnbRecipe(productId: string, lines: IFnbRecipeLine[]): Promise<void> {
+  await axios.put(endpoints.fnb.recipe(productId), { lines });
+}
+
+export async function getFnbStock(branchId: string): Promise<IFnbStockReport> {
+  const response = await axios.get<IFnbStockReport>(endpoints.fnb.stock, { params: { branchId } });
+  return response.data;
+}
+
+/** Kiểm kê (Count: quantity = số đếm) hoặc xuất huỷ (quantity = lượng bỏ đi). Gửi lại cùng clientRequestId không ghi hai lần. */
+export async function adjustFnbStock(data: {
+  branchId: string;
+  clientRequestId: string;
+  reason: FnbStockReason;
+  note?: string | null;
+  lines: { productId: string; quantity: number }[];
+}): Promise<{ replayed: boolean }> {
+  const response = await axios.post<{ replayed: boolean }>(endpoints.fnb.stockAdjustments, data);
+  return response.data;
 }

@@ -331,3 +331,85 @@ export interface IFnbSync {
   tickets: IKitchenTicket[];
   hasMore: boolean;
 }
+
+// ── Kho nguyên liệu (định lượng, tồn, số phần món còn pha được) ─────────
+
+export type FnbServiceScope = 'All' | 'DineIn' | 'Takeaway';
+export type FnbItemKind = 'Goods' | 'Ingredient' | 'SemiFinished' | 'Dish';
+
+export interface IFnbRecipeLine {
+  ingredientId: string;
+  /** Lượng theo đơn vị gốc của nguyên liệu cho một phần. */
+  quantity: number;
+  serviceScope: FnbServiceScope;
+}
+
+export interface IFnbRecipeItem {
+  productId: string;
+  dishId: string | null;
+  name: string;
+  variantName: string | null;
+  isTopping: boolean;
+  price: number;
+  lines: IFnbRecipeLine[];
+  /** Giá vốn một phần theo giá vốn nguyên liệu hiện tại (null = chưa có định lượng / giá vốn). */
+  costDineIn: number | null;
+  costTakeaway: number | null;
+}
+
+export interface IFnbIngredientOption {
+  id: string;
+  code: string;
+  name: string;
+  unit: string | null;
+  kind: FnbItemKind;
+  unitCost: number | null;
+  onHand: number;
+}
+
+export interface IFnbRecipeBook {
+  items: IFnbRecipeItem[];
+  ingredients: IFnbIngredientOption[];
+}
+
+export type FnbStockStatus = 'out' | 'low' | 'ok' | 'idle';
+
+export interface IFnbStockIngredient {
+  id: string;
+  code: string;
+  name: string;
+  unit: string | null;
+  kind: FnbItemKind;
+  onHand: number;
+  unitCost: number | null;
+  value: number;
+  /** Lượng dùng pha chế (ròng) trong usageDays ngày. */
+  used: number;
+  daysLeft: number | null;
+  usedInDishes: number;
+  status: FnbStockStatus;
+}
+
+export interface IFnbDishAvailability {
+  productId: string;
+  name: string;
+  variantName: string | null;
+  isTopping: boolean;
+  /** Nếu chỉ pha riêng món này. */
+  maxPortions: number;
+  /** Chia nguyên liệu dùng chung theo tỷ lệ bán gần đây. */
+  estimatedPortions: number;
+  soldUnits: number;
+  limitingIngredientId: string | null;
+  limitingIngredientName: string | null;
+}
+
+export interface IFnbStockReport {
+  generatedAt: string;
+  usageDays: number;
+  salesDays: number;
+  ingredients: IFnbStockIngredient[];
+  dishes: IFnbDishAvailability[];
+}
+
+export type FnbStockReason = 'Count' | 'Damaged' | 'Expired' | 'Other';
