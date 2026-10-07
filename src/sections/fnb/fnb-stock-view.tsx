@@ -30,8 +30,10 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import TableContainer from '@mui/material/TableContainer';
 import InputAdornment from '@mui/material/InputAdornment';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
 
 import { fCurrency } from 'src/utils/format-number';
 import { apiErrorMessage } from 'src/utils/api-error';
@@ -75,6 +77,7 @@ export default function FnbStockView() {
   const [counted, setCounted] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [disposeOpen, setDisposeOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     Promise.all([getBranchLocations(), getCurrentUser().catch(() => null)])
@@ -107,6 +110,14 @@ export default function FnbStockView() {
     }
   }, [branchId, enqueueSnackbar]);
 
+  /** Bấm làm mới: có vòng quay và báo đã cập nhật (số không đổi vẫn biết là đã tải lại). */
+  const refresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+    enqueueSnackbar('Đã cập nhật kho nguyên liệu', { variant: 'info' });
+  };
+
   useEffect(() => {
     setReport(null);
     setCounting(false);
@@ -125,6 +136,8 @@ export default function FnbStockView() {
   const lowIngredients = ingredients.filter((i) => i.status === 'out' || i.status === 'low').length;
   const lowDishes = (report?.dishes ?? []).filter((d) => d.maxPortions <= LOW_PORTIONS).length;
   const stockValue = ingredients.reduce((s, i) => s + i.value, 0);
+  const noRecipes = !!report && report.dishes.length === 0;
+  const updatedAt = report ? new Date(report.generatedAt).toLocaleTimeString('vi-VN') : '';
 
   const saveCount = async () => {
     if (pending.length === 0) return;
@@ -180,6 +193,26 @@ export default function FnbStockView() {
 
       {report && (
         <Stack spacing={2}>
+          {noRecipes && (
+            <Alert
+              severity="warning"
+              action={
+                canEdit ? (
+                  <Button
+                    color="inherit"
+                    size="small"
+                    component={RouterLink}
+                    href={`${paths.dashboard.fnb.root}?tab=recipes`}
+                  >
+                    Khai định lượng
+                  </Button>
+                ) : undefined
+              }
+            >
+              Chưa món nào có định lượng nên bán hàng <b>chưa trừ nguyên liệu</b> và chưa ước được số phần món. Khai lượng
+              nguyên liệu cho từng size / món ở Thiết lập F&amp;B › Định lượng — đơn gửi bar từ lúc đó mới trừ kho.
+            </Alert>
+          )}
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <Summary title="Giá trị tồn nguyên liệu" value={fCurrency(stockValue)} />
             <Summary
@@ -199,8 +232,11 @@ export default function FnbStockView() {
               <Tab value="ingredients" label={`Nguyên liệu (${ingredients.length})`} />
               <Tab value="dishes" label={`Món còn pha được (${report.dishes.length})`} />
             </Tabs>
-            <IconButton onClick={load} disabled={counting}>
-              <Iconify icon="solar:refresh-bold" />
+            <Typography variant="caption" color="text.secondary">
+              Cập nhật {updatedAt}
+            </Typography>
+            <IconButton onClick={refresh} disabled={counting || refreshing} title="Tải lại">
+              {refreshing ? <CircularProgress size={20} /> : <Iconify icon="solar:refresh-bold" />}
             </IconButton>
             {canEdit && tab === 'ingredients' && !counting && (
               <>

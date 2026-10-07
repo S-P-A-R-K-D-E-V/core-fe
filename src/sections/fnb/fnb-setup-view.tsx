@@ -42,6 +42,13 @@ type TabValue = (typeof TABS)[number]['value'];
 export default function FnbSetupView() {
   const settings = useSettingsContext();
   const [tab, setTab] = useState<TabValue>('floor');
+
+  // ?tab=recipes (link từ Kho nguyên liệu) — đọc trên trình duyệt, không dùng useSearchParams (cần Suspense khi build).
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('tab');
+    const match = TABS.find((t) => t.value === wanted);
+    if (match) setTab(match.value);
+  }, []);
   const [branches, setBranches] = useState<IBranchLocation[] | null>(null);
   const [branchId, setBranchId] = useState('');
 
