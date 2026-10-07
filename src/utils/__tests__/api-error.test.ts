@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { hasApiErrorCode } from '../api-error';
+import { apiErrorMessage, hasApiErrorCode } from '../api-error';
 
 const CODE = 'Auth.ProviderAlreadyLinked';
 
@@ -23,5 +23,17 @@ describe('hasApiErrorCode', () => {
     expect(hasApiErrorCode('Something went wrong', CODE)).toBe(false);
     expect(hasApiErrorCode(null, CODE)).toBe(false);
     expect(hasApiErrorCode(undefined, CODE)).toBe(false);
+  });
+});
+
+describe('apiErrorMessage', () => {
+  it('không in trang HTML (đường không được proxy sang BE) ra toast', () => {
+    expect(apiErrorMessage('<!DOCTYPE html><html><title>404</title></html>', 'Không tải được')).toBe('Không tải được');
+    expect(apiErrorMessage('  <html></html>', 'Lỗi')).toBe('Lỗi');
+  });
+
+  it('giữ thông báo dạng chữ và mô tả của Problem', () => {
+    expect(apiErrorMessage('Something went wrong', 'Lỗi')).toBe('Something went wrong');
+    expect(apiErrorMessage({ title: 'Không tìm thấy chi nhánh.', status: 404 }, 'Lỗi')).toBe('Không tìm thấy chi nhánh.');
   });
 });

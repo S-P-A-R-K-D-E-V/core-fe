@@ -7,7 +7,9 @@
 
 export function apiErrorMessage(err: any, fallback: string): string {
   if (!err) return fallback;
-  if (typeof err === 'string') return err;
+  // Đường không được proxy sang BE (next.config.mjs BACKEND_API_PREFIXES) → body là trang HTML của Next: không in ra
+  // toast.
+  if (typeof err === 'string') return /^\s*</.test(err) ? fallback : err;
 
   if (err.errors && typeof err.errors === 'object') {
     const first = Object.values(err.errors as Record<string, unknown>).flat()[0];
