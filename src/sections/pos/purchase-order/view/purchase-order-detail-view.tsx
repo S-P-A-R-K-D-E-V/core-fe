@@ -25,7 +25,7 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { fCurrency } from 'src/utils/format-number';
-import { fDateTime } from 'src/utils/format-time';
+import { fDate, fDateTime } from 'src/utils/format-time';
 
 import { useSnackbar } from 'src/components/snackbar';
 import Iconify from 'src/components/iconify';
@@ -39,6 +39,8 @@ import {
   setPurchaseOrderPaidBy,
 } from 'src/api/purchase-orders';
 import { getShareholders } from 'src/api/shareholders';
+
+const fmtQty = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 4 });
 
 // ----------------------------------------------------------------------
 
@@ -347,6 +349,7 @@ export default function PurchaseOrderDetailView({ id }: Props) {
                 <TableCell>Sản phẩm</TableCell>
                 <TableCell>SKU</TableCell>
                 <TableCell align="right">SL đặt</TableCell>
+                <TableCell>ĐVT</TableCell>
                 <TableCell align="right">Đã nhận</TableCell>
                 {receiveMode && <TableCell align="right" width={120}>Nhận lần này</TableCell>}
                 <TableCell align="right">Đơn giá</TableCell>
@@ -357,17 +360,31 @@ export default function PurchaseOrderDetailView({ id }: Props) {
             </TableHead>
             <TableBody>
               {(order.items || []).map((item: IPurchaseOrderItem) => {
-                const remaining = item.quantity - item.receivedQuantity;
+                // Số lẻ được (M7 bước 1): làm tròn 4 chữ số để tránh 0,30000000004.
+                const remaining = Math.round((item.quantity - item.receivedQuantity) * 10000) / 10000;
+                const factor = item.conversionFactor ?? 1;
                 return (
                   <TableRow key={item.id}>
                     <TableCell>
                       {item.productName}
                       {item.variantName && <Typography variant="caption" color="text.secondary"> ({item.variantName})</Typography>}
+                      {factor !== 1 && (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          = {fmtQty(item.baseQuantity ?? item.quantity * factor)} đơn vị gốc
+                          {item.baseUnitCost ? ` · ${fCurrency(item.baseUnitCost)}/đơn vị gốc` : ''}
+                        </Typography>
+                      )}
+                      {item.expiryDate && (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          Hạn dùng: {fDate(item.expiryDate)}
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell>{item.productCode}</TableCell>
-                    <TableCell align="right">{item.quantity}</TableCell>
+                    <TableCell align="right">{fmtQty(item.quantity)}</TableCell>
+                    <TableCell>{item.unitName || ''}</TableCell>
                     <TableCell align="right">
-                      {item.receivedQuantity}
+                      {fmtQty(item.receivedQuantity)}
                       {item.receivedQuantity >= item.quantity && (
                         <Iconify icon="eva:checkmark-circle-2-fill" sx={{ ml: 0.5, color: 'success.main', width: 16 }} />
                       )}
@@ -379,13 +396,13 @@ export default function PurchaseOrderDetailView({ id }: Props) {
                           type="number"
                           value={receiveQuantities[item.id] || 0}
                           onChange={(e) => {
-                            const val = Math.max(0, Math.min(remaining, Number(e.target.value)));
+                            const val = Math.max(0, Math.min(remaining, Number(e.target.value) || 0));
                             setReceiveQuantities((prev) => ({ ...prev, [item.id]: val }));
                           }}
-                          inputProps={{ min: 0, max: remaining }}
-                          sx={{ width: 80 }}
+                          inputProps={{ min: 0, max: remaining, step: 'any' }}
+                          sx={{ width: 96 }}
                           disabled={remaining <= 0}
-                          helperText={remaining > 0 ? `Còn ${remaining}` : 'Đủ'}
+                          helperText={remaining > 0 ? `Còn ${fmtQty(remaining)}` : 'Đủ'}
                         />
                       </TableCell>
                     )}

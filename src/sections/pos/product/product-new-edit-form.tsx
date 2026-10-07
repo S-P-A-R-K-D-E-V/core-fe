@@ -49,6 +49,7 @@ import { getAllCategories } from 'src/api/categories';
 import { getAllUnitOfMeasures } from 'src/api/unit-of-measures';
 import { getAllVariantAttributes } from 'src/api/variant-attributes';
 
+import ProductUnitsCard from './product-units-card';
 import CategoryTreeDialog from './category-tree-dialog';
 import UnitAttributeDialog, {
   UnitConversionFormItem,
@@ -611,6 +612,9 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
           </Box>
         </AccordionDetails>
       </Accordion>
+
+      {/* Đơn vị gốc + quy đổi (M7 bước 1) — cần id hàng nên chỉ hiện khi sửa hàng đã có */}
+      {currentProduct?.id && <ProductUnitsCard productId={currentProduct.id} />}
 
       {/* Stock section */}
       <Accordion defaultExpanded>

@@ -39,6 +39,9 @@ import { useRouter } from 'src/routes/hooks';
 import { useBoolean } from 'src/hooks/use-boolean';
 
 import { fCurrency } from 'src/utils/format-number';
+import { apiErrorMessage } from 'src/utils/api-error';
+
+import { useAuthContext } from 'src/auth/hooks';
 
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
@@ -46,7 +49,7 @@ import FormProvider, { RHFTextField, RHFSelect, RHFDateTimePicker } from 'src/co
 
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { ISupplier, IWarehouse, IProduct, IProductListItem, IProductVariant, IPurchaseOrder, IShareholder } from 'src/types/corecms-api';
+import { ISupplier, IWarehouse, IProduct, IProductUnits, IProductListItem, IProductVariant, IPurchaseOrder, IShareholder } from 'src/types/corecms-api';
 import {
   createPurchaseOrder,
   updatePurchaseOrder,
@@ -56,9 +59,10 @@ import {
 } from 'src/api/purchase-orders';
 import { getAllSuppliers } from 'src/api/suppliers';
 import { getAllWarehouses } from 'src/api/warehouses';
-import { getAllProducts } from 'src/api/products';
+import { getAllProducts, getProductUnits, getPurchaseHistory } from 'src/api/products';
 import { getShareholders } from 'src/api/shareholders';
 
+import { lineNetOf } from './purchase-line';
 import PurchaseOrderQuickCreateProduct from './purchase-order-quick-create-product';
 import PurchaseOrderQuickCreateSupplier from './purchase-order-quick-create-supplier';
 import PurchaseOrderVariantPicker from './purchase-order-variant-picker';
@@ -86,7 +90,8 @@ const SEARCH_MIN_CHARS = 1;
 const ItemSchema = Yup.object().shape({
   productId: Yup.string().required('Chọn sản phẩm'),
   productVariantId: Yup.string().optional().default(''),
-  quantity: Yup.number().min(1, 'Tối thiểu 1').required('Bắt buộc'),
+  // Số lẻ được (0,5 thùng, 2,5 kg) — M7 bước 1.
+  quantity: Yup.number().moreThan(0, 'Phải lớn hơn 0').required('Bắt buộc'),
   unitPrice: Yup.number().min(0).required('Bắt buộc'),
   vatRate: Yup.number().min(0).max(100).default(0),
   discountType: Yup.string().oneOf(['amount', 'percent']).default('amount'),
@@ -95,6 +100,16 @@ const ItemSchema = Yup.object().shape({
   _productName: Yup.string().default(''),
   _productCode: Yup.string().default(''),
   _attributes: Yup.string().default(''),
+  // Đơn vị nhập + hệ số về đơn vị gốc (GET products/{id}/units); trống = đơn vị gốc.
+  unitId: Yup.string().default(''),
+  unitName: Yup.string().default(''),
+  conversionFactor: Yup.number().default(1),
+  // Thành tiền trước VAT nhập tay (hoá đơn chỉ ghi thành tiền) — có thì thắng đơn giá.
+  lineTotal: Yup.number().nullable().default(null),
+  expiryDate: Yup.string().default(''),
+  _rowKey: Yup.string().default(''),
+  _baseUnitName: Yup.string().default(''),
+  _itemKind: Yup.string().default(''),
 });
 
 const Schema = Yup.object().shape({
@@ -120,7 +135,23 @@ const EMPTY_ITEM = {
   _productName: '',
   _productCode: '',
   _attributes: '',
+  unitId: '',
+  unitName: '',
+  conversionFactor: 1,
+  lineTotal: null as number | null,
+  expiryDate: '',
+  _rowKey: '',
+  _baseUnitName: '',
+  _itemKind: '',
 };
+
+/** Khoá dòng để gắn đơn vị / giá mặc định (tải bất đồng bộ) đúng dòng vừa thêm. */
+const newRowKey = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const fmtQty = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 4 });
+
+/** Ô số đang xoá trắng giữ chuỗi rỗng (để gõ lại), còn lại là số. */
+const toNumberOrBlank = (value: string): any => (value === '' ? '' : Number(value));
 
 type Props = {
   currentPurchaseOrder?: IPurchaseOrder;
@@ -162,6 +193,9 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
 
   // Product search
   const [productSearchInput, setProductSearchInput] = useState('');
+
+  // Tổng in trên hoá đơn nhà cung cấp — để đối chiếu với tổng phiếu.
+  const [invoiceTotal, setInvoiceTotal] = useState('');
 
   useEffect(() => {
     Promise.all([getAllSuppliers(), getAllWarehouses()])
@@ -294,6 +328,14 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
             : item.productName,
           _productCode: item.productCode || '',
           _attributes: '',
+          unitId: item.unitId || '',
+          unitName: item.unitName || '',
+          conversionFactor: item.conversionFactor || 1,
+          lineTotal: null,
+          expiryDate: item.expiryDate || '',
+          _rowKey: item.id,
+          _baseUnitName: '',
+          _itemKind: '',
         })),
       };
     }
@@ -321,6 +363,68 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
   } = methods;
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+
+  // ---------- Đơn vị nhập + giá mặc định (M7 bước 1) ----------
+  // Lịch sử giá nhập có giá vốn nên chỉ chủ / quản lý xem được (BE 403 với nhân viên).
+  const { user } = useAuthContext();
+  const canSeeCost = ['Admin', 'Manager'].some((r) => user?.role === r || (user?.roles ?? []).includes(r));
+  const [unitsByProduct, setUnitsByProduct] = useState<Record<string, IProductUnits>>({});
+  const unitsRequests = useRef<Record<string, Promise<IProductUnits | null>>>({});
+
+  const loadUnits = useCallback((productId: string) => {
+    if (!unitsRequests.current[productId]) {
+      unitsRequests.current[productId] = getProductUnits(productId)
+        .then((units) => {
+          setUnitsByProduct((prev) => ({ ...prev, [productId]: units }));
+          return units;
+        })
+        .catch(() => null);
+    }
+    return unitsRequests.current[productId];
+  }, []);
+
+  /**
+   * Gắn đơn vị nhập mặc định (đơn vị đánh dấu "mặc định khi nhập", không có thì đơn vị gốc) và giá nhập mặc định cho dòng
+   * vừa thêm: giá nhập gần nhất cùng đơn vị → giá nhập gần nhất theo đơn vị gốc × hệ số → giá vốn × hệ số. Không bao giờ
+   * lấy giá bán. Chỉ đổi giá khi người dùng chưa sửa (giá còn đúng số đặt lúc thêm).
+   */
+  const applyLineDefaults = useCallback(
+    async (rowKey: string, productId: string, baseCost: number, placeholderPrice: number) => {
+      const units = await loadUnits(productId);
+      const option = units?.units.find((u) => u.isDefaultPurchase) ?? units?.units[0];
+      const factor = option?.factor ?? 1;
+
+      let price = Math.round(baseCost * factor * 100) / 100;
+      if (canSeeCost) {
+        try {
+          const history = await getPurchaseHistory(productId, 10);
+          const sameUnit = history.find((h) => (h.unitId ?? null) === (option?.unitId ?? null));
+          if (sameUnit) price = sameUnit.unitPrice;
+          else if (history[0]?.baseUnitCost) price = Math.round(history[0].baseUnitCost * factor * 100) / 100;
+        } catch {
+          // Không có lịch sử → giữ giá theo giá vốn.
+        }
+      }
+
+      const items = getValues('items') || [];
+      const index = items.findIndex((it: any) => it._rowKey === rowKey);
+      if (index < 0) return;
+      setValue(`items.${index}.unitId`, option?.unitId ?? '');
+      setValue(`items.${index}.unitName`, option?.name ?? '');
+      setValue(`items.${index}.conversionFactor`, factor);
+      setValue(`items.${index}._baseUnitName`, units?.baseUnitName ?? '');
+      if (Number(items[index].unitPrice) === placeholderPrice) setValue(`items.${index}.unitPrice`, price);
+    },
+    [loadUnits, canSeeCost, getValues, setValue]
+  );
+
+  // Phiếu đang sửa / bản nháp khôi phục: tải đơn vị của các hàng đã có.
+  useEffect(() => {
+    (getValues('items') || []).forEach((it: any) => {
+      if (it.productId) loadUnits(it.productId);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fields.length]);
 
   const watchItems = watch('items');
   const watchDiscount = watch('discountAmount');
@@ -355,16 +459,12 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
     return item.discountAmount || 0;
   }, []);
 
-  const subTotal = (watchItems || []).reduce((sum, item) => {
-    const gross = (item.quantity || 0) * (item.unitPrice || 0);
-    return sum + gross - getLineDiscount(item);
-  }, 0);
+  const subTotal = (watchItems || []).reduce((sum, item) => sum + lineNetOf(item), 0);
 
-  const vatTotal = (watchItems || []).reduce((sum, item) => {
-    const gross = (item.quantity || 0) * (item.unitPrice || 0);
-    const lineNet = gross - getLineDiscount(item);
-    return sum + lineNet * ((item.vatRate || 0) / 100);
-  }, 0);
+  const vatTotal = (watchItems || []).reduce(
+    (sum, item) => sum + lineNetOf(item) * ((item.vatRate || 0) / 100),
+    0
+  );
 
   // Order-level discount
   const orderDiscount = useMemo(() => {
@@ -379,9 +479,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
   const buildPayload = (data: any) => {
     // Compute actual order-level discount amount
     const itemsGross = (data.items || []).reduce((s: number, it: any) => {
-      const g = (it.quantity || 0) * (it.unitPrice || 0);
-      const d = it.discountType === 'percent' ? g * ((it.discountAmount || 0) / 100) : (it.discountAmount || 0);
-      const net = g - d;
+      const net = lineNetOf(it);
       return s + net + net * ((it.vatRate || 0) / 100);
     }, 0);
     const orderDiscAmt = data.discountType === 'percent'
@@ -408,6 +506,12 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
           vatRate: item.vatRate || 0,
           discountAmount: Math.round(discAmt * 100) / 100,
           note: item.note || undefined,
+          unitId: item.unitId || undefined,
+          lineTotal:
+            item.lineTotal !== null && item.lineTotal !== undefined && item.lineTotal !== ''
+              ? Number(item.lineTotal)
+              : undefined,
+          expiryDate: item.expiryDate || undefined,
         };
       }),
     };
@@ -429,7 +533,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
       }
     } catch (error) {
       console.error(error);
-      enqueueSnackbar('Có lỗi xảy ra', { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(error, 'Có lỗi xảy ra'), { variant: 'error' });
     }
   });
 
@@ -483,25 +587,29 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
         return;
       }
 
+      // Giá nhập mặc định theo giá vốn (đơn vị gốc), rồi applyLineDefaults đổi sang giá nhập gần nhất / đơn vị nhập.
+      const rowKey = newRowKey();
+      const placeholder = option.costPrice || 0;
       append({
+        ...EMPTY_ITEM,
         productId: option.product.id,
         productVariantId: option.variant?.id || '',
         quantity: 1,
-        unitPrice: option.sellingPrice,
+        unitPrice: placeholder,
         vatRate: option.vatRate,
-        discountType: 'amount',
-        discountAmount: 0,
-        note: '',
         _productName: option.label,
         _productCode: option.code,
         _attributes: option.attributes,
+        _rowKey: rowKey,
+        _itemKind: option.product.itemKind || '',
       });
+      void applyLineDefaults(rowKey, option.product.id, option.costPrice || 0, placeholder);
       // Jump to last page
       const newTotal = fields.length + 1;
       const lastPage = Math.floor((newTotal - 1) / itemsRowsPerPage);
       setItemsPage(lastPage);
     },
-    [append, fields.length, itemsRowsPerPage, getValues, setValue]
+    [append, fields.length, itemsRowsPerPage, getValues, setValue, applyLineDefaults]
   );
 
   // Quick-create product callback → auto-add to order
@@ -519,24 +627,26 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
       }
 
       // Auto-add this new product to the order
+      const rowKey = newRowKey();
+      const placeholder = newProduct.costPrice ?? 0;
       append({
+        ...EMPTY_ITEM,
         productId: newProduct.id,
         productVariantId: '',
         quantity: 1,
-        unitPrice: newProduct.sellingPrice ?? newProduct.basePrice ?? 0,
+        unitPrice: placeholder,
         vatRate: newProduct.vatRate ?? 0,
-        discountType: 'amount',
-        discountAmount: 0,
-        note: '',
         _productName: newProduct.name,
         _productCode: newProduct.sku || newProduct.code || '',
-        _attributes: '',
+        _rowKey: rowKey,
+        _itemKind: newProduct.itemKind || '',
       });
+      void applyLineDefaults(rowKey, newProduct.id, newProduct.costPrice ?? 0, placeholder);
       const newTotal = fields.length + 1;
       const lastPage = Math.floor((newTotal - 1) / itemsRowsPerPage);
       setItemsPage(lastPage);
     },
-    [append, fields.length, itemsRowsPerPage, getValues, setValue]
+    [append, fields.length, itemsRowsPerPage, getValues, setValue, applyLineDefaults]
   );
 
   // Quick-create supplier callback
@@ -575,19 +685,22 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
           // Merge: add quantity to existing row
           setValue(`items.${dupIndex}.quantity`, (currentItems[dupIndex].quantity || 0) + sel.quantity);
         } else {
+          const rowKey = newRowKey();
+          const baseCost = sel.variant?.costPrice ?? sel.product.costPrice ?? 0;
           append({
+            ...EMPTY_ITEM,
             productId: sel.product.id,
             productVariantId: sel.variant?.id || '',
             quantity: sel.quantity,
-            unitPrice: sel.sellingPrice,
+            unitPrice: baseCost,
             vatRate: sel.product.vatRate ?? 0,
-            discountType: 'amount',
-            discountAmount: 0,
-            note: '',
             _productName: sel.variant ? `${sel.product.name} — ${sel.variant.name || sel.variant.sku}` : sel.label,
             _productCode: sel.sku,
             _attributes: sel.attributes,
+            _rowKey: rowKey,
+            _itemKind: sel.product.itemKind || '',
           });
+          void applyLineDefaults(rowKey, sel.product.id, baseCost, baseCost);
           addedCount += 1;
         }
       });
@@ -598,7 +711,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
         setItemsPage(lastPage);
       }
     },
-    [append, fields.length, itemsRowsPerPage, getValues, setValue]
+    [append, fields.length, itemsRowsPerPage, getValues, setValue, applyLineDefaults]
   );
 
   // Paginated slice of items
@@ -724,10 +837,11 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
                       <TableCell width={36}>STT</TableCell>
                       <TableCell width={100}>Mã hàng</TableCell>
                       <TableCell sx={{ minWidth: 200 }}>Tên hàng</TableCell>
-                      <TableCell width={70} align="center">SL</TableCell>
+                      <TableCell width={84} align="center">SL</TableCell>
+                      <TableCell width={110}>ĐVT</TableCell>
                       <TableCell width={110} align="right">Đơn giá</TableCell>
                       <TableCell width={150} align="right">Chiết khấu</TableCell>
-                      <TableCell width={120} align="right">Thành tiền</TableCell>
+                      <TableCell width={130} align="right">Thành tiền</TableCell>
                       <TableCell width={72} />
                     </TableRow>
                   </TableHead>
@@ -735,12 +849,22 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
                     {paginatedFields.map((field, pageIndex) => {
                       const realIndex = paginatedStart + pageIndex;
                       const item = watchItems?.[realIndex];
-                      const gross = (item?.quantity || 0) * (item?.unitPrice || 0);
-                      const lineDiscAmt = item?.discountType === 'percent'
-                        ? gross * ((item?.discountAmount || 0) / 100)
-                        : (item?.discountAmount || 0);
-                      const lineNet = gross - lineDiscAmt;
+                      const lineNet = lineNetOf(item);
                       const lineVat = lineNet * ((item?.vatRate || 0) / 100);
+                      const lineDiscAmt = item?.discountType === 'percent'
+                        ? (Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0) * ((Number(item?.discountAmount) || 0) / 100)
+                        : Number(item?.discountAmount) || 0;
+                      const productUnits = item?.productId ? unitsByProduct[item.productId] : undefined;
+                      const factor = Number(item?.conversionFactor) || 1;
+                      const baseName = item?._baseUnitName || productUnits?.baseUnitName || '';
+                      const baseQty = (Number(item?.quantity) || 0) * factor;
+                      const showConversion = factor !== 1 && !!baseName;
+                      // Hạn dùng chỉ hỏi với nguyên liệu / bán thành phẩm hoặc hàng có quy đổi đơn vị.
+                      const showExpiry =
+                        item?._itemKind === 'Ingredient' ||
+                        item?._itemKind === 'SemiFinished' ||
+                        (productUnits?.units.length ?? 0) > 1 ||
+                        !!item?.expiryDate;
 
                       const productName = item?._productName || '';
                       const productCode = item?._productCode || '';
@@ -773,26 +897,82 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
                                   {productAttrs}
                                 </Typography>
                               )}
+                              {showConversion && baseQty > 0 && (
+                                <Typography variant="caption" color="text.secondary" noWrap>
+                                  = {fmtQty(baseQty)} {baseName} · {fCurrency(lineNet / baseQty)}/{baseName}
+                                </Typography>
+                              )}
+                              {showExpiry && (
+                                <TextField
+                                  type="date"
+                                  size="small"
+                                  label="Hạn dùng"
+                                  value={item?.expiryDate || ''}
+                                  onChange={(e) => setValue(`items.${realIndex}.expiryDate`, e.target.value)}
+                                  InputLabelProps={{ shrink: true }}
+                                  sx={{ mt: 0.75, maxWidth: 170 }}
+                                />
+                              )}
                             </Stack>
                           </TableCell>
 
-                          {/* SL */}
+                          {/* SL — số lẻ được; sửa số lượng / đơn giá thì bỏ thành tiền nhập tay */}
                           <TableCell align="center">
-                            <RHFTextField
-                              name={`items.${realIndex}.quantity`}
+                            <TextField
                               size="small"
                               type="number"
-                              inputProps={{ min: 1, style: { textAlign: 'center' } }}
+                              value={item?.quantity ?? ''}
+                              onChange={(e) => {
+                                setValue(`items.${realIndex}.quantity`, toNumberOrBlank(e.target.value));
+                                setValue(`items.${realIndex}.lineTotal`, null);
+                              }}
+                              inputProps={{ min: 0, step: 'any', style: { textAlign: 'center' } }}
                             />
+                          </TableCell>
+
+                          {/* ĐVT — đơn vị nhập; đổi đơn vị thì giữ giá theo đơn vị gốc */}
+                          <TableCell>
+                            {productUnits && productUnits.units.length > 1 ? (
+                              <TextField
+                                select
+                                size="small"
+                                value={item?.unitId ?? ''}
+                                onChange={(e) => {
+                                  const next = productUnits.units.find((u) => (u.unitId ?? '') === e.target.value);
+                                  if (!next) return;
+                                  const basePrice = (Number(item?.unitPrice) || 0) / factor;
+                                  setValue(`items.${realIndex}.unitId`, next.unitId ?? '');
+                                  setValue(`items.${realIndex}.unitName`, next.name);
+                                  setValue(`items.${realIndex}.conversionFactor`, next.factor);
+                                  setValue(`items.${realIndex}.unitPrice`, Math.round(basePrice * next.factor * 100) / 100);
+                                  setValue(`items.${realIndex}.lineTotal`, null);
+                                }}
+                                sx={{ minWidth: 96 }}
+                              >
+                                {productUnits.units.map((u) => (
+                                  <MenuItem key={u.unitId ?? 'base'} value={u.unitId ?? ''}>
+                                    {u.name}
+                                  </MenuItem>
+                                ))}
+                              </TextField>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                {item?.unitName || productUnits?.baseUnitName || ''}
+                              </Typography>
+                            )}
                           </TableCell>
 
                           {/* Đơn giá */}
                           <TableCell align="right">
-                            <RHFTextField
-                              name={`items.${realIndex}.unitPrice`}
+                            <TextField
                               size="small"
                               type="number"
-                              inputProps={{ min: 0, style: { textAlign: 'right' } }}
+                              value={item?.unitPrice ?? ''}
+                              onChange={(e) => {
+                                setValue(`items.${realIndex}.unitPrice`, toNumberOrBlank(e.target.value));
+                                setValue(`items.${realIndex}.lineTotal`, null);
+                              }}
+                              inputProps={{ min: 0, step: 'any', style: { textAlign: 'right' } }}
                             />
                           </TableCell>
 
@@ -819,11 +999,27 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
                             </Stack>
                           </TableCell>
 
-                          {/* Thành tiền */}
+                          {/* Thành tiền trước VAT — sửa được (hoá đơn chỉ ghi thành tiền): đơn giá tính lại */}
                           <TableCell align="right">
-                            <Typography variant="body2" fontWeight="bold">
-                              {fCurrency(lineNet + lineVat)}
-                            </Typography>
+                            <TextField
+                              size="small"
+                              type="number"
+                              value={Math.round(lineNet * 100) / 100}
+                              onChange={(e) => {
+                                const total = Number(e.target.value) || 0;
+                                const qty = Number(item?.quantity) || 0;
+                                setValue(`items.${realIndex}.lineTotal`, total);
+                                if (qty > 0) {
+                                  setValue(`items.${realIndex}.unitPrice`, Math.round(((total + lineDiscAmt) / qty) * 100) / 100);
+                                }
+                              }}
+                              inputProps={{ min: 0, step: 'any', style: { textAlign: 'right', fontWeight: 600 } }}
+                            />
+                            {lineVat > 0 && (
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                + VAT {fCurrency(lineVat)}
+                              </Typography>
+                            )}
                           </TableCell>
 
                           {/* Actions: variant picker + delete */}
@@ -851,7 +1047,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
 
                     {fields.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                        <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
                           <Typography variant="body2" color="text.secondary">
                             Tìm và thêm sản phẩm ở thanh tìm kiếm phía trên
                           </Typography>
@@ -997,6 +1193,27 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
                       {fCurrency(grandTotal)}
                     </Typography>
                   </Stack>
+
+                  {/* Đối chiếu với tổng in trên hoá đơn giấy — chỉ để kiểm tra, không gửi lên máy chủ */}
+                  <TextField
+                    size="small"
+                    type="number"
+                    label="Tổng theo hoá đơn (để đối chiếu)"
+                    value={invoiceTotal}
+                    onChange={(e) => setInvoiceTotal(e.target.value)}
+                    inputProps={{ min: 0, step: 'any' }}
+                  />
+                  {invoiceTotal !== '' && Math.abs(Number(invoiceTotal) - grandTotal) >= 1 && (
+                    <Alert severity="warning" sx={{ py: 0 }}>
+                      Lệch {fCurrency(Math.abs(Number(invoiceTotal) - grandTotal))} so với hoá đơn — kiểm tra lại số lượng,
+                      đơn vị hoặc thành tiền từng dòng.
+                    </Alert>
+                  )}
+                  {invoiceTotal !== '' && Math.abs(Number(invoiceTotal) - grandTotal) < 1 && (
+                    <Typography variant="caption" color="success.main">
+                      Khớp với hoá đơn.
+                    </Typography>
+                  )}
                 </Stack>
               </Card>
 

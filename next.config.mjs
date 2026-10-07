@@ -15,7 +15,7 @@ const BACKEND_API_PREFIXES = [
   'payroll', 'payroll-cycles',
   'holiday-policies', 'penalty-policies',
   'kiotviet', 'notification', 'notifications', 'user-tours',
-  'categories', 'unit-of-measures', 'variant-attributes', 'products',
+  'categories', 'unit-of-measures', 'units', 'variant-attributes', 'products',
   'warehouses', 'inventory', 'suppliers', 'purchase-orders',
   'customers', 'sales-orders', 'bank-accounts', 'payment', 'reports',
   'chatbot', 'messenger', 'expenses', 'shareholders', 'cleaning', 'media-library',

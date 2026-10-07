@@ -410,11 +410,12 @@ export const endpoints = {
     update: (id: string) => `/categories/${id}`,
     delete: (id: string) => `/categories/${id}`,
   },
+  // Đơn vị tính — BE là /units (trước trỏ /unit-of-measures không tồn tại).
   unitOfMeasures: {
-    list: '/unit-of-measures',
-    create: '/unit-of-measures',
-    update: (id: string) => `/unit-of-measures/${id}`,
-    delete: (id: string) => `/unit-of-measures/${id}`,
+    list: '/units',
+    create: '/units',
+    update: (id: string) => `/units/${id}`,
+    delete: (id: string) => `/units/${id}`,
   },
   variantAttributes: {
     list: '/variant-attributes',
@@ -428,6 +429,9 @@ export const endpoints = {
     create: '/products',
     update: (id: string) => `/products/${id}`,
     delete: (id: string) => `/products/${id}`,
+    // Đơn vị gốc + quy đổi; lịch sử giá nhập (M7 bước 1).
+    units: (id: string) => `/products/${id}/units`,
+    purchaseHistory: (id: string) => `/products/${id}/purchase-history`,
   },
   warehouses: {
     list: '/warehouses',

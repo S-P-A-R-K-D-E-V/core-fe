@@ -1,5 +1,8 @@
 import axios, { endpoints } from 'src/utils/axios';
 import {
+  IProductUnits,
+  ISetProductUnitsRequest,
+  IPurchaseHistoryEntry,
   IProduct,
   IProductChild,
   IProductListItem,
@@ -241,6 +244,23 @@ export async function updateProduct(id: string, data: IUpdateProductRequest): Pr
     })),
   };
   await axios.put(endpoints.products.update(id), payload);
+}
+
+/** Đơn vị dùng được của hàng (đơn vị gốc, quy đổi đã khai, đơn vị cùng loại khối lượng / thể tích). */
+export async function getProductUnits(id: string): Promise<IProductUnits> {
+  const response = await axios.get<IProductUnits>(endpoints.products.units(id));
+  return response.data;
+}
+
+/** [Admin/Manager] Đặt đơn vị gốc + thay toàn bộ quy đổi của hàng. */
+export async function setProductUnits(id: string, data: ISetProductUnitsRequest): Promise<void> {
+  await axios.put(endpoints.products.units(id), data);
+}
+
+/** [Admin/Manager] Lịch sử giá nhập của hàng, mới nhất trước. */
+export async function getPurchaseHistory(id: string, limit = 20): Promise<IPurchaseHistoryEntry[]> {
+  const response = await axios.get<IPurchaseHistoryEntry[]>(endpoints.products.purchaseHistory(id), { params: { limit } });
+  return response.data;
 }
 
 export async function deleteProduct(id: string): Promise<void> {

@@ -1644,23 +1644,72 @@ export interface IUpdateCategoryRequest {
 }
 
 // --- Unit of Measure ---
+/** Loại đơn vị: Đếm (cái, thùng, gói…), Khối lượng (chuẩn g), Thể tích (chuẩn ml). */
+export type UnitDimension = 'Count' | 'Mass' | 'Volume';
+
 export interface IUnitOfMeasure {
   id: string;
   name: string;
   abbreviation: string;
   isActive: boolean;
   createdAt: string;
+  dimension?: UnitDimension;
+  /** Số đơn vị chuẩn của loại (g / ml) trong 1 đơn vị: kg = 1000, l = 1000. Đơn vị Đếm luôn 1. */
+  toStandard?: number;
 }
 
 export interface ICreateUnitOfMeasureRequest {
   name: string;
   abbreviation: string;
+  dimension?: UnitDimension;
+  toStandard?: number;
 }
 
 export interface IUpdateUnitOfMeasureRequest {
   name: string;
   abbreviation: string;
   isActive?: boolean;
+  dimension?: UnitDimension;
+  toStandard?: number;
+}
+
+/** Một đơn vị dùng được của hàng; factor = số đơn vị gốc trong 1 đơn vị này. */
+export interface IProductUnitOption {
+  unitId: string | null;
+  name: string;
+  factor: number;
+  /** 'base' (đơn vị gốc) | 'conversion' (khai theo hàng) | 'standard' (tự quy đổi cùng loại). */
+  source: 'base' | 'conversion' | 'standard';
+  isDefaultPurchase: boolean;
+}
+
+export interface IProductUnits {
+  productId: string;
+  baseUnitId: string | null;
+  baseUnitName: string;
+  /** Hàng đồng bộ từ KiotViet — chỉ đơn vị gốc. */
+  managedByKiotViet: boolean;
+  units: IProductUnitOption[];
+}
+
+export interface ISetProductUnitsRequest {
+  baseUnitId: string;
+  conversions: { unitId: string; factor: number; isDefaultPurchase?: boolean }[];
+}
+
+export interface IPurchaseHistoryEntry {
+  purchaseOrderId: string;
+  orderNumber: string;
+  date: string;
+  supplierName?: string | null;
+  unitId?: string | null;
+  unitName?: string | null;
+  quantity: number;
+  unitPrice: number;
+  conversionFactor: number;
+  /** Giá nhập một đơn vị gốc (trước VAT). */
+  baseUnitCost?: number | null;
+  status: string;
 }
 
 // --- Variant Attribute ---
@@ -1850,6 +1899,8 @@ export interface IProductListItem {
   imageUrl?: string;
   totalStock?: number;
   variants?: IProductVariant[];
+  itemKind?: ProductItemKind;
+  isTopping?: boolean;
 }
 
 export interface ICreateProductAttributeRequest {
@@ -2540,6 +2591,7 @@ export interface IPurchaseOrderItem {
   productCode: string;
   productVariantId?: string;
   variantName?: string;
+  /** Theo đơn vị nhập (unitName) — số lẻ được. */
   quantity: number;
   receivedQuantity: number;
   unitPrice: number;
@@ -2547,6 +2599,15 @@ export interface IPurchaseOrderItem {
   discountAmount: number;
   totalPrice: number;
   note?: string;
+  unitId?: string | null;
+  unitName?: string | null;
+  /** Số đơn vị gốc trong 1 đơn vị nhập, chốt lúc lập phiếu. */
+  conversionFactor?: number;
+  baseQuantity?: number;
+  /** Giá nhập một đơn vị gốc (trước VAT). */
+  baseUnitCost?: number | null;
+  expiryDate?: string | null;
+  sourceText?: string | null;
 }
 
 export interface ICreatePurchaseOrderRequest {
@@ -2567,6 +2628,13 @@ export interface ICreatePurchaseOrderItemRequest {
   vatRate: number;
   discountAmount: number;
   note?: string;
+  /** Đơn vị nhập; bỏ trống = đơn vị gốc. */
+  unitId?: string | null;
+  /** Thành tiền trước VAT nhập tay — có thì BE tính lại đơn giá. */
+  lineTotal?: number | null;
+  /** yyyy-MM-dd */
+  expiryDate?: string | null;
+  sourceText?: string | null;
 }
 
 export interface IUpdatePurchaseOrderRequest {

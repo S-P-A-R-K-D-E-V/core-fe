@@ -21,6 +21,8 @@ import DialogActions from '@mui/material/DialogActions';
 
 import { paths } from 'src/routes/paths';
 
+import { apiErrorMessage } from 'src/utils/api-error';
+
 import { useBoolean } from 'src/hooks/use-boolean';
 
 import Iconify from 'src/components/iconify';
@@ -32,14 +34,27 @@ import CustomPopover, { usePopover } from 'src/components/custom-popover';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import { useTable, TableHeadCustom, TableNoData } from 'src/components/table';
 
-import { IUnitOfMeasure } from 'src/types/corecms-api';
+import { UnitDimension, IUnitOfMeasure } from 'src/types/corecms-api';
 import { getAllUnitOfMeasures, createUnitOfMeasure, updateUnitOfMeasure, deleteUnitOfMeasure } from 'src/api/unit-of-measures';
 
 // ----------------------------------------------------------------------
 
+const DIMENSIONS: { value: UnitDimension; label: string; standard?: string }[] = [
+  { value: 'Count', label: 'Đếm (cái, thùng, gói…)' },
+  { value: 'Mass', label: 'Khối lượng', standard: 'g' },
+  { value: 'Volume', label: 'Thể tích', standard: 'ml' },
+];
+
+const dimensionText = (row: IUnitOfMeasure) => {
+  const dim = DIMENSIONS.find((d) => d.value === (row.dimension ?? 'Count'));
+  if (!dim?.standard) return 'Đếm';
+  return `${dim.label} · 1 ${row.name} = ${row.toStandard ?? 1} ${dim.standard}`;
+};
+
 const TABLE_HEAD = [
   { id: 'name', label: 'Tên' },
   { id: 'abbreviation', label: 'Viết tắt', width: 140 },
+  { id: 'dimension', label: 'Loại', width: 180 },
   { id: 'isActive', label: 'Trạng thái', width: 120 },
   { id: '', width: 88 },
 ];
@@ -55,6 +70,8 @@ export default function UnitOfMeasureListView() {
   const [editItem, setEditItem] = useState<IUnitOfMeasure | null>(null);
   const [formName, setFormName] = useState('');
   const [formAbbr, setFormAbbr] = useState('');
+  const [formDimension, setFormDimension] = useState<UnitDimension>('Count');
+  const [formToStandard, setFormToStandard] = useState('1');
 
   const fetchData = useCallback(async () => {
     try {
@@ -70,22 +87,32 @@ export default function UnitOfMeasureListView() {
     setEditItem(item || null);
     setFormName(item?.name || '');
     setFormAbbr(item?.abbreviation || '');
+    setFormDimension(item?.dimension ?? 'Count');
+    setFormToStandard(String(item?.toStandard ?? 1));
     dialog.onTrue();
   };
 
   const handleSave = async () => {
+    const toStandard = formDimension === 'Count' ? 1 : Number(formToStandard) || 1;
     try {
       if (editItem) {
-        await updateUnitOfMeasure(editItem.id, { name: formName, abbreviation: formAbbr });
+        // isActive phải gửi: BE coi thiếu là false (trước đây sửa đơn vị làm đơn vị bị ẩn).
+        await updateUnitOfMeasure(editItem.id, {
+          name: formName,
+          abbreviation: formAbbr,
+          isActive: editItem.isActive,
+          dimension: formDimension,
+          toStandard,
+        });
         enqueueSnackbar('Cập nhật thành công!');
       } else {
-        await createUnitOfMeasure({ name: formName, abbreviation: formAbbr });
+        await createUnitOfMeasure({ name: formName, abbreviation: formAbbr, dimension: formDimension, toStandard });
         enqueueSnackbar('Tạo thành công!');
       }
       dialog.onFalse();
       fetchData();
     } catch (error) {
-      enqueueSnackbar('Có lỗi xảy ra', { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(error, 'Có lỗi xảy ra'), { variant: 'error' });
     }
   };
 
@@ -95,7 +122,7 @@ export default function UnitOfMeasureListView() {
       enqueueSnackbar('Xóa thành công!');
       fetchData();
     } catch (error) {
-      enqueueSnackbar('Xóa thất bại', { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(error, 'Xóa thất bại'), { variant: 'error' });
     }
   };
 
@@ -138,6 +165,30 @@ export default function UnitOfMeasureListView() {
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField label="Tên" value={formName} onChange={(e) => setFormName(e.target.value)} fullWidth />
             <TextField label="Viết tắt" value={formAbbr} onChange={(e) => setFormAbbr(e.target.value)} fullWidth />
+            <TextField
+              select
+              label="Loại"
+              value={formDimension}
+              onChange={(e) => setFormDimension(e.target.value as UnitDimension)}
+              helperText="Thùng, gói… chọn Đếm rồi khai quy đổi riêng từng hàng (1 thùng đường = 20.000 ml)."
+              fullWidth
+            >
+              {DIMENSIONS.map((d) => (
+                <MenuItem key={d.value} value={d.value}>
+                  {d.label}
+                </MenuItem>
+              ))}
+            </TextField>
+            {formDimension !== 'Count' && (
+              <TextField
+                type="number"
+                label={`1 ${formName || 'đơn vị'} = ? ${formDimension === 'Mass' ? 'g' : 'ml'}`}
+                value={formToStandard}
+                onChange={(e) => setFormToStandard(e.target.value)}
+                inputProps={{ min: 0, step: 'any' }}
+                fullWidth
+              />
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -158,6 +209,7 @@ function UomRow({ row, onEdit, onDelete }: { row: IUnitOfMeasure; onEdit: VoidFu
       <TableRow hover>
         <TableCell sx={{ fontWeight: 'bold' }}>{row.name}</TableCell>
         <TableCell>{row.abbreviation}</TableCell>
+        <TableCell>{dimensionText(row)}</TableCell>
         <TableCell><Label color={row.isActive ? 'success' : 'error'}>{row.isActive ? 'Hoạt động' : 'Ẩn'}</Label></TableCell>
         <TableCell align="right">
           <IconButton onClick={popover.onOpen}><Iconify icon="eva:more-vertical-fill" /></IconButton>
