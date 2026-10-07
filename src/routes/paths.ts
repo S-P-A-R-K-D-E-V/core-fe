@@ -173,6 +173,9 @@ export const paths = {
     storeSettings: {
       root: `${ROOTS.DASHBOARD}/store-settings`,
     },
+    fnb: {
+      root: `${ROOTS.DASHBOARD}/fnb`,
+    },
     penaltyPolicy: {
       root: `${ROOTS.DASHBOARD}/penalty-policy`,
       list: `${ROOTS.DASHBOARD}/penalty-policy/list`,

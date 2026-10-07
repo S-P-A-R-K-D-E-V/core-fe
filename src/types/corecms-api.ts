@@ -3,6 +3,12 @@
 
 export type UserStatus = 'Active' | 'Pending' | 'Banned' | 'Rejected';
 
+/** Phạm vi chi nhánh của thành viên (GET/PUT /users/{id}/branches, /users/me). */
+export interface IBranchScope {
+  allBranches: boolean;
+  branchIds: string[];
+}
+
 export interface IUser {
   id: string;
   firstName: string;
@@ -25,6 +31,11 @@ export interface IUser {
   schedulingPriority?: number;
   roles: string[];
   hasFaceEmbedding: boolean;
+  /**
+   * Phạm vi chi nhánh ở cửa hàng hiện tại (BE mới). allBranches = mọi chi nhánh (Admin, hoặc chưa được phân công);
+   * ngược lại chỉ các chi nhánh trong branchIds.
+   */
+  branchScope?: IBranchScope;
 }
 
 export interface IAuthResponse {
@@ -544,6 +555,8 @@ export interface IBranchLocation {
   longitude?: number;
   geofenceRadius: number;
   isActive?: boolean; // BE chỉ tính geofence với chi nhánh đang hoạt động
+  /** Loại hình chi nhánh: 'retail' | 'fnb' (BE cũ không trả → coi là retail). */
+  businessType?: string;
 }
 
 // --- Salary Configuration ---
@@ -1757,7 +1770,13 @@ export interface IProduct {
   updatedAt?: string;
   variants?: IProductVariant[];
   unitConversions?: IProductUnitConversion[];
+  /** Loại mặt hàng (F&B): Goods (mặc định) | Ingredient | SemiFinished | Dish. */
+  itemKind?: ProductItemKind;
+  /** Món thêm (topping) của F&B — không có size. */
+  isTopping?: boolean;
 }
+
+export type ProductItemKind = 'Goods' | 'Ingredient' | 'SemiFinished' | 'Dish';
 
 export interface IProductAttribute {
   id: string;
@@ -1896,6 +1915,9 @@ export interface ICreateProductRequest {
     sellingPrice?: number;
     barcode?: string;
   }[];
+  /** F&B: bỏ trống khi sửa = giữ nguyên giá trị đang lưu. */
+  itemKind?: ProductItemKind;
+  isTopping?: boolean;
 }
 
 export interface IUpdateProductRequest {
@@ -1953,6 +1975,9 @@ export interface IUpdateProductRequest {
     sellingPrice?: number;
     barcode?: string;
   }[];
+  /** F&B: bỏ trống khi sửa = giữ nguyên giá trị đang lưu. */
+  itemKind?: ProductItemKind;
+  isTopping?: boolean;
 }
 
 // --- Warehouse ---

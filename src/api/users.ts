@@ -1,6 +1,7 @@
 import axios, { endpoints } from 'src/utils/axios';
 import {
   IUser,
+  IBranchScope,
   IUpdateUserRequest,
   IUpdateProfileRequest,
   IChangeUserStatusRequest,
@@ -104,6 +105,21 @@ export async function uploadMyAvatar(file: File): Promise<{ objectKey: string }>
   const response = await axios.post<{ objectKey: string }>(endpoints.users.uploadAvatar, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+  return response.data;
+}
+
+/** [Admin/Manager] Phạm vi chi nhánh của một thành viên. */
+export async function getUserBranches(id: string): Promise<IBranchScope> {
+  const response = await axios.get<IBranchScope>(endpoints.users.branches(id));
+  return response.data;
+}
+
+/**
+ * [Admin/Manager] Phân công chi nhánh — thay toàn bộ; [] = bỏ phân công (làm mọi chi nhánh). Admin phân công cho Quản lý
+ * và Nhân viên; Quản lý chỉ cho Nhân viên, trong các chi nhánh mình quản lý (BE kiểm tra).
+ */
+export async function setUserBranches(id: string, branchIds: string[]): Promise<IBranchScope> {
+  const response = await axios.put<IBranchScope>(endpoints.users.branches(id), { branchIds });
   return response.data;
 }
 

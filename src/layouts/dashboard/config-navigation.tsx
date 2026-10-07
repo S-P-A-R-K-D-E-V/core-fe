@@ -49,15 +49,22 @@ const ICONS = {
 // ----------------------------------------------------------------------
 
 /** Lọc nav item theo role VÀ theo feature key đang bật cho tenant hiện tại (đệ quy vào children).
- * Item không khai báo featureKey luôn hiện (không phải mọi mục đều gắn với 1 feature có thể tắt). */
-function filterByRoleAndFeature<T extends { roles?: string[]; featureKey?: string; children?: T[] }>(
+ * Item không khai báo featureKey luôn hiện (không phải mọi mục đều gắn với 1 feature có thể tắt). featureKey là mảng =
+ * hiện khi bật MỘT TRONG các khoá (vd hàng hoá dùng chung cho bán lẻ và F&B). */
+function filterByRoleAndFeature<T extends { roles?: string[]; featureKey?: string | string[]; children?: T[] }>(
   items: T[],
   userRole: string,
   enabledFeatures: string[]
 ): T[] {
   return items
     .filter((item) => !item.roles || item.roles.includes(userRole))
-    .filter((item) => !item.featureKey || enabledFeatures.includes(item.featureKey))
+    .filter(
+      (item) =>
+        !item.featureKey ||
+        (Array.isArray(item.featureKey) ? item.featureKey : [item.featureKey]).some((key) =>
+          enabledFeatures.includes(key)
+        )
+    )
     .map((item) => ({
       ...item,
       children: item.children ? filterByRoleAndFeature(item.children, userRole, enabledFeatures) : undefined,
@@ -169,6 +176,15 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             children: [
               { title: t('list'), path: paths.dashboard.user.list },
             ],
+          },
+
+          // THIẾT LẬP F&B (khu vực, bàn, thực đơn, ghi chú nhanh) — chỉ cửa hàng bật commerce.fnb.pos.
+          {
+            title: 'Thiết lập F&B',
+            path: paths.dashboard.fnb.root,
+            icon: ICONS.order,
+            roles: ['Admin', 'Manager'],
+            featureKey: 'commerce.fnb.pos',
           },
 
           // CÀI ĐẶT CỬA HÀNG (thương hiệu, KiotViet riêng, khoá API cho trợ lý AI)
@@ -349,7 +365,8 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             path: paths.dashboard.pos.product.root,
             icon: ICONS.product,
             roles: ['Admin'],
-            featureKey: 'commerce.retail.inventory',
+            // Hàng hoá / nhóm hàng dùng chung bán lẻ và F&B (món là hàng hoá có Loại mặt hàng = Món).
+            featureKey: ['commerce.retail.inventory', 'commerce.fnb.pos'],
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.product.list },
               { title: 'Thêm mới', path: paths.dashboard.pos.product.new },
@@ -360,7 +377,8 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             path: paths.dashboard.pos.category.root,
             icon: ICONS.folder,
             roles: ['Admin'],
-            featureKey: 'commerce.retail.inventory',
+            // Hàng hoá / nhóm hàng dùng chung bán lẻ và F&B (món là hàng hoá có Loại mặt hàng = Món).
+            featureKey: ['commerce.retail.inventory', 'commerce.fnb.pos'],
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.category.list },
               { title: 'Thêm mới', path: paths.dashboard.pos.category.new },

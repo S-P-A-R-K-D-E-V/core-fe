@@ -20,8 +20,8 @@ vi.mock('src/components/branding', () => ({
 // Imported after the mocks above so the hook picks up the mocked modules.
 import { useNavData } from 'src/layouts/dashboard/config-navigation';
 
-function navPaths(userRole?: string) {
-  const { result } = renderHook(() => useNavData(userRole, []));
+function navPaths(userRole?: string, enabledFeatures: string[] = []) {
+  const { result } = renderHook(() => useNavData(userRole, enabledFeatures));
   const out: string[] = [];
   result.current.forEach((group: any) =>
     group.items.forEach((item: any) => {
@@ -62,5 +62,22 @@ describe('useNavData — Cảnh báo tự động', () => {
 
   it.each(['Manager', 'Staff'])('%s không thấy', (role) => {
     expect(navPaths(role)).not.toContain(paths.dashboard.automation.root);
+  });
+});
+
+// F&B: trang Thiết lập F&B chỉ hiện khi cửa hàng bật commerce.fnb.pos; Hàng hoá dùng chung bán lẻ và F&B nên hiện khi
+// bật MỘT TRONG hai khoá.
+describe('useNavData — F&B', () => {
+  it('Thiết lập F&B chỉ hiện khi bật commerce.fnb.pos, cho Admin và Quản lý', () => {
+    expect(navPaths('Admin', ['commerce.retail.inventory'])).not.toContain(paths.dashboard.fnb.root);
+    expect(navPaths('Admin', ['commerce.fnb.pos'])).toContain(paths.dashboard.fnb.root);
+    expect(navPaths('Manager', ['commerce.fnb.pos'])).toContain(paths.dashboard.fnb.root);
+    expect(navPaths('Staff', ['commerce.fnb.pos'])).not.toContain(paths.dashboard.fnb.root);
+  });
+
+  it('Hàng hoá hiện với cửa hàng bán lẻ hoặc cửa hàng chỉ có F&B', () => {
+    expect(navPaths('Admin', [])).not.toContain(paths.dashboard.pos.product.root);
+    expect(navPaths('Admin', ['commerce.retail.inventory'])).toContain(paths.dashboard.pos.product.root);
+    expect(navPaths('Admin', ['commerce.fnb.pos'])).toContain(paths.dashboard.pos.product.root);
   });
 });

@@ -27,7 +27,11 @@ import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
 
 import { paths } from 'src/routes/paths';
+
+import { apiErrorMessage } from 'src/utils/api-error';
 import { useRouter } from 'src/routes/hooks';
+
+import { useAuthContext } from 'src/auth/hooks';
 
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
@@ -37,6 +41,7 @@ import {
   IProduct,
   ICategory,
   IUnitOfMeasure,
+  ProductItemKind,
   IVariantAttribute,
 } from 'src/types/corecms-api';
 import { createProduct, updateProduct, getProductById } from 'src/api/products';
@@ -73,6 +78,10 @@ type Props = {
 export default function ProductNewEditForm({ currentProduct, isDialog, onDialogClose, onDialogSaved, onProductCreated }: Props) {
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
+
+  // Loại mặt hàng / món thêm chỉ hiện ở cửa hàng có F&B (commerce.fnb.pos) — cửa hàng bán lẻ không thấy gì mới.
+  const { user } = useAuthContext();
+  const fnbEnabled = ((user?.enabledFeatures as string[] | undefined) ?? []).includes('commerce.fnb.pos');
 
   const [currentTab, setCurrentTab] = useState(0);
   const [categories, setCategories] = useState<ICategory[]>([]);
@@ -124,6 +133,8 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
     weightUnit: Yup.string().default('g'),
     location: Yup.string().default(''),
     hasVariants: Yup.boolean().default(false),
+    itemKind: Yup.string().oneOf(['Goods', 'Ingredient', 'SemiFinished', 'Dish']).default('Goods'),
+    isTopping: Yup.boolean().default(false),
     variants: Yup.array()
       .of(
         Yup.object().shape({
@@ -161,6 +172,8 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
         weightUnit: currentProduct?.weightUnit || 'g',
         location: currentProduct?.location || '',
         hasVariants: currentProduct?.hasVariants || false,
+        itemKind: currentProduct?.itemKind || 'Goods',
+        isTopping: currentProduct?.isTopping ?? false,
         variants:
           currentProduct?.variants?.map((v) => ({
             sku: v.sku,
@@ -188,6 +201,7 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
   } = methods;
 
   const hasVariants = watch('hasVariants');
+  const isTopping = watch('isTopping');
 
   const { fields, append, remove } = useFieldArray({ control, name: 'variants' });
 
@@ -416,6 +430,7 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
           weightUnit: data.weightUnit || undefined,
           location: data.location || undefined,
           hasVariants: data.hasVariants,
+          ...(fnbEnabled ? { itemKind: data.itemKind as ProductItemKind, isTopping: data.isTopping } : {}),
           attributes: attributesPayload,
           variants: variantsPayload,
           unitConversions: unitConversionPayload,
@@ -440,6 +455,7 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
           weightUnit: data.weightUnit || undefined,
           location: data.location || undefined,
           hasVariants: data.hasVariants,
+          ...(fnbEnabled ? { itemKind: data.itemKind as ProductItemKind, isTopping: data.isTopping } : {}),
           attributes: attributesPayload,
           variants: variantsPayload,
           unitConversions: unitConversionPayload,
@@ -463,7 +479,8 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
       }
     } catch (error) {
       console.error(error);
-      enqueueSnackbar('Có lỗi xảy ra', { variant: 'error' });
+      // Lỗi nghiệp vụ có mô tả (vd món thêm không được có size) — hiện đúng lý do thay vì câu chung.
+      enqueueSnackbar(apiErrorMessage(error, 'Có lỗi xảy ra'), { variant: 'error' });
     }
   });
 
@@ -528,6 +545,27 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
               <Iconify icon="mingcute:add-line" />
             </IconButton>
           </Stack>
+
+          {fnbEnabled && (
+            <>
+              <RHFSelect name="itemKind" label="Loại mặt hàng">
+                <MenuItem value="Goods">Hàng hoá</MenuItem>
+                <MenuItem value="Dish">Món (thực đơn F&B)</MenuItem>
+                <MenuItem value="Ingredient">Nguyên liệu</MenuItem>
+                <MenuItem value="SemiFinished">Bán thành phẩm</MenuItem>
+              </RHFSelect>
+              <FormControlLabel
+                label="Là món thêm (topping)"
+                control={
+                  <Switch
+                    checked={!!isTopping}
+                    disabled={hasVariants}
+                    onChange={(e) => setValue('isTopping', e.target.checked)}
+                  />
+                }
+              />
+            </>
+          )}
 
           {/* <RHFSelect name="unitOfMeasureId" label="Đơn vị tính">
             <MenuItem value="">— Chọn đơn vị —</MenuItem>

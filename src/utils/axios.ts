@@ -84,6 +84,7 @@ export const endpoints = {
     uploadMyIdCard: '/users/me/id-card',
     changePassword: '/users/me/change-password',
     schedulingPriority: (id: string) => `/users/${id}/scheduling-priority`,
+    branches: (id: string) => `/users/${id}/branches`,
   },
   roles: {
     list: '/roles',
@@ -183,6 +184,18 @@ export const endpoints = {
   },
   branches: {
     list: '/branches',
+  },
+  // F&B — thiết lập trên web (hợp đồng API v1, mục 3 và 4).
+  fnb: {
+    areas: '/fnb/areas',
+    area: (id: string) => `/fnb/areas/${id}`,
+    tables: '/fnb/tables',
+    table: (id: string) => `/fnb/tables/${id}`,
+    menu: '/fnb/menu',
+    soldOut: '/fnb/menu/sold-out',
+    dishToppings: (dishId: string) => `/fnb/menu/dishes/${dishId}/toppings`,
+    quickNotes: '/fnb/quick-notes',
+    quickNote: (id: string) => `/fnb/quick-notes/${id}`,
   },
   salary: {
     list: '/salary-configurations',
