@@ -464,6 +464,13 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             icon: ICONS.ecommerce,
             featureKey: 'commerce.fnb.pos',
           },
+          // MÁY IN PHIẾU F&B (máy tính quầy bar tự in phiếu bar của chi nhánh).
+          {
+            title: 'Máy in phiếu',
+            path: paths.dashboard.fnb.printStation,
+            icon: ICONS.invoice,
+            featureKey: 'commerce.fnb.pos',
+          },
           // KHO NGUYÊN LIỆU F&B (tồn, số ngày còn đủ, số phần món còn pha được, kiểm kê / xuất huỷ).
           {
             title: 'Kho nguyên liệu',

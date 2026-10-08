@@ -31,8 +31,11 @@ function page(title: string, body: string): string {
 </style></head><body>${body}</body></html>`;
 }
 
-/** Phiếu bar: tên món, size, số lượng, món thêm, ghi chú — không có giá. Phiếu HỦY in to chữ "HỦY" + lý do. */
-export function kitchenTicketHtml(ticket: IKitchenTicket): string {
+/**
+ * Phiếu bar: tên món, size, số lượng, món thêm, ghi chú — không có giá. Phiếu HỦY in to chữ "HỦY" + lý do; in lại thì có
+ * dòng "IN LẠI" (hợp đồng 6.1).
+ */
+export function kitchenTicketHtml(ticket: IKitchenTicket, reprint = false): string {
   const isVoid = ticket.kind === 'Void';
   const place = ticket.tableName ? `${ticket.areaName ? `${ticket.areaName} · ` : ''}${ticket.tableName}` : 'MANG VỀ';
   const lines = ticket.lines
@@ -45,6 +48,7 @@ export function kitchenTicketHtml(ticket: IKitchenTicket): string {
     })
     .join('');
   const body = `<h1>${isVoid ? 'HỦY MÓN' : `PHIẾU BAR${ticket.roundNo ? ` · Lượt ${ticket.roundNo}` : ''}`}</h1>
+${reprint ? '<div class="center"><b>— IN LẠI —</b></div>' : ''}
 <div class="center"><b>${escapeHtml(place)}</b> · Đơn ${escapeHtml(ticket.displayNo)}</div>
 <div class="center muted">${escapeHtml(time(ticket.createdAt))} · ${escapeHtml(ticket.createdByName)}</div>
 ${isVoid && ticket.voidReason ? `<div class="center"><b>Lý do: ${escapeHtml(ticket.voidReason)}</b></div>` : ''}

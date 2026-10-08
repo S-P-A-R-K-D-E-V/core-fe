@@ -1,9 +1,11 @@
 'use client';
 
 import type { IOpenOrder, FnbPaymentMethod } from 'src/types/fnb';
-import type { IKiotVietBankAccount } from 'src/types/corecms-api';
+import type { IQrPaymentResponse, IKiotVietBankAccount } from 'src/types/corecms-api';
 
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
+
+import Box from '@mui/material/Box';
 
 import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
@@ -23,12 +25,18 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { fCurrency } from 'src/utils/format-number';
 
 import { getBankAccounts } from 'src/api/bank-accounts';
+import { cancelQrPayment, createQrPayment, getQrPaymentStatus } from 'src/api/payment-qr';
 
 import { changeDue, quickCashOptions } from './lib/checkout';
 
 import type { PaymentInput } from './lib/checkout';
 
 // ----------------------------------------------------------------------
+// Chuyển khoản: hiện mã VietQR đúng số tiền + nội dung (dùng chung với Bán hàng). Cửa hàng có đối soát tiền về tự động
+// thì mã chuyển "COMPLETED" và đơn tự thanh toán; không thì nhân viên thấy tiền về rồi bấm Thanh toán như cũ.
+// ----------------------------------------------------------------------
+
+const QR_POLL_MS = 4_000;
 
 type Props = {
   open: boolean;
@@ -48,9 +56,25 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
   const [accounts, setAccounts] = useState<IKiotVietBankAccount[]>([]);
   const [accountId, setAccountId] = useState('');
   const [transferRef, setTransferRef] = useState('');
+  const [qr, setQr] = useState<IQrPaymentResponse | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const qrRef = useRef<IQrPaymentResponse | null>(null);
+  qrRef.current = qr;
+
+  /** Bỏ mã QR đang hiện (đổi phương thức / tài khoản / số tiền, đóng hộp thoại). */
+  const dropQr = () => {
+    const current = qrRef.current;
+    if (current) cancelQrPayment(current.id).catch(() => {});
+    setQr(null);
+    setQrError(null);
+  };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      dropQr();
+      return;
+    }
     setMethod('Cash');
     setCash('');
     setTransferRef(order ? `${order.tableName ?? 'Mang ve'} ${order.displayNo}` : '');
@@ -64,6 +88,55 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
 
   const cashGiven = cash === '' ? null : Number(cash);
   const tooLow = method === 'Cash' && cashGiven !== null && cashGiven < total;
+
+  const payInput = (): PaymentInput => ({
+    method,
+    cashGiven: method === 'Cash' ? cashGiven : null,
+    bankAccountId: method === 'Transfer' ? accountId || null : null,
+    transferRef: method === 'Transfer' ? transferRef : null,
+  });
+
+  // Mã QR cũ không còn đúng khi đổi tài khoản / số tiền / phương thức.
+  useEffect(() => {
+    dropQr();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [method, accountId, total]);
+
+  // Tiền về (đối soát tự động) → thanh toán luôn.
+  useEffect(() => {
+    if (!qr || busy) return undefined;
+    const timer = setInterval(async () => {
+      try {
+        const status = await getQrPaymentStatus(qr.id);
+        if (status.status === 'COMPLETED') {
+          clearInterval(timer);
+          setQr(null);
+          onPay(payInput());
+        } else if (status.status === 'CANCELLED' || status.status === 'ERRORCORRECTED') {
+          clearInterval(timer);
+          setQr(null);
+          setQrError('Mã QR đã bị huỷ — tạo lại mã.');
+        }
+      } catch {
+        // thử lại lần sau
+      }
+    }, QR_POLL_MS);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qr, busy]);
+
+  const showQr = async () => {
+    if (!accountId || total <= 0) return;
+    setQrLoading(true);
+    setQrError(null);
+    try {
+      setQr(await createQrPayment({ bankAccountId: accountId, amount: total, description: transferRef.trim() || undefined }));
+    } catch {
+      setQrError('Không tạo được mã QR cho tài khoản này — vẫn thanh toán chuyển khoản bằng tay được.');
+    } finally {
+      setQrLoading(false);
+    }
+  };
 
   return (
     <Dialog fullWidth maxWidth="xs" open={open} onClose={busy ? undefined : onClose}>
@@ -120,9 +193,36 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
                   </MenuItem>
                 ))}
               </TextField>
-              <TextField label="Nội dung chuyển khoản" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} />
+              <TextField
+                label="Nội dung chuyển khoản"
+                value={transferRef}
+                onChange={(e) => {
+                  setTransferRef(e.target.value);
+                  if (qr) dropQr();
+                }}
+              />
+              {accountId && !qr && (
+                <LoadingButton variant="outlined" loading={qrLoading} onClick={showQr} sx={{ alignSelf: 'flex-start' }}>
+                  Hiện mã QR
+                </LoadingButton>
+              )}
+              {qrError && <Alert severity="warning">{qrError}</Alert>}
+              {qr?.qrDataUrl && (
+                <Stack alignItems="center" spacing={1}>
+                  <Box
+                    component="img"
+                    src={qr.qrDataUrl}
+                    alt="Mã QR chuyển khoản"
+                    sx={{ width: 240, height: 240, objectFit: 'contain', borderRadius: 1, bgcolor: 'common.white' }}
+                  />
+                  <Typography variant="caption" color="text.secondary" textAlign="center">
+                    {fCurrency(total)} · {qr.bankName ?? ''} {qr.accountNumber ?? ''} — đang chờ tiền về; tiền về là tự thanh
+                    toán.
+                  </Typography>
+                </Stack>
+              )}
               <Typography variant="caption" color="text.secondary">
-                Bấm thanh toán khi đã thấy tiền về tài khoản.
+                Không tự nhận được tiền về thì bấm Thanh toán khi đã thấy tiền vào tài khoản.
               </Typography>
             </Stack>
           )}
@@ -136,14 +236,14 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
           variant="contained"
           loading={busy}
           disabled={tooLow}
-          onClick={() =>
-            onPay({
-              method,
-              cashGiven: method === 'Cash' ? cashGiven : null,
-              bankAccountId: method === 'Transfer' ? accountId || null : null,
-              transferRef: method === 'Transfer' ? transferRef : null,
-            })
-          }
+          onClick={() => {
+            const input = payInput();
+            if (qr) {
+              // Thanh toán tay khi đã thấy tiền: bỏ theo dõi mã (không huỷ — tiền có thể đang về theo mã này).
+              setQr(null);
+            }
+            onPay(input);
+          }}
         >
           Thanh toán
         </LoadingButton>

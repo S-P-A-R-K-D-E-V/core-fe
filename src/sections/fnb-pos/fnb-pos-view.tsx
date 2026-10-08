@@ -1,7 +1,6 @@
 'use client';
 
 import type { IFnbMenu, IFnbFloor } from 'src/types/fnb';
-import type { IBranchLocation } from 'src/types/corecms-api';
 
 import { useState, useEffect, useCallback } from 'react';
 
@@ -13,8 +12,6 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { getCurrentUser } from 'src/api/users';
-import { getBranchLocations } from 'src/api/attendance';
 import { getFnbMenu, getFnbFloor } from 'src/api/fnb';
 
 import { useStoreBrand } from 'src/components/branding';
@@ -23,6 +20,7 @@ import { useSettingsContext } from 'src/components/settings';
 import FnbFloor from './fnb-floor';
 import { newId } from './lib/ids';
 import FnbOrderScreen from './fnb-order-screen';
+import { useFnbBranches } from './use-fnb-branches';
 
 import type { OrderTarget } from './fnb-order-screen';
 
@@ -31,43 +29,18 @@ import type { OrderTarget } from './fnb-order-screen';
 // Sơ đồ làm mới mỗi 10 giây để thấy đơn do máy khác mở / thanh toán.
 // ----------------------------------------------------------------------
 
-const BRANCH_KEY = 'fnb.pos.branchId';
 const FLOOR_REFRESH_MS = 10_000;
 
 export default function FnbPosView() {
   const settings = useSettingsContext();
   const { brandName } = useStoreBrand();
 
-  const [branches, setBranches] = useState<IBranchLocation[] | null>(null);
-  const [branchId, setBranchId] = useState('');
+  const { branches, branchId, setBranchId } = useFnbBranches();
   const [menu, setMenu] = useState<IFnbMenu | null>(null);
   const [floor, setFloor] = useState<IFnbFloor | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [target, setTarget] = useState<OrderTarget | null>(null);
   const [now, setNow] = useState(() => Date.now());
-
-  // Chi nhánh F&B mà tài khoản được làm (Admin / chưa phân công = mọi chi nhánh).
-  useEffect(() => {
-    Promise.all([getBranchLocations(), getCurrentUser().catch(() => null)])
-      .then(([list, me]) => {
-        const scope = me?.branchScope;
-        const fnb = list.filter(
-          (b) =>
-            b.isActive !== false &&
-            b.businessType?.toLowerCase() === 'fnb' &&
-            (!scope || scope.allBranches || scope.branchIds.includes(b.id))
-        );
-        setBranches(fnb);
-        let saved = '';
-        try {
-          saved = window.localStorage.getItem(BRANCH_KEY) ?? '';
-        } catch {
-          // bỏ qua
-        }
-        setBranchId(fnb.some((b) => b.id === saved) ? saved : fnb[0]?.id ?? '');
-      })
-      .catch(() => setBranches([]));
-  }, []);
 
   const loadFloor = useCallback(async () => {
     if (!branchId) return;
@@ -83,11 +56,6 @@ export default function FnbPosView() {
 
   useEffect(() => {
     if (!branchId) return;
-    try {
-      window.localStorage.setItem(BRANCH_KEY, branchId);
-    } catch {
-      // bỏ qua
-    }
     setMenu(null);
     setFloor(null);
     setTarget(null);
@@ -162,6 +130,7 @@ export default function FnbPosView() {
         <FnbFloor
           floor={floor}
           now={now}
+          onPrinted={loadFloor}
           onOpenOrder={(o, table) =>
             setTarget({
               orderId: o.id,

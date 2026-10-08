@@ -1,6 +1,5 @@
 'use client';
 
-import type { IBranchLocation } from 'src/types/corecms-api';
 import type { FnbStockReason, IFnbStockReport, IFnbStockIngredient } from 'src/types/fnb';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -45,11 +44,10 @@ import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
-import { getCurrentUser } from 'src/api/users';
-import { getBranchLocations } from 'src/api/attendance';
 import { getFnbStock, adjustFnbStock } from 'src/api/fnb';
 
 import { newId } from 'src/sections/fnb-pos/lib/ids';
+import { useFnbBranches } from 'src/sections/fnb-pos/use-fnb-branches';
 
 import { fQty, countLines, REASON_LABEL, STATUS_LABEL, sortIngredients } from './lib/stock';
 
@@ -59,7 +57,6 @@ import { fQty, countLines, REASON_LABEL, STATUS_LABEL, sortIngredients } from '.
 // ngưỡng sau mỗi lần trừ kho thì chủ / quản lý nhận thông báo.
 // ----------------------------------------------------------------------
 
-const BRANCH_KEY = 'fnb.pos.branchId';
 const REFRESH_MS = 30_000;
 const LOW_PORTIONS = 10;
 
@@ -69,8 +66,7 @@ export default function FnbStockView() {
   const { enqueueSnackbar } = useSnackbar();
   const canEdit = ['Admin', 'Manager'].some((r) => user?.role === r || (user?.roles ?? []).includes(r));
 
-  const [branches, setBranches] = useState<IBranchLocation[] | null>(null);
-  const [branchId, setBranchId] = useState('');
+  const { branches, branchId, setBranchId } = useFnbBranches();
   const [report, setReport] = useState<IFnbStockReport | null>(null);
   const [tab, setTab] = useState<'ingredients' | 'dishes'>('ingredients');
   const [counting, setCounting] = useState(false);
@@ -78,28 +74,6 @@ export default function FnbStockView() {
   const [saving, setSaving] = useState(false);
   const [disposeOpen, setDisposeOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    Promise.all([getBranchLocations(), getCurrentUser().catch(() => null)])
-      .then(([list, me]) => {
-        const scope = me?.branchScope;
-        const fnb = list.filter(
-          (b) =>
-            b.isActive !== false &&
-            b.businessType?.toLowerCase() === 'fnb' &&
-            (!scope || scope.allBranches || scope.branchIds.includes(b.id))
-        );
-        setBranches(fnb);
-        let saved = '';
-        try {
-          saved = window.localStorage.getItem(BRANCH_KEY) ?? '';
-        } catch {
-          // bỏ qua
-        }
-        setBranchId(fnb.some((b) => b.id === saved) ? saved : fnb[0]?.id ?? '');
-      })
-      .catch(() => setBranches([]));
-  }, []);
 
   const load = useCallback(async () => {
     if (!branchId) return;
@@ -168,14 +142,7 @@ export default function FnbStockView() {
               label="Chi nhánh"
               value={branchId}
               disabled={branches.length === 1 || counting}
-              onChange={(e) => {
-                setBranchId(e.target.value);
-                try {
-                  window.localStorage.setItem(BRANCH_KEY, e.target.value);
-                } catch {
-                  // bỏ qua
-                }
-              }}
+              onChange={(e) => setBranchId(e.target.value)}
               sx={{ minWidth: 220 }}
             >
               {branches.map((b) => (
@@ -214,7 +181,7 @@ export default function FnbStockView() {
             </Alert>
           )}
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <Summary title="Giá trị tồn nguyên liệu" value={fCurrency(stockValue)} />
+            {canEdit && <Summary title="Giá trị tồn nguyên liệu" value={fCurrency(stockValue)} />}
             <Summary
               title="Nguyên liệu hết / sắp hết"
               value={String(lowIngredients)}
@@ -285,8 +252,8 @@ export default function FnbStockView() {
                       <TableCell>Nguyên liệu</TableCell>
                       <TableCell align="right">Tồn</TableCell>
                       {counting && <TableCell align="right">Đếm được</TableCell>}
-                      <TableCell align="right">Giá vốn</TableCell>
-                      <TableCell align="right">Giá trị</TableCell>
+                      {canEdit && <TableCell align="right">Giá vốn</TableCell>}
+                      {canEdit && <TableCell align="right">Giá trị</TableCell>}
                       <TableCell align="right">Dùng {report.usageDays} ngày</TableCell>
                       <TableCell align="right">Còn đủ</TableCell>
                       <TableCell>Trạng thái</TableCell>
@@ -297,6 +264,7 @@ export default function FnbStockView() {
                       <IngredientRow
                         key={i.id}
                         item={i}
+                        showCost={canEdit}
                         counting={counting}
                         value={counted[i.id] ?? ''}
                         onChange={(v) => setCounted((p) => ({ ...p, [i.id]: v }))}
@@ -400,9 +368,15 @@ function Summary({ title, value, color }: { title: string; value: string; color?
   );
 }
 
-type RowProps = { item: IFnbStockIngredient; counting: boolean; value: string; onChange: (v: string) => void };
+type RowProps = {
+  item: IFnbStockIngredient;
+  showCost: boolean;
+  counting: boolean;
+  value: string;
+  onChange: (v: string) => void;
+};
 
-function IngredientRow({ item, counting, value, onChange }: RowProps) {
+function IngredientRow({ item, showCost, counting, value, onChange }: RowProps) {
   const status = STATUS_LABEL[item.status];
   return (
     <TableRow hover>
@@ -433,8 +407,8 @@ function IngredientRow({ item, counting, value, onChange }: RowProps) {
           />
         </TableCell>
       )}
-      <TableCell align="right">{item.unitCost == null ? '—' : fCurrency(item.unitCost)}</TableCell>
-      <TableCell align="right">{fCurrency(item.value)}</TableCell>
+      {showCost && <TableCell align="right">{item.unitCost == null ? '—' : fCurrency(item.unitCost)}</TableCell>}
+      {showCost && <TableCell align="right">{fCurrency(item.value)}</TableCell>}
       <TableCell align="right">
         {fQty(item.used)} {item.used > 0 ? item.unit ?? '' : ''}
       </TableCell>

@@ -23,6 +23,7 @@ import { fCurrency } from 'src/utils/format-number';
 
 import Iconify from 'src/components/iconify';
 
+import { FnbUnprintedDialog } from './fnb-ticket-list';
 import { tablesOf, tableStatus, minutesSince, staleUnprinted } from './lib/floor';
 
 import type { TableStatus } from './lib/floor';
@@ -39,6 +40,8 @@ type Props = {
   now: number;
   onOpenOrder: (order: IOrderSummary, table: TableWithArea | null) => void;
   onNewOrder: (table: TableWithArea | null, shared: boolean) => void;
+  /** Vừa in phiếu từ danh sách phiếu chưa in — tải lại sơ đồ. */
+  onPrinted: VoidFunction;
 };
 
 const STATUS: Record<TableStatus, { label: string; color: string; bg: string }> = {
@@ -47,9 +50,10 @@ const STATUS: Record<TableStatus, { label: string; color: string; bg: string }> 
   billed: { label: 'Chờ thanh toán', color: 'warning.darker', bg: 'warning.lighter' },
 };
 
-export default function FnbFloor({ floor, now, onOpenOrder, onNewOrder }: Props) {
+export default function FnbFloor({ floor, now, onOpenOrder, onNewOrder, onPrinted }: Props) {
   const [areaId, setAreaId] = useState<string | null>(null);
   const [multi, setMulti] = useState<TableWithArea | null>(null);
+  const [unprintedOpen, setUnprintedOpen] = useState(false);
 
   const areas = useMemo(() => [...(floor?.areas ?? [])].sort((a, b) => a.sortOrder - b.sortOrder), [floor]);
   const tables = useMemo(() => tablesOf(floor, areaId), [floor, areaId]);
@@ -80,9 +84,24 @@ export default function FnbFloor({ floor, now, onOpenOrder, onNewOrder }: Props)
   return (
     <Stack spacing={2}>
       {stale.length > 0 && (
-        <Alert severity="warning">
-          {stale.length} phiếu bar chưa in được — kiểm tra máy in ở quầy.
+        <Alert
+          severity="warning"
+          action={
+            <Button color="inherit" size="small" onClick={() => setUnprintedOpen(true)}>
+              Xem &amp; in
+            </Button>
+          }
+        >
+          {stale.length} phiếu bar chưa in được — kiểm tra máy in / Máy in phiếu ở quầy bar.
         </Alert>
+      )}
+      {floor && (
+        <FnbUnprintedDialog
+          open={unprintedOpen}
+          branchId={floor.branchId}
+          onClose={() => setUnprintedOpen(false)}
+          onPrinted={onPrinted}
+        />
       )}
 
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>

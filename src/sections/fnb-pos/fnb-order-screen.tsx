@@ -169,7 +169,12 @@ export default function FnbOrderScreen({ branchId, storeName, menu, floor, targe
 
   const printTicket = useCallback(
     async (ticket: IKitchenTicket | null) => {
-      if (!ticket || !autoPrint) return;
+      if (!ticket) return;
+      if (!autoPrint) {
+        // Máy này không in: báo "bỏ qua" ngay để Máy in phiếu của chi nhánh nhận in, không phải chờ 30 giây.
+        await runFnbCommand(printResultCmd({ ...ctx, deviceName: 'Web' }, ticket.id, { result: 'Skipped' })).catch(() => {});
+        return;
+      }
       try {
         await printHtmlDocument(kitchenTicketHtml(ticket));
         await runFnbCommand(printResultCmd({ ...ctx, deviceName: 'Web' }, ticket.id, { result: 'Printed' }));
@@ -537,7 +542,11 @@ export default function FnbOrderScreen({ branchId, storeName, menu, floor, targe
                 }}
               />
             }
-            label={<Typography variant="caption">In phiếu bar khi gửi (hộp thoại in của trình duyệt)</Typography>}
+            label={
+              <Typography variant="caption">
+                In phiếu bar tại máy này (tắt nếu quầy bar đã có Máy in phiếu)
+              </Typography>
+            }
           />
         </Card>
       </Grid>

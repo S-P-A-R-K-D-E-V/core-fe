@@ -11,8 +11,12 @@ import type {
   IFnbRecipeLine,
   FnbStockReason,
   IFnbStockReport,
+  IKitchenTicket,
+  FnbPrintStatus,
   IOrderCommandResult,
 } from 'src/types/fnb';
+
+import { newId, isoNow, currentDeviceId } from 'src/sections/fnb-pos/lib/ids';
 
 import type { FnbCommand } from 'src/sections/fnb-pos/lib/commands';
 
@@ -123,6 +127,65 @@ export async function getFnbOrder(orderId: string): Promise<IOpenOrder> {
 export async function runFnbCommand(command: FnbCommand): Promise<IOrderCommandResult> {
   const res = await axios.request<IOrderCommandResult>({ method: command.method, url: command.path, data: command.body });
   return res.data;
+}
+
+// ── Phiếu bar (hợp đồng 6.2–6.4) ───────────────────────────────────────
+
+/** Phiếu bar của chi nhánh, mới nhất trước. `printStatus` dạng "Pending,Failed,Skipped". */
+export async function getKitchenTickets(
+  branchId: string,
+  params: { printStatus?: FnbPrintStatus[]; from?: string; minAgeSeconds?: number; limit?: number } = {}
+): Promise<IKitchenTicket[]> {
+  const res = await axios.get<IKitchenTicket[]>(endpoints.fnb.kitchenTickets, {
+    params: {
+      branchId,
+      printStatus: params.printStatus?.join(','),
+      from: params.from,
+      minAgeSeconds: params.minAgeSeconds,
+      limit: params.limit,
+    },
+  });
+  return res.data;
+}
+
+/** `deviceId`: mã máy gửi lệnh — Máy in phiếu dùng mã riêng để không trùng với tab bán hàng cùng trình duyệt. */
+const ticketEnvelope = (deviceId?: string) => ({
+  clientRequestId: newId(),
+  deviceId: deviceId ?? currentDeviceId(),
+  clientTime: isoNow(),
+});
+
+/** Giữ quyền in 30 giây (reprint = false) hoặc ghi nhật ký in lại (reprint = true). */
+export async function claimTicketPrint(
+  ticketId: string,
+  deviceName: string,
+  reprint: boolean,
+  deviceId?: string
+): Promise<IKitchenTicket> {
+  const res = await axios.post<{ ticket: IKitchenTicket }>(endpoints.fnb.ticketPrint(ticketId), {
+    ...ticketEnvelope(deviceId),
+    deviceName,
+    reprint,
+  });
+  return res.data.ticket;
+}
+
+export async function reportTicketPrint(
+  ticketId: string,
+  deviceName: string,
+  result: 'Printed' | 'Failed' | 'Skipped',
+  error: string | null,
+  reprint: boolean,
+  deviceId?: string
+): Promise<IKitchenTicket> {
+  const res = await axios.post<{ ticket: IKitchenTicket }>(endpoints.fnb.ticketPrintResult(ticketId), {
+    ...ticketEnvelope(deviceId),
+    deviceName,
+    result,
+    error,
+    reprint,
+  });
+  return res.data.ticket;
 }
 
 // ── Kho nguyên liệu ─────────────────────────────────────────────────────

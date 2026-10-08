@@ -48,3 +48,26 @@ export function currentDeviceId(): string {
   }
   return deviceId;
 }
+
+const STATION_KEY = 'fnb.printStationDeviceId';
+
+/**
+ * Mã máy riêng của "Máy in phiếu" (giữ trong localStorage): khác mã của tab bán hàng cùng trình duyệt, để quyền in 30 giây
+ * của phiếu tab bán hàng vừa tạo không bị Máy in phiếu coi là của chính mình rồi in trùng.
+ */
+export function stationDeviceId(): string {
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem(STATION_KEY);
+  } catch {
+    // bỏ qua
+  }
+  if (stored && UUID_RE.test(stored)) return stored;
+  const id = newId();
+  try {
+    window.localStorage.setItem(STATION_KEY, id);
+  } catch {
+    // bỏ qua
+  }
+  return id;
+}
