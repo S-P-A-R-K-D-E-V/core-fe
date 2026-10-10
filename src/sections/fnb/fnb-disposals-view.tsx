@@ -335,6 +335,8 @@ function FnbDisposalCreateDialog({ open, branchId, manager, ingredients, onClose
                   label="Đơn vị"
                   value={line.unitId ?? ''}
                   onChange={(e) => update(index, { unitId: e.target.value || null })}
+                  SelectProps={{ displayEmpty: true }}
+                  InputLabelProps={{ shrink: true }}
                   sx={{ width: 140 }}
                 >
                   <MenuItem value="">{line.ingredient?.unit || 'Đơn vị gốc'}</MenuItem>
