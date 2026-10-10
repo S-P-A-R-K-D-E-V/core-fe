@@ -216,6 +216,8 @@ export const endpoints = {
     recipe: (productId: string) => `/fnb/recipes/${productId}`,
     stock: '/fnb/stock',
     stockAdjustments: '/fnb/stock/adjustments',
+    stockLots: '/fnb/stock/lots',
+    stockVariance: '/fnb/stock/variance',
     disposals: '/fnb/disposals',
     disposal: (id: string) => `/fnb/disposals/${id}`,
     disposalReview: (id: string) => `/fnb/disposals/${id}/review`,

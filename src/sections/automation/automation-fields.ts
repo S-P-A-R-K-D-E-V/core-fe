@@ -25,6 +25,7 @@ const AREAS: Array<AutomationArea & { prefixes: string[] }> = [
   { key: 'summary', title: 'Tổng hợp', prefixes: ['daily'] },
   { key: 'attendance', title: 'Chấm công', prefixes: ['attendance'] },
   { key: 'sales', title: 'Bán hàng & thu chi', prefixes: ['sales', 'cash'] },
+  { key: 'fnb', title: 'Kho nguyên liệu F&B', prefixes: ['fnb'] },
 ];
 
 /** Quy tắc có tiền tố chưa biết vẫn hiện, ở nhóm cuối. */
@@ -159,6 +160,27 @@ const RULE_FIELDS: Record<string, Record<string, KnownField>> = {
       label: 'Phiếu chi phí từ',
       unit: 'đ',
       helperText: 'Phiếu chi phí từ mức này trở lên.',
+    },
+  },
+  'fnb.lot-expiry': {
+    time: {
+      kind: 'time',
+      label: 'Giờ báo hạn dùng',
+      helperText: `${VIETNAM_TIME} Báo lô đã quá hạn và lô còn tối đa 3 ngày tới hạn.`,
+    },
+  },
+  'fnb.stock-count': {
+    time: {
+      kind: 'time',
+      label: 'Giờ nhắc kiểm kho',
+      helperText: `${VIETNAM_TIME} Kiểm mỗi ngày thì nên đặt gần cuối ca.`,
+    },
+    intervalDays: {
+      kind: 'integer',
+      label: 'Kiểm kho mỗi',
+      unit: 'ngày',
+      helperText:
+        '1 = mỗi ngày, 7 = mỗi tuần (1–90). Quá số ngày này chưa chốt phiếu kiểm kho thì nhắc.',
     },
   },
 };

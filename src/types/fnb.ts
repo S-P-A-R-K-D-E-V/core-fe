@@ -390,6 +390,11 @@ export interface IFnbStockIngredient {
   status: FnbStockStatus;
   /** Đơn vị mua quy đổi (vd hộp = 380 ml) — nhập xuất huỷ / kiểm kho theo đơn vị này. */
   units: IFnbUnitOption[];
+  /** Hạn dùng sớm nhất của các lô còn hàng (yyyy-MM-dd); null = không lô nào ghi hạn. */
+  nearestExpiry: string | null;
+  /** Lượng thuộc lô còn ≤ 3 ngày tới hạn / đã quá hạn (đơn vị gốc). */
+  expiringQuantity: number;
+  expiredQuantity: number;
 }
 
 export interface IFnbUnitOption {
@@ -442,6 +447,10 @@ export interface IFnbDisposalLine {
   /** null với nhân viên. */
   costPrice: number | null;
   value: number | null;
+  /** Lô bị huỷ (huỷ theo lô); null = trừ theo hạn sớm nhất trước. */
+  lotId?: string | null;
+  lotLabel?: string | null;
+  lotExpiryDate?: string | null;
 }
 
 export interface IFnbDisposal {
@@ -506,3 +515,84 @@ export interface IFnbStockCount {
 }
 
 export type FnbCountScope = 'All' | 'Recipe' | 'Products';
+
+// ── Lô & hạn dùng, báo cáo hao hụt ───────────────────────────────────────
+
+export type FnbLotStatus = 'expired' | 'expiring' | 'ok' | 'none';
+export type FnbLotSource = 'PurchaseOrder' | 'Opening' | 'Adjustment';
+
+export interface IFnbLot {
+  id: string;
+  productId: string;
+  productCode: string;
+  productName: string;
+  unit: string | null;
+  source: FnbLotSource;
+  /** Số phiếu nhập (lô nhận hàng). */
+  label: string | null;
+  receivedAt: string;
+  /** yyyy-MM-dd; null = không rõ hạn. */
+  expiryDate: string | null;
+  /** Âm = đã quá hạn; null = không rõ hạn. */
+  daysLeft: number | null;
+  status: FnbLotStatus;
+  quantity: number;
+  remaining: number;
+  /** null với nhân viên. */
+  value: number | null;
+  units: IFnbUnitOption[];
+}
+
+export interface IFnbLotsReport {
+  today: string;
+  expiringDays: number;
+  lots: IFnbLot[];
+}
+
+export interface IFnbLossReason {
+  reason: FnbDisposalReason;
+  label: string;
+  quantity: number;
+  value: number;
+}
+
+export interface IFnbVarianceRow {
+  id: string;
+  code: string;
+  name: string;
+  unit: string | null;
+  unitCost: number | null;
+  opening: number;
+  purchased: number;
+  /** Dùng theo định lượng (ròng), gồm cả madeVoided. */
+  used: number;
+  madeVoided: number;
+  disposed: number;
+  disposedByReason: IFnbLossReason[];
+  /** + thừa, − thiếu khi kiểm. */
+  countVariance: number;
+  other: number;
+  closing: number;
+  loss: number;
+  lossValue: number;
+  /** 0–1; null = không tiêu hao. */
+  lossRate: number | null;
+  units: IFnbUnitOption[];
+}
+
+export interface IFnbVarianceReport {
+  from: string;
+  to: string;
+  lastCountAt: string | null;
+  totals: {
+    purchasedValue: number;
+    usedValue: number;
+    disposedValue: number;
+    madeVoidedValue: number;
+    shortageValue: number;
+    surplusValue: number;
+    lossValue: number;
+    disposedByReason: IFnbLossReason[];
+  };
+  rows: IFnbVarianceRow[];
+}

@@ -180,6 +180,8 @@ export const paths = {
       printStation: `${ROOTS.DASHBOARD}/fnb/print-station`,
       disposals: `${ROOTS.DASHBOARD}/fnb/disposals`,
       stockCounts: `${ROOTS.DASHBOARD}/fnb/stock-counts`,
+      expiry: `${ROOTS.DASHBOARD}/fnb/expiry`,
+      variance: `${ROOTS.DASHBOARD}/fnb/variance`,
     },
     penaltyPolicy: {
       root: `${ROOTS.DASHBOARD}/penalty-policy`,

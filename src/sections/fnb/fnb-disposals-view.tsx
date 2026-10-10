@@ -56,11 +56,12 @@ import { newId } from 'src/sections/fnb-pos/lib/ids';
 import { useFnbBranches } from 'src/sections/fnb-pos/use-fnb-branches';
 
 import { fQty } from './lib/stock';
-import { DOC_STATUS, factorOf, DISPOSAL_REASONS, DISPOSAL_PHOTO_THRESHOLD } from './lib/documents';
+import { fDay, DOC_STATUS, factorOf, DISPOSAL_REASONS, DISPOSAL_PHOTO_THRESHOLD } from './lib/documents';
 
 // ----------------------------------------------------------------------
 // Phiếu xuất huỷ nguyên liệu: nhân viên lập (chờ duyệt), chủ / quản lý duyệt thì mới trừ kho; quản lý lập thì hoàn tất
-// luôn. Phiếu giá trị từ 200.000 đ phải có ảnh. Huỷ phiếu đã hoàn tất = nhập lại kho.
+// luôn. Phiếu giá trị từ 200.000 đ phải có ảnh. Huỷ phiếu đã hoàn tất = nhập lại kho. Dòng gắn lô (lập từ trang Hạn dùng)
+// trừ đúng lô đó; dòng không gắn lô trừ lô hết hạn sớm nhất trước.
 // ----------------------------------------------------------------------
 
 type StatusTab = 'Pending' | 'Completed' | 'Cancelled' | 'All';
@@ -227,22 +228,39 @@ export default function FnbDisposalsView() {
 
 // ----------------------------------------------------------------------
 
-type DraftLine = { ingredient: IFnbStockIngredient | null; quantity: string; unitId: string | null; reason: FnbDisposalReason };
+export type FnbDisposalDraftLine = {
+  ingredient: IFnbStockIngredient | null;
+  quantity: string;
+  unitId: string | null;
+  reason: FnbDisposalReason;
+  /** Lô bị huỷ (lập từ trang Hạn dùng); null = trừ theo hạn sớm nhất trước. */
+  lotId: string | null;
+  lotLabel: string | null;
+};
 
-const emptyLine = (): DraftLine => ({ ingredient: null, quantity: '', unitId: null, reason: 'Expired' });
+const emptyLine = (): FnbDisposalDraftLine => ({
+  ingredient: null,
+  quantity: '',
+  unitId: null,
+  reason: 'Expired',
+  lotId: null,
+  lotLabel: null,
+});
 
 type CreateProps = {
   open: boolean;
   branchId: string;
   manager: boolean;
   ingredients: IFnbStockIngredient[];
+  /** Dòng điền sẵn khi mở (vd các lô quá hạn); không có = một dòng trống. */
+  initialLines?: FnbDisposalDraftLine[];
   onClose: VoidFunction;
   onCreated: (note: IFnbDisposal) => void;
 };
 
-function FnbDisposalCreateDialog({ open, branchId, manager, ingredients, onClose, onCreated }: CreateProps) {
+export function FnbDisposalCreateDialog({ open, branchId, manager, ingredients, initialLines, onClose, onCreated }: CreateProps) {
   const { enqueueSnackbar } = useSnackbar();
-  const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
+  const [lines, setLines] = useState<FnbDisposalDraftLine[]>([emptyLine()]);
   const [note, setNote] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
@@ -251,19 +269,19 @@ function FnbDisposalCreateDialog({ open, branchId, manager, ingredients, onClose
 
   useEffect(() => {
     if (!open) return;
-    setLines([emptyLine()]);
+    setLines(initialLines?.length ? initialLines : [emptyLine()]);
     setNote('');
     setFiles([]);
     setRequestId(newId());
-  }, [open]);
+  }, [open, initialLines]);
 
-  const update = (index: number, patch: Partial<DraftLine>) =>
+  const update = (index: number, patch: Partial<FnbDisposalDraftLine>) =>
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
 
   const valid =
     lines.length > 0 &&
     lines.every((l) => l.ingredient && Number(l.quantity) > 0) &&
-    new Set(lines.map((l) => `${l.ingredient?.id}|${l.reason}`)).size === lines.length;
+    new Set(lines.map((l) => `${l.ingredient?.id}|${l.reason}|${l.lotId ?? ''}`)).size === lines.length;
 
   // Giá trị xem trước — chỉ chủ / quản lý có giá vốn.
   const value = manager
@@ -290,6 +308,7 @@ function FnbDisposalCreateDialog({ open, branchId, manager, ingredients, onClose
           quantity: Number(l.quantity),
           unitId: l.unitId,
           reason: l.reason,
+          lotId: l.lotId,
         })),
       });
       onCreated(created);
@@ -309,60 +328,72 @@ function FnbDisposalCreateDialog({ open, branchId, manager, ingredients, onClose
           {lines.map((line, index) => {
             const units = line.ingredient?.units ?? [];
             return (
-              <Stack key={index} direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
-                <Autocomplete
-                  size="small"
-                  sx={{ flex: 2, minWidth: 200 }}
-                  options={ingredients}
-                  value={line.ingredient}
-                  getOptionLabel={(o) => o.name}
-                  isOptionEqualToValue={(a, b) => a.id === b.id}
-                  onChange={(_, v) => update(index, { ingredient: v, unitId: null })}
-                  renderInput={(params) => <TextField {...params} label="Nguyên liệu" />}
-                />
-                <TextField
-                  size="small"
-                  type="number"
-                  label="Lượng"
-                  value={line.quantity}
-                  onChange={(e) => update(index, { quantity: e.target.value })}
-                  inputProps={{ min: 0, step: 'any' }}
-                  sx={{ width: 110 }}
-                />
-                <TextField
-                  select
-                  size="small"
-                  label="Đơn vị"
-                  value={line.unitId ?? ''}
-                  onChange={(e) => update(index, { unitId: e.target.value || null })}
-                  SelectProps={{ displayEmpty: true }}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ width: 140 }}
-                >
-                  <MenuItem value="">{line.ingredient?.unit || 'Đơn vị gốc'}</MenuItem>
-                  {units.map((u) => (
-                    <MenuItem key={u.unitId} value={u.unitId}>
-                      {u.name} ({fQty(u.factor)} {line.ingredient?.unit ?? ''})
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <TextField
-                  select
-                  size="small"
-                  label="Lý do"
-                  value={line.reason}
-                  onChange={(e) => update(index, { reason: e.target.value as FnbDisposalReason })}
-                  sx={{ width: 130 }}
-                >
-                  {DISPOSAL_REASONS.map((r) => (
-                    <MenuItem key={r.value} value={r.value}>
-                      {r.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <IconButton color="error" disabled={lines.length === 1} onClick={() => setLines((p) => p.filter((_, i) => i !== index))}>
-                  <Iconify icon="solar:trash-bin-trash-bold" />
-                </IconButton>
+              <Stack key={index} spacing={0.5}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+                  <Autocomplete
+                    size="small"
+                    sx={{ flex: 2, minWidth: 200 }}
+                    options={ingredients}
+                    value={line.ingredient}
+                    getOptionLabel={(o) => o.name}
+                    isOptionEqualToValue={(a, b) => a.id === b.id}
+                    onChange={(_, v) => update(index, { ingredient: v, unitId: null, lotId: null, lotLabel: null })}
+                    renderInput={(params) => <TextField {...params} label="Nguyên liệu" />}
+                  />
+                  <TextField
+                    size="small"
+                    type="number"
+                    label="Lượng"
+                    value={line.quantity}
+                    onChange={(e) => update(index, { quantity: e.target.value })}
+                    inputProps={{ min: 0, step: 'any' }}
+                    sx={{ width: 110 }}
+                  />
+                  <TextField
+                    select
+                    size="small"
+                    label="Đơn vị"
+                    value={line.unitId ?? ''}
+                    onChange={(e) => update(index, { unitId: e.target.value || null })}
+                    SelectProps={{ displayEmpty: true }}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ width: 140 }}
+                  >
+                    <MenuItem value="">{line.ingredient?.unit || 'Đơn vị gốc'}</MenuItem>
+                    {units.map((u) => (
+                      <MenuItem key={u.unitId} value={u.unitId}>
+                        {u.name} ({fQty(u.factor)} {line.ingredient?.unit ?? ''})
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField
+                    select
+                    size="small"
+                    label="Lý do"
+                    value={line.reason}
+                    onChange={(e) => update(index, { reason: e.target.value as FnbDisposalReason })}
+                    sx={{ width: 130 }}
+                  >
+                    {DISPOSAL_REASONS.map((r) => (
+                      <MenuItem key={r.value} value={r.value}>
+                        {r.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <IconButton color="error" disabled={lines.length === 1} onClick={() => setLines((p) => p.filter((_, i) => i !== index))}>
+                    <Iconify icon="solar:trash-bin-trash-bold" />
+                  </IconButton>
+                </Stack>
+                {line.lotId && (
+                  <Chip
+                    size="small"
+                    variant="soft"
+                    color="warning"
+                    sx={{ alignSelf: 'flex-start' }}
+                    label={`Trừ đúng lô ${line.lotLabel ?? ''}`.trim()}
+                    onDelete={() => update(index, { lotId: null, lotLabel: null })}
+                  />
+                )}
               </Stack>
             );
           })}
@@ -485,8 +516,16 @@ function FnbDisposalDetailDialog({ id, manager, userId, onClose, onChanged }: De
               </TableHead>
               <TableBody>
                 {note.lines.map((l) => (
-                  <TableRow key={l.productId + l.reason}>
-                    <TableCell>{l.productName}</TableCell>
+                  <TableRow key={`${l.productId}|${l.reason}|${l.lotId ?? ''}`}>
+                    <TableCell>
+                      {l.productName}
+                      {l.lotId && (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          Lô {l.lotLabel ?? ''}
+                          {l.lotExpiryDate ? ` · HSD ${fDay(l.lotExpiryDate)}` : ''}
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell align="right">
                       {fQty(l.quantity)} {l.unit ?? ''}
                       {l.enteredUnitName ? ` (${fQty(l.enteredQuantity ?? 0)} ${l.enteredUnitName})` : ''}

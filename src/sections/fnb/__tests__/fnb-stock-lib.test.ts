@@ -3,6 +3,7 @@ import type { IFnbRecipeLine, IFnbStockIngredient, IFnbIngredientOption } from '
 import { describe, expect, it } from 'vitest';
 
 import { sortIngredients } from '../lib/stock';
+import { fDay, fQtyWithUnit } from '../lib/documents';
 import { recipeCost, recipeError, marginPercent } from '../lib/recipe';
 
 // ----------------------------------------------------------------------
@@ -69,6 +70,9 @@ const stock = (id: string, p: Partial<IFnbStockIngredient>): IFnbStockIngredient
   usedInDishes: 1,
   status: 'ok',
   units: [],
+  nearestExpiry: null,
+  expiringQuantity: 0,
+  expiredQuantity: 0,
   ...p,
 });
 
@@ -84,4 +88,21 @@ describe('kho nguyên liệu', () => {
     expect(sorted.map((s) => s.id)).toEqual(['out', 'low', 'ok-3', 'ok-5', 'idle']);
   });
 
+});
+
+describe('hạn dùng', () => {
+  it('ngày yyyy-MM-dd hiện dd/MM/yyyy', () => {
+    expect(fDay('2026-10-09')).toBe('09/10/2026');
+  });
+
+  it('lượng kèm quy ra đơn vị mua lớn nhất khi đủ một đơn vị', () => {
+    const units = [
+      { unitId: 'hop', name: 'hộp', factor: 380 },
+      { unitId: 'thung', name: 'thùng', factor: 4560 },
+    ];
+    expect(fQtyWithUnit(1140, 'ml', units)).toBe('1.140 ml (3 hộp)');
+    expect(fQtyWithUnit(9120, 'ml', units)).toBe('9.120 ml (2 thùng)');
+    expect(fQtyWithUnit(200, 'ml', units)).toBe('200 ml');
+    expect(fQtyWithUnit(200, 'g', [])).toBe('200 g');
+  });
 });

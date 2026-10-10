@@ -64,3 +64,21 @@ export function countParts(
 /** Đơn vị mua lớn nhất của nguyên liệu (dùng cho ô nhập thứ nhất); không có → null. */
 export const biggestUnit = (units: readonly IFnbUnitOption[]) =>
   units.length === 0 ? null : [...units].sort((a, b) => b.factor - a.factor)[0];
+
+/** Ngày "2026-10-09" → "09/10/2026". */
+export const fDay = (date: string) => date.split('-').reverse().join('/');
+
+/** Lượng theo đơn vị gốc kèm quy ra đơn vị mua lớn nhất còn đủ một đơn vị: "1.140 ml (3 hộp)". */
+export function fQtyWithUnit(
+  quantity: number,
+  unit: string | null,
+  units: readonly IFnbUnitOption[]
+): string {
+  const base =
+    `${quantity.toLocaleString('vi-VN', { maximumFractionDigits: 3 })} ${unit ?? ''}`.trim();
+  const big = [...units]
+    .sort((a, b) => b.factor - a.factor)
+    .find((u) => u.factor > 1 && quantity >= u.factor);
+  if (!big) return base;
+  return `${base} (${(quantity / big.factor).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} ${big.name})`;
+}

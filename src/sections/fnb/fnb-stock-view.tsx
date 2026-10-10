@@ -41,6 +41,7 @@ import { getFnbStock } from 'src/api/fnb';
 
 import { useFnbBranches } from 'src/sections/fnb-pos/use-fnb-branches';
 
+import { fDay } from './lib/documents';
 import { fQty, STATUS_LABEL, sortIngredients } from './lib/stock';
 
 // ----------------------------------------------------------------------
@@ -93,6 +94,8 @@ export default function FnbStockView() {
 
   const ingredients = useMemo(() => sortIngredients(report?.ingredients ?? []), [report]);
   const lowIngredients = ingredients.filter((i) => i.status === 'out' || i.status === 'low').length;
+  const expiredIngredients = ingredients.filter((i) => i.expiredQuantity > 0).length;
+  const expiringIngredients = ingredients.filter((i) => i.expiringQuantity > 0).length;
   const lowDishes = (report?.dishes ?? []).filter((d) => d.maxPortions <= LOW_PORTIONS).length;
   const stockValue = ingredients.reduce((s, i) => s + i.value, 0);
   const noRecipes = !!report && report.dishes.length === 0;
@@ -129,6 +132,24 @@ export default function FnbStockView() {
 
       {report && (
         <Stack spacing={2}>
+          {(expiredIngredients > 0 || expiringIngredients > 0) && (
+            <Alert
+              severity={expiredIngredients > 0 ? 'error' : 'warning'}
+              action={
+                <Button color="inherit" size="small" component={RouterLink} href={paths.dashboard.fnb.expiry}>
+                  Xem hạn dùng
+                </Button>
+              }
+            >
+              {[
+                expiredIngredients > 0 ? `${expiredIngredients} nguyên liệu có lô quá hạn — cần xuất huỷ` : '',
+                expiringIngredients > 0 ? `${expiringIngredients} nguyên liệu có lô sắp hết hạn — ưu tiên dùng trước` : '',
+              ]
+                .filter(Boolean)
+                .join('; ')}
+              .
+            </Alert>
+          )}
           {noRecipes && (
             <Alert
               severity="warning"
@@ -176,6 +197,14 @@ export default function FnbStockView() {
             </IconButton>
             <Button
               variant="outlined"
+              startIcon={<Iconify icon="solar:calendar-mark-bold" />}
+              component={RouterLink}
+              href={paths.dashboard.fnb.expiry}
+            >
+              Hạn dùng
+            </Button>
+            <Button
+              variant="outlined"
               startIcon={<Iconify icon="solar:clipboard-check-bold" />}
               component={RouterLink}
               href={paths.dashboard.fnb.stockCounts}
@@ -205,6 +234,7 @@ export default function FnbStockView() {
                       {canEdit && <TableCell align="right">Giá trị</TableCell>}
                       <TableCell align="right">Dùng {report.usageDays} ngày</TableCell>
                       <TableCell align="right">Còn đủ</TableCell>
+                      <TableCell>Hạn gần nhất</TableCell>
                       <TableCell>Trạng thái</TableCell>
                     </TableRow>
                   </TableHead>
@@ -214,7 +244,7 @@ export default function FnbStockView() {
                     ))}
                     {ingredients.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8}>
+                        <TableCell colSpan={9}>
                           <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
                             Chưa có nguyên liệu. Tạo hàng hoá với Loại mặt hàng = Nguyên liệu và nhập hàng.
                           </Typography>
@@ -324,6 +354,19 @@ function IngredientRow({ item, showCost }: RowProps) {
         {fQty(item.used)} {item.used > 0 ? item.unit ?? '' : ''}
       </TableCell>
       <TableCell align="right">{item.daysLeft == null ? '—' : `${fQty(item.daysLeft)} ngày`}</TableCell>
+      <TableCell>
+        <Typography variant="body2">{item.nearestExpiry ? fDay(item.nearestExpiry) : '—'}</Typography>
+        {item.expiredQuantity > 0 && (
+          <Typography variant="caption" color="error.main" display="block">
+            quá hạn {fQty(item.expiredQuantity)} {item.unit ?? ''}
+          </Typography>
+        )}
+        {item.expiringQuantity > 0 && (
+          <Typography variant="caption" color="warning.main" display="block">
+            sắp hết hạn {fQty(item.expiringQuantity)} {item.unit ?? ''}
+          </Typography>
+        )}
+      </TableCell>
       <TableCell>
         <Chip size="small" color={status.color} variant={status.color === 'default' ? 'outlined' : 'soft'} label={status.label} />
       </TableCell>

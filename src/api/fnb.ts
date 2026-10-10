@@ -10,6 +10,8 @@ import type {
   IFnbRecipeBook,
   IFnbRecipeLine,
   IFnbStockReport,
+  IFnbLotsReport,
+  IFnbVarianceReport,
   IKitchenTicket,
   FnbPrintStatus,
   IFnbDisposal,
@@ -208,6 +210,18 @@ export async function getFnbStock(branchId: string): Promise<IFnbStockReport> {
   return response.data;
 }
 
+/** Lô nguyên liệu còn hàng, hạn sớm nhất trước (máy chủ dựng lô cho tồn cũ chưa có lô). */
+export async function getFnbLots(branchId: string): Promise<IFnbLotsReport> {
+  const response = await axios.get<IFnbLotsReport>(endpoints.fnb.stockLots, { params: { branchId } });
+  return response.data;
+}
+
+/** Báo cáo hao hụt theo kỳ (ngày yyyy-MM-dd, tính cả hai đầu, tối đa 92 ngày) — chủ / quản lý. */
+export async function getFnbVariance(branchId: string, from: string, to: string): Promise<IFnbVarianceReport> {
+  const response = await axios.get<IFnbVarianceReport>(endpoints.fnb.stockVariance, { params: { branchId, from, to } });
+  return response.data;
+}
+
 // ── Phiếu xuất huỷ ──────────────────────────────────────────────────────
 
 export async function getFnbDisposals(branchId: string, status?: FnbDocStatus): Promise<IFnbDisposal[]> {
@@ -245,7 +259,14 @@ export async function createFnbDisposal(data: {
   clientRequestId: string;
   note?: string | null;
   photoKeys: string[];
-  lines: { productId: string; quantity: number; unitId: string | null; reason: FnbDisposalReason; note?: string | null }[];
+  lines: {
+    productId: string;
+    quantity: number;
+    unitId: string | null;
+    reason: FnbDisposalReason;
+    note?: string | null;
+    lotId?: string | null;
+  }[];
 }): Promise<IFnbDisposal> {
   const res = await axios.post<IFnbDisposal>(endpoints.fnb.disposals, data);
   return res.data;

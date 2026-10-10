@@ -471,7 +471,8 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             icon: ICONS.invoice,
             featureKey: 'commerce.fnb.pos',
           },
-          // KHO NGUYÊN LIỆU F&B: tồn + số phần món còn pha được; phiếu xuất huỷ và phiếu kiểm kho (nhân viên lập, quản lý duyệt).
+          // KHO NGUYÊN LIỆU F&B: tồn + số phần món còn pha được; hạn dùng theo lô; phiếu xuất huỷ và phiếu kiểm kho (nhân viên
+          // lập, quản lý duyệt); báo cáo hao hụt (chủ / quản lý).
           {
             title: 'Kho nguyên liệu',
             path: paths.dashboard.fnb.stock,
@@ -479,8 +480,10 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             featureKey: 'commerce.fnb.pos',
             children: [
               { title: 'Tồn & món còn pha', path: paths.dashboard.fnb.stock },
+              { title: 'Hạn dùng', path: paths.dashboard.fnb.expiry },
               { title: 'Xuất huỷ', path: paths.dashboard.fnb.disposals },
               { title: 'Kiểm kho', path: paths.dashboard.fnb.stockCounts },
+              { title: 'Hao hụt', path: paths.dashboard.fnb.variance, roles: ['Admin', 'Manager'] },
             ],
           },
           {
