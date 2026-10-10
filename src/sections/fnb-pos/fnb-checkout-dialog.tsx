@@ -77,7 +77,7 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
     }
     setMethod('Cash');
     setCash('');
-    setTransferRef(order ? `${order.tableName ?? 'Mang ve'} ${order.displayNo}` : '');
+    setTransferRef(order ? `${order.tableName ?? 'Mang ve'} #${order.displayNo}` : '');
     getBankAccounts()
       .then((list) => {
         setAccounts(list);

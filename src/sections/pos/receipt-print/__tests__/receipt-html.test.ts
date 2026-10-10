@@ -389,6 +389,18 @@ describe('renderReceiptHtml — giảm giá và hai lần thanh toán', () => {
     expect(textOf(doc.body)).toContain('Khách hàng: Trần Văn Bình - 0912345678');
   });
 
+  it('hoá đơn lưu riêng tiền khách đưa / tiền thối (khoản thu đúng bằng số trả): in khách đưa và tiền thừa', () => {
+    const tendered = normalReceipt({ payments: [payment('Cash', 'Tiền mặt', 255000)] });
+    tendered.totals = { ...tendered.totals, cashTendered: 300000, changeDue: 45000 };
+    expect(rows(parse(renderReceiptHtml(tendered)))).toEqual([
+      ['Tổng tiền hàng', '255.000đ'],
+      ['Khách cần trả', '255.000đ'],
+      ['Khách đã trả (Tiền mặt)', '255.000đ'],
+      ['Tiền khách đưa', '300.000đ'],
+      ['Tiền thừa trả khách', '45.000đ'],
+    ]);
+  });
+
   it('khách đưa dư tiền mặt: in số khách đưa và tiền thừa trả khách', () => {
     const overTender = normalReceipt({ payments: [payment('Cash', 'Tiền mặt', 300000)] });
     expect(rows(parse(renderReceiptHtml(overTender)))).toEqual([

@@ -494,6 +494,15 @@ function buildBlocks(receipt: ISalesOrderReceipt, paper: ReceiptPaper): Block[] 
       );
     }
   }
+  // Hoá đơn mới (F&B, POS tự quản tồn) lưu riêng tiền mặt khách đưa / tiền thối — khoản thu chỉ ghi đúng số đã trả nên
+  // cách tính từ khoản thu ở trên không ra tiền thừa. Không in hai lần khi khoản thu đã gồm phần dư (hoá đơn cũ).
+  const changeDue = Math.round(totals.changeDue ?? 0);
+  if (totals.cashTendered != null && changeDue > 0 && Math.round(tendered - totals.paid) <= 0 && !cancelled) {
+    blocks.push(
+      rowBlock('sb', 'Tiền khách đưa', formatReceiptMoney(totals.cashTendered), small, widthMm - SUB_INDENT_MM)
+    );
+    blocks.push(rowBlock('sb', 'Tiền thừa trả khách', formatReceiptMoney(changeDue), small, widthMm - SUB_INDENT_MM));
+  }
   // Hoá đơn đã huỷ không còn khoản nào phải trả
   if (totals.remaining > 0 && !cancelled) {
     blocks.push(

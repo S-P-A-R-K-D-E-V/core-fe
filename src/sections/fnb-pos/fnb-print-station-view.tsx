@@ -13,6 +13,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Container from '@mui/material/Container';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
 
@@ -64,7 +65,7 @@ export default function FnbPrintStationView() {
   const [running, setRunning] = useState(false);
   const [startedAt, setStartedAt] = useState(0);
   const [deviceName, setDeviceName] = useState('Máy in phiếu');
-  const [tickets, setTickets] = useState<IKitchenTicket[]>([]);
+  const [tickets, setTickets] = useState<IKitchenTicket[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [printedCount, setPrintedCount] = useState(0);
@@ -160,7 +161,7 @@ export default function FnbPrintStationView() {
     }
   };
 
-  const backlog = tickets.filter(
+  const backlog = (tickets ?? []).filter(
     (t) => t.printStatus !== 'Printed' && Date.parse(t.createdAt) < startedAt - GRACE_MS
   ).length;
 
@@ -243,10 +244,15 @@ export default function FnbPrintStationView() {
               Phiếu 2 giờ gần nhất
             </Typography>
             <List>
-              {tickets.map((t) => (
+              {tickets === null && (
+                <Stack alignItems="center" sx={{ py: 3 }}>
+                  <CircularProgress size={24} />
+                </Stack>
+              )}
+              {(tickets ?? []).map((t) => (
                 <FnbTicketRow key={t.id} ticket={t} busy={busyId === t.id} onPrint={(reprint) => printOne(t, reprint)} />
               ))}
-              {tickets.length === 0 && (
+              {tickets?.length === 0 && (
                 <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
                   Chưa có phiếu nào.
                 </Typography>

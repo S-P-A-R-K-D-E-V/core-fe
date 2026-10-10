@@ -2894,6 +2894,10 @@ export interface ISalesOrderReceiptTotals {
   paid: number;
   /** max(0, total − paid) */
   remaining: number;
+  /** Tiền mặt khách đưa (hoá đơn mới lưu riêng; khoản thu chỉ ghi đúng số đã trả). null = không ghi */
+  cashTendered?: number | null;
+  /** Tiền thối lại; null khi không có tiền khách đưa */
+  changeDue?: number | null;
 }
 
 export interface ISalesOrderReceiptPayment {

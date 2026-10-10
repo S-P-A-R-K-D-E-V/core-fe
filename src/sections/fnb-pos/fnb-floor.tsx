@@ -17,6 +17,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import ListItemText from '@mui/material/ListItemText';
 import DialogActions from '@mui/material/DialogActions';
 import CardActionArea from '@mui/material/CardActionArea';
+import CircularProgress from '@mui/material/CircularProgress';
 import ListItemButton from '@mui/material/ListItemButton';
 
 import { fCurrency } from 'src/utils/format-number';
@@ -66,7 +67,15 @@ export default function FnbFloor({ floor, now, onOpenOrder, onNewOrder, onPrinte
     else setMulti(table);
   };
 
-  if (floor && areas.length === 0 && takeaway.length === 0) {
+  if (!floor) {
+    return (
+      <Stack alignItems="center" sx={{ py: 8 }}>
+        <CircularProgress />
+      </Stack>
+    );
+  }
+
+  if (areas.length === 0 && takeaway.length === 0) {
     return (
       <Stack spacing={2}>
         <Alert severity="info">
