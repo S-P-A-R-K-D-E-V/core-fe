@@ -388,6 +388,15 @@ export interface IFnbStockIngredient {
   daysLeft: number | null;
   usedInDishes: number;
   status: FnbStockStatus;
+  /** Đơn vị mua quy đổi (vd hộp = 380 ml) — nhập xuất huỷ / kiểm kho theo đơn vị này. */
+  units: IFnbUnitOption[];
+}
+
+export interface IFnbUnitOption {
+  unitId: string;
+  name: string;
+  /** 1 đơn vị = factor đơn vị gốc. */
+  factor: number;
 }
 
 export interface IFnbDishAvailability {
@@ -412,4 +421,88 @@ export interface IFnbStockReport {
   dishes: IFnbDishAvailability[];
 }
 
-export type FnbStockReason = 'Count' | 'Damaged' | 'Expired' | 'Other';
+
+// ── Phiếu xuất huỷ / phiếu kiểm kho ───────────────────────────────────────
+
+export type FnbDocStatus = 'Draft' | 'Pending' | 'Completed' | 'Cancelled';
+export type FnbDisposalReason = 'Expired' | 'Damaged' | 'Spilled' | 'BadMake' | 'Other';
+
+export interface IFnbDisposalLine {
+  productId: string;
+  productCode: string;
+  productName: string;
+  unit: string | null;
+  /** Theo đơn vị gốc. */
+  quantity: number;
+  enteredUnitName: string | null;
+  enteredQuantity: number | null;
+  reason: FnbDisposalReason;
+  reasonLabel: string;
+  note: string | null;
+  /** null với nhân viên. */
+  costPrice: number | null;
+  value: number | null;
+}
+
+export interface IFnbDisposal {
+  id: string;
+  code: string;
+  branchId: string | null;
+  status: FnbDocStatus;
+  createdAt: string;
+  createdById: string;
+  createdByName: string | null;
+  note: string | null;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  totalValue: number | null;
+  /** Danh sách: url rỗng; chi tiết: url xem ảnh (hạn 1 giờ). */
+  photos: { key: string; url: string }[];
+  lines: IFnbDisposalLine[];
+}
+
+export interface IFnbStockCountLine {
+  lineId: string;
+  productId: string;
+  productCode: string;
+  productName: string;
+  unit: string | null;
+  units: IFnbUnitOption[];
+  isCounted: boolean;
+  countedQuantity: number | null;
+  countEntry: string | null;
+  countedAt: string | null;
+  countedByName: string | null;
+  /** null khi đếm mù (nhân viên). */
+  systemQuantity: number | null;
+  variance: number | null;
+  varianceValue: number | null;
+  varianceReason: string | null;
+  needsReason: boolean;
+}
+
+export interface IFnbStockCount {
+  id: string;
+  code: string;
+  branchId: string | null;
+  status: FnbDocStatus;
+  scope: string | null;
+  note: string | null;
+  createdAt: string;
+  createdById: string;
+  createdByName: string | null;
+  submittedAt: string | null;
+  submittedByName: string | null;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  /** Người xem đang đếm mù. */
+  blind: boolean;
+  totalLines: number;
+  countedLines: number;
+  totalVarianceValue: number | null;
+  lines: IFnbStockCountLine[] | null;
+}
+
+export type FnbCountScope = 'All' | 'Recipe' | 'Products';

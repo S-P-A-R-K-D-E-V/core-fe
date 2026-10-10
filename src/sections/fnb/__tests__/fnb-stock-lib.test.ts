@@ -2,7 +2,7 @@ import type { IFnbRecipeLine, IFnbStockIngredient, IFnbIngredientOption } from '
 
 import { describe, expect, it } from 'vitest';
 
-import { countLines, sortIngredients } from '../lib/stock';
+import { sortIngredients } from '../lib/stock';
 import { recipeCost, recipeError, marginPercent } from '../lib/recipe';
 
 // ----------------------------------------------------------------------
@@ -68,6 +68,7 @@ const stock = (id: string, p: Partial<IFnbStockIngredient>): IFnbStockIngredient
   daysLeft: null,
   usedInDishes: 1,
   status: 'ok',
+  units: [],
   ...p,
 });
 
@@ -83,9 +84,4 @@ describe('kho nguyên liệu', () => {
     expect(sorted.map((s) => s.id)).toEqual(['out', 'low', 'ok-3', 'ok-5', 'idle']);
   });
 
-  it('kiểm kê chỉ gửi ô đã nhập, hợp lệ và khác tồn hệ thống', () => {
-    const list = [stock('a', { onHand: 100 }), stock('b', { onHand: 50 }), stock('c', { onHand: 10 }), stock('d', { onHand: 5 })];
-    expect(countLines(list, { a: '94.5', b: '50', c: '', d: '-1' })).toEqual([{ productId: 'a', quantity: 94.5 }]);
-    expect(countLines(list, { c: '0' })).toEqual([{ productId: 'c', quantity: 0 }]);
-  });
 });

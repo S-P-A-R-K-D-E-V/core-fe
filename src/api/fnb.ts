@@ -9,10 +9,14 @@ import type {
   IFnbQuickNote,
   IFnbRecipeBook,
   IFnbRecipeLine,
-  FnbStockReason,
   IFnbStockReport,
   IKitchenTicket,
   FnbPrintStatus,
+  IFnbDisposal,
+  FnbDocStatus,
+  FnbCountScope,
+  IFnbStockCount,
+  FnbDisposalReason,
   IOrderCommandResult,
 } from 'src/types/fnb';
 
@@ -204,14 +208,93 @@ export async function getFnbStock(branchId: string): Promise<IFnbStockReport> {
   return response.data;
 }
 
-/** Kiểm kê (Count: quantity = số đếm) hoặc xuất huỷ (quantity = lượng bỏ đi). Gửi lại cùng clientRequestId không ghi hai lần. */
-export async function adjustFnbStock(data: {
+// ── Phiếu xuất huỷ ──────────────────────────────────────────────────────
+
+export async function getFnbDisposals(branchId: string, status?: FnbDocStatus): Promise<IFnbDisposal[]> {
+  const res = await axios.get<IFnbDisposal[]>(endpoints.fnb.disposals, { params: { branchId, status } });
+  return res.data;
+}
+
+export async function getFnbDisposal(id: string): Promise<IFnbDisposal> {
+  const res = await axios.get<IFnbDisposal>(endpoints.fnb.disposal(id));
+  return res.data;
+}
+
+/** Tải ảnh hàng huỷ thẳng lên R2: xin URL có chữ ký rồi PUT từng file; trả khoá ảnh để gửi kèm phiếu. */
+export async function uploadFnbDisposalPhotos(files: File[]): Promise<string[]> {
+  if (files.length === 0) return [];
+  const res = await axios.post<{ objectKey: string; uploadUrl: string }[]>(endpoints.fnb.disposalPhotos, {
+    files: files.map((f) => ({ fileName: f.name, contentType: f.type || 'image/jpeg' })),
+  });
+  await Promise.all(
+    res.data.map(async (slot, index) => {
+      const file = files[index];
+      const put = await fetch(slot.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'image/jpeg' },
+        body: file,
+      });
+      if (!put.ok) throw new Error(`Không tải được ảnh ${file.name}`);
+    })
+  );
+  return res.data.map((slot) => slot.objectKey);
+}
+
+export async function createFnbDisposal(data: {
   branchId: string;
   clientRequestId: string;
-  reason: FnbStockReason;
   note?: string | null;
-  lines: { productId: string; quantity: number }[];
-}): Promise<{ replayed: boolean }> {
-  const response = await axios.post<{ replayed: boolean }>(endpoints.fnb.stockAdjustments, data);
-  return response.data;
+  photoKeys: string[];
+  lines: { productId: string; quantity: number; unitId: string | null; reason: FnbDisposalReason; note?: string | null }[];
+}): Promise<IFnbDisposal> {
+  const res = await axios.post<IFnbDisposal>(endpoints.fnb.disposals, data);
+  return res.data;
+}
+
+/** action: approve | reject | cancel. */
+export async function reviewFnbDisposal(id: string, action: 'approve' | 'reject' | 'cancel', note?: string | null) {
+  const res = await axios.post<IFnbDisposal>(endpoints.fnb.disposalReview(id), { action, note });
+  return res.data;
+}
+
+// ── Phiếu kiểm kho ──────────────────────────────────────────────────────
+
+export async function getFnbStockCounts(branchId: string, status?: FnbDocStatus): Promise<IFnbStockCount[]> {
+  const res = await axios.get<IFnbStockCount[]>(endpoints.fnb.stockCounts, { params: { branchId, status } });
+  return res.data;
+}
+
+export async function getFnbStockCount(id: string): Promise<IFnbStockCount> {
+  const res = await axios.get<IFnbStockCount>(endpoints.fnb.stockCount(id));
+  return res.data;
+}
+
+export async function createFnbStockCount(data: {
+  branchId: string;
+  scope: FnbCountScope;
+  productIds?: string[];
+  note?: string | null;
+}): Promise<IFnbStockCount> {
+  const res = await axios.post<IFnbStockCount>(endpoints.fnb.stockCounts, data);
+  return res.data;
+}
+
+/** Lưu số đếm: mỗi dòng gồm các phần theo đơn vị (unitId null = đơn vị gốc); parts rỗng = xoá số đếm. */
+export async function saveFnbStockCount(
+  id: string,
+  entries: { lineId: string; parts: { unitId: string | null; quantity: number }[] }[]
+): Promise<IFnbStockCount> {
+  const res = await axios.put<IFnbStockCount>(endpoints.fnb.stockCountEntries(id), { entries });
+  return res.data;
+}
+
+/** action: submit | approve | return | cancel; approve kèm lý do cho dòng chênh lớn. */
+export async function reviewFnbStockCount(
+  id: string,
+  action: 'submit' | 'approve' | 'return' | 'cancel',
+  note?: string | null,
+  reasons?: { lineId: string; reason: string }[]
+): Promise<IFnbStockCount> {
+  const res = await axios.post<IFnbStockCount>(endpoints.fnb.stockCountReview(id), { action, note, reasons });
+  return res.data;
 }

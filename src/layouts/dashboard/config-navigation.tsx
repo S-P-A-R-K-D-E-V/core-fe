@@ -471,12 +471,17 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             icon: ICONS.invoice,
             featureKey: 'commerce.fnb.pos',
           },
-          // KHO NGUYÊN LIỆU F&B (tồn, số ngày còn đủ, số phần món còn pha được, kiểm kê / xuất huỷ).
+          // KHO NGUYÊN LIỆU F&B: tồn + số phần món còn pha được; phiếu xuất huỷ và phiếu kiểm kho (nhân viên lập, quản lý duyệt).
           {
             title: 'Kho nguyên liệu',
             path: paths.dashboard.fnb.stock,
             icon: ICONS.product,
             featureKey: 'commerce.fnb.pos',
+            children: [
+              { title: 'Tồn & món còn pha', path: paths.dashboard.fnb.stock },
+              { title: 'Xuất huỷ', path: paths.dashboard.fnb.disposals },
+              { title: 'Kiểm kho', path: paths.dashboard.fnb.stockCounts },
+            ],
           },
           {
             title: 'Đơn bán hàng',
