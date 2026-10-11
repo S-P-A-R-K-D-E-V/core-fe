@@ -13,6 +13,8 @@ import type {
   IFnbLotsReport,
   IFnbVarianceReport,
   IFnbBatch,
+  IFnbForecastAdvice,
+  IFnbForecastResponse,
   IFnbBatchRecipeBook,
   IFnbBatchRecipeLine,
   IKitchenTicket,
@@ -223,6 +225,32 @@ export async function getFnbLots(branchId: string): Promise<IFnbLotsReport> {
 export async function getFnbVariance(branchId: string, from: string, to: string): Promise<IFnbVarianceReport> {
   const response = await axios.get<IFnbVarianceReport>(endpoints.fnb.stockVariance, { params: { branchId, from, to } });
   return response.data;
+}
+
+// ── Dự báo nhập ─────────────────────────────────────────────────────────
+
+/** Dự báo hết nguyên liệu + gợi ý nhập (chủ / quản lý), kèm cờ trợ lý AI dùng được không. */
+export async function getFnbForecast(branchId: string): Promise<IFnbForecastResponse> {
+  const res = await axios.get<IFnbForecastResponse>(endpoints.fnb.stockForecast, { params: { branchId } });
+  return res.data;
+}
+
+/** AI đọc bảng dự báo và viết tóm tắt (409 khi cửa hàng chưa bật trợ lý AI). */
+export async function analyzeFnbForecast(branchId: string): Promise<IFnbForecastAdvice> {
+  const res = await axios.post<IFnbForecastAdvice>(endpoints.fnb.stockForecastAnalyze, { branchId });
+  return res.data;
+}
+
+/** Tạo phiếu nhập NHÁP — mỗi nhà cung cấp một phiếu; quantity theo đơn vị unitId (null = đơn vị gốc). */
+export async function createFnbForecastOrders(
+  branchId: string,
+  lines: { productId: string; supplierId: string; quantity: number; unitId: string | null }[]
+): Promise<{ orderId: string; supplierId: string; lines: number }[]> {
+  const res = await axios.post<{ orderId: string; supplierId: string; lines: number }[]>(endpoints.fnb.stockForecastOrders, {
+    branchId,
+    lines,
+  });
+  return res.data;
 }
 
 // ── Bán thành phẩm: công thức mẻ, phiếu pha ─────────────────────────────

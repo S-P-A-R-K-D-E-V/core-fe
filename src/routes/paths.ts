@@ -183,6 +183,7 @@ export const paths = {
       expiry: `${ROOTS.DASHBOARD}/fnb/expiry`,
       variance: `${ROOTS.DASHBOARD}/fnb/variance`,
       batches: `${ROOTS.DASHBOARD}/fnb/batches`,
+      forecast: `${ROOTS.DASHBOARD}/fnb/forecast`,
     },
     penaltyPolicy: {
       root: `${ROOTS.DASHBOARD}/penalty-policy`,

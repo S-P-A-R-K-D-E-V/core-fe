@@ -183,6 +183,31 @@ const RULE_FIELDS: Record<string, Record<string, KnownField>> = {
         '1 = mỗi ngày, 7 = mỗi tuần (1–90). Quá số ngày này chưa chốt phiếu kiểm kho thì nhắc.',
     },
   },
+  'fnb.reorder': {
+    time: {
+      kind: 'time',
+      label: 'Giờ báo cần nhập',
+      helperText: `${VIETNAM_TIME} Báo nguyên liệu còn đủ dùng ≤ ngày giao + dự phòng.`,
+    },
+    leadDays: {
+      kind: 'integer',
+      label: 'Hàng về sau',
+      unit: 'ngày',
+      helperText: 'Từ lúc đặt tới lúc nhà cung cấp giao (0–30).',
+    },
+    safetyDays: {
+      kind: 'integer',
+      label: 'Dự phòng',
+      unit: 'ngày',
+      helperText: 'Phòng hàng về trễ hoặc bán nhiều hơn dự báo (0–30).',
+    },
+    coverDays: {
+      kind: 'integer',
+      label: 'Mỗi lần nhập đủ dùng',
+      unit: 'ngày',
+      helperText: 'Lượng gợi ý nhập đủ dùng chừng này ngày sau khi hàng về (1–60). Trang Dự báo nhập dùng chung các số này.',
+    },
+  },
 };
 
 /** Nhãn chung theo tên khoá: kênh gửi (mọi quy tắc đều có) và các khoá quen khi một quy tắc MỚI dùng lại. */

@@ -673,3 +673,74 @@ export interface IFnbBatch {
   unitCost: number | null;
   lines: IFnbBatchLine[];
 }
+
+// ── Dự báo nhập nguyên liệu ──────────────────────────────────────────────
+
+/** out = hết, order = nên đặt ngay, soon = sắp tới lúc đặt, ordered = đã đặt đủ, ok, idle = không dùng. */
+export type FnbForecastStatus = 'out' | 'order' | 'soon' | 'ordered' | 'ok' | 'idle';
+export type FnbForecastConfidence = 'low' | 'medium' | 'high';
+
+export interface IFnbForecastPurchase {
+  /** null = đơn vị gốc. */
+  unitId: string | null;
+  unitName: string | null;
+  factor: number;
+  /** Số lượng theo đơn vị nhập. */
+  quantity: number;
+  unitPrice: number | null;
+}
+
+export interface IFnbForecastRow {
+  id: string;
+  code: string;
+  name: string;
+  unit: string | null;
+  kind: FnbItemKind;
+  onHand: number;
+  /** Tồn dùng được = tồn − phần sẽ hỏng trước khi kịp dùng. */
+  usable: number;
+  waste: number;
+  avgDaily: number;
+  /** Chỉ số 0 = Chủ nhật … 6 = Thứ Bảy. */
+  weekday: number[];
+  last7Daily: number;
+  /** 7 ngày gần nhất / trung bình trước đó; null = chưa đủ dữ liệu. */
+  trend: number | null;
+  dataDays: number;
+  confidence: FnbForecastConfidence;
+  daysLeft: number | null;
+  runOutDate: string | null;
+  reorderPoint: number;
+  onOrder: number;
+  status: FnbForecastStatus;
+  /** Lượng nên nhập (đơn vị gốc); 0 = chưa cần. */
+  suggestedQuantity: number;
+  purchase: IFnbForecastPurchase | null;
+  /** Bán thành phẩm có công thức mẻ — pha thêm thay vì nhập. */
+  makeInHouse: boolean;
+  supplierId: string | null;
+  supplierName: string | null;
+  estimatedCost: number | null;
+  units: IFnbUnitOption[];
+}
+
+export interface IFnbForecastReport {
+  generatedAt: string;
+  today: string;
+  historyDays: number;
+  dataDays: number;
+  confidence: FnbForecastConfidence;
+  settings: { leadDays: number; safetyDays: number; coverDays: number };
+  rows: IFnbForecastRow[];
+}
+
+export interface IFnbForecastResponse {
+  report: IFnbForecastReport;
+  aiAvailable: boolean;
+  aiUnavailableReason: string | null;
+}
+
+export interface IFnbForecastAdvice {
+  text: string;
+  generatedAt: string;
+}
