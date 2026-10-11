@@ -185,6 +185,9 @@ export async function createProduct(data: ICreateProductRequest): Promise<{ id: 
     taxType: data.taxType,
     taxRate: data.taxRate,
     taxRateDirect: data.taxRateDirect ?? data.vatRate,
+    // F&B: Loại mặt hàng / Là món thêm — bỏ trống (không bật F&B) thì máy chủ giữ mặc định / giá trị đang lưu.
+    itemKind: data.itemKind,
+    isTopping: data.isTopping,
     attributes: data.attributes,
     images: data.images,
     variants: data.variants?.map((v) => ({
@@ -229,6 +232,9 @@ export async function updateProduct(id: string, data: IUpdateProductRequest): Pr
     taxType: data.taxType,
     taxRate: data.taxRate,
     taxRateDirect: data.taxRateDirect ?? data.vatRate,
+    // F&B: Loại mặt hàng / Là món thêm — bỏ trống (không bật F&B) thì máy chủ giữ mặc định / giá trị đang lưu.
+    itemKind: data.itemKind,
+    isTopping: data.isTopping,
     attributes: data.attributes,
     images: data.images,
     variants: data.variants?.map((v) => ({
