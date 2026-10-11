@@ -56,6 +56,8 @@ const TYPE_LABELS: Record<string, { label: string; color: 'success' | 'error' | 
   Damage: { label: 'Xuất huỷ', color: 'error' },
   InternalUse: { label: 'Dùng nội bộ', color: 'warning' },
   FnbUsage: { label: 'Pha chế', color: 'info' },
+  FnbBatchUse: { label: 'Dùng pha mẻ', color: 'info' },
+  FnbBatchYield: { label: 'Pha mẻ ra', color: 'success' },
 };
 
 // ----------------------------------------------------------------------

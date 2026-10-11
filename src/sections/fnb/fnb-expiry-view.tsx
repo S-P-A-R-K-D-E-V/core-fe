@@ -60,6 +60,7 @@ const LOT_STATUS: Record<
 
 const SOURCE_LABEL = {
   PurchaseOrder: 'Nhập hàng',
+  Batch: 'Pha mẻ',
   Opening: 'Tồn đầu',
   Adjustment: 'Điều chỉnh',
 } as const;

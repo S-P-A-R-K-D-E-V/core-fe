@@ -39,8 +39,8 @@ import { fQty } from './lib/stock';
 import { fDay } from './lib/documents';
 
 // ----------------------------------------------------------------------
-// Báo cáo hao hụt nguyên liệu (chủ / quản lý): theo kỳ, mỗi nguyên liệu tồn đầu + nhập − dùng theo định lượng − xuất huỷ
-// ± chênh kiểm kê ± khác = tồn cuối. Hao hụt = xuất huỷ + món đã pha rồi huỷ + thiếu khi kiểm.
+// Báo cáo hao hụt nguyên liệu (chủ / quản lý): theo kỳ, mỗi nguyên liệu tồn đầu + nhập − dùng theo định lượng ± pha mẻ
+// − xuất huỷ ± chênh kiểm kê ± khác = tồn cuối. Hao hụt = xuất huỷ + món đã pha rồi huỷ + thiếu khi kiểm.
 // ----------------------------------------------------------------------
 
 /** Ngày theo giờ máy (Việt Nam) dạng yyyy-MM-dd. */
@@ -214,6 +214,7 @@ export default function FnbVarianceView() {
                   <TableCell align="right">Tồn đầu</TableCell>
                   <TableCell align="right">Nhập</TableCell>
                   <TableCell align="right">Dùng</TableCell>
+                  <TableCell align="right">Pha mẻ</TableCell>
                   <TableCell align="right">Xuất huỷ</TableCell>
                   <TableCell align="right">Chênh kiểm</TableCell>
                   <TableCell align="right">Khác</TableCell>
@@ -228,7 +229,7 @@ export default function FnbVarianceView() {
                 ))}
                 {report.rows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={10}>
+                    <TableCell colSpan={11}>
                       <Typography
                         variant="body2"
                         color="text.secondary"
@@ -246,10 +247,11 @@ export default function FnbVarianceView() {
       </Card>
 
       <Alert severity="info" sx={{ mt: 2 }}>
-        Dùng = nguyên liệu trừ theo định lượng khi gửi bar (đã cộng lại món huỷ chưa pha). Hao hụt =
+        Dùng = nguyên liệu trừ theo định lượng khi gửi bar (đã cộng lại món huỷ chưa pha). Pha mẻ = bán thành phẩm pha ra
+        (+) hoặc nguyên liệu dùng pha mẻ (−). Hao hụt =
         xuất huỷ + món đã pha rồi huỷ + phần thiếu khi kiểm kho (hao hụt không giải thích được). Giá
-        trị theo giá vốn hiện tại; tỷ lệ = hao hụt / tổng tiêu hao (dùng + xuất huỷ + thiếu khi
-        kiểm).
+        trị theo giá vốn hiện tại; tỷ lệ = hao hụt / tổng tiêu hao (dùng + dùng pha mẻ + xuất huỷ
+        + thiếu khi kiểm).
       </Alert>
     </Container>
   );
@@ -304,6 +306,22 @@ function VarianceRow({ row }: { row: IFnbVarianceRow }) {
           <Typography variant="caption" color="warning.main" display="block">
             pha rồi huỷ {fQty(row.madeVoided)}
           </Typography>
+        )}
+      </TableCell>
+      <TableCell align="right">
+        {row.produced || row.batchUsed ? (
+          <Tooltip
+            title={[
+              row.produced ? `Pha ra ${fQty(row.produced)} ${unit}` : '',
+              row.batchUsed ? `Dùng pha mẻ ${fQty(row.batchUsed)} ${unit}` : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          >
+            <span>{signed(row.produced - row.batchUsed)}</span>
+          </Tooltip>
+        ) : (
+          '—'
         )}
       </TableCell>
       <TableCell align="right">

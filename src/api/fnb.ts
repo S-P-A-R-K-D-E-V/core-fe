@@ -12,6 +12,9 @@ import type {
   IFnbStockReport,
   IFnbLotsReport,
   IFnbVarianceReport,
+  IFnbBatch,
+  IFnbBatchRecipeBook,
+  IFnbBatchRecipeLine,
   IKitchenTicket,
   FnbPrintStatus,
   IFnbDisposal,
@@ -220,6 +223,48 @@ export async function getFnbLots(branchId: string): Promise<IFnbLotsReport> {
 export async function getFnbVariance(branchId: string, from: string, to: string): Promise<IFnbVarianceReport> {
   const response = await axios.get<IFnbVarianceReport>(endpoints.fnb.stockVariance, { params: { branchId, from, to } });
   return response.data;
+}
+
+// ── Bán thành phẩm: công thức mẻ, phiếu pha ─────────────────────────────
+
+/** Mọi bán thành phẩm kèm công thức mẻ + nguyên liệu để chọn (nhân viên: không có giá vốn). */
+export async function getFnbBatchRecipes(branchId: string): Promise<IFnbBatchRecipeBook> {
+  const res = await axios.get<IFnbBatchRecipeBook>(endpoints.fnb.batchRecipes, { params: { branchId } });
+  return res.data;
+}
+
+/** Thay công thức mẻ (lines rỗng = bỏ công thức) — chủ / quản lý. */
+export async function setFnbBatchRecipe(
+  productId: string,
+  data: { yieldQuantity: number; shelfLifeDays: number | null; note?: string | null; lines: IFnbBatchRecipeLine[] }
+): Promise<void> {
+  await axios.put(endpoints.fnb.batchRecipe(productId), data);
+}
+
+export async function getFnbBatches(branchId: string, from?: string, to?: string): Promise<IFnbBatch[]> {
+  const res = await axios.get<IFnbBatch[]>(endpoints.fnb.batches, { params: { branchId, from, to } });
+  return res.data;
+}
+
+/** Lập phiếu pha mẻ — ghi kho ngay. lines / actualYield / expiryDate bỏ trống = theo công thức. */
+export async function createFnbBatch(data: {
+  branchId: string;
+  clientRequestId: string;
+  productId: string;
+  batchCount: number;
+  actualYield?: number | null;
+  expiryDate?: string | null;
+  lines?: IFnbBatchRecipeLine[] | null;
+  note?: string | null;
+}): Promise<IFnbBatch> {
+  const res = await axios.post<IFnbBatch>(endpoints.fnb.batches, data);
+  return res.data;
+}
+
+/** Huỷ phiếu pha (ghi ngược kho): quản lý bắt buộc lý do; nhân viên huỷ phiếu của mình trong 60 phút. */
+export async function cancelFnbBatch(id: string, note?: string | null): Promise<IFnbBatch> {
+  const res = await axios.post<IFnbBatch>(endpoints.fnb.batchCancel(id), { note });
+  return res.data;
 }
 
 // ── Phiếu xuất huỷ ──────────────────────────────────────────────────────

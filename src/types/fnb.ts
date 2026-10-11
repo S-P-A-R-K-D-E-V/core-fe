@@ -519,7 +519,7 @@ export type FnbCountScope = 'All' | 'Recipe' | 'Products';
 // ── Lô & hạn dùng, báo cáo hao hụt ───────────────────────────────────────
 
 export type FnbLotStatus = 'expired' | 'expiring' | 'ok' | 'none';
-export type FnbLotSource = 'PurchaseOrder' | 'Opening' | 'Adjustment';
+export type FnbLotSource = 'PurchaseOrder' | 'Batch' | 'Opening' | 'Adjustment';
 
 export interface IFnbLot {
   id: string;
@@ -528,7 +528,7 @@ export interface IFnbLot {
   productName: string;
   unit: string | null;
   source: FnbLotSource;
-  /** Số phiếu nhập (lô nhận hàng). */
+  /** Số phiếu nhập (lô nhận hàng) hoặc số phiếu pha (lô pha mẻ). */
   label: string | null;
   receivedAt: string;
   /** yyyy-MM-dd; null = không rõ hạn. */
@@ -567,6 +567,10 @@ export interface IFnbVarianceRow {
   /** Dùng theo định lượng (ròng), gồm cả madeVoided. */
   used: number;
   madeVoided: number;
+  /** Bán thành phẩm pha ra từ phiếu pha mẻ (ròng). */
+  produced: number;
+  /** Lượng dùng pha mẻ bán thành phẩm (ròng). */
+  batchUsed: number;
   disposed: number;
   disposedByReason: IFnbLossReason[];
   /** + thừa, − thiếu khi kiểm. */
@@ -595,4 +599,77 @@ export interface IFnbVarianceReport {
     disposedByReason: IFnbLossReason[];
   };
   rows: IFnbVarianceRow[];
+}
+
+// ── Bán thành phẩm pha theo mẻ ───────────────────────────────────────────
+
+export interface IFnbBatchRecipeLine {
+  ingredientId: string;
+  /** Lượng cho MỘT mẻ, đơn vị gốc của nguyên liệu. */
+  quantity: number;
+}
+
+export interface IFnbBatchRecipeItem {
+  productId: string;
+  code: string;
+  name: string;
+  unit: string | null;
+  onHand: number;
+  /** Sản lượng một mẻ (đơn vị gốc); null = chưa có công thức mẻ. */
+  yieldQuantity: number | null;
+  /** Hạn của lô pha = ngày pha + số ngày này; null = không ghi hạn. */
+  shelfLifeDays: number | null;
+  note: string | null;
+  lines: IFnbBatchRecipeLine[];
+  /** Giá vốn nguyên liệu một mẻ — null với nhân viên / chưa có giá vốn. */
+  batchCost: number | null;
+  /** Giá vốn một đơn vị gốc theo công thức. */
+  recipeUnitCost: number | null;
+  /** Giá vốn bình quân hiện tại. */
+  unitCost: number | null;
+  units: IFnbUnitOption[];
+}
+
+export interface IFnbBatchRecipeBook {
+  items: IFnbBatchRecipeItem[];
+  ingredients: IFnbIngredientOption[];
+}
+
+export interface IFnbBatchLine {
+  ingredientId: string;
+  code: string;
+  name: string;
+  unit: string | null;
+  quantity: number;
+  /** null với nhân viên. */
+  unitCost: number | null;
+  value: number | null;
+}
+
+export interface IFnbBatch {
+  id: string;
+  code: string;
+  branchId: string;
+  productId: string;
+  productCode: string;
+  productName: string;
+  unit: string | null;
+  batchCount: number;
+  /** Sản lượng theo công thức; null = pha không theo công thức. */
+  plannedYield: number | null;
+  actualYield: number;
+  expiryDate: string | null;
+  lotId: string | null;
+  status: 'Completed' | 'Cancelled';
+  note: string | null;
+  createdAt: string;
+  createdById: string;
+  createdByName: string | null;
+  cancelledAt: string | null;
+  cancelledByName: string | null;
+  cancelNote: string | null;
+  /** null với nhân viên. */
+  totalCost: number | null;
+  unitCost: number | null;
+  lines: IFnbBatchLine[];
 }

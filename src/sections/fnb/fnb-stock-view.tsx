@@ -203,6 +203,16 @@ export default function FnbStockView() {
             >
               Hạn dùng
             </Button>
+            {report?.ingredients.some((i) => i.kind === 'SemiFinished') && (
+              <Button
+                variant="outlined"
+                startIcon={<Iconify icon="solar:bottle-bold" />}
+                component={RouterLink}
+                href={paths.dashboard.fnb.batches}
+              >
+                Pha mẻ
+              </Button>
+            )}
             <Button
               variant="outlined"
               startIcon={<Iconify icon="solar:clipboard-check-bold" />}

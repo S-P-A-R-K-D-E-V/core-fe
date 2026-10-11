@@ -481,6 +481,7 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             children: [
               { title: 'Tồn & món còn pha', path: paths.dashboard.fnb.stock },
               { title: 'Hạn dùng', path: paths.dashboard.fnb.expiry },
+              { title: 'Pha mẻ', path: paths.dashboard.fnb.batches },
               { title: 'Xuất huỷ', path: paths.dashboard.fnb.disposals },
               { title: 'Kiểm kho', path: paths.dashboard.fnb.stockCounts },
               { title: 'Hao hụt', path: paths.dashboard.fnb.variance, roles: ['Admin', 'Manager'] },
