@@ -55,6 +55,7 @@ import {
   daysLeftText,
   needsAttention,
   groupBySupplier,
+  aiUnavailableText,
   FORECAST_STATUS,
   CONFIDENCE_LABEL,
   type ForecastOrderDraft,
@@ -160,7 +161,7 @@ export default function FnbForecastView() {
                 ))}
               </TextField>
             )}
-            <Tooltip title={data && !data.aiAvailable ? 'Trợ lý AI chưa bật cho cửa hàng (gói ai.assistant).' : ''}>
+            <Tooltip title={data && !data.aiAvailable ? aiUnavailableText(data.aiUnavailableReason) : ''}>
               <span>
                 <LoadingButton
                   variant="outlined"

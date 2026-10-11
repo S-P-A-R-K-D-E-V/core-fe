@@ -2,7 +2,15 @@ import type { IFnbForecastRow } from 'src/types/fnb';
 
 import { describe, expect, it } from 'vitest';
 
-import { trendOf, draftLines, weekdayText, daysLeftText, needsAttention, groupBySupplier } from '../lib/forecast';
+import {
+  trendOf,
+  draftLines,
+  weekdayText,
+  daysLeftText,
+  needsAttention,
+  groupBySupplier,
+  aiUnavailableText,
+} from '../lib/forecast';
 
 // ----------------------------------------------------------------------
 
@@ -54,6 +62,13 @@ describe('dự báo nhập', () => {
     expect(needsAttention(row({ status: 'ok' }))).toBe(false);
     expect(needsAttention(row({ status: 'ok', waste: 50 }))).toBe(true);
     expect(needsAttention(row({ status: 'ordered' }))).toBe(true);
+  });
+
+  it('lý do nút AI tắt theo máy chủ', () => {
+    expect(aiUnavailableText('not_configured')).toMatch(/chưa được cấu hình/);
+    expect(aiUnavailableText('feature_off')).toMatch(/ai\.assistant/);
+    expect(aiUnavailableText('role_not_allowed')).toMatch(/quản lý/);
+    expect(aiUnavailableText(null)).toMatch(/chưa được cấu hình/);
   });
 
   it('phiếu nháp: bỏ hàng pha tại quán / không có gợi ý, gom theo nhà cung cấp', () => {

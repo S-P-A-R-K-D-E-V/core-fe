@@ -24,6 +24,20 @@ export const CONFIDENCE_LABEL: Record<FnbForecastConfidence, string> = {
   high: 'cao',
 };
 
+/** Vì sao nút "Phân tích AI" tắt — theo lý do máy chủ trả (AssistantUnavailableReasons). */
+export function aiUnavailableText(reason: string | null): string {
+  switch (reason) {
+    case 'feature_off':
+      return 'Gói của cửa hàng chưa có trợ lý AI (ai.assistant).';
+    case 'role_not_allowed':
+      return 'Chỉ chủ cửa hàng / quản lý dùng được phân tích AI.';
+    case 'sign_in_required':
+      return 'Phiên đăng nhập không thuộc cửa hàng này — đăng nhập lại.';
+    default:
+      return 'Trợ lý AI chưa được cấu hình trên máy chủ (thiếu khoá AI của trợ lý cửa hàng).';
+  }
+}
+
 /** Trạng thái cần quản lý để ý (đặt hàng / đã đặt) hoặc có hàng sẽ hỏng. */
 export const needsAttention = (row: IFnbForecastRow) =>
   row.status === 'out' || row.status === 'order' || row.status === 'soon' || row.status === 'ordered' || row.waste > 0;
