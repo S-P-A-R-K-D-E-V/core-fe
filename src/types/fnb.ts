@@ -41,6 +41,74 @@ export interface IFnbMenuDish {
   priceFrom: number;
   variants: IFnbMenuVariant[];
   toppingIds: string[];
+  /** Món là combo: các nhóm thành phần; null / thiếu = món thường. Combo không có size và không nhận món thêm. */
+  combo?: IFnbMenuCombo | null;
+}
+
+/** Mỗi nhóm chọn đúng một lựa chọn (nhóm một lựa chọn = thành phần cố định); lựa chọn đầu là mặc định. */
+export interface IFnbMenuCombo {
+  groups: IFnbMenuComboGroup[];
+}
+
+export interface IFnbMenuComboGroup {
+  id: string;
+  name: string;
+  sortOrder: number;
+  options: IFnbMenuComboOption[];
+}
+
+export interface IFnbMenuComboOption {
+  /** Dòng bán được của món thành phần (size hoặc chính món). */
+  productId: string;
+  dishId: string;
+  name: string;
+  variantName: string | null;
+  /** Số lượng cho MỖI combo. */
+  quantity: number;
+  /** Giá bán lẻ của món thành phần. */
+  price: number;
+  /** Phụ thu cộng vào giá combo khi chọn. */
+  surcharge: number;
+  isSoldOut: boolean;
+  sortOrder: number;
+}
+
+// ── Khai combo (Thiết lập F&B) ──────────────────────────────────────────
+
+export interface IFnbComboOptionItem {
+  productId: string;
+  name: string;
+  variantName: string | null;
+  quantity: number;
+  surcharge: number;
+  /** Giá bán lẻ hiện tại; null khi món không còn trên thực đơn. */
+  price: number | null;
+  isAvailable: boolean;
+}
+
+export interface IFnbComboItem {
+  productId: string;
+  code: string;
+  name: string;
+  price: number;
+  /** false = món đã tắt, hoặc có nhóm không còn lựa chọn hợp lệ. */
+  isOnMenu: boolean;
+  /** Tổng giá bán lẻ của các lựa chọn mặc định. */
+  componentsPrice: number;
+  groups: { id: string; name: string; options: IFnbComboOptionItem[] }[];
+}
+
+export interface IFnbComboBook {
+  combos: IFnbComboItem[];
+  /** Món chưa là combo, không có size — biến thành combo được. */
+  candidates: { productId: string; code: string; name: string; price: number }[];
+  /** Dòng bán được của các món thường — chọn làm thành phần được. */
+  choices: { productId: string; dishId: string; name: string; variantName: string | null; price: number }[];
+}
+
+export interface IFnbComboGroupInput {
+  name: string;
+  options: { productId: string; quantity: number; surcharge: number }[];
 }
 
 export interface IFnbMenuTopping {
@@ -98,6 +166,18 @@ export interface ILineTopping {
   unitPrice: number;
 }
 
+/** Thành phần đã chọn của dòng combo; `quantity` là số lượng cho MỖI combo. */
+export interface ILineComponent {
+  groupId: string;
+  groupName: string;
+  productId: string;
+  name: string;
+  variantName: string | null;
+  quantity: number;
+  listPrice: number;
+  surcharge: number;
+}
+
 export interface IOrderLine {
   id: string;
   /** Thứ tự hiển thị trong đơn do máy chủ cấp. */
@@ -130,6 +210,8 @@ export interface IOrderLine {
   createdAt: string;
   createdByName: string;
   flags: string[];
+  /** Dòng combo: các món thành phần đã chọn (rỗng / thiếu với món thường). Huỷ / chuyển đi cả combo. */
+  components?: ILineComponent[];
 }
 
 export interface IOrderDiscount {
@@ -233,6 +315,8 @@ export interface IKitchenTicketLine {
   toppings: { name: string; quantity: number }[];
   quickNotes: string[];
   note: string | null;
+  /** Dòng combo: các món quầy bar phải làm, số lượng cho MỖI combo. */
+  components?: { name: string; variantName: string | null; quantity: number }[];
 }
 
 /** Phiếu bar: nội dung chụp lúc tạo (không đổi) + trạng thái in (đổi được). */

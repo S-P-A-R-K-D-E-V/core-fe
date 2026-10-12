@@ -222,6 +222,8 @@ export const endpoints = {
     stockForecast: '/fnb/stock/forecast',
     stockForecastAnalyze: '/fnb/stock/forecast/analyze',
     stockForecastOrders: '/fnb/stock/forecast/orders',
+    combos: '/fnb/menu/combos',
+    combo: (productId: string) => `/fnb/menu/combos/${productId}`,
     batchRecipes: '/fnb/batch-recipes',
     batchRecipe: (productId: string) => `/fnb/batch-recipes/${productId}`,
     batches: '/fnb/batches',

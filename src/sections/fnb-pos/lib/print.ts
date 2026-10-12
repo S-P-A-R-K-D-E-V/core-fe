@@ -40,11 +40,18 @@ export function kitchenTicketHtml(ticket: IKitchenTicket, reprint = false): stri
   const place = ticket.tableName ? `${ticket.areaName ? `${ticket.areaName} · ` : ''}${ticket.tableName}` : 'MANG VỀ';
   const lines = ticket.lines
     .map((l) => {
+      // Combo: quầy bar làm từng món thành phần — in đậm, kèm tổng số lượng của món đó (số combo × số lượng trong combo).
+      const components = (l.components ?? [])
+        .map(
+          (c) =>
+            `<div class="sub row"><b>- ${escapeHtml(lineTitle(c))}</b><b>${c.quantity * l.quantity}</b></div>`
+        )
+        .join('');
       const toppings = l.toppings.map((t) => `<div class="sub">+ ${escapeHtml(t.name)}${t.quantity > 1 ? ` x${t.quantity}` : ''}</div>`).join('');
       const notes = [...l.quickNotes, ...(l.note ? [l.note] : [])]
         .map((n) => `<div class="sub">* ${escapeHtml(n)}</div>`)
         .join('');
-      return `<div class="line"><div class="row"><span>${escapeHtml(lineTitle(l))}</span><span class="qty">${l.quantity}</span></div>${toppings}${notes}</div>`;
+      return `<div class="line"><div class="row"><span>${escapeHtml(lineTitle(l))}</span><span class="qty">${l.quantity}</span></div>${components}${toppings}${notes}</div>`;
     })
     .join('');
   const body = `<h1>${isVoid ? 'HỦY MÓN' : `PHIẾU BAR${ticket.roundNo ? ` · Lượt ${ticket.roundNo}` : ''}`}</h1>
@@ -63,10 +70,13 @@ export function billHtml(order: IOpenOrder, storeName: string | null): string {
     .filter(isActiveLine)
     .sort((a, b) => a.seq - b.seq)
     .map((l) => {
+      const components = (l.components ?? [])
+        .map((c) => `<div class="sub">- ${escapeHtml(lineTitle(c))} x${c.quantity * l.quantity}</div>`)
+        .join('');
       const toppings = l.toppings
         .map((t) => `<div class="sub">+ ${escapeHtml(t.name)} x${t.quantity * l.quantity}</div>`)
         .join('');
-      return `<div class="line"><div class="row"><span>${escapeHtml(lineTitle(l))} x${l.quantity}</span><span>${money(l.amount)}</span></div>${toppings}</div>`;
+      return `<div class="line"><div class="row"><span>${escapeHtml(lineTitle(l))} x${l.quantity}</span><span>${money(l.amount)}</span></div>${components}${toppings}</div>`;
     })
     .join('');
   const t = order.totals;

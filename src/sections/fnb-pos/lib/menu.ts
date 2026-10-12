@@ -1,5 +1,13 @@
 // Port từ app (corecms-mobile src/features/fnb/menu.ts) — giữ cùng quy tắc để web và app tính giống nhau.
-import type { IFnbMenu, IFnbMenuCategory, IFnbMenuDish, IFnbMenuTopping, IFnbMenuVariant, IFnbQuickNote } from 'src/types/fnb';
+import type {
+  IFnbMenu,
+  IFnbMenuDish,
+  IFnbQuickNote,
+  IFnbMenuTopping,
+  IFnbMenuVariant,
+  IFnbMenuCategory,
+  IFnbMenuComboOption,
+} from 'src/types/fnb';
 
 // ----------------------------------------------------------------------
 // Thực đơn trên máy (contract 3.1): một gói cho chi nhánh, app tự lọc theo nhóm / tên. Sắp xếp theo `sortOrder`
@@ -88,5 +96,17 @@ export function quickNotesFor(menu: IFnbMenu | null | undefined, dish: IFnbMenuD
 
 /** Bấm món mở bảng tuỳ chọn khi có nhiều size hoặc có món thêm; còn lại thêm thẳng. */
 export function dishNeedsOptions(menu: IFnbMenu | null | undefined, dish: IFnbMenuDish): boolean {
+  // Combo có nhóm nhiều lựa chọn thì phải mở hộp thoại để chọn; combo toàn thành phần cố định thêm thẳng.
+  if (dish.combo) return dish.combo.groups.some((g) => g.options.length > 1);
   return dish.variants.length > 1 || allowedToppings(menu, dish).length > 0;
+}
+
+/** Tên một thành phần combo: "Cà phê sữa (L)", số lượng lớn hơn 1 thì thêm " x2". */
+export const componentTitle = (c: { name: string; variantName: string | null; quantity: number }) =>
+  `${c.name}${c.variantName ? ` (${c.variantName})` : ''}${c.quantity > 1 ? ` x${c.quantity}` : ''}`;
+
+/** Nhãn một lựa chọn của nhóm combo: tên, phụ thu nếu có, "hết" nếu đã báo hết. */
+export function comboOptionLabel(option: IFnbMenuComboOption): string {
+  const surcharge = option.surcharge > 0 ? ` · +${option.surcharge.toLocaleString('vi-VN')} đ` : '';
+  return `${componentTitle(option)}${surcharge}${option.isSoldOut ? ' · hết' : ''}`;
 }

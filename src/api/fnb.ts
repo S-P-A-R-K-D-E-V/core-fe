@@ -13,6 +13,8 @@ import type {
   IFnbLotsReport,
   IFnbVarianceReport,
   IFnbDishMarginReport,
+  IFnbComboBook,
+  IFnbComboGroupInput,
   IFnbBatch,
   IFnbForecastAdvice,
   IFnbForecastResponse,
@@ -261,6 +263,19 @@ export async function createFnbForecastOrders(
 }
 
 // ── Bán thành phẩm: công thức mẻ, phiếu pha ─────────────────────────────
+
+// ── Combo ───────────────────────────────────────────────────────────────
+
+/** Combo đã khai + món biến thành combo được + dòng bán được để chọn làm thành phần — chủ / quản lý. */
+export async function getFnbCombos(branchId: string): Promise<IFnbComboBook> {
+  const res = await axios.get<IFnbComboBook>(endpoints.fnb.combos, { params: { branchId } });
+  return res.data;
+}
+
+/** Thay nhóm thành phần của một món (groups rỗng = món thôi là combo) — chủ / quản lý. */
+export async function setFnbCombo(productId: string, groups: IFnbComboGroupInput[]): Promise<void> {
+  await axios.put(endpoints.fnb.combo(productId), { groups });
+}
 
 /** Mọi bán thành phẩm kèm công thức mẻ + nguyên liệu để chọn (nhân viên: không có giá vốn). */
 export async function getFnbBatchRecipes(branchId: string): Promise<IFnbBatchRecipeBook> {

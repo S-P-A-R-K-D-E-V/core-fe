@@ -19,8 +19,16 @@ import { fCurrency } from 'src/utils/format-number';
 
 import Iconify from 'src/components/iconify';
 
-import { quickNotesFor, sortedVariants, variantSoldOut, defaultVariant, allowedToppings } from './lib/menu';
-import { itemDraft, MAX_QTY, MAX_NOTE_LEN, openItemDraft, MAX_QUICK_NOTES, MAX_TOPPING_QTY } from './lib/draft';
+import { quickNotesFor, sortedVariants, variantSoldOut, defaultVariant, allowedToppings, comboOptionLabel } from './lib/menu';
+import {
+  itemDraft,
+  MAX_QTY,
+  MAX_NOTE_LEN,
+  openItemDraft,
+  comboComponents,
+  MAX_QUICK_NOTES,
+  MAX_TOPPING_QTY,
+} from './lib/draft';
 
 import type { DraftLine } from './lib/draft';
 
@@ -48,10 +56,12 @@ type DishProps = {
   onAdd: (line: DraftLine) => void;
 };
 
-/** Chọn size, món thêm, ghi chú cho một món rồi thêm vào lượt đang chọn. */
+/** Chọn size, món thêm (hoặc lựa chọn của từng nhóm combo), ghi chú cho một món rồi thêm vào lượt đang chọn. */
 export function FnbDishDialog({ open, menu, dish, onClose, onAdd }: DishProps) {
   const [variantId, setVariantId] = useState<string | null>(null);
   const [toppingQty, setToppingQty] = useState<Record<string, number>>({});
+  // Combo: nhóm → productId đã chọn (nhóm chưa chọn lấy lựa chọn mặc định còn bán).
+  const [choices, setChoices] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<string[]>([]);
   const [note, setNote] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -60,6 +70,7 @@ export function FnbDishDialog({ open, menu, dish, onClose, onAdd }: DishProps) {
     if (!open || !dish) return;
     setVariantId(defaultVariant(dish)?.productId ?? null);
     setToppingQty({});
+    setChoices({});
     setNotes([]);
     setNote('');
     setQuantity(1);
@@ -69,10 +80,16 @@ export function FnbDishDialog({ open, menu, dish, onClose, onAdd }: DishProps) {
 
   const variants = sortedVariants(dish);
   const variant = variants.find((v) => v.productId === variantId) ?? null;
-  const toppings = allowedToppings(menu, dish);
+  // Combo không nhận món thêm.
+  const toppings = dish.combo ? [] : allowedToppings(menu, dish);
+  const components = comboComponents(dish, choices);
+  const comboBlocked = components.some((c) =>
+    dish.combo?.groups.find((g) => g.id === c.groupId)?.options.find((o) => o.productId === c.productId)?.isSoldOut
+  );
   const quickNotes = quickNotesFor(menu, dish);
   const toppingSum = toppings.reduce((s, t) => s + (toppingQty[t.productId] ?? 0) * t.price, 0);
-  const preview = variant ? quantity * (variant.price + toppingSum) : 0;
+  const surcharge = components.reduce((s, c) => s + c.surcharge, 0);
+  const preview = variant ? quantity * (variant.price + toppingSum + surcharge) : 0;
 
   const add = () => {
     if (!variant) return;
@@ -82,6 +99,7 @@ export function FnbDishDialog({ open, menu, dish, onClose, onAdd }: DishProps) {
         toppings: toppings
           .filter((t) => (toppingQty[t.productId] ?? 0) > 0)
           .map((t) => ({ productId: t.productId, name: t.name, quantity: toppingQty[t.productId], unitPrice: t.price })),
+        components,
         quickNotes: notes,
         note,
       })
@@ -114,6 +132,30 @@ export function FnbDishDialog({ open, menu, dish, onClose, onAdd }: DishProps) {
               </Stack>
             </Stack>
           )}
+
+          {dish.combo?.groups.map((group) => {
+            const picked = components.find((c) => c.groupId === group.id)?.productId;
+            return (
+              <Stack key={group.id} spacing={1}>
+                <Typography variant="subtitle2">
+                  {group.name}
+                  {group.options.length > 1 ? ' — chọn 1' : ''}
+                </Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  {group.options.map((o) => (
+                    <Chip
+                      key={o.productId}
+                      label={comboOptionLabel(o)}
+                      color={o.productId === picked ? 'primary' : 'default'}
+                      variant={o.productId === picked ? 'filled' : 'outlined'}
+                      disabled={o.isSoldOut}
+                      onClick={() => setChoices((prev) => ({ ...prev, [group.id]: o.productId }))}
+                    />
+                  ))}
+                </Stack>
+              </Stack>
+            );
+          })}
 
           {toppings.length > 0 && (
             <Stack spacing={1}>
@@ -179,7 +221,7 @@ export function FnbDishDialog({ open, menu, dish, onClose, onAdd }: DishProps) {
         <Button variant="outlined" onClick={onClose}>
           Huỷ
         </Button>
-        <Button variant="contained" disabled={!variant} onClick={add}>
+        <Button variant="contained" disabled={!variant || comboBlocked} onClick={add}>
           Thêm · {fCurrency(preview)}
         </Button>
       </DialogActions>

@@ -40,7 +40,7 @@ import FnbCheckoutDialog from './fnb-checkout-dialog';
 import { billHtml, kitchenTicketHtml } from './lib/print';
 import { FnbDishDialog, FnbOpenItemDialog } from './fnb-dish-dialog';
 import { addDraft, itemDraft, draftTotal, draftAmount, setDraftQty, toLineInput } from './lib/draft';
-import { filterDishes, defaultVariant, dishNeedsOptions, sortedCategories } from './lib/menu';
+import { filterDishes, defaultVariant, componentTitle, dishNeedsOptions, sortedCategories } from './lib/menu';
 import { FnbMoveDialog, FnbVoidDialog, FnbCancelDialog, FnbDiscountDialog } from './fnb-order-actions';
 import {
   roundsOf,
@@ -391,6 +391,7 @@ export default function FnbOrderScreen({ branchId, storeName, menu, floor, targe
                     </Typography>
                     <Typography variant="body2" color={d.isSoldOut ? 'error.main' : 'text.secondary'}>
                       {d.isSoldOut ? 'Hết món' : fCurrency(d.priceFrom)}
+                      {d.combo && !d.isSoldOut ? ' · Combo' : ''}
                     </Typography>
                   </CardActionArea>
                 </Card>
@@ -648,8 +649,16 @@ export default function FnbOrderScreen({ branchId, storeName, menu, floor, targe
 
 // ----------------------------------------------------------------------
 
-function DraftDetails({ line }: { line: Pick<DraftLine, 'toppings' | 'quickNotes' | 'note'> }) {
+function DraftDetails({
+  line,
+}: {
+  line: Pick<DraftLine, 'toppings' | 'quickNotes' | 'note'> & {
+    components?: { name: string; variantName: string | null; quantity: number }[];
+  };
+}) {
   const parts = [
+    // Combo: các món thành phần đã chọn.
+    ...(line.components ?? []).map(componentTitle),
     ...line.toppings.map((t) => `+${t.name}${t.quantity > 1 ? ` x${t.quantity}` : ''}`),
     ...line.quickNotes,
     ...(line.note ? [line.note] : []),
