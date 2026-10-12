@@ -218,6 +218,7 @@ export const endpoints = {
     stockAdjustments: '/fnb/stock/adjustments',
     stockLots: '/fnb/stock/lots',
     stockVariance: '/fnb/stock/variance',
+    dishMargin: '/fnb/reports/dish-margin',
     stockForecast: '/fnb/stock/forecast',
     stockForecastAnalyze: '/fnb/stock/forecast/analyze',
     stockForecastOrders: '/fnb/stock/forecast/orders',

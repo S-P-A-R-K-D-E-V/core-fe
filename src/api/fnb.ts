@@ -12,6 +12,7 @@ import type {
   IFnbStockReport,
   IFnbLotsReport,
   IFnbVarianceReport,
+  IFnbDishMarginReport,
   IFnbBatch,
   IFnbForecastAdvice,
   IFnbForecastResponse,
@@ -224,6 +225,12 @@ export async function getFnbLots(branchId: string): Promise<IFnbLotsReport> {
 /** Báo cáo hao hụt theo kỳ (ngày yyyy-MM-dd, tính cả hai đầu, tối đa 92 ngày) — chủ / quản lý. */
 export async function getFnbVariance(branchId: string, from: string, to: string): Promise<IFnbVarianceReport> {
   const response = await axios.get<IFnbVarianceReport>(endpoints.fnb.stockVariance, { params: { branchId, from, to } });
+  return response.data;
+}
+
+/** Lãi gộp theo món trong kỳ (ngày yyyy-MM-dd theo giờ bán, tính cả hai đầu, tối đa 92 ngày) — chủ / quản lý. */
+export async function getFnbDishMargin(branchId: string, from: string, to: string): Promise<IFnbDishMarginReport> {
+  const response = await axios.get<IFnbDishMarginReport>(endpoints.fnb.dishMargin, { params: { branchId, from, to } });
   return response.data;
 }
 

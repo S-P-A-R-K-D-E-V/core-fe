@@ -485,6 +485,7 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
               { title: 'Xuất huỷ', path: paths.dashboard.fnb.disposals },
               { title: 'Kiểm kho', path: paths.dashboard.fnb.stockCounts },
               { title: 'Hao hụt', path: paths.dashboard.fnb.variance, roles: ['Admin', 'Manager'] },
+              { title: 'Lãi gộp theo món', path: paths.dashboard.fnb.margin, roles: ['Admin', 'Manager'] },
               { title: 'Dự báo nhập', path: paths.dashboard.fnb.forecast, roles: ['Admin', 'Manager'] },
             ],
           },

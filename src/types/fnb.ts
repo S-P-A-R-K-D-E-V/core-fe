@@ -601,6 +601,50 @@ export interface IFnbVarianceReport {
   rows: IFnbVarianceRow[];
 }
 
+// ── Lãi gộp theo món ─────────────────────────────────────────────────────
+
+/** dish = món, topping = món thêm, goods = hàng bán thẳng (trừ tồn chính nó). */
+export type FnbDishMarginKind = 'dish' | 'topping' | 'goods';
+
+/** Một mặt hàng đã bán trong kỳ (size là một dòng riêng); tiền đã làm tròn đồng. */
+export interface IFnbDishMarginRow {
+  id: string;
+  code: string;
+  name: string;
+  kind: FnbDishMarginKind;
+  quantity: number;
+  /** Sau giảm giá dòng và giảm giá toàn đơn. */
+  revenue: number;
+  averagePrice: number | null;
+  /** Giá vốn của các dòng có giá vốn. */
+  cost: number;
+  /** Giá vốn bình quân một đơn vị; null = chưa dòng nào có giá vốn. */
+  unitCost: number | null;
+  /** Doanh thu của các dòng có giá vốn − giá vốn. */
+  profit: number;
+  /** 0–1; null = không dòng nào có giá vốn. */
+  marginRate: number | null;
+  uncostedQuantity: number;
+  /** Doanh thu của các dòng chưa có giá vốn — không nằm trong lãi gộp. */
+  uncostedRevenue: number;
+  /** 0–1: tỷ trọng doanh thu trong kỳ. */
+  revenueShare: number | null;
+}
+
+export interface IFnbDishMarginReport {
+  from: string;
+  to: string;
+  invoiceCount: number;
+  totals: {
+    revenue: number;
+    cost: number;
+    profit: number;
+    marginRate: number | null;
+    uncostedRevenue: number;
+  };
+  rows: IFnbDishMarginRow[];
+}
+
 // ── Bán thành phẩm pha theo mẻ ───────────────────────────────────────────
 
 export interface IFnbBatchRecipeLine {
