@@ -44,6 +44,7 @@ import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
+import FnbBranchNotice from 'src/sections/fnb-pos/fnb-branch-notice';
 import { useFnbBranches } from 'src/sections/fnb-pos/use-fnb-branches';
 
 import { fQty } from './lib/stock';
@@ -72,7 +73,7 @@ type Filter = 'attention' | 'all';
 export default function FnbForecastView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
-  const { branches, branchId, setBranchId } = useFnbBranches();
+  const { branchId } = useFnbBranches();
 
   const [data, setData] = useState<IFnbForecastResponse | null>(null);
   const [filter, setFilter] = useState<Filter>('attention');
@@ -145,22 +146,6 @@ export default function FnbForecastView() {
         ]}
         action={
           <Stack direction="row" spacing={1} alignItems="center">
-            {branches && branches.length > 1 && (
-              <TextField
-                select
-                size="small"
-                label="Chi nhánh"
-                value={branchId}
-                onChange={(e) => setBranchId(e.target.value)}
-                sx={{ minWidth: 180 }}
-              >
-                {branches.map((b) => (
-                  <MenuItem key={b.id} value={b.id}>
-                    {b.branchName}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
             <Tooltip title={data && !data.aiAvailable ? aiUnavailableText(data.aiUnavailableReason) : ''}>
               <span>
                 <LoadingButton
@@ -187,11 +172,7 @@ export default function FnbForecastView() {
         sx={{ mb: 3 }}
       />
 
-      {branches?.length === 0 && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Cửa hàng chưa có chi nhánh loại hình F&amp;B đang hoạt động.
-        </Alert>
-      )}
+      <FnbBranchNotice sx={{ mb: 2 }} />
 
       {report && (
         <>

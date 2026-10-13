@@ -14,7 +14,6 @@ import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
-import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import Container from '@mui/material/Container';
 import TableBody from '@mui/material/TableBody';
@@ -54,6 +53,7 @@ import {
   reviewFnbStockCount,
 } from 'src/api/fnb';
 
+import FnbBranchNotice from 'src/sections/fnb-pos/fnb-branch-notice';
 import { useFnbBranches } from 'src/sections/fnb-pos/use-fnb-branches';
 
 import { fQty } from './lib/stock';
@@ -76,7 +76,7 @@ export default function FnbStockCountsView() {
   const { user } = useAuthContext();
   const { enqueueSnackbar } = useSnackbar();
   const manager = ['Admin', 'Manager'].some((r) => user?.role === r || (user?.roles ?? []).includes(r));
-  const { branches, branchId, setBranchId } = useFnbBranches();
+  const { branchId } = useFnbBranches();
 
   const [tab, setTab] = useState<StatusTab>('Draft');
   const [counts, setCounts] = useState<IFnbStockCount[] | null>(null);
@@ -131,15 +131,6 @@ export default function FnbStockCountsView() {
         ]}
         action={
           <Stack direction="row" spacing={1}>
-            {branches && branches.length > 1 && (
-              <TextField select size="small" label="Chi nhánh" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
-                {branches.map((b) => (
-                  <MenuItem key={b.id} value={b.id}>
-                    {b.branchName}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
             <Button
               variant="contained"
               startIcon={<Iconify icon="mingcute:add-line" />}
@@ -153,7 +144,7 @@ export default function FnbStockCountsView() {
         sx={{ mb: 3 }}
       />
 
-      {branches?.length === 0 && <Alert severity="info">Chưa có chi nhánh F&amp;B nào bạn được làm.</Alert>}
+      <FnbBranchNotice sx={{ mb: 2 }} />
 
       <Card>
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 2 }}>

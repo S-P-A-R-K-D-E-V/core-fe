@@ -1,53 +1,21 @@
 'use client';
 
-import type { IBranchLocation } from 'src/types/corecms-api';
+import { useMemo } from 'react';
 
-import { useState, useEffect, useCallback } from 'react';
-
-import { getCurrentUser } from 'src/api/users';
-import { getBranchLocations } from 'src/api/attendance';
+import { useWorkingBranch } from 'src/store/working-branch-store';
 
 // ----------------------------------------------------------------------
-// Chi nhánh F&B mà tài khoản được làm (branchScope của /users/me: Admin / chưa phân công = mọi chi nhánh), chi nhánh
-// đang chọn nhớ trên máy — dùng chung cho Bán hàng F&B, Kho nguyên liệu, Máy in phiếu.
+// Chi nhánh F&B của các màn F&B (Bán hàng, Kho nguyên liệu, Máy in phiếu, Thiết lập…) = chi nhánh đang làm việc
+// chọn ở header, khi chi nhánh đó là F&B. Chi nhánh đang làm việc không phải F&B → branchId rỗng, màn hiện
+// FnbBranchNotice để chuyển sang một chi nhánh F&B.
 // ----------------------------------------------------------------------
-
-const BRANCH_KEY = 'fnb.pos.branchId';
 
 export function useFnbBranches() {
-  const [branches, setBranches] = useState<IBranchLocation[] | null>(null);
-  const [branchId, setBranchIdState] = useState('');
+  const branch = useWorkingBranch((s) => s.branch);
+  const options = useWorkingBranch((s) => s.options);
 
-  useEffect(() => {
-    Promise.all([getBranchLocations(), getCurrentUser().catch(() => null)])
-      .then(([list, me]) => {
-        const scope = me?.branchScope;
-        const fnb = list.filter(
-          (b) =>
-            b.isActive !== false &&
-            b.businessType?.toLowerCase() === 'fnb' &&
-            (!scope || scope.allBranches || scope.branchIds.includes(b.id))
-        );
-        setBranches(fnb);
-        let saved = '';
-        try {
-          saved = window.localStorage.getItem(BRANCH_KEY) ?? '';
-        } catch {
-          // bỏ qua
-        }
-        setBranchIdState(fnb.some((b) => b.id === saved) ? saved : fnb[0]?.id ?? '');
-      })
-      .catch(() => setBranches([]));
-  }, []);
+  /** Các chi nhánh F&B tài khoản được làm; null = chưa hỏi xong danh sách chi nhánh. */
+  const branches = useMemo(() => options?.filter((b) => b.type === 'fnb') ?? null, [options]);
 
-  const setBranchId = useCallback((id: string) => {
-    setBranchIdState(id);
-    try {
-      window.localStorage.setItem(BRANCH_KEY, id);
-    } catch {
-      // bỏ qua
-    }
-  }, []);
-
-  return { branches, branchId, setBranchId };
+  return { branches, branchId: branch?.type === 'fnb' ? branch.id : '' };
 }

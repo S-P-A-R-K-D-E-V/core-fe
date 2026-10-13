@@ -16,6 +16,7 @@ import { useSettingsContext } from 'src/components/settings';
 import Searchbar from '../common/searchbar';
 import { NAV, HEADER } from '../config-layout';
 import SettingsButton from '../common/settings-button';
+import BranchSwitcher from '../common/branch-switcher';
 import AccountPopover from '../common/account-popover';
 import UsersPopover from '../common/users-popover';
 import LanguagePopover from '../common/language-popover';
@@ -51,6 +52,8 @@ export default function Header({ onOpenNav }: Props) {
           <SvgColor src="/assets/icons/navbar/ic_menu_item.svg" />
         </IconButton>
       )}
+
+      <BranchSwitcher />
 
       <Searchbar />
 

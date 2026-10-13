@@ -9,6 +9,8 @@ import Iconify from 'src/components/iconify';
 import SvgColor from 'src/components/svg-color';
 import { useStoreBrand } from 'src/components/branding';
 
+import { BranchType, menuBranchTypes, useWorkingBranch } from 'src/store/working-branch-store';
+
 // ----------------------------------------------------------------------
 
 const icon = (name: string) => (
@@ -48,16 +50,17 @@ const ICONS = {
 
 // ----------------------------------------------------------------------
 
-/** Lọc nav item theo role VÀ theo feature key đang bật cho tenant hiện tại (đệ quy vào children).
+/** Lọc nav item theo role, theo feature key đang bật cho tenant hiện tại VÀ theo loại chi nhánh (đệ quy vào children).
  * Item không khai báo featureKey luôn hiện (không phải mọi mục đều gắn với 1 feature có thể tắt). featureKey là mảng =
- * hiện khi bật MỘT TRONG các khoá (vd hàng hoá dùng chung cho bán lẻ và F&B). */
-function filterByRoleAndFeature<T extends { roles?: string[]; featureKey?: string | string[]; children?: T[] }>(
-  items: T[],
-  userRole: string,
-  enabledFeatures: string[]
-): T[] {
+ * hiện khi bật MỘT TRONG các khoá (vd hàng hoá dùng chung cho bán lẻ và F&B).
+ * Item có branchType chỉ hiện khi loại đó nằm trong branchTypes (xem menuBranchTypes: nhân viên = loại của chi nhánh
+ * đang làm việc, quản lý = các loại trong chi nhánh được phân công); branchTypes null = không thu hẹp (chủ cửa hàng). */
+function filterNavItems<
+  T extends { roles?: string[]; featureKey?: string | string[]; branchType?: BranchType; children?: T[] },
+>(items: T[], userRole: string, enabledFeatures: string[], branchTypes: BranchType[] | null): T[] {
   return items
     .filter((item) => !item.roles || item.roles.includes(userRole))
+    .filter((item) => !item.branchType || !branchTypes || branchTypes.includes(item.branchType))
     .filter(
       (item) =>
         !item.featureKey ||
@@ -67,7 +70,9 @@ function filterByRoleAndFeature<T extends { roles?: string[]; featureKey?: strin
     )
     .map((item) => ({
       ...item,
-      children: item.children ? filterByRoleAndFeature(item.children, userRole, enabledFeatures) : undefined,
+      children: item.children
+        ? filterNavItems(item.children, userRole, enabledFeatures, branchTypes)
+        : undefined,
     }));
 }
 
@@ -75,6 +80,13 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
   const { t } = useTranslate();
 
   const { isCiCi } = useStoreBrand();
+
+  const branch = useWorkingBranch((s) => s.branch);
+  const branchOptions = useWorkingBranch((s) => s.options);
+  const branchTypes = useMemo(
+    () => menuBranchTypes(userRole, branch, branchOptions),
+    [userRole, branch, branchOptions]
+  );
 
   const data = useMemo(
     () => {
@@ -185,6 +197,7 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             icon: ICONS.order,
             roles: ['Admin', 'Manager'],
             featureKey: 'commerce.fnb.pos',
+            branchType: 'fnb' as BranchType,
           },
 
           // CÀI ĐẶT CỬA HÀNG (thương hiệu, KiotViet riêng, khoá API cho trợ lý AI)
@@ -463,6 +476,7 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             path: paths.dashboard.fnb.pos,
             icon: ICONS.ecommerce,
             featureKey: 'commerce.fnb.pos',
+            branchType: 'fnb' as BranchType,
           },
           // MÁY IN PHIẾU F&B (máy tính quầy bar tự in phiếu bar của chi nhánh).
           {
@@ -470,6 +484,7 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             path: paths.dashboard.fnb.printStation,
             icon: ICONS.invoice,
             featureKey: 'commerce.fnb.pos',
+            branchType: 'fnb' as BranchType,
           },
           // KHO NGUYÊN LIỆU F&B: tồn + số phần món còn pha được; hạn dùng theo lô; phiếu xuất huỷ và phiếu kiểm kho (nhân viên
           // lập, quản lý duyệt); báo cáo hao hụt (chủ / quản lý).
@@ -478,6 +493,7 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             path: paths.dashboard.fnb.stock,
             icon: ICONS.product,
             featureKey: 'commerce.fnb.pos',
+            branchType: 'fnb' as BranchType,
             children: [
               { title: 'Tồn & món còn pha', path: paths.dashboard.fnb.stock },
               { title: 'Hạn dùng', path: paths.dashboard.fnb.expiry },
@@ -551,18 +567,18 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
       // Nếu user chưa load hoặc chưa có role → trả nguyên (SplashScreen đang hiện)
       if (!userRole) return fullNav;
 
-      // Lọc từng group theo role + feature đang bật cho tenant, bỏ group rỗng.
+      // Lọc từng group theo role + feature đang bật cho tenant + loại chi nhánh, bỏ group rỗng.
       // enabledFeatures undefined (chưa fetch xong /users/me) → coi như chưa bật gì, tránh
       // nháy hiện rồi ẩn khi tenant có feature bị tắt.
       return fullNav
         .map((group) => ({
           ...group,
-          items: filterByRoleAndFeature(group.items as any[], userRole, enabledFeatures ?? []),
+          items: filterNavItems(group.items as any[], userRole, enabledFeatures ?? [], branchTypes),
         }))
         .filter((group) => group.items.length > 0);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, userRole, enabledFeatures, isCiCi]
+    [t, userRole, enabledFeatures, isCiCi, branchTypes]
   );
 
   return data;

@@ -11,7 +11,6 @@ import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
-import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import Container from '@mui/material/Container';
 import TableBody from '@mui/material/TableBody';
@@ -33,6 +32,7 @@ import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
+import FnbBranchNotice from 'src/sections/fnb-pos/fnb-branch-notice';
 import { useFnbBranches } from 'src/sections/fnb-pos/use-fnb-branches';
 
 import { fQty } from './lib/stock';
@@ -62,7 +62,7 @@ const signed = (n: number) => (n === 0 ? '0' : `${n > 0 ? '+' : '−'}${fQty(Mat
 export default function FnbVarianceView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
-  const { branches, branchId, setBranchId } = useFnbBranches();
+  const { branchId } = useFnbBranches();
 
   const [from, setFrom] = useState(daysAgo(6));
   const [to, setTo] = useState(isoDay(new Date()));
@@ -109,26 +109,10 @@ export default function FnbVarianceView() {
           { name: 'Kho nguyên liệu', href: paths.dashboard.fnb.stock },
           { name: 'Hao hụt' },
         ]}
-        action={
-          branches &&
-          branches.length > 1 && (
-            <TextField
-              select
-              size="small"
-              label="Chi nhánh"
-              value={branchId}
-              onChange={(e) => setBranchId(e.target.value)}
-            >
-              {branches.map((b) => (
-                <MenuItem key={b.id} value={b.id}>
-                  {b.branchName}
-                </MenuItem>
-              ))}
-            </TextField>
-          )
-        }
         sx={{ mb: 3 }}
       />
+
+      <FnbBranchNotice sx={{ mb: 2 }} />
 
       <Card sx={{ p: 2, mb: 2 }}>
         <Stack

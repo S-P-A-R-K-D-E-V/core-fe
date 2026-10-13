@@ -12,13 +12,11 @@ import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
-import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import Container from '@mui/material/Container';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -36,6 +34,7 @@ import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
+import FnbBranchNotice from 'src/sections/fnb-pos/fnb-branch-notice';
 import { useFnbBranches } from 'src/sections/fnb-pos/use-fnb-branches';
 
 import { fDay, fQtyWithUnit } from './lib/documents';
@@ -109,7 +108,7 @@ export default function FnbExpiryView() {
   const manager = ['Admin', 'Manager'].some(
     (r) => user?.role === r || (user?.roles ?? []).includes(r)
   );
-  const { branches, branchId, setBranchId } = useFnbBranches();
+  const { branchId } = useFnbBranches();
 
   const [filter, setFilter] = useState<Filter>('attention');
   const [report, setReport] = useState<IFnbLotsReport | null>(null);
@@ -151,21 +150,6 @@ export default function FnbExpiryView() {
         ]}
         action={
           <Stack direction="row" spacing={1}>
-            {branches && branches.length > 1 && (
-              <TextField
-                select
-                size="small"
-                label="Chi nhánh"
-                value={branchId}
-                onChange={(e) => setBranchId(e.target.value)}
-              >
-                {branches.map((b) => (
-                  <MenuItem key={b.id} value={b.id}>
-                    {b.branchName}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
             <Button
               variant="contained"
               color="error"
@@ -182,9 +166,7 @@ export default function FnbExpiryView() {
         sx={{ mb: 3 }}
       />
 
-      {branches?.length === 0 && (
-        <Alert severity="info">Chưa có chi nhánh F&amp;B nào bạn được làm.</Alert>
-      )}
+      <FnbBranchNotice sx={{ mb: 2 }} />
 
       {report && (
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>

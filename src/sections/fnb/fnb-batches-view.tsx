@@ -11,7 +11,6 @@ import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
-import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import Container from '@mui/material/Container';
 import TableBody from '@mui/material/TableBody';
@@ -43,6 +42,7 @@ import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
 import { newId } from 'src/sections/fnb-pos/lib/ids';
+import FnbBranchNotice from 'src/sections/fnb-pos/fnb-branch-notice';
 import { useFnbBranches } from 'src/sections/fnb-pos/use-fnb-branches';
 
 import { fQty } from './lib/stock';
@@ -72,7 +72,7 @@ export default function FnbBatchesView() {
   const { user } = useAuthContext();
   const { enqueueSnackbar } = useSnackbar();
   const manager = ['Admin', 'Manager'].some((r) => user?.role === r || (user?.roles ?? []).includes(r));
-  const { branches, branchId, setBranchId } = useFnbBranches();
+  const { branchId } = useFnbBranches();
 
   const [days, setDays] = useState<number>(7);
   const [batches, setBatches] = useState<IFnbBatch[] | null>(null);
@@ -117,22 +117,6 @@ export default function FnbBatchesView() {
         ]}
         action={
           <Stack direction="row" spacing={1} alignItems="center">
-            {branches && branches.length > 1 && (
-              <TextField
-                select
-                size="small"
-                label="Chi nhánh"
-                value={branchId}
-                onChange={(e) => setBranchId(e.target.value)}
-                sx={{ minWidth: 180 }}
-              >
-                {branches.map((b) => (
-                  <MenuItem key={b.id} value={b.id}>
-                    {b.branchName}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
             <Button
               variant="contained"
               startIcon={<Iconify icon="mingcute:add-line" />}
@@ -146,11 +130,7 @@ export default function FnbBatchesView() {
         sx={{ mb: 3 }}
       />
 
-      {branches?.length === 0 && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Cửa hàng chưa có chi nhánh loại hình F&amp;B đang hoạt động.
-        </Alert>
-      )}
+      <FnbBranchNotice sx={{ mb: 2 }} />
       {book && book.items.length === 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Chưa có bán thành phẩm. Tạo hàng hoá với Loại mặt hàng = Bán thành phẩm rồi khai công thức mẻ ở Thiết lập F&amp;B

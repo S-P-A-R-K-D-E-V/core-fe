@@ -7,10 +7,10 @@ import { useState, useEffect, useCallback } from 'react';
 import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import Container from '@mui/material/Container';
-import MenuItem from '@mui/material/MenuItem';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
+
+import { useWorkingBranchLock } from 'src/hooks/use-working-branch-sync';
 
 import { getFnbMenu, getFnbFloor } from 'src/api/fnb';
 
@@ -20,12 +20,13 @@ import { useSettingsContext } from 'src/components/settings';
 import FnbFloor from './fnb-floor';
 import { newId } from './lib/ids';
 import FnbOrderScreen from './fnb-order-screen';
+import FnbBranchNotice from './fnb-branch-notice';
 import { useFnbBranches } from './use-fnb-branches';
 
 import type { OrderTarget } from './fnb-order-screen';
 
 // ----------------------------------------------------------------------
-// Bán hàng F&B trên web: chọn chi nhánh F&B (trong phạm vi được phân công) → sơ đồ bàn → màn gọi món.
+// Bán hàng F&B trên web: chi nhánh F&B đang làm việc (chọn ở header) → sơ đồ bàn → màn gọi món.
 // Sơ đồ làm mới mỗi 10 giây để thấy đơn do máy khác mở / thanh toán.
 // ----------------------------------------------------------------------
 
@@ -35,7 +36,7 @@ export default function FnbPosView() {
   const settings = useSettingsContext();
   const { brandName } = useStoreBrand();
 
-  const { branches, branchId, setBranchId } = useFnbBranches();
+  const { branches, branchId } = useFnbBranches();
   const [menu, setMenu] = useState<IFnbMenu | null>(null);
   const [floor, setFloor] = useState<IFnbFloor | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +54,9 @@ export default function FnbPosView() {
     }
     setNow(Date.now());
   }, [branchId]);
+
+  // Đang mở đơn thì không cho đổi chi nhánh ở header (đơn đang gọi dở sẽ mất).
+  useWorkingBranchLock(!!target, 'Đang mở đơn — quay lại sơ đồ bàn rồi mới đổi chi nhánh.');
 
   useEffect(() => {
     if (!branchId) return;
@@ -90,31 +94,9 @@ export default function FnbPosView() {
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
           Bán hàng F&B
         </Typography>
-        {branches.length > 0 && (
-          <TextField
-            select
-            size="small"
-            label="Chi nhánh"
-            value={branchId}
-            disabled={branches.length === 1 || !!target}
-            onChange={(e) => setBranchId(e.target.value)}
-            sx={{ minWidth: 220 }}
-          >
-            {branches.map((b) => (
-              <MenuItem key={b.id} value={b.id}>
-                {b.branchName}
-              </MenuItem>
-            ))}
-          </TextField>
-        )}
       </Stack>
 
-      {branches.length === 0 && (
-        <Alert severity="info">
-          Chưa có chi nhánh F&B nào bạn được làm. Quản lý đặt loại hình chi nhánh là F&B (trang quản trị cửa hàng) và phân
-          công chi nhánh cho bạn.
-        </Alert>
-      )}
+      <FnbBranchNotice sx={{ mb: 2 }} />
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}

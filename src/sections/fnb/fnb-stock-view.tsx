@@ -12,13 +12,11 @@ import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
-import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import Container from '@mui/material/Container';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import TableContainer from '@mui/material/TableContainer';
@@ -39,6 +37,7 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
 import { getFnbStock } from 'src/api/fnb';
 
+import FnbBranchNotice from 'src/sections/fnb-pos/fnb-branch-notice';
 import { useFnbBranches } from 'src/sections/fnb-pos/use-fnb-branches';
 
 import { fDay } from './lib/documents';
@@ -59,7 +58,7 @@ export default function FnbStockView() {
   const { enqueueSnackbar } = useSnackbar();
   const canEdit = ['Admin', 'Manager'].some((r) => user?.role === r || (user?.roles ?? []).includes(r));
 
-  const { branches, branchId, setBranchId } = useFnbBranches();
+  const { branchId } = useFnbBranches();
   const [report, setReport] = useState<IFnbStockReport | null>(null);
   const [tab, setTab] = useState<'ingredients' | 'dishes'>('ingredients');
   const [refreshing, setRefreshing] = useState(false);
@@ -106,29 +105,10 @@ export default function FnbStockView() {
       <CustomBreadcrumbs
         heading="Kho nguyên liệu"
         links={[{ name: 'Dashboard', href: paths.dashboard.root }, { name: 'Kho nguyên liệu' }]}
-        action={
-          branches && branches.length > 0 ? (
-            <TextField
-              select
-              size="small"
-              label="Chi nhánh"
-              value={branchId}
-              disabled={branches.length === 1}
-              onChange={(e) => setBranchId(e.target.value)}
-              sx={{ minWidth: 220 }}
-            >
-              {branches.map((b) => (
-                <MenuItem key={b.id} value={b.id}>
-                  {b.branchName}
-                </MenuItem>
-              ))}
-            </TextField>
-          ) : null
-        }
         sx={{ mb: 3 }}
       />
 
-      {branches?.length === 0 && <Alert severity="info">Chưa có chi nhánh F&amp;B nào bạn được làm.</Alert>}
+      <FnbBranchNotice sx={{ mb: 2 }} />
 
       {report && (
         <Stack spacing={2}>

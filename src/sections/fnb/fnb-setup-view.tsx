@@ -4,10 +4,7 @@ import { useState, useEffect } from 'react';
 
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
-import Alert from '@mui/material/Alert';
-import MenuItem from '@mui/material/MenuItem';
 import Container from '@mui/material/Container';
-import TextField from '@mui/material/TextField';
 
 import { paths } from 'src/routes/paths';
 
@@ -15,9 +12,8 @@ import Iconify from 'src/components/iconify';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
-import { IBranchLocation } from 'src/types/corecms-api';
-
-import { getBranchLocations } from 'src/api/attendance';
+import FnbBranchNotice from 'src/sections/fnb-pos/fnb-branch-notice';
+import { useFnbBranches } from 'src/sections/fnb-pos/use-fnb-branches';
 
 import FnbMenuTab from './fnb-menu-tab';
 import FnbComboTab from './fnb-combo-tab';
@@ -53,18 +49,9 @@ export default function FnbSetupView() {
     const match = TABS.find((t) => t.value === wanted);
     if (match) setTab(match.value);
   }, []);
-  const [branches, setBranches] = useState<IBranchLocation[] | null>(null);
-  const [branchId, setBranchId] = useState('');
 
-  useEffect(() => {
-    getBranchLocations()
-      .then((list) => {
-        const fnb = list.filter((b) => b.isActive !== false && b.businessType?.toLowerCase() === 'fnb');
-        setBranches(fnb);
-        setBranchId((current) => current || fnb[0]?.id || '');
-      })
-      .catch(() => setBranches([]));
-  }, []);
+  // Chi nhánh F&B đang thiết lập = chi nhánh đang làm việc chọn ở header.
+  const { branchId } = useFnbBranches();
 
   const needsBranch = tab !== 'notes';
 
@@ -73,24 +60,6 @@ export default function FnbSetupView() {
       <CustomBreadcrumbs
         heading="Thiết lập F&B"
         links={[{ name: 'Dashboard', href: paths.dashboard.root }, { name: 'Thiết lập F&B' }]}
-        action={
-          needsBranch && branches && branches.length > 0 ? (
-            <TextField
-              select
-              size="small"
-              label="Chi nhánh"
-              value={branchId}
-              onChange={(e) => setBranchId(e.target.value)}
-              sx={{ minWidth: 220 }}
-            >
-              {branches.map((b) => (
-                <MenuItem key={b.id} value={b.id}>
-                  {b.branchName}
-                </MenuItem>
-              ))}
-            </TextField>
-          ) : null
-        }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
@@ -100,12 +69,7 @@ export default function FnbSetupView() {
         ))}
       </Tabs>
 
-      {needsBranch && branches?.length === 0 && (
-        <Alert severity="info">
-          Cửa hàng chưa có chi nhánh loại hình F&amp;B đang hoạt động. Thêm chi nhánh F&amp;B ở Console rồi quay lại
-          trang này.
-        </Alert>
-      )}
+      {needsBranch && <FnbBranchNotice />}
 
       {tab === 'floor' && branchId && <FnbFloorTab key={branchId} branchId={branchId} />}
       {tab === 'menu' && branchId && <FnbMenuTab key={branchId} branchId={branchId} />}

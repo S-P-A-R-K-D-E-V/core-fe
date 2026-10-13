@@ -9,13 +9,14 @@ import List from '@mui/material/List';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
-import MenuItem from '@mui/material/MenuItem';
 import Container from '@mui/material/Container';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
+
+import { useWorkingBranchLock } from 'src/hooks/use-working-branch-sync';
 
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
@@ -25,6 +26,7 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import { getKitchenTickets } from 'src/api/fnb';
 
 import { stationDeviceId } from './lib/ids';
+import FnbBranchNotice from './fnb-branch-notice';
 import { useFnbBranches } from './use-fnb-branches';
 import { printTicketFlow, stationQueue } from './lib/ticket-print';
 import { FnbTicketRow, webTicketPrintDeps } from './fnb-ticket-list';
@@ -60,9 +62,11 @@ const writeStorage = (key: string, value: string) => {
 export default function FnbPrintStationView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
-  const { branches, branchId, setBranchId } = useFnbBranches();
+  const { branchId } = useFnbBranches();
 
   const [running, setRunning] = useState(false);
+  // Đang in thì không cho đổi chi nhánh ở header (máy đang giữ quyền in của chi nhánh này).
+  useWorkingBranchLock(running, 'Máy in phiếu đang chạy — dừng lại rồi mới đổi chi nhánh.');
   const [startedAt, setStartedAt] = useState(0);
   const [deviceName, setDeviceName] = useState('Máy in phiếu');
   const [tickets, setTickets] = useState<IKitchenTicket[] | null>(null);
@@ -173,27 +177,12 @@ export default function FnbPrintStationView() {
         sx={{ mb: 3 }}
       />
 
-      {branches?.length === 0 && <Alert severity="info">Chưa có chi nhánh F&amp;B nào bạn được làm.</Alert>}
+      <FnbBranchNotice sx={{ mb: 2 }} />
 
-      {branches && branches.length > 0 && (
+      {branchId && (
         <Stack spacing={2}>
           <Card sx={{ p: 2 }}>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
-              <TextField
-                select
-                size="small"
-                label="Chi nhánh"
-                value={branchId}
-                disabled={running || branches.length === 1}
-                onChange={(e) => setBranchId(e.target.value)}
-                sx={{ minWidth: 200 }}
-              >
-                {branches.map((b) => (
-                  <MenuItem key={b.id} value={b.id}>
-                    {b.branchName}
-                  </MenuItem>
-                ))}
-              </TextField>
               <TextField
                 size="small"
                 label="Tên máy"

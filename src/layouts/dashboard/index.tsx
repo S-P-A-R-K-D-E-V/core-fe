@@ -14,6 +14,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useResponsive } from 'src/hooks/use-responsive';
 import { useMobileView } from 'src/hooks/use-mobile-view';
+import { useWorkingBranchSync } from 'src/hooks/use-working-branch-sync';
 import { SyncNotificationProvider } from 'src/hooks/use-sync-notification';
 import { useShiftNotificationAlert } from 'src/hooks/use-shift-notification-alert';
 
@@ -61,6 +62,9 @@ export default function DashboardLayout({ children }: Props) {
       refreshUser?.();
     }
   }, [user, refreshUser]);
+
+  // Chi nhánh đang làm việc (nút đổi chi nhánh trên header, menu theo loại chi nhánh, các màn F&B).
+  useWorkingBranchSync(user?.id);
 
   const lgUp = useResponsive('up', 'lg');
 

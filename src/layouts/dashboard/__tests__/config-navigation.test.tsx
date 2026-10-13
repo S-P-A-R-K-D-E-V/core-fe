@@ -5,7 +5,7 @@ import { paths } from 'src/routes/paths';
 
 // ----------------------------------------------------------------------
 // Mục "System Jobs" chỉ hiện ở cửa hàng CiCi (core-be: /admin/workers cửa hàng khác 404),
-// kể cả danh sách đầy đủ chưa lọc theo role (ô tìm kiếm dùng useNavData() không tham số).
+// kể cả danh sách đầy đủ chưa lọc theo role (useNavData() không tham số, lúc người dùng chưa nạp xong).
 // ----------------------------------------------------------------------
 
 vi.mock('src/locales', () => ({
@@ -19,6 +19,8 @@ vi.mock('src/components/branding', () => ({
 
 // Imported after the mocks above so the hook picks up the mocked modules.
 import { useNavData } from 'src/layouts/dashboard/config-navigation';
+
+import { useWorkingBranch } from 'src/store/working-branch-store';
 
 function navPaths(userRole?: string, enabledFeatures: string[] = []) {
   const { result } = renderHook(() => useNavData(userRole, enabledFeatures));
@@ -34,6 +36,7 @@ function navPaths(userRole?: string, enabledFeatures: string[] = []) {
 
 afterEach(() => {
   brand.isCiCi = true;
+  useWorkingBranch.setState({ hydrated: false, branch: null, options: null, lock: null });
 });
 
 describe('useNavData — System Jobs', () => {
@@ -71,6 +74,10 @@ describe('useNavData — F&B', () => {
   it('Thiết lập F&B chỉ hiện khi bật commerce.fnb.pos, cho Admin và Quản lý', () => {
     expect(navPaths('Admin', ['commerce.retail.inventory'])).not.toContain(paths.dashboard.fnb.root);
     expect(navPaths('Admin', ['commerce.fnb.pos'])).toContain(paths.dashboard.fnb.root);
+
+    // Quản lý và nhân viên còn phụ thuộc loại chi nhánh (xem nhóm "menu theo loại chi nhánh" bên dưới).
+    const fnbBranch = { id: 'b2', name: 'Quầy cà phê', type: 'fnb' as const };
+    useWorkingBranch.setState({ hydrated: true, branch: fnbBranch, options: [fnbBranch] });
     expect(navPaths('Manager', ['commerce.fnb.pos'])).toContain(paths.dashboard.fnb.root);
     expect(navPaths('Staff', ['commerce.fnb.pos'])).not.toContain(paths.dashboard.fnb.root);
   });
@@ -79,5 +86,59 @@ describe('useNavData — F&B', () => {
     expect(navPaths('Admin', [])).not.toContain(paths.dashboard.pos.product.root);
     expect(navPaths('Admin', ['commerce.retail.inventory'])).toContain(paths.dashboard.pos.product.root);
     expect(navPaths('Admin', ['commerce.fnb.pos'])).toContain(paths.dashboard.pos.product.root);
+  });
+});
+
+// Mục F&B gắn loại chi nhánh: nhân viên chỉ thấy khi chi nhánh đang làm việc là F&B, quản lý thấy khi có chi nhánh
+// F&B trong phạm vi được phân công, chủ cửa hàng không bị thu hẹp. Mục dùng chung không đổi theo chi nhánh.
+describe('useNavData — menu theo loại chi nhánh', () => {
+  const FNB = ['commerce.fnb.pos', 'workforce.attendance'];
+  const retail = { id: 'b1', name: 'Cửa hàng', type: 'retail' as const };
+  const fnb = { id: 'b2', name: 'Quầy cà phê', type: 'fnb' as const };
+  const working = (branch: typeof retail | typeof fnb | null, options: (typeof retail | typeof fnb)[] | null) =>
+    useWorkingBranch.setState({ hydrated: true, branch, options });
+
+  const staffFnbPaths = [paths.dashboard.fnb.pos, paths.dashboard.fnb.printStation, paths.dashboard.fnb.stock];
+
+  it('nhân viên ở chi nhánh bán lẻ: không thấy mục F&B dù cửa hàng bật F&B; mục dùng chung vẫn còn', () => {
+    working(retail, [retail, fnb]);
+    const shown = navPaths('Staff', FNB);
+
+    staffFnbPaths.forEach((path) => expect(shown).not.toContain(path));
+    expect(shown).toContain(paths.dashboard.attendance.checkin);
+    expect(shown).toContain(paths.dashboard.shiftCash.root);
+  });
+
+  it('nhân viên đổi sang chi nhánh F&B: thấy Bán hàng F&B, Máy in phiếu, Kho nguyên liệu', () => {
+    working(fnb, [retail, fnb]);
+    const shown = navPaths('Staff', FNB);
+
+    staffFnbPaths.forEach((path) => expect(shown).toContain(path));
+    expect(shown).toContain(paths.dashboard.attendance.checkin);
+  });
+
+  it('chưa biết chi nhánh đang làm việc: nhân viên chưa thấy mục F&B', () => {
+    staffFnbPaths.forEach((path) => expect(navPaths('Staff', FNB)).not.toContain(path));
+  });
+
+  it('quản lý: theo các loại chi nhánh được phân công, không theo chi nhánh đang chọn', () => {
+    working(retail, [retail, fnb]);
+    expect(navPaths('Manager', FNB)).toContain(paths.dashboard.fnb.root);
+    expect(navPaths('Manager', FNB)).toContain(paths.dashboard.fnb.pos);
+
+    working(retail, [retail]);
+    expect(navPaths('Manager', FNB)).not.toContain(paths.dashboard.fnb.root);
+    expect(navPaths('Manager', FNB)).not.toContain(paths.dashboard.fnb.pos);
+  });
+
+  it('chủ cửa hàng: không thu hẹp theo chi nhánh', () => {
+    working(retail, [retail]);
+    expect(navPaths('Admin', FNB)).toContain(paths.dashboard.fnb.root);
+    expect(navPaths('Admin', FNB)).toContain(paths.dashboard.fnb.pos);
+  });
+
+  it('cửa hàng không bật F&B: chi nhánh F&B cũng không làm hiện mục F&B', () => {
+    working(fnb, [fnb]);
+    expect(navPaths('Staff', ['workforce.attendance'])).not.toContain(paths.dashboard.fnb.pos);
   });
 });
