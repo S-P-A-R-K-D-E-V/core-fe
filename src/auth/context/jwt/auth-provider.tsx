@@ -402,6 +402,26 @@ export function AuthProvider({ children }: Props) {
     fetchAndPatchAvatar(user);
   }, [fetchAndPatchAvatar]);
 
+  // Mã QR — đổi mã đã được duyệt trên app + verifier của trình duyệt này lấy phiên (xem JwtQrLogin).
+  // Phiên sống 12 giờ không gia hạn và BE không trả refreshToken; hết hạn thì quét lại.
+  const loginWithQr = useCallback(async (code: string, codeVerifier: string) => {
+    const res = await axios.post<IAuthResponse>(endpoints.auth.qrExchange, { code, codeVerifier });
+    const { token: accessToken, refreshToken, sessionToken } = res.data;
+
+    // Xoá refreshToken còn sót của lần đăng nhập trước trong tab này: setSession không ghi đè khi
+    // refreshToken mới rỗng, mà token cũ sẽ được dùng để xin access token mới vượt hạn 12 giờ.
+    setSession(null);
+    setSession(accessToken, refreshToken);
+
+    if (sessionToken) {
+      localStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
+    }
+
+    const user = buildUserFromResponse(res.data);
+    dispatch({ type: Types.LOGIN, payload: { user } });
+    fetchAndPatchAvatar(user);
+  }, [fetchAndPatchAvatar]);
+
   const loginWithOAuth = useCallback(async (provider: 'google' | 'facebook' | 'apple', token: string, avatarUrl?: string) => {
     const data: IOAuthLoginRequest = { provider, token };
     const res = await axios.post<IAuthResponse>(endpoints.auth.oauthLogin, data);
@@ -472,11 +492,12 @@ export function AuthProvider({ children }: Props) {
     try {
       const userId = state.user?.id;
       const refreshToken = getRefreshToken();
+      const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
 
-      if (userId && refreshToken) {
+      // Phiên đăng nhập bằng mã QR không có refreshToken nhưng vẫn phải báo BE đóng phiên của nó.
+      if (userId && (refreshToken || sessionToken)) {
         // Gửi sessionToken của trình duyệt này → BE chỉ đóng phiên đăng nhập này, không đăng xuất
         // các thiết bị / cửa hàng khác. BE lấy user từ JWT; userId giữ lại cho BE cũ.
-        const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
         const logoutData: ILogoutRequest = sessionToken ? { userId, sessionToken } : { userId };
         await axios.post(endpoints.auth.logout, logoutData);
       }
@@ -512,11 +533,12 @@ export function AuthProvider({ children }: Props) {
       restoreSession,
       loginWithOAuth,
       loginWithSso,
+      loginWithQr,
       pendingVerification,
       updateUser,
       refreshUser,
     }),
-    [login, logout, register, verifyOtp, resendOtp, restoreSession, loginWithOAuth, loginWithSso, updateUser, refreshUser, state.user, status, pendingVerification]
+    [login, logout, register, verifyOtp, resendOtp, restoreSession, loginWithOAuth, loginWithSso, loginWithQr, updateUser, refreshUser, state.user, status, pendingVerification]
   );
 
   return <AuthContext.Provider value={memoizedValue}>{children}</AuthContext.Provider>;

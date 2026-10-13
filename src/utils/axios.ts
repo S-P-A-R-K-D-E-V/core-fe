@@ -62,6 +62,10 @@ export const endpoints = {
     // Xin vé liên kết Google/Apple (đã đăng nhập) rồi mở trang auth /sso/start/?link=1#t=<vé>.
     oauthLinkStart: '/auth/oauth-link/start',
     ssoExchange: '/auth/sso/exchange',
+    // Đăng nhập bằng mã QR: trang đăng nhập xin mã, hỏi trạng thái, rồi đổi mã + verifier lấy phiên 12 giờ.
+    qrStart: '/auth/qr/start',
+    qrStatus: '/auth/qr/status',
+    qrExchange: '/auth/qr/exchange',
     ssoHandoff: (tenantCode: string) => `/auth-hub/${tenantCode}/handoff`,
     // Gọi thẳng /api/app-hub trên auth host (ingress → core-api), KHÔNG qua rewrite của Next: giới hạn
     // tần suất app-hub tính theo IP client, đi qua core-fe thì mọi người dùng chung IP của ingress.

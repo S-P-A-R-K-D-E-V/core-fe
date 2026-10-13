@@ -55,6 +55,20 @@ export interface IAuthResponse {
   hasShiftPreference?: boolean;
 }
 
+// Đăng nhập bằng mã QR (POST /auth/qr/*). Phiên tạo ra sống 12 giờ không gia hạn; response đổi mã là
+// IAuthResponse với refreshToken = null.
+export interface IQrLoginStartResponse {
+  code: string;
+  expiresInSeconds: number;
+  pollIntervalSeconds: number;
+}
+
+export type QrLoginStatus = 'pending' | 'scanned' | 'approved' | 'rejected' | 'expired';
+
+export interface IQrLoginStatusResponse {
+  status: QrLoginStatus;
+}
+
 export interface ILoginRequest {
   email: string;
   password: string;

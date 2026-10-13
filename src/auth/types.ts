@@ -60,6 +60,7 @@ export type JWTContextType = CanRemove & {
   restoreSession: (sessionToken: string) => Promise<void>;
   loginWithOAuth: (provider: 'google' | 'facebook' | 'apple', token: string, avatarUrl?: string) => Promise<void>;
   loginWithSso?: (code: string, state: string) => Promise<void>;
+  loginWithQr?: (code: string, codeVerifier: string) => Promise<void>;
   pendingVerification: { email: string } | null;
   updateUser: (updates: Partial<NonNullable<AuthUserType>>) => void;
   /** Re-sync role/permissions from JWT + latest profile from server.

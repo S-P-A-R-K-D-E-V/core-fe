@@ -29,6 +29,8 @@ import { APPLE_SERVICES_ID, safeReturnPath, beginCentralLogin, tenantCodeFromHos
 import Iconify from 'src/components/iconify';
 import FormProvider, { RHFTextField } from 'src/components/hook-form';
 
+import JwtQrLogin from './jwt-qr-login';
+
 // ----------------------------------------------------------------------
 
 export default function JwtLoginView() {
@@ -61,6 +63,10 @@ export default function JwtLoginView() {
   }
 
   const password = useBoolean();
+
+  // Đăng nhập bằng mã QR quét từ app. Ẩn khi trang này do chính app mở (?mobile=true) — người dùng
+  // đang ở trên điện thoại, không có màn hình thứ hai để quét.
+  const qrLogin = useBoolean();
 
   const LoginSchema = Yup.object().shape({
     email: Yup.string().required('Email is required').email('Email must be a valid email address'),
@@ -234,8 +240,36 @@ export default function JwtLoginView() {
       >
         Login
       </LoadingButton>
+
+      {!isMobile && (
+        <LoadingButton
+          fullWidth
+          size="large"
+          variant="outlined"
+          color="inherit"
+          onClick={() => {
+            setErrorMsg('');
+            qrLogin.onTrue();
+          }}
+          startIcon={<Iconify icon="solar:qr-code-bold" width={20} />}
+        >
+          Đăng nhập bằng mã QR
+        </LoadingButton>
+      )}
     </Stack>
   );
+
+  if (qrLogin.value && !isMobile) {
+    return (
+      <>
+        <Stack spacing={2} sx={{ mb: 4 }}>
+          <Typography variant="h4">Đăng nhập bằng mã QR</Typography>
+        </Stack>
+
+        <JwtQrLogin onSuccess={() => router.push(returnTo)} onBack={qrLogin.onFalse} />
+      </>
+    );
+  }
 
   return (
     <>
