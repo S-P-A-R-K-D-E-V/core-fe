@@ -26,10 +26,6 @@ const OPTIONS = [
     linkTo: '/',
   },
   {
-    label: 'Hồ sơ',
-    linkTo: paths.dashboard.user.profile,
-  },
-  {
     label: 'Cài đặt',
     linkTo: paths.dashboard.user.account,
   },

@@ -17,6 +17,8 @@ import { useBoolean } from 'src/hooks/use-boolean';
 import { useResponsive } from 'src/hooks/use-responsive';
 import { useEventListener } from 'src/hooks/use-event-listener';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
@@ -39,7 +41,10 @@ function Searchbar() {
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  const navData = useNavData();
+  const { user } = useAuthContext();
+
+  // Cùng bộ lọc vai trò + tính năng với thanh menu — không truyền thì ô tìm kiếm liệt kê mọi mục.
+  const navData = useNavData(user?.role, user?.enabledFeatures);
 
   const handleClose = useCallback(() => {
     search.onFalse();
