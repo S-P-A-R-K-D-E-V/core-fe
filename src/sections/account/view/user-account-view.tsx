@@ -18,6 +18,7 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import AccountGeneral from '../account-general';
 import AccountBilling from '../account-billing';
 import AccountSocialLinks from '../account-social-links';
+import AccountLoginSessions from '../account-login-sessions';
 import AccountNotifications from '../account-notifications';
 import AccountChangePassword from '../account-change-password';
 import AccountConnectedAccounts from '../account-connected-accounts';
@@ -119,6 +120,7 @@ export default function AccountView() {
       {currentTab === 'security' && (
         <>
           <AccountChangePassword />
+          <AccountLoginSessions />
           <AccountDelete />
         </>
       )}

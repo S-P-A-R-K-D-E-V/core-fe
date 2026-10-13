@@ -130,6 +130,24 @@ export interface IChangePasswordRequest {
 
 export interface IRefreshTokenRequest {
   refreshToken: string;
+  // Phiên của trình duyệt này — BE chỉ cấp access token mới cho một phiên còn mở (thiếu → 400).
+  sessionToken?: string | null;
+}
+
+// Thiết bị đang đăng nhập (GET /auth/sessions). Thời điểm là ISO UTC.
+export interface ILoginSession {
+  id: string;
+  /** Dạng "Chrome · Windows" / "App · Android"; null khi không nhận ra. */
+  device: string | null;
+  ipAddress: string | null;
+  signedInAt: string;
+  /** Lần gần nhất thiết bị đăng nhập / khôi phục phiên. */
+  lastActiveAt: string | null;
+  expiresAt: string;
+  /** Chính trình duyệt đang xem. */
+  isCurrent: boolean;
+  /** Phiên web tạo bằng mã QR: tự hết lúc expiresAt, không gia hạn. */
+  signedInWithQr: boolean;
 }
 
 export interface ILogoutRequest {

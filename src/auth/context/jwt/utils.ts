@@ -61,8 +61,11 @@ export const tokenExpired = (exp: number) => {
     
     if (refreshToken) {
       try {
+        // Kèm sessionToken của trình duyệt này: BE chỉ cấp access token mới cho một phiên còn mở, và gắn
+        // token với phiên đó (đăng xuất thiết bị này từ xa là token hết dùng được).
         const response = await axios.post<IAuthResponse>(endpoints.auth.refreshToken, {
           refreshToken,
+          sessionToken: localStorage.getItem('sessionToken'),
         } as IRefreshTokenRequest);
         
         const { token, refreshToken: newRefreshToken } = response.data;

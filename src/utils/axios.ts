@@ -66,6 +66,10 @@ export const endpoints = {
     qrStart: '/auth/qr/start',
     qrStatus: '/auth/qr/status',
     qrExchange: '/auth/qr/exchange',
+    // Thiết bị đang đăng nhập: xem các phiên còn mở của mình, đăng xuất từng thiết bị / mọi thiết bị khác từ xa.
+    sessions: '/auth/sessions',
+    sessionRevoke: (sessionId: string) => `/auth/sessions/${sessionId}`,
+    sessionsRevokeOthers: '/auth/sessions/revoke-others',
     ssoHandoff: (tenantCode: string) => `/auth-hub/${tenantCode}/handoff`,
     // Gọi thẳng /api/app-hub trên auth host (ingress → core-api), KHÔNG qua rewrite của Next: giới hạn
     // tần suất app-hub tính theo IP client, đi qua core-fe thì mọi người dùng chung IP của ingress.
