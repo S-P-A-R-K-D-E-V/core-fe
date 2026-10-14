@@ -94,6 +94,13 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
       {
         subheader: t('overview'),
         items: [
+          // Giám sát cửa hàng: lượt khách qua camera, hoá đơn, chuyển đổi, nhân sự hôm nay
+          {
+            title: 'Giám sát cửa hàng',
+            path: paths.dashboard.general.storeMonitor,
+            icon: ICONS.analytics,
+            roles: ['Admin', 'Manager'],
+          },
           // SHIFT CASH (Kiểm tiền quầy)
           {
             title: t('shiftCash'),

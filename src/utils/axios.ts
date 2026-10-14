@@ -189,6 +189,7 @@ export const endpoints = {
     processRequest: (id: string) => `/attendance/requests/${id}/process`,
     report: '/attendance/report',
     myReport: '/attendance/my-report',
+    todayBoard: '/attendance/today-board',
   },
   branches: {
     list: '/branches',
@@ -578,6 +579,7 @@ export const endpoints = {
   },
   reports: {
     dashboard: '/reports/dashboard',
+    storeMonitor: '/reports/store-monitor',
     revenue: '/reports/revenue',
     revenueExport: '/reports/revenue/export',
     productSales: '/reports/product-sales',
