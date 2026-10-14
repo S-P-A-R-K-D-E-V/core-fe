@@ -136,7 +136,7 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             featureKey: 'workforce.attendance',
           },
           {
-            title: 'Thiết bị Kiosk',
+            title: 'Thiết bị cửa hàng',
             path: paths.dashboard.attendance.kioskDevices,
             icon: ICONS.tour,
             roles: ['Admin', 'Manager'],

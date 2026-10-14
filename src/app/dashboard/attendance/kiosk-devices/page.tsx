@@ -3,7 +3,7 @@ import { KioskDevicesView } from 'src/sections/kiosk-devices/view/kiosk-devices-
 // ----------------------------------------------------------------------
 
 export const metadata = {
-  title: 'Dashboard: Thiết bị Kiosk',
+  title: 'Dashboard: Thiết bị cửa hàng',
 };
 
 export default function KioskDevicesPage() {

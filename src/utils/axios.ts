@@ -613,6 +613,7 @@ export const endpoints = {
     pairingClaim: '/kiosk-pairing/claim',
     devices: '/kiosk-devices',
     deviceRevoke: (deviceId: string) => `/kiosk-devices/${deviceId}/revoke`,
+    device: (deviceId: string) => `/kiosk-devices/${deviceId}`,
   },
   messenger: {
     conversations: '/messenger/conversations',

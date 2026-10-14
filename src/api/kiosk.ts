@@ -76,3 +76,8 @@ export async function getKioskDevices(): Promise<IKioskDeviceItem[]> {
 export async function revokeKioskDevice(deviceId: string): Promise<void> {
   await axios.post(endpoints.kiosk.deviceRevoke(deviceId));
 }
+
+/** Yêu cầu JWT Admin/Manager — đổi tên hiển thị của thiết bị (kiosk hoặc agent camera). */
+export async function renameKioskDevice(deviceId: string, name: string): Promise<void> {
+  await axios.patch(endpoints.kiosk.device(deviceId), { name });
+}

@@ -84,6 +84,16 @@ export interface IKioskClaimResponse {
   deviceName: string;
 }
 
+export interface IKioskAgentCamera {
+  key: string;
+  name: string | null;
+  online: boolean;
+  fps: number | null;
+  lastFrameAt: string | null;
+  inToday: number | null;
+  outToday: number | null;
+}
+
 export interface IKioskDeviceItem {
   id: string;
   name: string;
@@ -92,4 +102,11 @@ export interface IKioskDeviceItem {
   isActive: boolean;
   createdAt: string;
   lastSeenAt: string | null;
+  /** camera-agent: Spark Camera Agent (đếm khách) đã gửi heartbeat; kiosk: màn chấm công web. */
+  kind: 'camera-agent' | 'kiosk';
+  agentVersion: string | null;
+  lastHeartbeatAt: string | null;
+  /** null với kiosk web (không gửi heartbeat). */
+  online: boolean | null;
+  cameras: IKioskAgentCamera[];
 }
