@@ -190,6 +190,9 @@ export const endpoints = {
     report: '/attendance/report',
     myReport: '/attendance/my-report',
     todayBoard: '/attendance/today-board',
+    // Chấm công trực tiếp theo chi nhánh (camera quầy).
+    branchBoard: '/attendance/branch-board',
+    branchBoardBranches: '/attendance/branch-board/branches',
   },
   branches: {
     list: '/branches',

@@ -33,7 +33,7 @@ import { getBranchLocations } from 'src/api/attendance';
 import { getKioskDevices, claimKioskPairing, revokeKioskDevice, renameKioskDevice } from 'src/api/kiosk';
 
 import type { IBranchLocation } from 'src/types/corecms-api';
-import type { IKioskDeviceItem } from 'src/types/kiosk';
+import type { IKioskDeviceItem, IKioskAgentCamera } from 'src/types/kiosk';
 
 // ----------------------------------------------------------------------
 // Thiết bị cửa hàng — mọi thiết bị đăng nhập bằng key thiết bị (không có tài khoản người dùng):
@@ -54,6 +54,25 @@ function statusOf(d: IKioskDeviceItem): StatusChip {
   if (!d.isActive) return { label: 'Đã thu hồi', color: 'default' };
   if (d.kind === 'camera-agent') return d.online ? { label: 'Đang chạy', color: 'success' } : { label: 'Mất kết nối', color: 'error' };
   return { label: 'Đã ghép nối', color: 'info' };
+}
+
+/**
+ * Loại agent theo vai trò camera nó báo: quầy chấm công (counter_face), cửa đếm khách (customer_door) hoặc cả hai.
+ * Agent cũ chưa báo vai trò → "Camera".
+ */
+export function agentCaption(d: Pick<IKioskDeviceItem, 'agentVersion' | 'cameras'>): string {
+  const roles = new Set(d.cameras.map((c) => c.role).filter(Boolean));
+  let label = 'Camera';
+  if (roles.has('counter_face') && roles.has('customer_door')) label = 'Camera chấm công + đếm khách';
+  else if (roles.has('counter_face')) label = 'Camera chấm công';
+  else if (roles.has('customer_door')) label = 'Camera đếm khách';
+  return d.agentVersion ? `${label} · agent ${d.agentVersion}` : label;
+}
+
+function cameraChipLabel(c: IKioskAgentCamera): string {
+  const name = c.name || c.key;
+  if (c.role === 'counter_face') return `${name} · chấm công`;
+  return `${name}${c.inToday !== null && c.inToday !== undefined ? ` · ${c.inToday} vào` : ''}`;
 }
 
 // ----------------------------------------------------------------------
@@ -290,7 +309,7 @@ export function KioskDevicesView() {
                           <Box>
                             <Typography variant="subtitle2">{d.name}</Typography>
                             <Typography variant="caption" color="text.secondary">
-                              {isAgent ? `Camera đếm khách · agent ${d.agentVersion}` : 'Kiosk chấm công'}
+                              {isAgent ? agentCaption(d) : 'Kiosk chấm công'}
                             </Typography>
                           </Box>
                         </Stack>
@@ -312,7 +331,7 @@ export function KioskDevicesView() {
                                 size="small"
                                 variant="outlined"
                                 color={c.online && d.online ? 'success' : 'error'}
-                                label={`${c.name || c.key}${c.inToday !== null ? ` · ${c.inToday} vào` : ''}`}
+                                label={cameraChipLabel(c)}
                               />
                             ))}
                           </Stack>

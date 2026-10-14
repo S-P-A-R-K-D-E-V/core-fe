@@ -141,6 +141,14 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             icon: ICONS.tour,
             roles: ['Admin', 'Manager'],
           },
+          // Chấm công trực tiếp: camera quầy + ca hôm nay + người camera thấy, theo chi nhánh
+          {
+            title: 'Chấm công trực tiếp',
+            path: paths.dashboard.attendance.live,
+            icon: ICONS.dashboard,
+            roles: ['Admin', 'Manager'],
+            featureKey: 'workforce.attendance',
+          },
           // {
           //   title: t('myLogs'),
           //   path: paths.dashboard.attendance.myLogs,

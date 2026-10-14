@@ -1,5 +1,7 @@
 // Giám sát cửa hàng — GET /reports/store-monitor (StoreMonitorController phía Core-be).
 
+import type { AgentCameraRole } from 'src/types/kiosk';
+
 export type IStoreMonitorTotals = {
   in: number;
   out: number;
@@ -34,6 +36,10 @@ export type IAgentCameraStatus = {
   lastFrameAt: string | null;
   inToday: number | null;
   outToday: number | null;
+  /** null/thiếu = agent cũ chưa báo vai trò. */
+  role?: AgentCameraRole | null;
+  /** Agent có hỗ trợ xem trực tiếp không; null/thiếu = chưa rõ. */
+  liveView?: boolean | null;
 };
 
 export type IStoreMonitorDevice = {

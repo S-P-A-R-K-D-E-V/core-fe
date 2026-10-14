@@ -84,6 +84,9 @@ export interface IKioskClaimResponse {
   deviceName: string;
 }
 
+/** Vai trò camera do agent khai báo: quầy chấm công (nhận diện nhân viên) hoặc cửa (đếm khách). */
+export type AgentCameraRole = 'counter_face' | 'customer_door';
+
 export interface IKioskAgentCamera {
   key: string;
   name: string | null;
@@ -92,6 +95,10 @@ export interface IKioskAgentCamera {
   lastFrameAt: string | null;
   inToday: number | null;
   outToday: number | null;
+  /** null/thiếu = agent cũ chưa báo vai trò. */
+  role?: AgentCameraRole | null;
+  /** Agent có hỗ trợ xem trực tiếp không; null/thiếu = chưa rõ. */
+  liveView?: boolean | null;
 }
 
 export interface IKioskDeviceItem {
