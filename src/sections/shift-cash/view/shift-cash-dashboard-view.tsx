@@ -94,6 +94,7 @@ import {
   exportKiotVietExcel,
 } from 'src/api/shiftCash';
 import { getShareholders } from 'src/api/shareholders';
+import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 
 // ======================================================================
 
@@ -311,6 +312,7 @@ function ShiftCashDashboardContent() {
   const isToday = currentDate === todayDate;
   // Chỉ Admin: chọn ngày cũ, xem nhật ký / audit, xem theo tháng (Manager theo luật của Staff)
   const isAdmin = isShiftCashBypass(user);
+  const shareholdersOn = useFeatureEnabled(FEATURE.shareholders);
 
   // Link từ thông báo "Kiểm tra chênh lệch quầy": ?date=yyyy-MM-dd mở thẳng ngày đó (chỉ Admin được xem ngày
   // cũ; ngày tương lai / sai định dạng thì bỏ qua). Chỉ áp một lần cho mỗi giá trị trên URL.
@@ -419,9 +421,9 @@ function ShiftCashDashboardContent() {
     Promise.allSettled([
       // getVietQRBanks().then((banks) => setVietQRBanks(banks)),
       getKiotVietBankAccounts().then((accounts) => setKiotBankAccounts(accounts)),
-      ...(isAdmin ? [getShareholders(true).then((list) => setShareholders(list))] : []),
+      ...(isAdmin && shareholdersOn ? [getShareholders(true).then((list) => setShareholders(list))] : []),
     ]);
-  }, [isAdmin]);
+  }, [isAdmin, shareholdersOn]);
 
   // Lazy-load all invoice details when kiotData is available
   useEffect(() => {
@@ -1263,7 +1265,7 @@ function ShiftCashDashboardContent() {
                               <TableCell>Loại</TableCell>
                               <TableCell align="right">Số tiền</TableCell>
                               <TableCell>Ghi chú</TableCell>
-                              <TableCell>Cổ đông</TableCell>
+                              {shareholdersOn && <TableCell>Cổ đông</TableCell>}
                               <TableCell>Người tạo</TableCell>
                               <TableCell>Thời gian</TableCell>
                               <TableCell align="right" />
@@ -1300,15 +1302,17 @@ function ShiftCashDashboardContent() {
                                   </Typography>
                                 </TableCell>
                                 <TableCell>{tx.note || '—'}</TableCell>
-                                <TableCell>
-                                  {tx.shareholderName ? (
-                                    <Label variant="soft" color="warning">
-                                      {tx.shareholderName}
-                                    </Label>
-                                  ) : (
-                                    '—'
-                                  )}
-                                </TableCell>
+                                {shareholdersOn && (
+                                  <TableCell>
+                                    {tx.shareholderName ? (
+                                      <Label variant="soft" color="warning">
+                                        {tx.shareholderName}
+                                      </Label>
+                                    ) : (
+                                      '—'
+                                    )}
+                                  </TableCell>
+                                )}
                                 <TableCell>
                                   <Typography variant="caption">{tx.createdByName}</Typography>
                                 </TableCell>
@@ -1949,7 +1953,7 @@ function ShiftCashDashboardContent() {
             />
             {/* Gắn cổ đông: chỉ Admin (danh sách cổ đông chỉ Admin đọc được). Vai trò khác sửa khoản đã
                 gắn thì giữ nguyên cổ đông cũ — txShareholderId vẫn gửi lại như cũ. */}
-            {isAdmin && (
+            {isAdmin && shareholdersOn && (
               <TextField
                 select
                 fullWidth

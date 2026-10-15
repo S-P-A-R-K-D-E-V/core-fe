@@ -39,6 +39,7 @@ import {
   setPurchaseOrderPaidBy,
 } from 'src/api/purchase-orders';
 import { getShareholders } from 'src/api/shareholders';
+import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 
 const fmtQty = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 4 });
 
@@ -101,7 +102,8 @@ export default function PurchaseOrderDetailView({ id }: Props) {
 
   useEffect(() => { fetchOrder(); }, [fetchOrder]);
 
-  const canEditPaidBy = order?.status === 'Returned';
+  const shareholdersOn = useFeatureEnabled(FEATURE.shareholders);
+  const canEditPaidBy = shareholdersOn && order?.status === 'Returned';
 
   useEffect(() => {
     if (!canEditPaidBy) return;
@@ -260,6 +262,7 @@ export default function PurchaseOrderDetailView({ id }: Props) {
               <Typography variant="caption" color="text.secondary">Người duyệt</Typography>
               <Typography variant="body2">{order.approvedByName || '—'}</Typography>
             </Stack>
+            {shareholdersOn && (
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">Ai chi hộ</Typography>
               {editingPaidBy ? (
@@ -300,6 +303,7 @@ export default function PurchaseOrderDetailView({ id }: Props) {
                 </Stack>
               )}
             </Stack>
+            )}
           </Box>
           {order.note && (
             <Stack spacing={0.5} sx={{ mt: 2 }}>

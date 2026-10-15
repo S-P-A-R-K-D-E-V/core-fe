@@ -1,3 +1,4 @@
+import FeatureGuard from 'src/auth/guard/feature-guard';
 import { StoreMonitorView } from 'src/sections/store-monitor/view/store-monitor-view';
 
 // ----------------------------------------------------------------------
@@ -7,5 +8,9 @@ export const metadata = {
 };
 
 export default function StoreMonitorPage() {
-  return <StoreMonitorView />;
+  return (
+    <FeatureGuard feature="store.camera">
+      <StoreMonitorView />
+    </FeatureGuard>
+  );
 }

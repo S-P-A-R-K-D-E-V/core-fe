@@ -27,6 +27,11 @@ vi.mock('src/api/kiosk', () => ({
   revokeKioskDevice: (...a: any[]) => api.revokeKioskDevice(...a),
   renameKioskDevice: (...a: any[]) => api.renameKioskDevice(...a),
 }));
+let cameraOn = true;
+vi.mock('src/hooks/use-feature-enabled', () => ({
+  FEATURE: { storeCamera: 'store.camera', shareholders: 'finance.shareholders', partnerDebt: 'finance.partner-debt' },
+  useFeatureEnabled: (key: string) => key === 'store.camera' && cameraOn,
+}));
 vi.mock('src/api/attendance', () => ({
   getBranchLocations: () => Promise.resolve([{ id: 'b1', branchName: 'CiCi Cầu Giấy' }]),
 }));
@@ -71,6 +76,17 @@ describe('KioskDevicesView', () => {
     api.getKioskDevices.mockResolvedValue(devices);
     api.renameKioskDevice.mockResolvedValue(undefined);
     api.revokeKioskDevice.mockResolvedValue(undefined);
+    cameraOn = true;
+  });
+
+  it('only offers kiosk pairing when the store has no camera feature', async () => {
+    cameraOn = false;
+    renderView();
+
+    await waitFor(() => expect(screen.getByText('Camera cửa chính')).toBeTruthy());
+    expect(screen.queryByRole('tab', { name: /Camera đếm khách/ })).toBeNull();
+    expect(screen.queryByText(/python -m agent pair/)).toBeNull();
+    expect(screen.getByText(/kiosk-checkin/)).toBeTruthy();
   });
 
   it('shows camera agents and kiosks with their status', async () => {

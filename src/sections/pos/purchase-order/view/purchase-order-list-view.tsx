@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
@@ -42,6 +42,7 @@ import { IPurchaseOrder, ISupplier, IShareholder } from 'src/types/corecms-api';
 import { getAllPurchaseOrders, cancelPurchaseOrder, confirmPurchaseOrder, setPurchaseOrderPaidBy } from 'src/api/purchase-orders';
 import { getAllSuppliers } from 'src/api/suppliers';
 import { getShareholders } from 'src/api/shareholders';
+import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 
 // ----------------------------------------------------------------------
 
@@ -96,6 +97,11 @@ export default function PurchaseOrderListView() {
   const [tableData, setTableData] = useState<IPurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
   const [shareholders, setShareholders] = useState<IShareholder[]>([]);
+  const shareholdersOn = useFeatureEnabled(FEATURE.shareholders);
+  const tableHead = useMemo(
+    () => (shareholdersOn ? TABLE_HEAD : TABLE_HEAD.filter((h) => h.id !== 'paidByShareholder')),
+    [shareholdersOn]
+  );
   const [savingPaidById, setSavingPaidById] = useState<string | null>(null);
   const [filterSupplier, setFilterSupplier] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -113,7 +119,7 @@ export default function PurchaseOrderListView() {
           pageSize,
         }),
         getAllSuppliers(),
-        getShareholders(true),
+        shareholdersOn ? getShareholders(true) : Promise.resolve([] as IShareholder[]),
       ]);
       setTableData(pagedResult.items);
       setTotalCount(pagedResult.totalCount);
@@ -123,7 +129,7 @@ export default function PurchaseOrderListView() {
       console.error(error);
       enqueueSnackbar('Không thể tải đơn nhập hàng', { variant: 'error' });
     }
-  }, [enqueueSnackbar, filterSupplier, filterStatus, pageNumber, pageSize]);
+  }, [enqueueSnackbar, filterSupplier, filterStatus, pageNumber, pageSize, shareholdersOn]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -231,7 +237,7 @@ export default function PurchaseOrderListView() {
                 <TableHeadCustom
                   order={table.order}
                   orderBy={table.orderBy}
-                  headLabel={TABLE_HEAD}
+                  headLabel={tableHead}
                   rowCount={totalCount}
                   onSort={table.onSort}
                 />
@@ -242,6 +248,7 @@ export default function PurchaseOrderListView() {
                       <TableCell>{row.supplierName}</TableCell>
                       <TableCell>{row.warehouseName}</TableCell>
                       <TableCell align="right">{fCurrency(row.totalAmount)}</TableCell>
+                      {shareholdersOn && (
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         {row.status === 'Returned' ? (
                           <TextField
@@ -267,6 +274,7 @@ export default function PurchaseOrderListView() {
                           '—'
                         )}
                       </TableCell>
+                      )}
                       <TableCell>
                         <Label variant="soft" color={STATUS_COLOR_MAP[row.status] || 'default'}>
                           {STATUS_LABEL_MAP[row.status] || row.status}

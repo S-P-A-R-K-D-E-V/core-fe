@@ -1,3 +1,4 @@
+import FeatureGuard from 'src/auth/guard/feature-guard';
 import { AttendanceLiveView } from 'src/sections/attendance-live/view/attendance-live-view';
 
 // ----------------------------------------------------------------------
@@ -7,5 +8,9 @@ export const metadata = {
 };
 
 export default function AttendanceLivePage() {
-  return <AttendanceLiveView />;
+  return (
+    <FeatureGuard feature="store.camera">
+      <AttendanceLiveView />
+    </FeatureGuard>
+  );
 }

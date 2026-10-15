@@ -21,6 +21,7 @@ import { RHFDatePicker } from 'src/components/hook-form/rhf-date-picker';
 import { IExpense, IExpenseCategory, IShareholder } from 'src/types/corecms-api';
 import { createExpense, updateExpense, getExpenseCategories } from 'src/api/expenses';
 import { getShareholders } from 'src/api/shareholders';
+import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 
 // ----------------------------------------------------------------------
 
@@ -33,11 +34,15 @@ export default function ExpenseNewEditForm({ currentExpense }: Props) {
   const { enqueueSnackbar } = useSnackbar();
   const [categories, setCategories] = useState<IExpenseCategory[]>([]);
   const [shareholders, setShareholders] = useState<IShareholder[]>([]);
+  const shareholdersOn = useFeatureEnabled(FEATURE.shareholders);
 
   useEffect(() => {
     getExpenseCategories(true).then(setCategories);
-    getShareholders(true).then(setShareholders);
   }, []);
+
+  useEffect(() => {
+    if (shareholdersOn) getShareholders(true).then(setShareholders).catch(() => {});
+  }, [shareholdersOn]);
 
   const isReadOnly = Boolean(currentExpense?.sourceTemplateId);
 
@@ -130,19 +135,21 @@ export default function ExpenseNewEditForm({ currentExpense }: Props) {
 
               <RHFDatePicker name="expenseDate" label="Ngày chi" />
 
-              <RHFSelect
-                name="paidByShareholderId"
-                label="Ai chi hộ (nếu có)"
-                disabled={isReadOnly}
-                helperText="Chọn cổ đông đã bỏ tiền túi chi khoản này — tự động ghi vào sổ giao dịch vốn"
-              >
-                <MenuItem value="">Không ai / cửa hàng tự trả</MenuItem>
-                {shareholders.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.name}
-                  </MenuItem>
-                ))}
-              </RHFSelect>
+              {shareholdersOn && (
+                <RHFSelect
+                  name="paidByShareholderId"
+                  label="Ai chi hộ (nếu có)"
+                  disabled={isReadOnly}
+                  helperText="Chọn cổ đông đã bỏ tiền túi chi khoản này — tự động ghi vào sổ giao dịch vốn"
+                >
+                  <MenuItem value="">Không ai / cửa hàng tự trả</MenuItem>
+                  {shareholders.map((s) => (
+                    <MenuItem key={s.id} value={s.id}>
+                      {s.name}
+                    </MenuItem>
+                  ))}
+                </RHFSelect>
+              )}
 
               <RHFTextField name="note" label="Ghi chú" multiline rows={3} />
             </Stack>

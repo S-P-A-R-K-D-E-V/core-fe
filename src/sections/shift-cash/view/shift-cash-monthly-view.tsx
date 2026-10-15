@@ -31,6 +31,7 @@ import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 import { IShiftCashTransaction, IShareholder } from 'src/types/corecms-api';
 import { getShiftCashTransactions, updateShiftCashTransaction } from 'src/api/shiftCash';
 import { getShareholders } from 'src/api/shareholders';
+import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 
 // ----------------------------------------------------------------------
 
@@ -92,6 +93,7 @@ function ShiftCashMonthlyContent() {
   });
   const [transactions, setTransactions] = useState<IShiftCashTransaction[]>([]);
   const [shareholders, setShareholders] = useState<IShareholder[]>([]);
+  const shareholdersOn = useFeatureEnabled(FEATURE.shareholders);
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
 
@@ -120,8 +122,8 @@ function ShiftCashMonthlyContent() {
   }, [fetchData]);
 
   useEffect(() => {
-    getShareholders(true).then(setShareholders).catch(() => {});
-  }, []);
+    if (shareholdersOn) getShareholders(true).then(setShareholders).catch(() => {});
+  }, [shareholdersOn]);
 
   const handleSetShareholder = useCallback(
     async (tx: IShiftCashTransaction, shareholderId: string) => {
@@ -205,7 +207,7 @@ function ShiftCashMonthlyContent() {
                   <TableCell>Loại</TableCell>
                   <TableCell align="right">Số tiền</TableCell>
                   <TableCell>Ghi chú</TableCell>
-                  <TableCell sx={{ minWidth: 260 }}>Chi cho / Thu từ ai</TableCell>
+                  {shareholdersOn && <TableCell sx={{ minWidth: 260 }}>Chi cho / Thu từ ai</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -219,7 +221,8 @@ function ShiftCashMonthlyContent() {
                   </TableRow>
                 )}
                 {transactions.map((tx) => {
-                  const suggestion = !tx.shareholderId ? suggestShareholder(tx.note, shareholders) : null;
+                  const suggestion =
+                    shareholdersOn && !tx.shareholderId ? suggestShareholder(tx.note, shareholders) : null;
                   return (
                     <TableRow key={tx.id} hover>
                       <TableCell>{tx.date.split('-').reverse().join('/')}</TableCell>
@@ -239,6 +242,7 @@ function ShiftCashMonthlyContent() {
                         </Typography>
                       </TableCell>
                       <TableCell>{tx.note || '—'}</TableCell>
+                      {shareholdersOn && (
                       <TableCell>
                         <Stack direction="row" spacing={1} alignItems="center">
                           <TextField
@@ -269,6 +273,7 @@ function ShiftCashMonthlyContent() {
                           )}
                         </Stack>
                       </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}

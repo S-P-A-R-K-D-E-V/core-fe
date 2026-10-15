@@ -100,6 +100,7 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             path: paths.dashboard.general.storeMonitor,
             icon: ICONS.analytics,
             roles: ['Admin', 'Manager'],
+            featureKey: 'store.camera',
           },
           // SHIFT CASH (Kiểm tiền quầy)
           {
@@ -147,7 +148,7 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             path: paths.dashboard.attendance.live,
             icon: ICONS.dashboard,
             roles: ['Admin', 'Manager'],
-            featureKey: 'workforce.attendance',
+            featureKey: 'store.camera',
           },
           // {
           //   title: t('myLogs'),
@@ -548,6 +549,7 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             path: paths.dashboard.pos.shareholder.root,
             icon: ICONS.banking,
             roles: ['Admin'],
+            featureKey: 'finance.shareholders',
             children: [
               { title: 'Cổ đông & Kênh thu tiền', path: paths.dashboard.pos.shareholder.list },
               { title: 'Sổ giao dịch vốn', path: paths.dashboard.pos.shareholder.transactions },

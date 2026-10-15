@@ -13,7 +13,11 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import InputAdornment from '@mui/material/InputAdornment';
 
+import { FEATURE } from 'src/hooks/use-feature-enabled';
+
 import Iconify from 'src/components/iconify';
+
+import { useAuthContext } from 'src/auth/hooks';
 
 // ----------------------------------------------------------------------
 // Chọn quyền cho khoá API theo nhóm: danh mục → nhóm (domain của quyền) → từng quyền. Tích ô ở
@@ -50,6 +54,13 @@ const DOMAIN_LABELS: Record<string, string> = {
   'partner-voucher': 'Công nợ đối tác',
   settlement: 'Chốt sổ',
   shareholder: 'Cổ đông',
+};
+
+/** Nhóm quyền thuộc tính năng theo gói — ẩn khi cửa hàng chưa bật (API cũng trả 403). */
+const DOMAIN_FEATURE: Record<string, string> = {
+  shareholder: FEATURE.shareholders,
+  settlement: FEATURE.shareholders,
+  'partner-voucher': FEATURE.partnerDebt,
 };
 
 const CATEGORIES: { label: string; icon: string; domains: string[] }[] = [
@@ -126,12 +137,15 @@ type Props = {
 export default function AgentPermissionPicker({ domains, permissions, value, onChange }: Props) {
   const [search, setSearch] = useState('');
   const selected = useMemo(() => new Set(value), [value]);
+  const { user } = useAuthContext();
+  const enabledFeatures = user?.enabledFeatures as string[] | undefined;
 
   // danh mục → [nhóm, quyền của nhóm]; nhóm chưa khai báo ở CATEGORIES rơi vào "Khác".
   const groups = useMemo(() => {
     const byDomain = new Map<string, string[]>();
     permissions.forEach((p) => {
       const d = domainOf(p, domains);
+      if (DOMAIN_FEATURE[d] && !(enabledFeatures ?? []).includes(DOMAIN_FEATURE[d])) return;
       byDomain.set(d, [...(byDomain.get(d) ?? []), p]);
     });
     const known = new Set(CATEGORIES.flatMap((c) => c.domains));
@@ -144,7 +158,7 @@ export default function AgentPermissionPicker({ domains, permissions, value, onC
           .map((d) => ({ domain: d, permissions: byDomain.get(d)!.sort() })),
       }))
       .filter((c) => c.domains.length > 0);
-  }, [permissions, domains]);
+  }, [permissions, domains, enabledFeatures]);
 
   const keyword = search.trim().toLowerCase();
   const matches = (domain: string, permission: string) =>

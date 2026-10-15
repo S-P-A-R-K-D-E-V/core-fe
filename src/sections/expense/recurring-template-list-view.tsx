@@ -48,6 +48,7 @@ import {
   deactivateRecurringExpenseTemplate,
 } from 'src/api/expenses';
 import { getShareholders } from 'src/api/shareholders';
+import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 
 // ----------------------------------------------------------------------
 
@@ -82,6 +83,7 @@ export default function RecurringTemplateListView() {
   const [templates, setTemplates] = useState<IRecurringExpenseTemplate[]>([]);
   const [categories, setCategories] = useState<IExpenseCategory[]>([]);
   const [shareholders, setShareholders] = useState<IShareholder[]>([]);
+  const shareholdersOn = useFeatureEnabled(FEATURE.shareholders);
   const [editing, setEditing] = useState<IRecurringExpenseTemplate | null>(null);
   const [deactivateId, setDeactivateId] = useState<string | null>(null);
 
@@ -90,7 +92,7 @@ export default function RecurringTemplateListView() {
       const [templateResult, categoryResult, shareholderResult] = await Promise.all([
         getRecurringExpenseTemplates(),
         getExpenseCategories(true),
-        getShareholders(true),
+        shareholdersOn ? getShareholders(true) : Promise.resolve([] as IShareholder[]),
       ]);
       setTemplates(templateResult);
       setCategories(categoryResult);
@@ -99,7 +101,7 @@ export default function RecurringTemplateListView() {
       console.error(error);
       enqueueSnackbar('Không thể tải chi phí định kỳ', { variant: 'error' });
     }
-  }, [enqueueSnackbar]);
+  }, [enqueueSnackbar, shareholdersOn]);
 
   useEffect(() => {
     fetchData();
@@ -267,18 +269,20 @@ export default function RecurringTemplateListView() {
                 <RHFDatePicker name="validFrom" label="Áp dụng từ ngày" />
                 <RHFDatePicker name="validTo" label="Áp dụng đến ngày (để trống = không giới hạn)" />
               </Stack>
-              <RHFSelect
-                name="paidByShareholderId"
-                label="Ai chi hộ (nếu có)"
-                helperText="Mỗi lần hệ thống tự sinh chi phí kỳ mới, sẽ tự ghi vào sổ giao dịch vốn cổ đông này"
-              >
-                <MenuItem value="">Không ai / cửa hàng tự trả</MenuItem>
-                {shareholders.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.name}
-                  </MenuItem>
-                ))}
-              </RHFSelect>
+              {shareholdersOn && (
+                <RHFSelect
+                  name="paidByShareholderId"
+                  label="Ai chi hộ (nếu có)"
+                  helperText="Mỗi lần hệ thống tự sinh chi phí kỳ mới, sẽ tự ghi vào sổ giao dịch vốn cổ đông này"
+                >
+                  <MenuItem value="">Không ai / cửa hàng tự trả</MenuItem>
+                  {shareholders.map((s) => (
+                    <MenuItem key={s.id} value={s.id}>
+                      {s.name}
+                    </MenuItem>
+                  ))}
+                </RHFSelect>
+              )}
             </Stack>
           </DialogContent>
           <DialogActions>

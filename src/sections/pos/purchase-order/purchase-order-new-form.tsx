@@ -61,6 +61,7 @@ import { getAllSuppliers } from 'src/api/suppliers';
 import { getAllWarehouses } from 'src/api/warehouses';
 import { getAllProducts, getProductUnits, getPurchaseHistory } from 'src/api/products';
 import { getShareholders } from 'src/api/shareholders';
+import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 
 import { lineNetOf } from './purchase-line';
 import PurchaseOrderQuickCreateProduct from './purchase-order-quick-create-product';
@@ -170,6 +171,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
   const [warehouses, setWarehouses] = useState<IWarehouse[]>([]);
   const [products, setProducts] = useState<IProductListItem[]>([]);
   const [shareholders, setShareholders] = useState<IShareholder[]>([]);
+  const shareholdersOn = useFeatureEnabled(FEATURE.shareholders);
 
   // Lazy search state
   const [searchOptions, setSearchOptions] = useState<ProductOption[]>([]);
@@ -211,9 +213,12 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
         }
       })
       .catch(console.error);
-    getShareholders(true).then(setShareholders).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (shareholdersOn) getShareholders(true).then(setShareholders).catch(() => {});
+  }, [shareholdersOn]);
 
   // Load draft on mount (skip in edit mode)
   useEffect(() => {
@@ -1119,18 +1124,20 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
 
                 <RHFDateTimePicker name="expectedDate" label="Ngày nhập hàng" sx={{ mb: 2 }} />
 
-                <RHFSelect
-                  name="paidByShareholderId"
-                  label="Ai chi hộ (nếu có)"
-                  helperText="Chọn cổ đông đã bỏ tiền túi trả đơn nhập này — tự động ghi vào sổ giao dịch vốn"
-                >
-                  <MenuItem value="">Không ai / cửa hàng tự trả</MenuItem>
-                  {shareholders.map((s) => (
-                    <MenuItem key={s.id} value={s.id}>
-                      {s.name}
-                    </MenuItem>
-                  ))}
-                </RHFSelect>
+                {shareholdersOn && (
+                  <RHFSelect
+                    name="paidByShareholderId"
+                    label="Ai chi hộ (nếu có)"
+                    helperText="Chọn cổ đông đã bỏ tiền túi trả đơn nhập này — tự động ghi vào sổ giao dịch vốn"
+                  >
+                    <MenuItem value="">Không ai / cửa hàng tự trả</MenuItem>
+                    {shareholders.map((s) => (
+                      <MenuItem key={s.id} value={s.id}>
+                        {s.name}
+                      </MenuItem>
+                    ))}
+                  </RHFSelect>
+                )}
               </Card>
 
               {/* Summary */}

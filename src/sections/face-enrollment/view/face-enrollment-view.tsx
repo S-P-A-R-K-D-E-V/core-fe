@@ -32,6 +32,7 @@ import { useAuthContext } from 'src/auth/hooks';
 
 import { checkEnrollQuality, submitFaceEnrollment, faceEnrollDebugLog, getEnrollCameras } from 'src/api/faceEnrollment';
 import { useEnrollSnapshot } from 'src/hooks/use-enroll-snapshot';
+import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 import { useBrowserLocation } from 'src/hooks/use-browser-location';
 import type { IEnrollQualityResponse } from 'src/types/corecms-api';
 import type { IEnrollCamera } from 'src/types/attendance-live';
@@ -201,11 +202,16 @@ export default function FaceEnrollmentView() {
     isAdmin ? null : location.position
   );
 
+  const cameraOn = useFeatureEnabled(FEATURE.storeCamera);
   useEffect(() => {
+    if (!cameraOn) {
+      setBranchCameras([]);
+      return;
+    }
     getEnrollCameras()
       .then(setBranchCameras)
       .catch(() => setBranchCameras([]));
-  }, []);
+  }, [cameraOn]);
 
   function chooseSource(next: string) {
     setSource(next);

@@ -30,6 +30,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 import { getBranchLocations } from 'src/api/attendance';
+import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 import { getKioskDevices, claimKioskPairing, revokeKioskDevice, renameKioskDevice } from 'src/api/kiosk';
 
 import type { IBranchLocation } from 'src/types/corecms-api';
@@ -115,12 +116,14 @@ function PairingGuide({ kind }: { kind: 'kiosk' | 'camera' }) {
 
 export function KioskDevicesView() {
   const { enqueueSnackbar } = useSnackbar();
+  const cameraOn = useFeatureEnabled(FEATURE.storeCamera);
 
   const [devices, setDevices] = useState<IKioskDeviceItem[]>([]);
   const [branches, setBranches] = useState<IBranchLocation[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [guide, setGuide] = useState<'kiosk' | 'camera'>('camera');
+  const [guide, setGuide] = useState<'kiosk' | 'camera'>(cameraOn ? 'camera' : 'kiosk');
+  const pairingGuide = cameraOn ? guide : 'kiosk';
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [branchId, setBranchId] = useState('');
@@ -212,14 +215,16 @@ export function KioskDevicesView() {
       <Card sx={{ mb: 3 }}>
         <Box sx={{ px: 3, pt: 2 }}>
           <Typography variant="subtitle1">Ghép nối thiết bị mới</Typography>
-          <Tabs value={guide} onChange={(_, v) => setGuide(v)} sx={{ mt: 1 }}>
-            <Tab value="camera" label="Camera đếm khách" icon={<Iconify icon="solar:videocamera-record-bold" width={20} />} iconPosition="start" />
+          <Tabs value={pairingGuide} onChange={(_, v) => setGuide(v)} sx={{ mt: 1 }}>
+            {cameraOn && (
+              <Tab value="camera" label="Camera đếm khách" icon={<Iconify icon="solar:videocamera-record-bold" width={20} />} iconPosition="start" />
+            )}
             <Tab value="kiosk" label="Kiosk chấm công" icon={<Iconify icon="solar:monitor-smartphone-bold" width={20} />} iconPosition="start" />
           </Tabs>
         </Box>
         <Divider />
         <Stack spacing={2.5} sx={{ p: 3 }}>
-          <PairingGuide kind={guide} />
+          <PairingGuide kind={pairingGuide} />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField
               id="pair-code"
@@ -232,7 +237,7 @@ export function KioskDevicesView() {
             <TextField
               id="pair-name"
               label="Tên thiết bị"
-              placeholder={guide === 'camera' ? 'VD: Camera cửa chính' : 'VD: Kiosk quầy lễ tân'}
+              placeholder={pairingGuide === 'camera' ? 'VD: Camera cửa chính' : 'VD: Kiosk quầy lễ tân'}
               value={name}
               onChange={(e) => setName(e.target.value)}
               fullWidth
