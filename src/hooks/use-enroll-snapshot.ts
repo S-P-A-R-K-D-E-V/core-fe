@@ -5,6 +5,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 
 import { HOST_API } from 'src/config-global';
 
+import type { BrowserPosition } from 'src/hooks/use-browser-location';
 import type { IStoreLiveSnapshot } from 'src/types/attendance-live';
 
 // ----------------------------------------------------------------------
@@ -21,8 +22,11 @@ export type EnrollSnapshotResult = { data: string; error?: undefined } | { data?
 
 type Pending = { resolve: (r: EnrollSnapshotResult) => void; timer: ReturnType<typeof setTimeout> };
 
-export function useEnrollSnapshot(target: { deviceId: string; cameraKey: string } | null) {
+/** position: vị trí trình duyệt (người không phải Admin phải đang ở cửa hàng của camera); null = không gửi. */
+export function useEnrollSnapshot(target: { deviceId: string; cameraKey: string } | null, position: BrowserPosition | null = null) {
   const connRef = useRef<signalR.HubConnection | null>(null);
+  const positionRef = useRef<BrowserPosition | null>(position);
+  positionRef.current = position;
   const pendingRef = useRef<Map<string, Pending>>(new Map());
   const [state, setState] = useState<EnrollSnapshotState>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -92,10 +96,14 @@ export function useEnrollSnapshot(target: { deviceId: string; cameraKey: string 
       return { error: 'Đang kết nối camera quầy…' };
     }
     try {
+      const p = positionRef.current;
       const res = await conn.invoke<{ ok: boolean; error?: string | null; requestId?: string | null }>(
         'RequestSnapshot',
         deviceId,
-        cameraKey
+        cameraKey,
+        p?.latitude ?? null,
+        p?.longitude ?? null,
+        p?.accuracy ?? null
       );
       if (!res?.ok || !res.requestId) return { error: res?.error || 'Không chụp được ảnh từ camera quầy.' };
       const { requestId } = res;

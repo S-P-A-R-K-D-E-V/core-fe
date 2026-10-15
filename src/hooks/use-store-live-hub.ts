@@ -5,6 +5,8 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 
 import { HOST_API } from 'src/config-global';
 
+import type { BrowserPosition } from 'src/hooks/use-browser-location';
+
 import type {
   ILiveOverlayBox,
   IStoreLiveFrame,
@@ -59,6 +61,12 @@ export type UseStoreLiveHubOptions = {
   paused: boolean;
   /** Không cần ổn định identity — hook giữ bản mới nhất trong ref. */
   onPresence?: (event: IStorePresenceChanged) => void;
+  /**
+   * Không phải Admin: máy chủ chỉ cho xem khi đang ở cửa hàng của camera → gửi vị trí kèm Watch và gửi lại mỗi phút.
+   * requireLocation mà chưa có vị trí thì chưa xem.
+   */
+  requireLocation?: boolean;
+  position?: BrowserPosition | null;
 };
 
 export type UseStoreLiveHubResult = {
@@ -68,7 +76,12 @@ export type UseStoreLiveHubResult = {
   /** Agent của thiết bị có đang nối vào hub không (từ kết quả Watch và sự kiện live_status). */
   sources: Record<string, boolean>;
   error: string | null;
+  /** Bị từ chối vì vị trí (ngoài cửa hàng, chưa bật định vị…) — hiện cho người xem, tự thử lại khi có vị trí mới. */
+  accessDenied: { reason: string; message: string } | null;
 };
+
+/** Gia hạn quyền xem (gửi lại vị trí) mỗi ngần này — máy chủ cho hiệu lực 150 giây. */
+const LOCATION_RENEW_MS = 60_000;
 
 function errorText(err: unknown, fallback: string): string {
   if (err && typeof err === 'object' && 'message' in err) {
@@ -78,7 +91,14 @@ function errorText(err: unknown, fallback: string): string {
   return fallback;
 }
 
-export function useStoreLiveHub({ branchId, deviceIds, paused, onPresence }: UseStoreLiveHubOptions): UseStoreLiveHubResult {
+export function useStoreLiveHub({
+  branchId,
+  deviceIds,
+  paused,
+  onPresence,
+  requireLocation = false,
+  position = null,
+}: UseStoreLiveHubOptions): UseStoreLiveHubResult {
   const connRef = useRef<signalR.HubConnection | null>(null);
   /** Thiết bị đã Watch trên kết nối hiện tại. */
   const watchedRef = useRef<Set<string>>(new Set());
@@ -89,15 +109,26 @@ export function useStoreLiveHub({ branchId, deviceIds, paused, onPresence }: Use
   /** Mốc nhận hình gần nhất theo frameKey — để tính hình/giây. */
   const arrivalsRef = useRef<Map<string, number[]>>(new Map());
   const onPresenceRef = useRef(onPresence);
+  const positionRef = useRef<BrowserPosition | null>(position);
+  const requireLocationRef = useRef(requireLocation);
+  positionRef.current = position;
+  requireLocationRef.current = requireLocation;
 
   const [connectionState, setConnectionState] = useState<StoreLiveConnectionState>('idle');
   const [frames, setFrames] = useState<Record<string, LiveFrameState>>({});
   const [sources, setSources] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState<{ reason: string; message: string } | null>(null);
 
   useEffect(() => {
     onPresenceRef.current = onPresence;
   }, [onPresence]);
+
+  /** Watch kèm vị trí hiện tại (null khi Admin hoặc chưa có). */
+  const invokeWatch = useCallback((conn: signalR.HubConnection, id: string) => {
+    const p = requireLocationRef.current ? positionRef.current : null;
+    return conn.invoke<IStoreLiveWatchResult>('Watch', id, p?.latitude ?? null, p?.longitude ?? null, p?.accuracy ?? null);
+  }, []);
 
   // Khoá chuỗi để mảng deviceIds mới (mỗi lần tải lại bảng) không làm Watch/Unwatch lại.
   const deviceKey = paused ? '' : Array.from(new Set(deviceIds.filter(Boolean))).sort().join(',');
@@ -116,18 +147,22 @@ export function useStoreLiveHub({ branchId, deviceIds, paused, onPresence }: Use
       conn.invoke('Unwatch', id).catch(() => {});
     });
 
+    // Không phải Admin mà chưa có vị trí: chưa xin xem (máy chủ sẽ từ chối), chờ định vị.
+    if (requireLocationRef.current && !positionRef.current) return;
+
     desired.forEach((id) => {
       if (watched.has(id)) return;
       watched.add(id);
-      conn
-        .invoke<IStoreLiveWatchResult>('Watch', id)
+      invokeWatch(conn, id)
         .then((res) => {
           if (generationRef.current !== generation) return;
           if (!res?.ok) {
             watched.delete(id);
-            setError(res?.error || 'Không mở được hình trực tiếp của thiết bị.');
+            if (res?.reason) setAccessDenied({ reason: res.reason, message: res.error || 'Không được xem camera này.' });
+            else setError(res?.error || 'Không mở được hình trực tiếp của thiết bị.');
             return;
           }
+          setAccessDenied(null);
           const connected = !!res.sourceConnected;
           setSources((prev) => (prev[id] === connected ? prev : { ...prev, [id]: connected }));
         })
@@ -137,7 +172,7 @@ export function useStoreLiveHub({ branchId, deviceIds, paused, onPresence }: Use
           setError(errorText(err, 'Không mở được hình trực tiếp của thiết bị.'));
         });
     });
-  }, []);
+  }, [invokeWatch]);
 
   // Kết nối theo chi nhánh.
   useEffect(() => {
@@ -259,11 +294,36 @@ export function useStoreLiveHub({ branchId, deviceIds, paused, onPresence }: Use
     };
   }, [branchId, syncWatches]);
 
-  // Đổi danh sách thiết bị / tạm dừng / vừa kết nối → Watch/Unwatch cho khớp.
+  // Đổi danh sách thiết bị / tạm dừng / vừa kết nối / vừa có vị trí → Watch/Unwatch cho khớp.
+  const hasPosition = !!position;
   useEffect(() => {
     desiredRef.current = deviceKey ? deviceKey.split(',') : [];
     syncWatches();
-  }, [deviceKey, connectionState, syncWatches]);
+  }, [deviceKey, connectionState, syncWatches, hasPosition]);
 
-  return { connectionState, frames, sources, error };
+  // Không phải Admin: gia hạn quyền xem bằng vị trí mới mỗi phút (rời cửa hàng → máy chủ ngừng gửi hình) và thử lại
+  // những thiết bị đang bị từ chối.
+  useEffect(() => {
+    if (!requireLocation) return undefined;
+    const timer = setInterval(() => {
+      const conn = connRef.current;
+      if (!conn || conn.state !== signalR.HubConnectionState.Connected || !positionRef.current) return;
+      const generation = generationRef.current;
+      Array.from(watchedRef.current).forEach((id) => {
+        invokeWatch(conn, id)
+          .then((res) => {
+            if (generationRef.current !== generation) return;
+            if (!res?.ok) {
+              watchedRef.current.delete(id);
+              if (res?.reason) setAccessDenied({ reason: res.reason, message: res.error || 'Không được xem camera này.' });
+            }
+          })
+          .catch(() => {});
+      });
+      syncWatches();
+    }, LOCATION_RENEW_MS);
+    return () => clearInterval(timer);
+  }, [requireLocation, invokeWatch, syncWatches]);
+
+  return { connectionState, frames, sources, error, accessDenied };
 }

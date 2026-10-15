@@ -18,6 +18,10 @@ vi.mock('src/routes/components', async () => {
 // Hàm ổn định như notistack thật — hàm mới mỗi render làm callback đổi identity và lặp vô hạn.
 const enqueueSnackbar = vi.fn();
 vi.mock('src/components/snackbar', () => ({ useSnackbar: () => ({ enqueueSnackbar }) }));
+let currentUser: any = { role: 'Admin', roles: ['Admin'] };
+vi.mock('src/auth/hooks', () => ({ useAuthContext: () => ({ user: currentUser }) }));
+let locationState: any = { position: null, error: null };
+vi.mock('src/hooks/use-browser-location', () => ({ useBrowserLocation: () => locationState }));
 vi.mock('src/store/working-branch-store', () => ({
   useWorkingBranch: (selector: any) => selector({ branch: null }),
 }));
@@ -96,7 +100,9 @@ describe('AttendanceLiveView', () => {
     api.getBranchBoard.mockReset();
     api.getBranchBoardBranches.mockReset();
     enqueueSnackbar.mockReset();
-    hubState = { connectionState: 'connected', frames: {}, sources: { d1: true }, error: null };
+    hubState = { connectionState: 'connected', frames: {}, sources: { d1: true }, error: null, accessDenied: null };
+    currentUser = { role: 'Admin', roles: ['Admin'] };
+    locationState = { position: null, error: null };
     api.getBranchBoardBranches.mockResolvedValue([{ branchId: 'b1', branchName: 'CiCi Cầu Giấy', deviceCount: 1, liveDeviceCount: 1 }]);
     api.getBranchBoard.mockResolvedValue(board);
   });
@@ -205,5 +211,24 @@ describe('live tile helpers', () => {
     renderView();
     expect(await screen.findByText(/Agent 0.4.0 cũ/)).toBeTruthy();
     expect(screen.getByText(/agent 0.4.0/)).toBeTruthy();
+  });
+});
+
+describe('camera access outside the store', () => {
+  it('admin watches without location; a manager away from the store sees why there is no picture', async () => {
+    renderView();
+    await screen.findByText('Trần Thị Lan');
+    expect(lastHubOptions.requireLocation).toBe(false);
+
+    currentUser = { role: 'Manager', roles: ['Manager'] };
+    locationState = { position: { latitude: 21.03, longitude: 105.8, accuracy: 20 }, error: null };
+    hubState = {
+      ...hubState,
+      accessDenied: { reason: 'outside', message: 'Bạn đang cách Chi nhánh 21 Chùa Láng khoảng 650 m (cho phép 100 m)' },
+    };
+    renderView();
+    expect(await screen.findByText(/khoảng 650 m/)).toBeTruthy();
+    expect(lastHubOptions.requireLocation).toBe(true);
+    expect(lastHubOptions.position).toEqual({ latitude: 21.03, longitude: 105.8, accuracy: 20 });
   });
 });

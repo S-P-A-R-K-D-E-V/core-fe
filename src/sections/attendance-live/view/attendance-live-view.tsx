@@ -28,6 +28,8 @@ import { fTime } from 'src/utils/format-time';
 import { useWorkingBranch } from 'src/store/working-branch-store';
 import { getBranchBoard, getBranchBoardBranches } from 'src/api/attendance-live';
 import { frameKey, useStoreLiveHub, type LiveFrameState } from 'src/hooks/use-store-live-hub';
+import { useBrowserLocation } from 'src/hooks/use-browser-location';
+import { useAuthContext } from 'src/auth/hooks';
 
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
@@ -340,7 +342,19 @@ function LivePanel({ branchId, devices, boardLoaded, onPresence }: LivePanelProp
   const tiles = useMemo(() => counterTiles(devices), [devices]);
   const deviceIds = useMemo(() => tiles.map((t) => t.device.id), [tiles]);
 
-  const { connectionState, frames, sources, error } = useStoreLiveHub({ branchId, deviceIds, paused, onPresence });
+  // Admin xem ở đâu cũng được; quản lý phải đang ở cửa hàng của camera (máy chủ kiểm tra vị trí, gia hạn mỗi phút).
+  const { user } = useAuthContext();
+  const isAdmin = user?.role === 'Admin' || !!user?.roles?.some((r: string) => r === 'Admin');
+  const location = useBrowserLocation(!isAdmin && tiles.length > 0 && !paused);
+  const { connectionState, frames, sources, error, accessDenied } = useStoreLiveHub({
+    branchId,
+    deviceIds,
+    paused,
+    onPresence,
+    requireLocation: !isAdmin,
+    position: location.position,
+  });
+  const locationBlocked = !isAdmin && !paused && tiles.length > 0 && (!!accessDenied || !!location.error || !location.position);
 
   // Đồng hồ để chip LIVE tắt khi hình ngừng tới.
   useEffect(() => {
@@ -386,6 +400,14 @@ function LivePanel({ branchId, devices, boardLoaded, onPresence }: LivePanelProp
         {error && (
           <Alert severity="warning" sx={{ mb: 2 }}>
             {error}
+          </Alert>
+        )}
+
+        {locationBlocked && (
+          <Alert severity={accessDenied || location.error ? 'warning' : 'info'} sx={{ mb: 2 }}>
+            {location.error ||
+              accessDenied?.message ||
+              'Đang xác định vị trí — tài khoản không phải chủ cửa hàng chỉ xem được camera khi đang ở cửa hàng.'}
           </Alert>
         )}
 

@@ -14,12 +14,14 @@ vi.mock('src/components/snackbar', () => ({ useSnackbar: () => ({ enqueueSnackba
 vi.mock('src/components/settings', () => ({ useSettingsContext: () => ({ themeStretch: false }) }));
 vi.mock('src/components/custom-breadcrumbs', () => ({ default: ({ heading }: any) => <h1>{heading}</h1> }));
 vi.mock('src/auth/guard/role-based-guard', () => ({ default: ({ children }: any) => <>{children}</> }));
-const user = { role: 'Staff', roles: ['Staff'], hasFaceEmbedding: false };
+let user: any = { role: 'Staff', roles: ['Staff'], hasFaceEmbedding: false };
 const refreshUser = vi.fn(() => Promise.resolve());
 vi.mock('src/auth/hooks', () => ({ useAuthContext: () => ({ user, refreshUser }) }));
 const push = vi.fn();
 vi.mock('src/routes/hooks', () => ({ useRouter: () => ({ push }) }));
 vi.mock('../view/self-verify-dialog', () => ({ SelfVerifyDialog: () => null }));
+let locationState: any = { position: { latitude: 21.0229, longitude: 105.8079, accuracy: 15 }, error: null };
+vi.mock('src/hooks/use-browser-location', () => ({ useBrowserLocation: () => locationState }));
 
 const api = { checkEnrollQuality: vi.fn(), submitFaceEnrollment: vi.fn(), getEnrollCameras: vi.fn() };
 vi.mock('src/api/faceEnrollment', () => ({
@@ -31,9 +33,11 @@ vi.mock('src/api/faceEnrollment', () => ({
 
 const capture = vi.fn();
 let snapshotTarget: any = 'unset';
+let snapshotPosition: any = 'unset';
 vi.mock('src/hooks/use-enroll-snapshot', () => ({
-  useEnrollSnapshot: (target: any) => {
+  useEnrollSnapshot: (target: any, position: any) => {
     snapshotTarget = target;
+    snapshotPosition = position;
     return { state: target ? 'ready' : 'idle', error: null, capture };
   },
 }));
@@ -59,6 +63,8 @@ describe('FaceEnrollmentView with the branch attendance camera', () => {
     Object.values(api).forEach((fn) => fn.mockReset());
     capture.mockReset();
     snapshotTarget = 'unset';
+    user = { role: 'Staff', roles: ['Staff'], hasFaceEmbedding: false };
+    locationState = { position: { latitude: 21.0229, longitude: 105.8079, accuracy: 15 }, error: null };
     api.getEnrollCameras.mockResolvedValue([camera]);
     // Máy không có webcam (như PC ở quầy không có camera).
     Object.defineProperty(navigator, 'mediaDevices', {
@@ -91,5 +97,29 @@ describe('FaceEnrollmentView with the branch attendance camera', () => {
 
     expect(await screen.findByText(/Chưa thấy khuôn mặt trước camera quầy/, {}, { timeout: 3000 })).toBeTruthy();
     expect(api.checkEnrollQuality).not.toHaveBeenCalled();
+  });
+});
+
+describe('FaceEnrollmentView rules', () => {
+  beforeEach(() => {
+    api.getEnrollCameras.mockResolvedValue([camera]);
+  });
+
+  it('lets staff re-enroll their own face', async () => {
+    user = { role: 'Staff', roles: ['Staff'], hasFaceEmbedding: true };
+    renderView();
+    const button = await screen.findByText('Đăng ký lại');
+    expect(button.closest('button')!.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('staff must share their location to use the counter camera', async () => {
+    user = { role: 'Staff', roles: ['Staff'], hasFaceEmbedding: false };
+    locationState = { position: null, error: 'Bạn đã chặn quyền định vị — cho phép vị trí cho trang này để xem camera khi ở cửa hàng.' };
+    capture.mockReset();
+    renderView();
+    fireEvent.click(await screen.findByText('Dùng camera chấm công'));
+    expect(await screen.findByText(/chặn quyền định vị/, {}, { timeout: 3000 })).toBeTruthy();
+    expect(capture).not.toHaveBeenCalled();
+    expect(snapshotPosition).toBeNull();
   });
 });

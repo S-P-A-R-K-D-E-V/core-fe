@@ -32,6 +32,7 @@ import { useAuthContext } from 'src/auth/hooks';
 
 import { checkEnrollQuality, submitFaceEnrollment, faceEnrollDebugLog, getEnrollCameras } from 'src/api/faceEnrollment';
 import { useEnrollSnapshot } from 'src/hooks/use-enroll-snapshot';
+import { useBrowserLocation } from 'src/hooks/use-browser-location';
 import type { IEnrollQualityResponse } from 'src/types/corecms-api';
 import type { IEnrollCamera } from 'src/types/attendance-live';
 
@@ -139,10 +140,7 @@ export default function FaceEnrollmentView() {
   const { user, refreshUser } = useAuthContext();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const isAdminOrManager =
-    user?.role === 'Admin' ||
-    user?.role === 'Manager' ||
-    !!user?.roles?.some((r: string) => r === 'Admin' || r === 'Manager');
+  const isAdmin = user?.role === 'Admin' || !!user?.roles?.some((r: string) => r === 'Admin');
 
   const [mode, setMode] = useState<Mode>(user?.hasFaceEmbedding ? 'status' : 'capture');
   const [verifyOpen, setVerifyOpen] = useState(false);
@@ -196,8 +194,11 @@ export default function FaceEnrollmentView() {
   const branchCamera = branchCameras.find((c) => cameraSourceKey(c) === source) ?? null;
   const usingBranchCamera = !!branchCamera;
   const snapshotTarget = branchCamera ? { deviceId: branchCamera.deviceId, cameraKey: branchCamera.cameraKey } : null;
+  // Không phải Admin: chỉ dùng được camera quầy khi đang ở cửa hàng (máy chủ kiểm tra vị trí mỗi lần chụp).
+  const location = useBrowserLocation(mode === 'capture' && usingBranchCamera && !isAdmin);
   const { state: snapshotState, error: snapshotError, capture: captureSnapshot } = useEnrollSnapshot(
-    mode === 'capture' ? snapshotTarget : null
+    mode === 'capture' ? snapshotTarget : null,
+    isAdmin ? null : location.position
   );
 
   useEffect(() => {
@@ -288,6 +289,10 @@ export default function FaceEnrollmentView() {
   /** Một khung để kiểm tra: webcam (đồng bộ) hoặc ảnh agent chụp từ camera quầy. */
   const grabFrame = useCallback(async (): Promise<string | null> => {
     if (!usingBranchCamera) return captureFrameBase64();
+    if (!isAdmin && !location.position) {
+      setHint(location.error || 'Đang xác định vị trí — chỉ dùng được camera quầy khi đang ở cửa hàng.');
+      return null;
+    }
     const snap = await captureSnapshot();
     if (snap.error !== undefined) {
       setHint(snap.error);
@@ -295,7 +300,7 @@ export default function FaceEnrollmentView() {
     }
     setBranchPreview(snap.data);
     return snap.data;
-  }, [usingBranchCamera, captureFrameBase64, captureSnapshot]);
+  }, [usingBranchCamera, captureFrameBase64, captureSnapshot, isAdmin, location.position, location.error]);
 
   // ── Auto-detect: lấy mẫu frame nền, tự chấp nhận/tự chuyển bước — KHÔNG cần bấm chụp. ──
   useEffect(() => {
@@ -418,17 +423,14 @@ export default function FaceEnrollmentView() {
                 variant="outlined"
                 size="large"
                 color="inherit"
-                disabled={!isAdminOrManager}
                 startIcon={<Iconify icon="mdi:camera-retake" />}
                 onClick={startReenroll}
               >
                 Đăng ký lại
               </Button>
-              {!isAdminOrManager && (
-                <Typography variant="caption" color="text.secondary">
-                  Cần Admin hoặc Quản lý thực hiện đăng ký lại — liên hệ quản lý nếu khuôn mặt thay đổi nhiều.
-                </Typography>
-              )}
+              <Typography variant="caption" color="text.secondary">
+                Chấm công hay không nhận ra bạn? Đăng ký lại bằng camera chấm công ở quầy cho kết quả chính xác hơn.
+              </Typography>
             </Stack>
 
             <SelfVerifyDialog open={verifyOpen} onClose={() => setVerifyOpen(false)} />

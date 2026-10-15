@@ -121,7 +121,15 @@ export type IBranchBoard = {
 
 export type IStoreLiveInvokeResult = { ok: boolean; error?: string | null };
 
-export type IStoreLiveWatchResult = IStoreLiveInvokeResult & { sourceConnected?: boolean };
+/** reason khi bị từ chối vì vị trí (người không phải Admin phải đang ở cửa hàng của camera). */
+export type StoreCameraDeniedReason = 'branch_no_location' | 'location_required' | 'low_accuracy' | 'outside';
+
+export type IStoreLiveWatchResult = IStoreLiveInvokeResult & {
+  sourceConnected?: boolean;
+  reason?: StoreCameraDeniedReason | string | null;
+  /** Gọi lại Watch (kèm vị trí mới) sau ngần này giây; null = Admin, không cần. */
+  recheckSeconds?: number | null;
+};
 
 /** ≈2 hình/giây mỗi camera; data là JPEG base64 không có tiền tố data:. */
 /** Khung khuôn mặt agent vẽ lên hình (toạ độ tương đối 0..1 theo khung hình). */
