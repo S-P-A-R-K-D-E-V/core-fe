@@ -436,6 +436,7 @@ export const endpoints = {
     enrollPresign: '/face-tracking/enroll/presign',
     enrollBatch: '/face-tracking/enroll/batch',
     verifySelf: '/face-tracking/verify-self',
+    enrollCameras: '/face-tracking/enroll/cameras',
   },
   notificationConfig: {
     list: '/notification/config',

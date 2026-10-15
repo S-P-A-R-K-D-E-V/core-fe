@@ -105,6 +105,20 @@ type LiveTileModel = { device: IBranchBoardDevice; camera: IBranchBoardCamera };
 
 const FACE_BOXES_KEY = 'attendance-live.showFaceBoxes';
 
+/** Agent từ bản này mới có khung nhận diện, 8 hình/giây và chụp ảnh đăng ký khuôn mặt. */
+const RECOMMENDED_AGENT = '0.6.0';
+
+/** So phiên bản dạng 0.6.0; phần không phải số coi như 0. */
+export function versionBelow(version: string | null | undefined, min: string): boolean {
+  if (!version) return false;
+  const a = version.split('.').map((n) => parseInt(n, 10) || 0);
+  const b = min.split('.').map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0);
+  }
+  return false;
+}
+
 function readFaceBoxesPref(): boolean {
   try {
     return localStorage.getItem(FACE_BOXES_KEY) !== '0';
@@ -278,9 +292,17 @@ function LiveTile({ tile, frame, sourceConnected, paused, now, showFaceBoxes }: 
         </Typography>
         <Typography variant="caption" color="text.secondary" noWrap>
           {device.name}
+          {device.agentVersion ? ` · agent ${device.agentVersion}` : ''}
+          {isLive && frame?.fps ? ` · ${frame.fps.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} hình/giây` : ''}
           {frame ? ` · hình lúc ${clock(frame.at, true)}` : ''}
         </Typography>
       </Stack>
+      {versionBelow(device.agentVersion, RECOMMENDED_AGENT) && (
+        <Alert severity="warning" sx={{ py: 0 }}>
+          Agent {device.agentVersion} cũ: chỉ ~2 hình/giây, chưa có khung nhận diện và chụp ảnh đăng ký. Cập nhật Spark
+          Camera ≥ {RECOMMENDED_AGENT} trên máy quầy (bấm Dừng, giải nén bản mới đè lên thư mục cũ, chạy lại).
+        </Alert>
+      )}
     </Stack>
   );
 }
@@ -300,7 +322,7 @@ type LivePanelProps = {
   onPresence: (event: IStorePresenceChanged) => void;
 };
 
-/** Hình trực tiếp nằm riêng ở đây để ~4 hình/giây mỗi camera chỉ vẽ lại khối này, không vẽ lại các bảng. */
+/** Hình trực tiếp nằm riêng ở đây để tới 8 hình/giây mỗi camera chỉ vẽ lại khối này, không vẽ lại các bảng. */
 function LivePanel({ branchId, devices, boardLoaded, onPresence }: LivePanelProps) {
   const [paused, setPaused] = useState(false);
   const [showFaceBoxes, setShowFaceBoxes] = useState(readFaceBoxesPref);

@@ -11,6 +11,8 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import Alert from '@mui/material/Alert';
 import IconButton from '@mui/material/IconButton';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -28,8 +30,10 @@ import Iconify from 'src/components/iconify';
 import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 import { useAuthContext } from 'src/auth/hooks';
 
-import { checkEnrollQuality, submitFaceEnrollment, faceEnrollDebugLog } from 'src/api/faceEnrollment';
+import { checkEnrollQuality, submitFaceEnrollment, faceEnrollDebugLog, getEnrollCameras } from 'src/api/faceEnrollment';
+import { useEnrollSnapshot } from 'src/hooks/use-enroll-snapshot';
 import type { IEnrollQualityResponse } from 'src/types/corecms-api';
+import type { IEnrollCamera } from 'src/types/attendance-live';
 
 import { SelfVerifyDialog } from './self-verify-dialog';
 
@@ -123,6 +127,10 @@ function extractApiError(error: any): string {
 
 type Mode = 'status' | 'capture';
 
+/** Nguồn ảnh: camera của máy đang dùng, hoặc camera chấm công của chi nhánh ("deviceId|cameraKey"). */
+const DEVICE_SOURCE = 'device';
+const cameraSourceKey = (c: IEnrollCamera) => `${c.deviceId}|${c.cameraKey}`;
+
 export default function FaceEnrollmentView() {
   const theme = useTheme();
   const router = useRouter();
@@ -181,6 +189,30 @@ export default function FaceEnrollmentView() {
   const [done, setDone] = useState(false);
   const [failedReason, setFailedReason] = useState<string | null>(null);
 
+  // ── Nguồn ảnh: camera máy này hoặc camera chấm công của chi nhánh (ảnh độ phân giải cao do agent chụp). ──
+  const [branchCameras, setBranchCameras] = useState<IEnrollCamera[]>([]);
+  const [source, setSource] = useState<string>(DEVICE_SOURCE);
+  const [branchPreview, setBranchPreview] = useState<string | null>(null);
+  const branchCamera = branchCameras.find((c) => cameraSourceKey(c) === source) ?? null;
+  const usingBranchCamera = !!branchCamera;
+  const snapshotTarget = branchCamera ? { deviceId: branchCamera.deviceId, cameraKey: branchCamera.cameraKey } : null;
+  const { state: snapshotState, error: snapshotError, capture: captureSnapshot } = useEnrollSnapshot(
+    mode === 'capture' ? snapshotTarget : null
+  );
+
+  useEffect(() => {
+    getEnrollCameras()
+      .then(setBranchCameras)
+      .catch(() => setBranchCameras([]));
+  }, []);
+
+  function chooseSource(next: string) {
+    setSource(next);
+    setBranchPreview(null);
+    setHint(null);
+    setCameraError(null);
+  }
+
   const step = STEPS[stepIndex];
 
   useEffect(() => {
@@ -210,14 +242,14 @@ export default function FaceEnrollmentView() {
   }, []);
 
   useEffect(() => {
-    if (mode !== 'capture') return undefined;
+    if (mode !== 'capture' || usingBranchCamera) return undefined;
     startCamera();
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       setCameraReady(false);
     };
-  }, [mode, startCamera]);
+  }, [mode, startCamera, usingBranchCamera]);
 
   const captureFrameBase64 = useCallback((): string | null => {
     if (!videoRef.current || !canvasRef.current) return null;
@@ -251,16 +283,33 @@ export default function FaceEnrollmentView() {
     }
   }
 
+  const sourceReady = usingBranchCamera ? snapshotState === 'ready' : cameraReady;
+
+  /** Một khung để kiểm tra: webcam (đồng bộ) hoặc ảnh agent chụp từ camera quầy. */
+  const grabFrame = useCallback(async (): Promise<string | null> => {
+    if (!usingBranchCamera) return captureFrameBase64();
+    const snap = await captureSnapshot();
+    if (snap.error !== undefined) {
+      setHint(snap.error);
+      return null;
+    }
+    setBranchPreview(snap.data);
+    return snap.data;
+  }, [usingBranchCamera, captureFrameBase64, captureSnapshot]);
+
   // ── Auto-detect: lấy mẫu frame nền, tự chấp nhận/tự chuyển bước — KHÔNG cần bấm chụp. ──
   useEffect(() => {
-    if (mode !== 'capture' || !cameraReady || stepPassed || submitting || done) return undefined;
+    if (mode !== 'capture' || !sourceReady || stepPassed || submitting || done) return undefined;
 
     const interval = setInterval(async () => {
       if (busyRef.current) return;
-      const base64 = captureFrameBase64();
-      if (!base64) return;
-
       busyRef.current = true;
+      const base64 = await grabFrame();
+      if (!base64) {
+        busyRef.current = false;
+        return;
+      }
+
       try {
         const quality = await checkEnrollQuality(base64);
         const error = validateStep(step.key, quality);
@@ -293,7 +342,7 @@ export default function FaceEnrollmentView() {
 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, cameraReady, stepPassed, submitting, done, stepIndex, step.key, captureFrameBase64]);
+  }, [mode, sourceReady, stepPassed, submitting, done, stepIndex, step.key, grabFrame]);
 
   function handleReset() {
     setStepIndex(0);
@@ -303,7 +352,8 @@ export default function FaceEnrollmentView() {
     setDone(false);
     setHint(null);
     setStepPassed(false);
-    if (!streamRef.current) startCamera();
+    setBranchPreview(null);
+    if (!streamRef.current && !usingBranchCamera) startCamera();
   }
 
   function startReenroll() {
@@ -320,6 +370,31 @@ export default function FaceEnrollmentView() {
           links={[{ name: 'Dashboard', href: paths.dashboard.root }, { name: 'Đăng ký khuôn mặt' }]}
           sx={{ mb: { xs: 3, md: 5 } }}
         />
+
+        {mode === 'capture' && !done && branchCameras.length > 0 && (
+          <TextField
+            id="face-enroll-source"
+            select
+            fullWidth
+            size="small"
+            label="Nguồn ảnh"
+            value={source}
+            onChange={(e) => chooseSource(e.target.value)}
+            helperText={
+              usingBranchCamera
+                ? 'Đứng trước camera quầy, cách khoảng 0,5–1 m, làm theo từng bước. Đăng ký bằng camera chấm công giúp chấm công nhận ra bạn chính xác hơn.'
+                : 'Có thể chọn camera chấm công của chi nhánh để đăng ký đúng camera dùng khi chấm công.'
+            }
+            sx={{ mb: 2 }}
+          >
+            <MenuItem value={DEVICE_SOURCE}>Camera của máy này</MenuItem>
+            {branchCameras.map((c) => (
+              <MenuItem key={cameraSourceKey(c)} value={cameraSourceKey(c)} disabled={!c.online}>
+                Camera chấm công: {c.cameraName} ({c.deviceName} · {c.branchName}){c.online ? '' : ' — mất kết nối'}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
 
         {mode === 'status' ? (
           <Card sx={{ p: 5, textAlign: 'center' }}>
@@ -410,9 +485,20 @@ export default function FaceEnrollmentView() {
             <Typography variant="h6" sx={{ mb: 2 }}>
               {cameraError}
             </Typography>
-            <Button variant="contained" onClick={startCamera}>
-              Thử lại
-            </Button>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="center">
+              <Button variant="contained" onClick={startCamera}>
+                Thử lại
+              </Button>
+              {branchCameras.some((c) => c.online) && (
+                <Button
+                  variant="outlined"
+                  startIcon={<Iconify icon="mdi:cctv" />}
+                  onClick={() => chooseSource(cameraSourceKey(branchCameras.find((c) => c.online)!))}
+                >
+                  Dùng camera chấm công
+                </Button>
+              )}
+            </Stack>
           </Card>
         ) : (
           <Card sx={{ overflow: 'hidden' }}>
@@ -444,15 +530,26 @@ export default function FaceEnrollmentView() {
               }}
             >
               <canvas ref={canvasRef} style={{ display: 'none' }} />
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transform: 'scaleX(-1)' }}
-              />
+              {usingBranchCamera ? (
+                branchPreview && (
+                  <Box
+                    component="img"
+                    alt="Ảnh từ camera quầy"
+                    src={`data:image/jpeg;base64,${branchPreview}`}
+                    sx={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                  />
+                )
+              ) : (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transform: 'scaleX(-1)' }}
+                />
+              )}
 
-              {cameraReady && (
+              {sourceReady && !usingBranchCamera && (
                 <Box
                   sx={{
                     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -474,7 +571,13 @@ export default function FaceEnrollmentView() {
                 </Box>
               )}
 
-              {!cameraReady && (
+              {usingBranchCamera && stepPassed && (
+                <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Iconify icon="mdi:check-bold" width={72} sx={{ color: 'success.main' }} />
+                </Box>
+              )}
+
+              {(usingBranchCamera ? !branchPreview : !cameraReady) && (
                 <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <CircularProgress sx={{ color: '#fff' }} />
                 </Box>
@@ -492,6 +595,12 @@ export default function FaceEnrollmentView() {
                 </Typography>
               </Box>
             </Box>
+
+            {usingBranchCamera && snapshotState === 'error' && snapshotError && (
+              <Alert severity="error" sx={{ m: 2 }}>
+                {snapshotError}
+              </Alert>
+            )}
 
             {submitting && (
               <Stack direction="row" spacing={1} alignItems="center" justifyContent="center" sx={{ py: 2 }}>

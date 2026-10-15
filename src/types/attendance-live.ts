@@ -87,6 +87,8 @@ export type IBranchBoardDevice = {
   /** Agent đang nối vào hub xem trực tiếp. */
   liveConnected: boolean;
   cameras: IBranchBoardCamera[];
+  /** Phiên bản spark-camera-agent (heartbeat); null khi chưa báo. */
+  agentVersion?: string | null;
 };
 
 export type IBranchBoardCounts = {
@@ -157,3 +159,26 @@ export type IStorePresenceChanged = {
 };
 
 export type StoreLiveConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
+
+// GET /face-tracking/enroll/cameras — camera chấm công (counter_face) dùng làm nguồn ảnh đăng ký khuôn mặt.
+export type IEnrollCamera = {
+  deviceId: string;
+  deviceName: string;
+  branchId: string;
+  branchName: string;
+  cameraKey: string;
+  cameraName: string;
+  /** Agent gửi heartbeat ≤ 3 phút và camera có hình. */
+  online: boolean;
+  /** Agent đang nối hub (chụp được ngay). */
+  sourceConnected: boolean;
+};
+
+/** Sự kiện "snapshot" của /hubs/store-live — ảnh trả về cho RequestSnapshot. */
+export type IStoreLiveSnapshot = {
+  requestId: string;
+  deviceId: string;
+  cameraKey: string;
+  data: string | null;
+  error: string | null;
+};

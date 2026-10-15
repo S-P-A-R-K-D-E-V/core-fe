@@ -39,7 +39,7 @@ vi.mock('src/hooks/use-store-live-hub', () => ({
 }));
 
 // Imported after the mocks above.
-import { AttendanceLiveView } from '../view/attendance-live-view';
+import { AttendanceLiveView, versionBelow } from '../view/attendance-live-view';
 
 const board: IBranchBoard = {
   date: '2026-10-15',
@@ -76,7 +76,7 @@ const board: IBranchBoard = {
   ],
   devices: [
     {
-      id: 'd1', name: 'Camera quầy', online: true, liveConnected: true,
+      id: 'd1', name: 'Camera quầy', online: true, liveConnected: true, agentVersion: '0.4.0',
       cameras: [{ key: 'quay1', name: 'Quầy thu ngân', role: 'counter_face', online: true, fps: 5,
         lastFrameAt: null, inToday: 0, outToday: 0, liveView: true }],
     },
@@ -190,5 +190,20 @@ describe('AttendanceLiveView', () => {
     fireEvent.click(screen.getByLabelText('Hiện khung nhận diện'));
     expect(screen.queryAllByTestId('face-box')).toHaveLength(0);
     expect(screen.queryByText('Xuân Vũ · 68%')).toBeNull();
+  });
+});
+
+describe('live tile helpers', () => {
+  it('flags agents older than 0.6.0', () => {
+    expect(versionBelow('0.4.0', '0.6.0')).toBe(true);
+    expect(versionBelow('0.6.0', '0.6.0')).toBe(false);
+    expect(versionBelow('0.10.1', '0.6.0')).toBe(false);
+    expect(versionBelow(null, '0.6.0')).toBe(false);
+  });
+
+  it('warns on the live tile when the counter agent is old', async () => {
+    renderView();
+    expect(await screen.findByText(/Agent 0.4.0 cũ/)).toBeTruthy();
+    expect(screen.getByText(/agent 0.4.0/)).toBeTruthy();
   });
 });

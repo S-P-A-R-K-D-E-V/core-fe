@@ -1,4 +1,5 @@
 import axios, { endpoints } from 'src/utils/axios';
+import type { IEnrollCamera } from 'src/types/attendance-live';
 import {
   IEnrollQualityRequest,
   IEnrollQualityResponse,
@@ -113,5 +114,11 @@ export async function verifySelfFace(videoBase64: string): Promise<IVerifySelfRe
   const response = await axios.post<IVerifySelfResponse>(endpoints.faceTracking.verifySelf, {
     videoBase64,
   } satisfies IVerifySelfRequest);
+  return response.data;
+}
+
+/** Camera chấm công của chi nhánh (trong phạm vi người dùng) dùng được làm nguồn ảnh đăng ký. */
+export async function getEnrollCameras(): Promise<IEnrollCamera[]> {
+  const response = await axios.get<IEnrollCamera[]>(endpoints.faceTracking.enrollCameras);
   return response.data;
 }
