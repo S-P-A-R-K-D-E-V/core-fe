@@ -1,3 +1,7 @@
+'use client';
+
+// Dùng được trong page / layout server component (đọc user từ AuthContext phía client).
+
 import { m } from 'framer-motion';
 
 import Container from '@mui/material/Container';
