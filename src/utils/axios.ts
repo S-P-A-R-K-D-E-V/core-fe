@@ -597,6 +597,14 @@ export const endpoints = {
     sync: (id: string) => `/payment/settings/connections/${id}/sync`,
     test: (id: string) => `/payment/settings/connections/${id}/test`,
     rotateWebhookSecret: (id: string) => `/payment/settings/connections/${id}/rotate-webhook-secret`,
+    // Liên kết ngân hàng vào tài khoản ApiPay của kết nối (thay cho my.apipay.vn)
+    apipayBanks: (id: string) => `/payment/settings/connections/${id}/apipay/banks`,
+    apipayAvailableBanks: (id: string) =>
+      `/payment/settings/connections/${id}/apipay/banks/available`,
+    apipayConfirmOtp: (id: string) =>
+      `/payment/settings/connections/${id}/apipay/banks/confirm-otp`,
+    apipayUseBank: (id: string, publicId: string) =>
+      `/payment/settings/connections/${id}/apipay/banks/${encodeURIComponent(publicId)}/use`,
     // Tài khoản ngân hàng kèm kết nối đối soát của từng tài khoản (Admin)
     bankAccounts: '/payment/bank-accounts',
   },

@@ -192,6 +192,114 @@ export type IPaymentConnectionSyncResult = {
   matched: number;
 };
 
+// ---------------------------------------------------------------------- Liên kết ngân hàng qua ApiPay (Admin)
+
+/** Loại tài khoản ApiPay: cá nhân / doanh nghiệp / hộ kinh doanh. */
+export type ApiPayAccountType =
+  | 'personal-account'
+  | 'business-account'
+  | 'business-household-account';
+
+/** GET payment/settings/connections/{id}/apipay/banks/available — ngân hàng ApiPay cho liên kết. */
+export type IApiPayAvailableBank = {
+  bin: string;
+  code: string;
+  name: string;
+  shortName?: string | null;
+  logoUrl?: string | null;
+};
+
+/** Tài khoản đã liên kết vào tài khoản ApiPay của kết nối. */
+export type IApiPayLinkedBank = {
+  publicId: string;
+  bin?: string | null;
+  bankName?: string | null;
+  bankShortName?: string | null;
+  /** Số tài khoản gốc tại ngân hàng */
+  accountNumber: string;
+  accountName?: string | null;
+  nickname?: string | null;
+  /** Tài khoản ảo ApiPay cấp — QR phải in số này */
+  vaNumber?: string | null;
+  status: 'active' | 'inactive' | 'pending' | (string & {});
+  /** ApiPay đang xử lý kích hoạt thủ công (tới 24 giờ) */
+  manualActivationPending: boolean;
+  createdAt?: string | null;
+  /** Đang là tài khoản nhận của kết nối */
+  inUse: boolean;
+  /** Kết nối đang chờ tài khoản này kích hoạt để tự gắn */
+  pending: boolean;
+};
+
+/** Tài khoản vừa thành tài khoản nhận của kết nối (spark-payment). */
+export type IApiPayAppliedBank = {
+  publicId: string;
+  bin: string;
+  bankName?: string | null;
+  bankShortName?: string | null;
+  /** Số in trên QR: số VA, hoặc số gốc khi ngân hàng không cấp VA */
+  accountNumber: string;
+  accountName?: string | null;
+  originalAccountNumber: string;
+  virtualAccount: boolean;
+};
+
+/** core-be thêm / bật lại tài khoản ngân hàng của cửa hàng mang số trên QR (POS chọn được). */
+export type IApiPayCoreBankAccount = {
+  id?: string;
+  created?: boolean;
+  isDefault?: boolean;
+  /** Không thêm được (thêm tay ở Tài khoản ngân hàng) */
+  error?: string;
+};
+
+/** GET payment/settings/connections/{id}/apipay/banks */
+export type IApiPayBanksResponse = {
+  banks: IApiPayLinkedBank[];
+  connection: IPaymentConnection;
+  /** Tài khoản đang chờ kích hoạt vừa xong → đã gắn vào kết nối */
+  applied?: IApiPayAppliedBank | null;
+  coreBankAccount?: IApiPayCoreBankAccount | null;
+};
+
+/** active = đã gắn vào kết nối; otp_required = nhập OTP; pending_activation = chờ ApiPay kích hoạt thủ công. */
+export type ApiPayLinkStatus = 'active' | 'otp_required' | 'pending_activation';
+
+export type IApiPayLinkResult = {
+  status: ApiPayLinkStatus;
+  message?: string | null;
+  publicId?: string | null;
+  vaNumber?: string | null;
+  connection: IPaymentConnection;
+  applied?: IApiPayAppliedBank | null;
+  coreBankAccount?: IApiPayCoreBankAccount | null;
+};
+
+/**
+ * POST payment/settings/connections/{id}/apipay/banks. SĐT, CCCD / mã số thuế chỉ chuyển thẳng sang ApiPay — máy chủ
+ * không lưu.
+ */
+export type IApiPayLinkRequest = {
+  bankBin: string;
+  bankName: string;
+  accountType: ApiPayAccountType;
+  accountNumber: string;
+  /** In hoa không dấu */
+  accountName: string;
+  mobile: string;
+  /** CCCD hoặc mã số thuế — ACB cá nhân không cần */
+  identity?: string;
+  /** Tên đăng nhập ACB OneBiz — ACB doanh nghiệp / hộ kinh doanh */
+  acbUserId?: string;
+  nickname?: string;
+};
+
+export type IApiPayConfirmOtpRequest = {
+  bankBin: string;
+  accountNumber: string;
+  otp: string;
+};
+
 // ---------------------------------------------------------------------- Đối soát (Admin, Manager)
 
 export type BankTxnStatus = 'matched' | 'unmatched' | 'ignored';

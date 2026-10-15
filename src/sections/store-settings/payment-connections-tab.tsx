@@ -27,6 +27,7 @@ import {
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 
+import { ApiPayBankLinkCard } from './apipay-bank-link';
 import { normalizeBankAccount, bankAccountOptionLabel } from './bank-account/utils';
 import {
   ConnectionList,
@@ -162,6 +163,8 @@ export default function PaymentConnectionsTab() {
           />
         </Stack>
       </Card>
+
+      <ApiPayBankLinkCard connections={connections} onChanged={load} />
 
       <ConnectionFormDialog
         open={addOpen}

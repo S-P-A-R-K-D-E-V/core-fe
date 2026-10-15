@@ -1,6 +1,11 @@
 import axios, { endpoints } from 'src/utils/axios';
 
 import type {
+  IApiPayLinkResult,
+  IApiPayLinkRequest,
+  IApiPayBanksResponse,
+  IApiPayAvailableBank,
+  IApiPayConfirmOtpRequest,
   IPaymentSettings,
   IPaymentConnection,
   IPaymentProviderInfo,
@@ -77,5 +82,59 @@ export async function rotatePaymentWebhookSecret(id: string): Promise<IPaymentCo
 /** Tài khoản ngân hàng của cửa hàng kèm kết nối đối soát của từng tài khoản + kết nối chưa gắn tài khoản. */
 export async function getPaymentBankAccounts(): Promise<IPaymentBankAccountsResponse> {
   const res = await axios.get<IPaymentBankAccountsResponse>(endpoints.paymentSettings.bankAccounts);
+  return res.data;
+}
+
+// ---------------------------------------------------------------------- Liên kết ngân hàng qua ApiPay
+
+/** Ngân hàng ApiPay cho liên kết (danh mục sống của ApiPay). */
+export async function getApiPayAvailableBanks(
+  connectionId: string
+): Promise<IApiPayAvailableBank[]> {
+  const res = await axios.get<IApiPayAvailableBank[]>(
+    endpoints.paymentSettings.apipayAvailableBanks(connectionId)
+  );
+  return res.data;
+}
+
+/** Tài khoản đã liên kết; tài khoản chờ kích hoạt mà đã xong thì máy chủ tự gắn vào kết nối (applied). */
+export async function getApiPayLinkedBanks(connectionId: string): Promise<IApiPayBanksResponse> {
+  const res = await axios.get<IApiPayBanksResponse>(
+    endpoints.paymentSettings.apipayBanks(connectionId)
+  );
+  return res.data;
+}
+
+/** Gửi liên kết → active | otp_required | pending_activation. SĐT / CCCD không được lưu ở máy chủ. */
+export async function linkApiPayBank(
+  connectionId: string,
+  data: IApiPayLinkRequest
+): Promise<IApiPayLinkResult> {
+  const res = await axios.post<IApiPayLinkResult>(
+    endpoints.paymentSettings.apipayBanks(connectionId),
+    data
+  );
+  return res.data;
+}
+
+export async function confirmApiPayBankOtp(
+  connectionId: string,
+  data: IApiPayConfirmOtpRequest
+): Promise<IApiPayLinkResult> {
+  const res = await axios.post<IApiPayLinkResult>(
+    endpoints.paymentSettings.apipayConfirmOtp(connectionId),
+    data
+  );
+  return res.data;
+}
+
+/** Dùng tài khoản đã liên kết (vd từ my.apipay.vn) làm tài khoản nhận của kết nối. */
+export async function selectApiPayBank(
+  connectionId: string,
+  publicId: string
+): Promise<IApiPayLinkResult> {
+  const res = await axios.post<IApiPayLinkResult>(
+    endpoints.paymentSettings.apipayUseBank(connectionId, publicId)
+  );
   return res.data;
 }

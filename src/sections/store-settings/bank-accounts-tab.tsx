@@ -39,6 +39,7 @@ import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 
+import { ApiPayBankLinkCard } from './apipay-bank-link';
 import BankAccountFormDialog from './bank-account/bank-account-form-dialog';
 import BankAccountVietQrDialog from './bank-account/bank-account-vietqr-dialog';
 import {
@@ -317,6 +318,14 @@ export default function BankAccountsTab() {
           onChanged={load}
         />
       ))}
+
+      {enabled && (
+        <ApiPayBankLinkCard
+          connections={[...accounts.flatMap((a) => a.connections ?? []), ...unassigned]}
+          hideWhenEmpty
+          onChanged={load}
+        />
+      )}
 
       {enabled && unassigned.length > 0 && (
         <Card sx={{ p: 3 }}>
