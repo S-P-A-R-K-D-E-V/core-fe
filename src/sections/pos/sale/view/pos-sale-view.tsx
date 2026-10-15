@@ -44,6 +44,8 @@ import { fCurrency } from 'src/utils/format-number';
 import { qrTransactionRef } from 'src/utils/payment-status';
 import { salesOrderCreatedMessage } from 'src/utils/kiotviet-sync-status';
 import { useAuthContext } from 'src/auth/hooks';
+import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
 
 import { IProduct, IProductListItem, IProductChild, ICustomer, IWarehouse } from 'src/types/corecms-api';
 import { getAllProducts } from 'src/api/products';
@@ -58,6 +60,8 @@ import PosProductDetailDrawer from '../pos-product-detail-drawer';
 import PosVariantPickerDrawer from '../pos-variant-picker-drawer';
 import PosPaymentDrawer, { PaymentLine } from '../pos-payment-drawer';
 import PosQrPayment from '../pos-qr-payment';
+import PosQtyInput from '../pos-qty-input';
+import { findScannedProduct } from '../pos-sale-utils';
 import { useWorkingBranch } from 'src/store/working-branch-store';
 import { useCustomerDisplaySync } from 'src/sections/customer-display/use-customer-display-sync';
 import {
@@ -144,11 +148,7 @@ function relabelOrders(orders: DraftOrder[]): DraftOrder[] {
   return orders.map((o, idx) => ({ ...o, label: `Hóa đơn ${idx + 1}` }));
 }
 
-let orderCounter = 1;
-
-function createEmptyOrder(): DraftOrder {
-  const id = orderCounter;
-  orderCounter += 1;
+function createEmptyOrder(id: number): DraftOrder {
   return {
     id,
     label: `Hóa đơn ${id}`,
@@ -179,16 +179,26 @@ export default function PosSaleView() {
   const [warehouses, setWarehouses] = useState<IWarehouse[]>([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState<IWarehouse | null>(null);
 
-  // Draft orders (tabs)
-  const [orders, setOrders] = useState<DraftOrder[]>([createEmptyOrder()]);
+  // Draft orders (tabs). Bộ đếm id theo từng lần mở màn hình — trước đây là biến cấp module và đơn đầu tạo lại mỗi lần
+  // render: vào lại màn bán hàng (điều hướng trong app) thì đơn đầu có id ≠ activeOrderId → bấm sản phẩm không vào đơn.
+  const orderCounterRef = useRef(2);
+  const [orders, setOrders] = useState<DraftOrder[]>(() => [createEmptyOrder(1)]);
   const [activeOrderId, setActiveOrderId] = useState<number>(1);
+  const nextEmptyOrder = useCallback(() => {
+    const order = createEmptyOrder(orderCounterRef.current);
+    orderCounterRef.current += 1;
+    return order;
+  }, []);
 
   // Search
   const [productSearch, setProductSearch] = useState('');
   const [searchResults, setSearchResults] = useState<IProductListItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Lượt tìm mới nhất — bỏ kết quả về muộn của từ khoá cũ (gõ nhanh / quét mã).
+  const searchSeqRef = useRef(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const customerInputRef = useRef<HTMLInputElement>(null);
 
   // Right sidebar tab: 0 = Bán nhanh, 1 = Bán thường
   const [rightTab, setRightTab] = useState(0);
@@ -244,7 +254,8 @@ export default function PosSaleView() {
   // Handle restore/discard cached orders
   const handleRestoreDrafts = useCallback(() => {
     if (cachedData) {
-      orderCounter = cachedData.orderCounter;
+      const maxId = Math.max(0, ...cachedData.orders.map((o) => o.id));
+      orderCounterRef.current = Math.max(cachedData.orderCounter || 0, maxId + 1);
       const restored = relabelOrders(cachedData.orders);
       setOrders(restored);
       setActiveOrderId(restored[0].id);
@@ -264,7 +275,7 @@ export default function PosSaleView() {
   useEffect(() => {
     const hasItems = orders.some((o) => o.items.length > 0);
     if (hasItems) {
-      saveDraftsToStorage(orders, orderCounter, selectedWarehouse?.id);
+      saveDraftsToStorage(orders, orderCounterRef.current, selectedWarehouse?.id);
     } else {
       clearDraftsFromStorage();
     }
@@ -303,8 +314,11 @@ export default function PosSaleView() {
     }
     setSearchLoading(true);
     searchDebounceRef.current = setTimeout(() => {
+      searchSeqRef.current += 1;
+      const seq = searchSeqRef.current;
       getAllProducts({ keyword: productSearch, isActive: true })
         .then((r) => {
+          if (seq !== searchSeqRef.current) return;
           setSearchResults(r.items);
           setProducts((prev) => {
             // Merge new results into existing products list
@@ -314,19 +328,24 @@ export default function PosSaleView() {
           });
         })
         .catch(console.error)
-        .finally(() => setSearchLoading(false));
+        .finally(() => {
+          if (seq === searchSeqRef.current) setSearchLoading(false);
+        });
     }, 300);
     return () => {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
   }, [productSearch]);
 
-  // F3 global keyboard shortcut to focus search
+  // F3: ô tìm hàng hoá; F4: ô tìm khách hàng (cả hai đều ghi trên ô nhập)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F3') {
         e.preventDefault();
         searchInputRef.current?.focus();
+      } else if (e.key === 'F4') {
+        e.preventDefault();
+        customerInputRef.current?.focus();
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -408,11 +427,13 @@ export default function PosSaleView() {
 
   // ====== Order handlers ======
 
+  // Sửa đúng đơn đang hiện (activeOrder rơi về đơn đầu khi activeOrderId không còn khớp đơn nào).
+  const activeId = activeOrder.id;
   const updateActiveOrder = useCallback(
     (updater: (order: DraftOrder) => DraftOrder) => {
-      setOrders((prev) => prev.map((o) => (o.id === activeOrderId ? updater(o) : o)));
+      setOrders((prev) => prev.map((o) => (o.id === activeId ? updater(o) : o)));
     },
-    [activeOrderId]
+    [activeId]
   );
 
   const handleAddProduct = useCallback(
@@ -530,6 +551,49 @@ export default function PosSaleView() {
     [updateActiveOrder, enqueueSnackbar]
   );
 
+  // Enter khi chưa có lựa chọn trong danh sách (máy quét mã vạch gõ mã + Enter nhanh hơn lượt tìm 300 ms, hoặc gõ đủ mã
+  // rồi Enter): tra ngay; khớp đúng mã / mã vạch (kể cả của phiên bản) thì thêm luôn, nhiều kết quả thì để chọn.
+  const handleScanCode = useCallback(
+    async (raw: string) => {
+      const code = raw.trim();
+      if (!code) return;
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+      searchSeqRef.current += 1;
+      const seq = searchSeqRef.current;
+      setSearchLoading(true);
+      try {
+        const r = await getAllProducts({ keyword: code, isActive: true });
+        if (seq !== searchSeqRef.current) return;
+        const hit = findScannedProduct(r.items, code);
+        if (hit) {
+          if (hit.child) handleAddVariant(hit.product, hit.child);
+          else handleAddProduct(hit.product);
+          setProductSearch('');
+          setSearchResults([]);
+        } else if (r.items.length === 0) {
+          enqueueSnackbar(`Không tìm thấy sản phẩm "${code}"`, { variant: 'warning' });
+        } else {
+          setSearchResults(r.items);
+        }
+      } catch {
+        if (seq === searchSeqRef.current) enqueueSnackbar('Không tìm được sản phẩm, thử lại', { variant: 'error' });
+      } finally {
+        if (seq === searchSeqRef.current) setSearchLoading(false);
+      }
+    },
+    [handleAddProduct, handleAddVariant, enqueueSnackbar]
+  );
+
+  const handleRefreshData = useCallback(() => {
+    Promise.all([getAllProducts({ isActive: true }), getAllCustomers({ isActive: true })])
+      .then(([p, c]) => {
+        setProducts(p.items);
+        setCustomers(c);
+        enqueueSnackbar('Đã tải lại hàng hoá và khách hàng', { variant: 'success' });
+      })
+      .catch(() => enqueueSnackbar('Không tải lại được dữ liệu', { variant: 'error' }));
+  }, [enqueueSnackbar]);
+
   const handleUpdateQuantity = useCallback(
     (itemKey: string, newQuantity: number) => {
       updateActiveOrder((order) => {
@@ -628,10 +692,10 @@ export default function PosSaleView() {
   // ====== Tab handlers ======
 
   const handleAddTab = useCallback(() => {
-    const newOrder = createEmptyOrder();
+    const newOrder = nextEmptyOrder();
     setOrders((prev) => relabelOrders([...prev, newOrder]));
     setActiveOrderId(newOrder.id);
-  }, []);
+  }, [nextEmptyOrder]);
 
   const handleCloseTab = useCallback(
     (orderId: number) => {
@@ -661,9 +725,10 @@ export default function PosSaleView() {
     setPaymentDrawerOpen(true);
   }, [activeOrder.items, selectedWarehouse, enqueueSnackbar]);
 
+  /** true = đã tạo hoá đơn; false = lỗi (đã báo) — giữ nguyên trạng thái thanh toán để thu ngân thử lại. */
   const handleConfirmPayment = useCallback(
-    async (payments: PaymentLine[]) => {
-      if (!selectedWarehouse) return;
+    async (payments: PaymentLine[]): Promise<boolean> => {
+      if (!selectedWarehouse) return false;
 
       try {
         const created = await createSalesOrder({
@@ -702,28 +767,28 @@ export default function PosSaleView() {
         setPaymentDrawerOpen(false);
         customerDisplay.paid(grandTotal > 0 ? grandTotal : 0);
 
-        // Reset current order and relabel
+        // Bỏ đơn vừa bán; còn mỗi nó thì thay bằng đơn trống
+        const soldId = activeOrder.id;
+        const replacement = nextEmptyOrder();
         setOrders((prev) => {
-          if (prev.length <= 1) {
-            const newOrder = createEmptyOrder();
-            setActiveOrderId(newOrder.id);
-            return relabelOrders([newOrder]);
-          }
-          const remaining = relabelOrders(prev.filter((o) => o.id !== activeOrderId));
-          setActiveOrderId(remaining[remaining.length - 1].id);
-          return remaining;
+          const remaining = prev.filter((o) => o.id !== soldId);
+          const next = relabelOrders(remaining.length > 0 ? remaining : [replacement]);
+          setActiveOrderId(next[next.length - 1].id);
+          return next;
         });
 
         // Refresh products
         getAllProducts({ isActive: true })
           .then((r) => setProducts(r.items))
           .catch(console.error);
+        return true;
       } catch (error: any) {
         const message = error?.title || error?.message || 'Có lỗi xảy ra khi thanh toán';
         enqueueSnackbar(message, { variant: 'error' });
+        return false;
       }
     },
-    [activeOrder, activeOrderId, selectedWarehouse, sellerName, enqueueSnackbar]
+    [activeOrder, grandTotal, nextEmptyOrder, selectedWarehouse, sellerName, enqueueSnackbar]
   );
 
   // Nút máy in: in phiếu thanh toán của hoá đơn vừa bán (không tự in sau khi bán)
@@ -764,7 +829,8 @@ export default function PosSaleView() {
 
     setQuickPaymentLoading(true);
     try {
-      await handleConfirmPayment(payments);
+      // Lỗi tạo hoá đơn: giữ phương thức / số tiền / mã QR đã trả để thử lại, không reset.
+      if (!(await handleConfirmPayment(payments))) return;
       // Reset quick payment state
       setQuickSelectedMethods(['Cash']);
       setQuickMethodAmounts({});
@@ -796,13 +862,12 @@ export default function PosSaleView() {
     }
   }, [quickDiscountInput, quickDiscountMode, subTotal, handleSetDiscount]);
 
-  // Auto-fill customer payment when grand total changes
+  // Auto-fill customer payment when grand total changes (cả khi giỏ về 0 — không giữ số tiền của giỏ cũ)
   useEffect(() => {
-    if (grandTotal > 0) {
-      setQuickCustomerPayment(grandTotal);
-      if (quickSelectedMethods.length === 1) {
-        setQuickMethodAmounts({ [quickSelectedMethods[0]]: grandTotal });
-      }
+    const due = grandTotal > 0 ? grandTotal : 0;
+    setQuickCustomerPayment(due);
+    if (quickSelectedMethods.length === 1) {
+      setQuickMethodAmounts({ [quickSelectedMethods[0]]: due });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grandTotal]);
@@ -830,7 +895,9 @@ export default function PosSaleView() {
       sx={{
         position: 'fixed',
         inset: 0,
-        zIndex: theme.zIndex.drawer + 2,
+        // Trên header / thanh điều hướng của dashboard (appBar + 1) nhưng DƯỚI ngăn kéo (drawer) và hộp thoại — trước đây
+        // là drawer + 2 nên ngăn chọn phiên bản, chi tiết sản phẩm, thanh toán "Bán thường" mở mà bị che.
+        zIndex: theme.zIndex.appBar + 2,
         bgcolor: 'background.default',
         display: 'flex',
         flexDirection: 'column',
@@ -861,9 +928,15 @@ export default function PosSaleView() {
           {/* Product search */}
         <Autocomplete
           freeSolo
+          autoHighlight
+          clearOnEscape
           openOnFocus={false}
+          // Luôn null: chọn lại đúng sản phẩm / quét lại đúng mã vẫn báo onChange (MUI bỏ qua khi giá trị không đổi).
+          value={null}
           open={productSearch.trim().length > 0 && (searchResults.length > 0 || searchLoading)}
-          options={searchResults}
+          // Đang tìm thì chưa có lựa chọn: Enter lúc này là mã quét / gõ → tra ngay (handleScanCode), không lấy nhầm
+          // kết quả của từ khoá trước.
+          options={searchLoading ? [] : searchResults}
           getOptionLabel={(option) =>
             typeof option === 'string' ? option : `${option.code || option.sku || ''} - ${option.name}`
           }
@@ -873,7 +946,9 @@ export default function PosSaleView() {
             if (reason === 'input' || reason === 'clear') setProductSearch(value);
           }}
           onChange={(_, value) => {
-            if (value && typeof value !== 'string') {
+            if (typeof value === 'string') {
+              handleScanCode(value);
+            } else if (value) {
               handleAddProduct(value);
               setProductSearch('');
               setSearchResults([]);
@@ -888,6 +963,7 @@ export default function PosSaleView() {
               option.totalStock ??
               option.inventories?.reduce((s, inv) => s + (inv.onHand || 0), 0) ??
               0;
+            const variantCount = option.childProducts?.length ?? 0;
             return (
               <li key={option.id} {...optionProps}>
                 <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: '100%' }}>
@@ -909,12 +985,18 @@ export default function PosSaleView() {
                       <Typography variant="caption" color="primary.main" fontWeight={600}>
                         {fCurrency(option.sellingPrice || option.basePrice)}
                       </Typography>
-                      <Typography
-                        variant="caption"
-                        color={stock > 0 ? 'success.main' : 'error.main'}
-                      >
-                        Tồn: {stock}
-                      </Typography>
+                      {variantCount > 0 ? (
+                        <Typography variant="caption" color="info.main">
+                          {variantCount} phiên bản
+                        </Typography>
+                      ) : (
+                        <Typography
+                          variant="caption"
+                          color={stock > 0 ? 'success.main' : 'error.main'}
+                        >
+                          Tồn: {stock}
+                        </Typography>
+                      )}
                     </Stack>
                   </Box>
                 </Stack>
@@ -927,14 +1009,6 @@ export default function PosSaleView() {
               inputRef={searchInputRef}
               size="small"
               placeholder="Tìm hàng hóa (F3)"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && searchResults.length > 0 && !searchLoading) {
-                  e.preventDefault();
-                  handleAddProduct(searchResults[0]);
-                  setProductSearch('');
-                  setSearchResults([]);
-                }
-              }}
               InputProps={{
                 ...params.InputProps,
                 startAdornment: (
@@ -965,9 +1039,15 @@ export default function PosSaleView() {
           }}
         />
 
-        <IconButton sx={{ color: 'white', ml: 1 }}>
-          <Iconify icon="solar:barcode-bold" />
-        </IconButton>
+        <Tooltip title="Quét mã vạch: đặt con trỏ vào ô tìm rồi quét (Enter tự thêm)">
+          <IconButton
+            aria-label="Quét mã vạch"
+            sx={{ color: 'white', ml: 1 }}
+            onClick={() => searchInputRef.current?.focus()}
+          >
+            <Iconify icon="solar:barcode-bold" />
+          </IconButton>
+        </Tooltip>
 
         {/* Invoice tabs */}
         <Tabs
@@ -1017,15 +1097,11 @@ export default function PosSaleView() {
 
         {/* Right side icons */}
         <Stack direction="row" alignItems="center" spacing={1}>
-          <IconButton sx={{ color: 'white' }}>
-            <Iconify icon="solar:lock-keyhole-bold" />
-          </IconButton>
-          <IconButton sx={{ color: 'white' }}>
-            <Iconify icon="solar:undo-left-round-bold" />
-          </IconButton>
-          <IconButton sx={{ color: 'white' }}>
-            <Iconify icon="solar:refresh-bold" />
-          </IconButton>
+          <Tooltip title="Tải lại hàng hoá, khách hàng">
+            <IconButton aria-label="Tải lại dữ liệu" sx={{ color: 'white' }} onClick={handleRefreshData}>
+              <Iconify icon="solar:refresh-bold" />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Mở màn hình khách (màn phụ hướng về khách)">
             <IconButton sx={{ color: 'white' }} onClick={() => openCustomerDisplayWindow()}>
               <Iconify icon="solar:monitor-bold" />
@@ -1041,9 +1117,17 @@ export default function PosSaleView() {
           <Typography variant="caption" sx={{ opacity: 0.8 }}>
             {selectedWarehouse?.name || 'Chọn kho'}
           </Typography>
-          <IconButton sx={{ color: 'white' }}>
-            <Iconify icon="eva:menu-fill" />
-          </IconButton>
+          {/* Màn bán hàng phủ kín dashboard — đây là lối ra (đơn tạm vẫn được lưu trên máy). */}
+          <Tooltip title="Thoát màn bán hàng">
+            <IconButton
+              aria-label="Thoát màn bán hàng"
+              component={RouterLink}
+              href={paths.dashboard.root}
+              sx={{ color: 'white' }}
+            >
+              <Iconify icon="eva:menu-fill" />
+            </IconButton>
+          </Tooltip>
         </Stack>
       </Toolbar>
       </AppBar>
@@ -1082,7 +1166,7 @@ export default function PosSaleView() {
                     </TableCell>
                     <TableCell width={40} />
                     <TableCell>Tên sản phẩm</TableCell>
-                    <TableCell width={100} align="center">
+                    <TableCell width={130} align="center">
                       Số lượng
                     </TableCell>
                     <TableCell width={130} align="right">
@@ -1178,28 +1262,15 @@ export default function PosSaleView() {
                                 <div>Tồn kho: {item.stockOnHand}</div>
                                 <div>Đã đặt: {item.stockOnOrder}</div>
                                 {isLowStock && (
-                                  <div style={{ color: '#ff5252' }}>⚠ Hết hàng!</div>
+                                  <div style={{ color: '#ff5252' }}>⚠ Đã lấy hết số tồn</div>
                                 )}
                               </Box>
                             }
                             arrow
                           >
-                            <TextField
-                              size="small"
-                              type="number"
+                            <PosQtyInput
                               value={item.quantity}
-                              onChange={(e) =>
-                                handleUpdateQuantity(itemKey, Number(e.target.value) || 0)
-                              }
-                              inputProps={{ min: 1, max: item.stockOnHand, style: { textAlign: 'center' } }}
-                              sx={{
-                                width: 70,
-                                '& .MuiOutlinedInput-root': {
-                                  bgcolor: isLowStock
-                                    ? alpha(theme.palette.error.main, 0.08)
-                                    : undefined,
-                                },
-                              }}
+                              onChange={(quantity) => handleUpdateQuantity(itemKey, quantity)}
                               error={isLowStock}
                             />
                           </Tooltip>
@@ -1348,12 +1419,14 @@ export default function PosSaleView() {
                   </Typography>
                 </Stack>
                 <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="caption" color="text.secondary">Kênh bán</Typography>
+                  <Typography variant="caption" color="text.secondary">Kho xuất</Typography>
                   <Autocomplete
                     size="small"
                     options={warehouses.filter((w) => w.isActive)}
                     getOptionLabel={(o) => o.name}
-                    value={selectedWarehouse ?? undefined}
+                    // Kiểm soát ngay từ đầu (null khi chưa tải): trước đây undefined → ô hiện trống dù đã chọn kho.
+                    value={selectedWarehouse as IWarehouse}
+                    isOptionEqualToValue={(o, v) => o.id === v.id}
                     onChange={(_, v) => setSelectedWarehouse(v)}
                     sx={{ width: 140 }}
                     renderInput={(params) => <TextField {...params} variant="standard" />}
@@ -1377,6 +1450,7 @@ export default function PosSaleView() {
                   renderInput={(params) => (
                     <TextField
                       {...params}
+                      inputRef={customerInputRef}
                       placeholder="Tìm khách hàng (F4)"
                       InputProps={{
                         ...params.InputProps,
@@ -1603,7 +1677,8 @@ export default function PosSaleView() {
                     size="small"
                     options={warehouses.filter((w) => w.isActive)}
                     getOptionLabel={(option) => option.name}
-                    value={selectedWarehouse ?? undefined}
+                    value={selectedWarehouse as IWarehouse}
+                    isOptionEqualToValue={(o, v) => o.id === v.id}
                     onChange={(_, v) => setSelectedWarehouse(v)}
                     sx={{ width: 160 }}
                     renderInput={(params) => <TextField {...params} placeholder="Chi nhánh" />}
@@ -1629,6 +1704,7 @@ export default function PosSaleView() {
                   renderInput={(params) => (
                     <TextField
                       {...params}
+                      inputRef={customerInputRef}
                       placeholder="Tìm khách hàng (F4)"
                       InputProps={{
                         ...params.InputProps,
@@ -1638,16 +1714,6 @@ export default function PosSaleView() {
                               <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
                             </InputAdornment>
                             {params.InputProps.startAdornment}
-                          </>
-                        ),
-                        endAdornment: (
-                          <>
-                            {params.InputProps.endAdornment}
-                            <InputAdornment position="end">
-                              <IconButton size="small">
-                                <Iconify icon="mingcute:add-line" width={18} />
-                              </IconButton>
-                            </InputAdornment>
                           </>
                         ),
                       }}
@@ -1846,7 +1912,9 @@ export default function PosSaleView() {
         onCustomerChange={handleSetCustomer}
         onDiscountChange={handleSetDiscount}
         onCouponChange={handleSetCoupon}
-        onConfirm={handleConfirmPayment}
+        onConfirm={async (payments) => {
+          await handleConfirmPayment(payments);
+        }}
       />
 
       {/* Product Detail Drawer */}

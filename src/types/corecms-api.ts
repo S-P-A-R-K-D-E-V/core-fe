@@ -1968,6 +1968,8 @@ export interface IProductListItem {
   variants?: IProductVariant[];
   itemKind?: ProductItemKind;
   isTopping?: boolean;
+  /** Ảnh đại diện máy chủ trả trong danh sách (URL đầy đủ hoặc khoá lưu trữ). */
+  coverImageUrl?: string;
 }
 
 export interface ICreateProductAttributeRequest {
