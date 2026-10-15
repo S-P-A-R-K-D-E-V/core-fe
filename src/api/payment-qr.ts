@@ -3,6 +3,7 @@ import {
   ICreateQrPaymentRequest,
   IQrPaymentResponse,
   IQrPaymentStatusResponse,
+  IPosPaymentConnectionsResponse,
 } from 'src/types/corecms-api';
 
 export async function createQrPayment(data: ICreateQrPaymentRequest): Promise<IQrPaymentResponse> {
@@ -17,4 +18,10 @@ export async function getQrPaymentStatus(id: string): Promise<IQrPaymentStatusRe
 
 export async function cancelQrPayment(id: string): Promise<void> {
   await axios.delete(endpoints.paymentQr.cancel(id));
+}
+
+/** Kết nối thu ngân chọn làm nguồn xác nhận chuyển khoản (ApiPay, SePay, ngân hàng trực tiếp...). */
+export async function getPosPaymentConnections(): Promise<IPosPaymentConnectionsResponse> {
+  const response = await axios.get<IPosPaymentConnectionsResponse>(endpoints.paymentQr.connections);
+  return response.data;
 }

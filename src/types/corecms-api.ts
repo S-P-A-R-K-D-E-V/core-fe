@@ -3002,9 +3002,39 @@ export interface ISalesOrderReceipt {
 
 export interface ICreateQrPaymentRequest {
   salesOrderId?: string;
-  bankAccountId: string;
+  /** Bắt buộc khi không chọn kết nối; có connectionId thì chỉ ghi lại tài khoản (QR vào tài khoản của kết nối). */
+  bankAccountId?: string | null;
   amount: number;
   description?: string;
+  /** Kết nối xác nhận chuyển khoản (GET payment/qr/connections) — null = theo tài khoản như cũ. */
+  connectionId?: string | null;
+}
+
+/**
+ * Nguồn xác nhận chuyển khoản thu ngân chọn được khi tạo QR (GET payment/qr/connections): kết nối spark-payment đang bật,
+ * đã gắn tài khoản nhận. Không có credentials.
+ */
+export interface IPosPaymentConnection {
+  id: string;
+  /** apipay | sepay | casso | acb | mbbank | bidv | mockbank ... */
+  provider: string;
+  /** bank_feed | bank_direct */
+  kind: string;
+  displayName: string;
+  bin?: string | null;
+  /** Tài khoản nhận của kết nối — với ngân hàng có VA (MB, BIDV qua ApiPay) là số VA. */
+  accountNumber: string;
+  accountName?: string | null;
+  environment: 'test' | 'live' | (string & {});
+  /** Tài khoản ngân hàng của cửa hàng cùng số (null khi là VA). */
+  bankAccountId?: string | null;
+  bankName?: string | null;
+}
+
+export interface IPosPaymentConnectionsResponse {
+  /** Dịch vụ thanh toán (spark-payment) đang bật */
+  enabled: boolean;
+  connections: IPosPaymentConnection[];
 }
 
 /** INIT | PENDING | COMPLETED | CANCELLED | ERRORCORRECTED | EXPIRED (EXPIRED chỉ có khi bật dịch vụ thanh toán). */
@@ -3034,6 +3064,8 @@ export interface IQrPaymentResponse extends IQrPaymentServiceFields {
   bankAccountId?: string;
   bankName?: string;
   accountNumber?: string;
+  /** Kết nối xác nhận chuyển khoản đã dùng (null = theo tài khoản). */
+  connectionId?: string | null;
 }
 
 export interface IQrPaymentStatusResponse extends IQrPaymentServiceFields {

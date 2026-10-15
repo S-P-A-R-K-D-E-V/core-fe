@@ -584,6 +584,8 @@ export const endpoints = {
     create: '/payment/qr/create',
     cancel: (id: string) => `/payment/qr/${id}/cancel`,
     status: (id: string) => `/payment/qr/${id}/status`,
+    /** Nguồn xác nhận chuyển khoản cho POS (StoreStaff) */
+    connections: '/payment/qr/connections',
   },
   // Dịch vụ thanh toán (spark-payment) qua core-be: kết nối SePay/Casso/payOS/VNPay/ngân hàng trực tiếp (Admin), đối
   // soát (Admin, Manager).

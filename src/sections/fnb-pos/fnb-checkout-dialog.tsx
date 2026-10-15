@@ -24,13 +24,18 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { usePaymentStatusEvents } from 'src/hooks/use-payment-status-events';
 
+import { apiErrorMessage } from 'src/utils/api-error';
 import { fCurrency } from 'src/utils/format-number';
-import { qrOutcome, isEventForQr } from 'src/utils/payment-status';
+import { qrTarget } from 'src/utils/payment-connection';
+import { qrOutcome, isEventForQr, paymentProviderLabel } from 'src/utils/payment-status';
 
 import { getBankAccounts } from 'src/api/bank-accounts';
 import { cancelQrPayment, createQrPayment, getQrPaymentStatus } from 'src/api/payment-qr';
 
 import PaymentQrInfo, { useQrImageSrc, useExpirySeconds } from 'src/components/payment-qr-info';
+import PaymentConnectionSelect, {
+  usePosPaymentConnections,
+} from 'src/components/payment-connection-select';
 
 import { changeDue, quickCashOptions } from './lib/checkout';
 
@@ -40,6 +45,8 @@ import type { PaymentInput } from './lib/checkout';
 // Chuyển khoản: hiện mã VietQR đúng số tiền + nội dung (dùng chung với Bán hàng). Cửa hàng có đối soát tiền về tự động
 // thì mã chuyển "COMPLETED" và đơn tự thanh toán; không thì nhân viên thấy tiền về rồi bấm Thanh toán như cũ.
 // Bật dịch vụ thanh toán: tiền về báo ngay qua SignalR (vẫn hỏi 4 s làm dự phòng), mã có nội dung CK + hạn dùng.
+// Chọn nguồn xác nhận là một kết nối (vd ApiPay — VA): QR vào tài khoản của kết nối; "Tài khoản nhận" vẫn là tài khoản
+// ghi sổ của khoản thu.
 // ----------------------------------------------------------------------
 
 const QR_POLL_MS = 4_000;
@@ -65,6 +72,7 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
   const [qr, setQr] = useState<IQrPaymentResponse | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
+  const { connections, connectionId, connection, setConnectionId } = usePosPaymentConnections();
   const qrRef = useRef<IQrPaymentResponse | null>(null);
   qrRef.current = qr;
 
@@ -108,11 +116,11 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
     return paymentCode ? { ...input, transferRef: paymentCode } : input;
   };
 
-  // Mã QR cũ không còn đúng khi đổi tài khoản / số tiền / phương thức.
+  // Mã QR cũ không còn đúng khi đổi tài khoản / nguồn xác nhận / số tiền / phương thức.
   useEffect(() => {
     dropQr();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, accountId, total]);
+  }, [method, accountId, connectionId, total]);
 
   /** Trạng thái mã (poll hoặc SignalR): tiền về → thanh toán luôn; huỷ / hết hạn → báo tạo lại. true = đã xử lý xong mã. */
   const handleQrStatus = (qrId: string, status: string) => {
@@ -149,16 +157,35 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
   });
 
   const qrImageSrc = useQrImageSrc(qr?.qrDataUrl, qr?.qrPayload);
+  // Mã tạo theo kết nối → "đang chờ tiền về qua ApiPay".
+  const qrVia =
+    connection && qr?.connectionId === connection.id
+      ? ` qua ${paymentProviderLabel(connection.provider)}${
+          connection.environment === 'test' ? ' (thử nghiệm)' : ''
+        }`
+      : '';
   const secondsLeft = useExpirySeconds(qr?.expiresAt);
 
   const showQr = async () => {
-    if (!accountId || total <= 0) return;
+    if ((!accountId && !connectionId) || total <= 0) return;
     setQrLoading(true);
     setQrError(null);
     try {
-      setQr(await createQrPayment({ bankAccountId: accountId, amount: total, description: transferRef.trim() || undefined }));
-    } catch {
-      setQrError('Không tạo được mã QR cho tài khoản này — vẫn thanh toán chuyển khoản bằng tay được.');
+      setQr(
+        await createQrPayment({
+          ...qrTarget(connectionId, accountId),
+          amount: total,
+          description: transferRef.trim() || undefined,
+        })
+      );
+    } catch (err) {
+      // Đã chọn kết nối mà lỗi: báo đúng lý do (kết nối tắt, ApiPay lỗi...) — máy chủ không tự đổi sang VietQR thường.
+      const reason = apiErrorMessage(err, 'Không tạo được mã QR qua kết nối đã chọn.');
+      setQrError(
+        connectionId
+          ? `${reason} — chọn nguồn khác hoặc thanh toán bằng tay.`
+          : 'Không tạo được mã QR cho tài khoản này — vẫn thanh toán chuyển khoản bằng tay được.'
+      );
     } finally {
       setQrLoading(false);
     }
@@ -219,6 +246,11 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
                   </MenuItem>
                 ))}
               </TextField>
+              <PaymentConnectionSelect
+                connections={connections}
+                value={connectionId}
+                onChange={setConnectionId}
+              />
               <TextField
                 label="Nội dung chuyển khoản"
                 value={transferRef}
@@ -227,7 +259,7 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
                   if (qr) dropQr();
                 }}
               />
-              {accountId && !qr && (
+              {(accountId || connectionId) && !qr && (
                 <LoadingButton variant="outlined" loading={qrLoading} onClick={showQr} sx={{ alignSelf: 'flex-start' }}>
                   Hiện mã QR
                 </LoadingButton>
@@ -242,8 +274,9 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
                     sx={{ width: 240, height: 240, objectFit: 'contain', borderRadius: 1, bgcolor: 'common.white' }}
                   />
                   <Typography variant="caption" color="text.secondary" textAlign="center">
-                    {fCurrency(total)} · {qr.bankName ?? ''} {qr.accountNumber ?? ''} — đang chờ tiền về; tiền về là tự thanh
-                    toán.
+                    {fCurrency(total)} · {qr.bankName ?? ''} {qr.accountNumber ?? ''} — đang chờ tiền về
+                    {qrVia}
+                    ; tiền về là tự thanh toán.
                   </Typography>
                   <PaymentQrInfo paymentCode={qr.paymentCode} secondsLeft={secondsLeft} />
                 </Stack>

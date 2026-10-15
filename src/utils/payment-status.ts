@@ -95,6 +95,7 @@ export const PAYMENT_PROVIDER_LABEL: Record<string, string> = {
   bidv: 'BIDV',
   mbbank: 'MB Bank',
   mockbank: 'Ngân hàng giả lập',
+  apipay: 'ApiPay',
 };
 
 /** Tên ngắn của nhà cung cấp; khoá lạ (danh mục thêm nhà mới) hiện nguyên bản. */

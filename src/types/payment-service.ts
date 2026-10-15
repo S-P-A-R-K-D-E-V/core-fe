@@ -45,6 +45,7 @@ export type PaymentProvider =
   | 'bidv'
   | 'mbbank'
   | 'mockbank'
+  | 'apipay'
   | (string & {});
 
 /** bank_direct = API ngân hàng trực tiếp; bank_feed = SePay/Casso đọc biến động số dư; gateway = payOS/VNPay. */

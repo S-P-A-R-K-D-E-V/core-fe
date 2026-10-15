@@ -17,8 +17,13 @@ import { alpha, useTheme } from '@mui/material/styles';
 
 import Iconify from 'src/components/iconify';
 import PaymentQrInfo, { useQrImageSrc, useExpirySeconds } from 'src/components/payment-qr-info';
+import PaymentConnectionSelect, {
+  usePosPaymentConnections,
+} from 'src/components/payment-connection-select';
 import { fCurrency } from 'src/utils/format-number';
-import { qrOutcome, isEventForQr } from 'src/utils/payment-status';
+import { apiErrorMessage } from 'src/utils/api-error';
+import { qrTarget } from 'src/utils/payment-connection';
+import { qrOutcome, isEventForQr, paymentProviderLabel } from 'src/utils/payment-status';
 import { usePaymentStatusEvents } from 'src/hooks/use-payment-status-events';
 import { getBankAccounts, getVietQRBanks } from 'src/api/bank-accounts';
 import { createQrPayment, getQrPaymentStatus, cancelQrPayment } from 'src/api/payment-qr';
@@ -61,13 +66,25 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
   const [vietQRBanks, setVietQRBanks] = useState<IVietQRBank[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [accountsLoading, setAccountsLoading] = useState(true);
+  // Nguồn xác nhận chuyển khoản: '' = theo tài khoản (như cũ); kết nối (vd ApiPay — VA) = QR vào tài khoản của kết nối.
+  const {
+    connections,
+    connectionId,
+    connection,
+    setConnectionId,
+    loaded: connectionsLoaded,
+  } = usePosPaymentConnections();
 
   const [debouncedAmount, setDebouncedAmount] = useState(amount);
   const [qrState, setQrState] = useState<QrState>('idle');
   const [qrOrder, setQrOrder] = useState<IQrPaymentResponse | null>(null);
   const [statusData, setStatusData] = useState<IQrPaymentStatusResponse | null>(null);
   const [error, setError] = useState('');
-  const [createdFor, setCreatedFor] = useState<{ amount: number; bankAccountId: string } | null>(null);
+  const [createdFor, setCreatedFor] = useState<{
+    amount: number;
+    bankAccountId: string;
+    connectionId: string;
+  } | null>(null);
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
@@ -158,7 +175,7 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
 
   // Tạo / tạo lại QR — "phiên kiểm tra QR" (PaymentQrOrder) để OpsBridge report lên cập nhật trạng thái
   const handleGenerateQr = useCallback(async () => {
-    if (debouncedAmount <= 0 || !selectedAccountId) return;
+    if (debouncedAmount <= 0 || (!selectedAccountId && !connectionId)) return;
 
     setQrState((prev) =>
       prev === 'idle' || prev === 'error' || prev === 'cancelled' || prev === 'expired' ? 'loading' : prev
@@ -168,7 +185,8 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     try {
       const result = await createQrPayment({
         salesOrderId,
-        bankAccountId: selectedAccountId,
+        // Theo kết nối: QR vào tài khoản / VA của kết nối; tài khoản chỉ gửi khi kết nối trùng tài khoản của cửa hàng.
+        ...qrTarget(connectionId, connection ? connection.bankAccountId : selectedAccountId),
         amount: debouncedAmount,
         description: orderCode ? `Thanh toan ${orderCode}` : undefined,
       });
@@ -176,24 +194,49 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
 
       setQrOrder(result);
       setStatusData(null);
-      setCreatedFor({ amount: debouncedAmount, bankAccountId: selectedAccountId });
+      setCreatedFor({ amount: debouncedAmount, bankAccountId: selectedAccountId, connectionId });
       setQrState('active');
       startPolling(result.id);
     } catch (err: any) {
       if (!mountedRef.current) return;
       setQrState('error');
-      setError(err?.detail || err?.title || err?.message || 'Không thể tạo mã QR. Vui lòng thử lại.');
+      // Đổi nguồn xác nhận mà mã mới lỗi: bỏ mã đang hiện — mã đó không thuộc nguồn đang chọn, thu ngân dễ nhầm.
+      if (createdFor && createdFor.connectionId !== connectionId) {
+        stopPolling();
+        setQrOrder(null);
+        setStatusData(null);
+        setCreatedFor(null);
+      }
+      setError(apiErrorMessage(err, 'Không thể tạo mã QR. Vui lòng thử lại.'));
     }
-  }, [debouncedAmount, selectedAccountId, salesOrderId, orderCode, startPolling]);
+  }, [
+    debouncedAmount,
+    selectedAccountId,
+    connectionId,
+    connection,
+    createdFor,
+    salesOrderId,
+    orderCode,
+    startPolling,
+    stopPolling,
+  ]);
 
-  // Tự tạo QR khi mới vào / tự tạo lại khi amount (đã debounce) hoặc tài khoản thay đổi
+  // Tự tạo QR khi mới vào / tự tạo lại khi amount (đã debounce), tài khoản hoặc nguồn xác nhận thay đổi. Chờ tải xong
+  // danh sách kết nối — tránh tạo mã theo tài khoản rồi lại đổi sang kết nối thu ngân đã chọn lần trước.
   useEffect(() => {
-    if (debouncedAmount <= 0 || !selectedAccountId) return;
+    if (!connectionsLoaded) return;
+    if (debouncedAmount <= 0 || (!selectedAccountId && !connectionId)) return;
     if (qrState === 'completed') return; // đã thanh toán — không tự tạo lại
-    if (createdFor && createdFor.amount === debouncedAmount && createdFor.bankAccountId === selectedAccountId) return;
+    if (
+      createdFor &&
+      createdFor.amount === debouncedAmount &&
+      createdFor.bankAccountId === selectedAccountId &&
+      createdFor.connectionId === connectionId
+    )
+      return;
     handleGenerateQr();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedAmount, selectedAccountId]);
+  }, [debouncedAmount, selectedAccountId, connectionId, connectionsLoaded]);
 
   const handleCheckPayment = useCallback(async () => {
     if (!qrOrder) return;
@@ -308,7 +351,25 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     </TextField>
   );
 
-  if (accountsLoading) {
+  // Chọn kết nối thì QR vào tài khoản của kết nối — ô tài khoản không còn tác dụng, ẩn đi.
+  const sourceSelectors = (
+    <>
+      <PaymentConnectionSelect
+        connections={connections}
+        value={connectionId}
+        onChange={setConnectionId}
+        disabled={qrState === 'completed'}
+      />
+      {!connection && bankAccounts.length > 0 && bankSelector}
+    </>
+  );
+
+  // Kết nối của mã đang hiện (mã tạo theo kết nối) — để ghi "xác nhận qua ApiPay" dưới QR.
+  const qrConnection = qrOrder?.connectionId
+    ? connections.find((c) => c.id === qrOrder.connectionId)
+    : undefined;
+
+  if (accountsLoading || !connectionsLoaded) {
     return (
       <Stack alignItems="center" sx={{ py: 3 }}>
         <CircularProgress size={24} />
@@ -316,7 +377,7 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     );
   }
 
-  if (bankAccounts.length === 0) {
+  if (bankAccounts.length === 0 && connections.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
         Chưa có tài khoản ngân hàng. Vui lòng cấu hình trong KiotViet.
@@ -324,11 +385,23 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     );
   }
 
+  // Có kết nối nhưng chưa khai tài khoản ngân hàng, đang để "theo tài khoản"
+  if (!connection && bankAccounts.length === 0) {
+    return (
+      <Stack spacing={1.5} sx={{ py: 1 }}>
+        {sourceSelectors}
+        <Typography variant="body2" color="text.secondary">
+          Chưa có tài khoản ngân hàng — chọn nguồn xác nhận chuyển khoản ở trên để tạo mã QR.
+        </Typography>
+      </Stack>
+    );
+  }
+
   // Lỗi (chưa từng tạo được QR nào)
   if (qrState === 'error' && !qrOrder) {
     return (
       <Stack spacing={1.5} sx={{ py: 1 }}>
-        {bankSelector}
+        {sourceSelectors}
         <Alert severity="error">{error}</Alert>
         <Button variant="outlined" onClick={handleGenerateQr}>
           Thử lại
@@ -341,7 +414,7 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
   if (qrState === 'loading' && !qrOrder) {
     return (
       <Stack spacing={1.5} sx={{ py: 1 }}>
-        {bankSelector}
+        {sourceSelectors}
         <Stack alignItems="center" spacing={1.5} sx={{ py: 3 }}>
           <CircularProgress size={32} />
           <Typography variant="body2" color="text.secondary">
@@ -383,7 +456,7 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
   if (qrState === 'cancelled') {
     return (
       <Stack spacing={1.5} sx={{ py: 1 }}>
-        {bankSelector}
+        {sourceSelectors}
         <Alert severity="warning">Mã QR đã bị hủy.</Alert>
         <Button variant="contained" onClick={handleGenerateQr}>
           Tạo mã QR mới
@@ -396,7 +469,7 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
   if (qrState === 'expired') {
     return (
       <Stack spacing={1.5} sx={{ py: 1 }}>
-        {bankSelector}
+        {sourceSelectors}
         <Alert severity="warning">
           Mã QR đã hết hạn{paymentCode ? ` (${paymentCode})` : ''}. Tạo mã mới để khách chuyển khoản.
         </Alert>
@@ -410,7 +483,7 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
   // Active / Polling — có QR để hiện (kể cả đang regenerate ngầm)
   return (
     <Stack spacing={1.5} sx={{ py: 1 }}>
-      {bankSelector}
+      {sourceSelectors}
 
       <Stack alignItems="center" spacing={1.5}>
         <Stack direction="row" alignItems="center" spacing={1}>
@@ -455,6 +528,13 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
         {(qrOrder?.bankName || qrOrder?.accountNumber) && (
           <Typography variant="caption" color="text.secondary">
             {qrOrder.bankName} - {qrOrder.accountNumber}
+          </Typography>
+        )}
+
+        {qrConnection && (
+          <Typography variant="caption" color="text.secondary">
+            Tiền về qua {paymentProviderLabel(qrConnection.provider)} là đơn tự xác nhận
+            {qrConnection.environment === 'test' ? ' (thử nghiệm)' : ''}
           </Typography>
         )}
 
