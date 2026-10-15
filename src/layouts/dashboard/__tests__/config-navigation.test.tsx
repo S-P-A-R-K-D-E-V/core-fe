@@ -142,3 +142,29 @@ describe('useNavData — menu theo loại chi nhánh', () => {
     expect(navPaths('Staff', ['workforce.attendance'])).not.toContain(paths.dashboard.fnb.pos);
   });
 });
+
+// Camera, giám sát và báo cáo kinh doanh chỉ dành cho chủ cửa hàng — quản lý không thấy (trang cũng chặn bằng
+// RoleBasedGuard khi mở thẳng đường dẫn).
+describe('useNavData — camera, giám sát, báo cáo chỉ Admin', () => {
+  const features = ['store.camera', 'workforce.attendance'];
+  const ownerOnly = [
+    paths.dashboard.general.storeMonitor,
+    paths.dashboard.attendance.live,
+    paths.dashboard.attendance.kioskDevices,
+    paths.dashboard.pos.report.root,
+    paths.dashboard.pos.report.revenue,
+    paths.dashboard.pos.report.tax,
+  ];
+
+  it('Admin thấy', () => {
+    const admin = navPaths('Admin', features);
+    ownerOnly.forEach((p) => expect(admin).toContain(p));
+  });
+
+  it.each(['Manager', 'Staff'])('%s không thấy', (role) => {
+    const visible = navPaths(role, features);
+    ownerOnly.forEach((p) => expect(visible).not.toContain(p));
+    // Quản lý vẫn quản lý chấm công như cũ.
+    if (role === 'Manager') expect(visible).toContain(paths.dashboard.attendance.report);
+  });
+});

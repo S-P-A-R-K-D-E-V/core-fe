@@ -1,3 +1,4 @@
+import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 import { KioskDevicesView } from 'src/sections/kiosk-devices/view/kiosk-devices-view';
 
 // ----------------------------------------------------------------------
@@ -7,5 +8,9 @@ export const metadata = {
 };
 
 export default function KioskDevicesPage() {
-  return <KioskDevicesView />;
+  return (
+    <RoleBasedGuard hasContent roles={['Admin']}>
+      <KioskDevicesView />
+    </RoleBasedGuard>
+  );
 }

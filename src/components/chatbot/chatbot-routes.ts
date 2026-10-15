@@ -112,7 +112,7 @@ export const CHATBOT_WEB_ROUTES: Readonly<Record<string, WebRouteDef>> = {
 
   // Admin
   dashboard: { roles: ADMIN, path: () => dashboard.pos.report.dashboard },
-  'revenue-report': { roles: MANAGER, path: () => dashboard.pos.report.revenue },
+  'revenue-report': { roles: ADMIN, path: () => dashboard.pos.report.revenue },
   'financial-overview': { roles: ADMIN, path: () => dashboard.pos.report.dashboard },
   'break-even-report': { roles: ADMIN, path: () => dashboard.pos.report.breakEven },
   'attendance-report': {

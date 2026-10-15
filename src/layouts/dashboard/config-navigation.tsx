@@ -94,12 +94,12 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
       {
         subheader: t('overview'),
         items: [
-          // Giám sát cửa hàng: lượt khách qua camera, hoá đơn, chuyển đổi, nhân sự hôm nay
+          // Giám sát cửa hàng: lượt khách qua camera, hoá đơn, chuyển đổi, nhân sự hôm nay — chỉ chủ cửa hàng.
           {
             title: 'Giám sát cửa hàng',
             path: paths.dashboard.general.storeMonitor,
             icon: ICONS.analytics,
-            roles: ['Admin', 'Manager'],
+            roles: ['Admin'],
             featureKey: 'store.camera',
           },
           // SHIFT CASH (Kiểm tiền quầy)
@@ -140,14 +140,14 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             title: 'Thiết bị cửa hàng',
             path: paths.dashboard.attendance.kioskDevices,
             icon: ICONS.tour,
-            roles: ['Admin', 'Manager'],
+            roles: ['Admin'],
           },
-          // Chấm công trực tiếp: camera quầy + ca hôm nay + người camera thấy, theo chi nhánh
+          // Chấm công trực tiếp: camera quầy + ca hôm nay + người camera thấy, theo chi nhánh — chỉ chủ cửa hàng.
           {
             title: 'Chấm công trực tiếp',
             path: paths.dashboard.attendance.live,
             icon: ICONS.dashboard,
-            roles: ['Admin', 'Manager'],
+            roles: ['Admin'],
             featureKey: 'store.camera',
           },
           // {
@@ -573,10 +573,11 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             ],
           },
           {
+            // Báo cáo kinh doanh: chỉ chủ cửa hàng (quản lý không thấy).
             title: 'Báo cáo',
             path: paths.dashboard.pos.report.root,
             icon: ICONS.analytics,
-            roles: ['Admin', 'Manager'],
+            roles: ['Admin'],
             children: [
               // Tổng quan tài chính gọi /reports/expenses + /reports/break-even (chỉ Admin) → Manager không thấy mục này.
               { title: 'Tổng quan', path: paths.dashboard.pos.report.dashboard, roles: ['Admin'] },

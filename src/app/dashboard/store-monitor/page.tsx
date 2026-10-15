@@ -1,4 +1,5 @@
 import FeatureGuard from 'src/auth/guard/feature-guard';
+import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 import { StoreMonitorView } from 'src/sections/store-monitor/view/store-monitor-view';
 
 // ----------------------------------------------------------------------
@@ -9,8 +10,10 @@ export const metadata = {
 
 export default function StoreMonitorPage() {
   return (
-    <FeatureGuard feature="store.camera">
-      <StoreMonitorView />
-    </FeatureGuard>
+    <RoleBasedGuard hasContent roles={['Admin']}>
+      <FeatureGuard feature="store.camera">
+        <StoreMonitorView />
+      </FeatureGuard>
+    </RoleBasedGuard>
   );
 }
