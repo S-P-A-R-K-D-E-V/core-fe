@@ -92,7 +92,8 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('ApiPayBankLinkDialog', () => {
+// Nhiều thao tác gõ / chọn: ~2–3 s một test, cho rộng khi cả bộ test chạy song song.
+describe('ApiPayBankLinkDialog', { timeout: 20000 }, () => {
   it('gửi liên kết đã chuẩn hoá → OTP → hiện số VA và tài khoản đã thêm cho POS', async () => {
     const user = userEvent.setup();
     const onChanged = vi.fn();
