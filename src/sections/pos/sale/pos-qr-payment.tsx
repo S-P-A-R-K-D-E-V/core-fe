@@ -16,7 +16,10 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { alpha, useTheme } from '@mui/material/styles';
 
 import Iconify from 'src/components/iconify';
+import PaymentQrInfo, { useQrImageSrc, useExpirySeconds } from 'src/components/payment-qr-info';
 import { fCurrency } from 'src/utils/format-number';
+import { qrOutcome, isEventForQr } from 'src/utils/payment-status';
+import { usePaymentStatusEvents } from 'src/hooks/use-payment-status-events';
 import { getBankAccounts, getVietQRBanks } from 'src/api/bank-accounts';
 import { createQrPayment, getQrPaymentStatus, cancelQrPayment } from 'src/api/payment-qr';
 import {
@@ -35,7 +38,7 @@ type Props = {
   onPaymentCompleted?: (qrOrder: IQrPaymentStatusResponse) => void;
 };
 
-type QrState = 'idle' | 'loading' | 'active' | 'polling' | 'completed' | 'cancelled' | 'error';
+type QrState = 'idle' | 'loading' | 'active' | 'polling' | 'completed' | 'cancelled' | 'expired' | 'error';
 
 const STATUS_LABELS: Record<string, { label: string; color: 'default' | 'info' | 'success' | 'error' | 'warning' }> = {
   INIT: { label: 'Chờ thanh toán', color: 'info' },
@@ -43,6 +46,7 @@ const STATUS_LABELS: Record<string, { label: string; color: 'default' | 'info' |
   COMPLETED: { label: 'Đã thanh toán', color: 'success' },
   CANCELLED: { label: 'Đã hủy', color: 'error' },
   ERRORCORRECTED: { label: 'Đã hoàn', color: 'error' },
+  EXPIRED: { label: 'Hết hạn', color: 'default' },
 };
 
 const POLL_INTERVAL = 4000; // 4 giây — đồng bộ trạng thái từ OpsBridge report lên
@@ -67,6 +71,8 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
+  // Poll và SignalR có thể cùng báo COMPLETED — chỉ gọi onPaymentCompleted một lần cho mỗi mã.
+  const completedQrIdRef = useRef<string | null>(null);
 
   // Tải danh sách tài khoản ngân hàng + logo VietQR
   useEffect(() => {
@@ -107,6 +113,32 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     }
   }, []);
 
+  // Trạng thái mới (poll, bấm kiểm tra hoặc SignalR) → cùng một đường xử lý
+  const applyStatus = useCallback(
+    (status: IQrPaymentStatusResponse) => {
+      setStatusData(status);
+      const outcome = qrOutcome(status.status);
+
+      if (outcome === 'completed') {
+        stopPolling();
+        setQrState('completed');
+        if (completedQrIdRef.current !== status.id) {
+          completedQrIdRef.current = status.id;
+          onPaymentCompleted?.(status);
+        }
+      } else if (outcome === 'cancelled') {
+        stopPolling();
+        setQrState('cancelled');
+      } else if (outcome === 'expired') {
+        // Hết hạn: dừng hỏi; tiền về trễ theo mã này vẫn báo qua SignalR (qrOrder giữ nguyên)
+        stopPolling();
+        setQrState('expired');
+      }
+      return outcome;
+    },
+    [stopPolling, onPaymentCompleted]
+  );
+
   const startPolling = useCallback(
     (qrId: string) => {
       stopPolling();
@@ -115,29 +147,22 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
         try {
           const status = await getQrPaymentStatus(qrId);
           if (!mountedRef.current) return;
-          setStatusData(status);
-
-          if (status.status === 'COMPLETED') {
-            stopPolling();
-            setQrState('completed');
-            onPaymentCompleted?.(status);
-          } else if (status.status === 'CANCELLED' || status.status === 'ERRORCORRECTED') {
-            stopPolling();
-            setQrState('cancelled');
-          }
+          applyStatus(status);
         } catch (err) {
           console.error('QR status poll error:', err);
         }
       }, POLL_INTERVAL);
     },
-    [stopPolling, onPaymentCompleted]
+    [stopPolling, applyStatus]
   );
 
   // Tạo / tạo lại QR — "phiên kiểm tra QR" (PaymentQrOrder) để OpsBridge report lên cập nhật trạng thái
   const handleGenerateQr = useCallback(async () => {
     if (debouncedAmount <= 0 || !selectedAccountId) return;
 
-    setQrState((prev) => (prev === 'idle' || prev === 'error' || prev === 'cancelled' ? 'loading' : prev));
+    setQrState((prev) =>
+      prev === 'idle' || prev === 'error' || prev === 'cancelled' || prev === 'expired' ? 'loading' : prev
+    );
     setError('');
 
     try {
@@ -176,24 +201,36 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     try {
       const status = await getQrPaymentStatus(qrOrder.id);
       if (!mountedRef.current) return;
-      setStatusData(status);
-
-      if (status.status === 'COMPLETED') {
-        stopPolling();
-        setQrState('completed');
-        onPaymentCompleted?.(status);
-      } else if (status.status === 'CANCELLED' || status.status === 'ERRORCORRECTED') {
-        stopPolling();
-        setQrState('cancelled');
-      } else {
-        setQrState('active');
-      }
+      if (applyStatus(status) === 'pending') setQrState('active');
     } catch {
       if (!mountedRef.current) return;
       setQrState('active');
       setError('Không thể kiểm tra trạng thái. Vui lòng thử lại.');
     }
-  }, [qrOrder, stopPolling, onPaymentCompleted]);
+  }, [qrOrder, applyStatus]);
+
+  // SignalR PaymentStatusChanged của mã đang hiện: hỏi lại máy chủ để có đủ dữ liệu như khi poll; máy chủ chưa kịp
+  // đổi trạng thái hoặc lỗi mạng → dùng trạng thái của sự kiện. Polling 4 s vẫn chạy làm dự phòng.
+  usePaymentStatusEvents((event) => {
+    if (!qrOrder || !isEventForQr(event, qrOrder.id) || qrState === 'completed') return;
+    const base: IQrPaymentStatusResponse = statusData ?? { ...qrOrder, updatedAt: qrOrder.createdAt };
+    const fromEvent = (data: IQrPaymentStatusResponse): IQrPaymentStatusResponse => ({
+      ...data,
+      status: event.status,
+      amountReceived: event.amountReceived,
+      paymentCode: event.paymentCode ?? data.paymentCode,
+      updatedAt: new Date().toISOString(),
+    });
+    getQrPaymentStatus(qrOrder.id)
+      .then((status) => {
+        if (!mountedRef.current) return;
+        const fetched = qrOutcome(status.status);
+        applyStatus(fetched !== 'pending' || fetched === qrOutcome(event.status) ? status : fromEvent(status));
+      })
+      .catch(() => {
+        if (mountedRef.current) applyStatus(fromEvent(base));
+      });
+  });
 
   const handleCancelQr = useCallback(async () => {
     if (!qrOrder) return;
@@ -208,6 +245,13 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     setCreatedFor(null);
     setQrState('cancelled');
   }, [qrOrder, stopPolling]);
+
+  // QR hết hạn → bỏ mã cũ khỏi màn rồi tạo mã mới (cùng số tiền / tài khoản)
+  const handleRenewExpired = useCallback(() => {
+    setQrOrder(null);
+    setStatusData(null);
+    handleGenerateQr();
+  }, [handleGenerateQr]);
 
   // Đang trong khung debounce hoặc đang gọi API tạo lại — vẫn giữ QR cũ hiển thị, chỉ báo nhẹ
   const isRegenerating =
@@ -225,6 +269,14 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
       }),
     [bankAccounts, vietQRBanks]
   );
+
+  const qrImageSrc = useQrImageSrc(qrOrder?.qrDataUrl, qrOrder?.qrPayload);
+  const paymentCode = statusData?.paymentCode ?? qrOrder?.paymentCode;
+  const secondsLeft = useExpirySeconds(
+    qrState === 'active' || qrState === 'polling' ? statusData?.expiresAt ?? qrOrder?.expiresAt : null
+  );
+  const amountReceived = statusData?.amountReceived ?? 0;
+  const expectedAmount = statusData?.amount ?? qrOrder?.amount ?? amount;
 
   const currentStatus = statusData?.status || qrOrder?.status || '';
   const statusInfo = STATUS_LABELS[currentStatus] || { label: currentStatus, color: 'default' as const };
@@ -340,6 +392,21 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     );
   }
 
+  // Expired (chỉ khi bật dịch vụ thanh toán)
+  if (qrState === 'expired') {
+    return (
+      <Stack spacing={1.5} sx={{ py: 1 }}>
+        {bankSelector}
+        <Alert severity="warning">
+          Mã QR đã hết hạn{paymentCode ? ` (${paymentCode})` : ''}. Tạo mã mới để khách chuyển khoản.
+        </Alert>
+        <Button variant="contained" onClick={handleRenewExpired}>
+          Tạo mã QR mới
+        </Button>
+      </Stack>
+    );
+  }
+
   // Active / Polling — có QR để hiện (kể cả đang regenerate ngầm)
   return (
     <Stack spacing={1.5} sx={{ py: 1 }}>
@@ -367,10 +434,10 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
           {fCurrency(amount)}
         </Typography>
 
-        {qrOrder?.qrDataUrl && (
+        {qrImageSrc && (
           <Box
             component="img"
-            src={qrOrder.qrDataUrl}
+            src={qrImageSrc}
             alt="QR Code thanh toán"
             sx={{
               width: 240,
@@ -389,6 +456,14 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
           <Typography variant="caption" color="text.secondary">
             {qrOrder.bankName} - {qrOrder.accountNumber}
           </Typography>
+        )}
+
+        <PaymentQrInfo paymentCode={paymentCode} secondsLeft={secondsLeft} />
+
+        {amountReceived > 0 && amountReceived < expectedAmount && (
+          <Alert severity="warning" sx={{ width: '100%' }}>
+            Đã nhận {fCurrency(amountReceived)} / {fCurrency(expectedAmount)} — khách chuyển thiếu.
+          </Alert>
         )}
 
         {error && (

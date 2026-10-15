@@ -22,10 +22,15 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
+import { usePaymentStatusEvents } from 'src/hooks/use-payment-status-events';
+
 import { fCurrency } from 'src/utils/format-number';
+import { qrOutcome, isEventForQr } from 'src/utils/payment-status';
 
 import { getBankAccounts } from 'src/api/bank-accounts';
 import { cancelQrPayment, createQrPayment, getQrPaymentStatus } from 'src/api/payment-qr';
+
+import PaymentQrInfo, { useQrImageSrc, useExpirySeconds } from 'src/components/payment-qr-info';
 
 import { changeDue, quickCashOptions } from './lib/checkout';
 
@@ -34,6 +39,7 @@ import type { PaymentInput } from './lib/checkout';
 // ----------------------------------------------------------------------
 // Chuyển khoản: hiện mã VietQR đúng số tiền + nội dung (dùng chung với Bán hàng). Cửa hàng có đối soát tiền về tự động
 // thì mã chuyển "COMPLETED" và đơn tự thanh toán; không thì nhân viên thấy tiền về rồi bấm Thanh toán như cũ.
+// Bật dịch vụ thanh toán: tiền về báo ngay qua SignalR (vẫn hỏi 4 s làm dự phòng), mã có nội dung CK + hạn dùng.
 // ----------------------------------------------------------------------
 
 const QR_POLL_MS = 4_000;
@@ -102,21 +108,26 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [method, accountId, total]);
 
+  /** Trạng thái mã (poll hoặc SignalR): tiền về → thanh toán luôn; huỷ / hết hạn → báo tạo lại. true = đã xử lý xong mã. */
+  const handleQrStatus = (qrId: string, status: string) => {
+    if (qrRef.current?.id !== qrId) return true; // mã đã bỏ / đã xử lý (poll và SignalR cùng báo)
+    const outcome = qrOutcome(status);
+    if (outcome === 'pending') return false;
+    qrRef.current = null;
+    setQr(null);
+    if (outcome === 'completed') onPay(payInput());
+    else if (outcome === 'cancelled') setQrError('Mã QR đã bị huỷ — tạo lại mã.');
+    else setQrError('Mã QR đã hết hạn — bấm Hiện mã QR để tạo mã mới.');
+    return true;
+  };
+
   // Tiền về (đối soát tự động) → thanh toán luôn.
   useEffect(() => {
     if (!qr || busy) return undefined;
     const timer = setInterval(async () => {
       try {
         const status = await getQrPaymentStatus(qr.id);
-        if (status.status === 'COMPLETED') {
-          clearInterval(timer);
-          setQr(null);
-          onPay(payInput());
-        } else if (status.status === 'CANCELLED' || status.status === 'ERRORCORRECTED') {
-          clearInterval(timer);
-          setQr(null);
-          setQrError('Mã QR đã bị huỷ — tạo lại mã.');
-        }
+        if (handleQrStatus(qr.id, status.status)) clearInterval(timer);
       } catch {
         // thử lại lần sau
       }
@@ -124,6 +135,14 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qr, busy]);
+
+  usePaymentStatusEvents((event) => {
+    if (!qr || busy || !isEventForQr(event, qr.id)) return;
+    handleQrStatus(qr.id, event.status);
+  });
+
+  const qrImageSrc = useQrImageSrc(qr?.qrDataUrl, qr?.qrPayload);
+  const secondsLeft = useExpirySeconds(qr?.expiresAt);
 
   const showQr = async () => {
     if (!accountId || total <= 0) return;
@@ -207,11 +226,11 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
                 </LoadingButton>
               )}
               {qrError && <Alert severity="warning">{qrError}</Alert>}
-              {qr?.qrDataUrl && (
+              {qr && qrImageSrc && (
                 <Stack alignItems="center" spacing={1}>
                   <Box
                     component="img"
-                    src={qr.qrDataUrl}
+                    src={qrImageSrc}
                     alt="Mã QR chuyển khoản"
                     sx={{ width: 240, height: 240, objectFit: 'contain', borderRadius: 1, bgcolor: 'common.white' }}
                   />
@@ -219,6 +238,7 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
                     {fCurrency(total)} · {qr.bankName ?? ''} {qr.accountNumber ?? ''} — đang chờ tiền về; tiền về là tự thanh
                     toán.
                   </Typography>
+                  <PaymentQrInfo paymentCode={qr.paymentCode} secondsLeft={secondsLeft} />
                 </Stack>
               )}
               <Typography variant="caption" color="text.secondary">

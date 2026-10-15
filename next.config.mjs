@@ -23,6 +23,8 @@ const BACKEND_API_PREFIXES = [
   'auth-hub', 'store-settings', 'agent-keys', 'automation',
   // F&B: khu vực, bàn, thực đơn, ghi chú nhanh (trang Thiết lập F&B). Thiếu ở đây → Next trả trang 404 HTML.
   'fnb',
+  // Đơn online từ storefront (trang quản trị Đơn online).
+  'online-orders',
   // API công khai của cửa hàng (thương hiệu, sản phẩm) — app mobile bản cửa hàng dùng để kiểm tra mã cửa hàng.
   'public',
 ];

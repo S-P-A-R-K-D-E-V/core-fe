@@ -532,6 +532,20 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
               { title: 'Tạo đơn', path: paths.dashboard.pos.salesOrder.new },
             ],
           },
+          // ĐƠN ONLINE (storefront): chỉ sinh hoá đơn khi khách đã thanh toán.
+          {
+            title: 'Đơn online',
+            path: paths.dashboard.onlineOrders.root,
+            icon: ICONS.order,
+            roles: ['Admin', 'Manager'],
+          },
+          // ĐỐI SOÁT THANH TOÁN: giao dịch ngân hàng / cổng ↔ thanh toán, khớp tay, bỏ qua.
+          {
+            title: 'Đối soát thanh toán',
+            path: paths.dashboard.payment.reconciliation,
+            icon: ICONS.banking,
+            roles: ['Admin', 'Manager'],
+          },
           {
             title: 'Chi phí & Công nợ',
             path: paths.dashboard.pos.expense.root,

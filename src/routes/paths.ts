@@ -174,6 +174,14 @@ export const paths = {
     storeSettings: {
       root: `${ROOTS.DASHBOARD}/store-settings`,
     },
+    // Dịch vụ thanh toán: đối soát giao dịch ngân hàng / cổng với thanh toán; đơn online từ storefront.
+    payment: {
+      root: `${ROOTS.DASHBOARD}/payment`,
+      reconciliation: `${ROOTS.DASHBOARD}/payment/reconciliation`,
+    },
+    onlineOrders: {
+      root: `${ROOTS.DASHBOARD}/online-orders`,
+    },
     fnb: {
       root: `${ROOTS.DASHBOARD}/fnb`,
       pos: `${ROOTS.DASHBOARD}/fnb/pos`,

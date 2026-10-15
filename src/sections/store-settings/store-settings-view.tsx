@@ -14,6 +14,7 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
 import AgentKeysTab from './agent-keys-tab';
 import StoreBrandingTab from './store-branding-tab';
+import PaymentConnectionsTab from './payment-connections-tab';
 import KiotVietConnectionTab from './kiotviet-connection-tab';
 
 // ----------------------------------------------------------------------
@@ -21,6 +22,7 @@ import KiotVietConnectionTab from './kiotviet-connection-tab';
 const TABS = [
   { value: 'branding', label: 'Thông tin cửa hàng', icon: 'solar:shop-bold' },
   { value: 'kiotviet', label: 'Kết nối KiotViet', icon: 'solar:link-round-bold' },
+  { value: 'payment', label: 'Thanh toán', icon: 'solar:card-transfer-bold' },
   { value: 'agent-keys', label: 'Kết nối MCP & khoá API', icon: 'solar:key-bold' },
 ] as const;
 
@@ -46,6 +48,7 @@ export default function StoreSettingsView() {
 
       {tab === 'branding' && <StoreBrandingTab />}
       {tab === 'kiotviet' && <KiotVietConnectionTab />}
+      {tab === 'payment' && <PaymentConnectionsTab />}
       {tab === 'agent-keys' && <AgentKeysTab />}
     </Container>
   );

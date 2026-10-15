@@ -2982,26 +2982,41 @@ export interface ICreateQrPaymentRequest {
   description?: string;
 }
 
-export interface IQrPaymentResponse {
+/** INIT | PENDING | COMPLETED | CANCELLED | ERRORCORRECTED | EXPIRED (EXPIRED chỉ có khi bật dịch vụ thanh toán). */
+export type QrPaymentStatus = 'INIT' | 'PENDING' | 'COMPLETED' | 'CANCELLED' | 'ERRORCORRECTED' | 'EXPIRED';
+
+/** Các field chỉ có khi core-be bật dịch vụ thanh toán (PaymentService:Enabled) — tắt thì không có, giữ luồng cũ. */
+export interface IQrPaymentServiceFields {
+  /** Nội dung chuyển khoản bắt buộc (SP + 7 ký tự) — thiếu mã thì giao dịch không tự khớp. */
+  paymentCode?: string;
+  /** ISO — quá hạn thì máy chủ chuyển EXPIRED */
+  expiresAt?: string;
+  /** Chuỗi EMVCo để tự vẽ QR khi không có qrDataUrl */
+  qrPayload?: string;
+  checkoutUrl?: string;
+  amountReceived?: number;
+}
+
+export interface IQrPaymentResponse extends IQrPaymentServiceFields {
   id: string;
   bankOrderId?: string;
   traceNumber?: string;
   virtualAccount?: string;
   qrDataUrl?: string;
   amount: number;
-  status: string;
+  status: QrPaymentStatus | string;
   createdAt: string;
   bankAccountId?: string;
   bankName?: string;
   accountNumber?: string;
 }
 
-export interface IQrPaymentStatusResponse {
+export interface IQrPaymentStatusResponse extends IQrPaymentServiceFields {
   id: string;
   bankOrderId?: string;
   traceNumber?: string;
   amount: number;
-  status: string;
+  status: QrPaymentStatus | string;
   virtualAccount?: string;
   qrDataUrl?: string;
   createdAt: string;

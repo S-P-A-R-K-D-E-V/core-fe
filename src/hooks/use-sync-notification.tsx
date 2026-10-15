@@ -9,6 +9,7 @@ import type { INotification, NotificationCategory } from 'src/types/notification
 import { setSession } from 'src/auth/context/jwt/utils';
 
 import axios, { endpoints } from 'src/utils/axios';
+import { PAYMENT_STATUS_EVENT, normalizePaymentStatusEvent } from 'src/utils/payment-status';
 import {
   getNotifications,
   markAllNotificationsAsRead,
@@ -219,7 +220,14 @@ export function SyncNotificationProvider({ children }: Props) {
       window.dispatchEvent(new CustomEvent('shift-notification', { detail: notification }));
     });
 
-    connection.on('ForceLogout', (payload: { Reason: string }) => {
+    // Tiền về / QR hết hạn (dịch vụ thanh toán) → POS nghe qua usePaymentStatusEvents; POS vẫn hỏi trạng thái 4 s làm
+    // dự phòng khi mất kết nối.
+    connection.on('PaymentStatusChanged', (raw: unknown) => {
+      const event = normalizePaymentStatusEvent(raw);
+      if (event) window.dispatchEvent(new CustomEvent(PAYMENT_STATUS_EVENT, { detail: event }));
+    });
+
+    connection.on('ForceLogout',(payload: { Reason: string }) => {
       console.warn('Force logout:', payload.Reason);
       // Clear all session/cache to ensure fresh navigation on re-login
       setSession(null);

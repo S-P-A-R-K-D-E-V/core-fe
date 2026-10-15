@@ -581,6 +581,25 @@ export const endpoints = {
     cancel: (id: string) => `/payment/qr/${id}/cancel`,
     status: (id: string) => `/payment/qr/${id}/status`,
   },
+  // Dịch vụ thanh toán (spark-payment) qua core-be: kết nối SePay/Casso/payOS/VNPay (Admin), đối soát (Admin, Manager).
+  paymentSettings: {
+    root: '/payment/settings',
+    connections: '/payment/settings/connections',
+    connection: (id: string) => `/payment/settings/connections/${id}`,
+    sync: (id: string) => `/payment/settings/connections/${id}/sync`,
+  },
+  paymentReconciliation: {
+    summary: '/payment/reconciliation/summary',
+    transactions: '/payment/reconciliation/transactions',
+    intents: '/payment/reconciliation/intents',
+    match: (id: string) => `/payment/reconciliation/transactions/${id}/match`,
+    ignore: (id: string) => `/payment/reconciliation/transactions/${id}/ignore`,
+  },
+  onlineOrders: {
+    list: '/online-orders',
+    details: (id: string) => `/online-orders/${id}`,
+    cancel: (id: string) => `/online-orders/${id}/cancel`,
+  },
   reports: {
     dashboard: '/reports/dashboard',
     storeMonitor: '/reports/store-monitor',
