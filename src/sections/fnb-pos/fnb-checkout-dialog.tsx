@@ -102,6 +102,12 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
     transferRef: method === 'Transfer' ? transferRef : null,
   });
 
+  /** Trả bằng mã QR đang hiện: mã giao dịch = mã thanh toán của QR (core-be gắn QR với hoá đơn); không có mã → như cũ. */
+  const payInputForQr = (paymentCode: string | null | undefined): PaymentInput => {
+    const input = payInput();
+    return paymentCode ? { ...input, transferRef: paymentCode } : input;
+  };
+
   // Mã QR cũ không còn đúng khi đổi tài khoản / số tiền / phương thức.
   useEffect(() => {
     dropQr();
@@ -113,9 +119,10 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
     if (qrRef.current?.id !== qrId) return true; // mã đã bỏ / đã xử lý (poll và SignalR cùng báo)
     const outcome = qrOutcome(status);
     if (outcome === 'pending') return false;
+    const paymentCode = qrRef.current?.paymentCode;
     qrRef.current = null;
     setQr(null);
-    if (outcome === 'completed') onPay(payInput());
+    if (outcome === 'completed') onPay(payInputForQr(paymentCode));
     else if (outcome === 'cancelled') setQrError('Mã QR đã bị huỷ — tạo lại mã.');
     else setQrError('Mã QR đã hết hạn — bấm Hiện mã QR để tạo mã mới.');
     return true;
@@ -257,7 +264,7 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
           loading={busy}
           disabled={tooLow}
           onClick={() => {
-            const input = payInput();
+            const input = qr ? payInputForQr(qr.paymentCode) : payInput();
             if (qr) {
               // Thanh toán tay khi đã thấy tiền: bỏ theo dõi mã (không huỷ — tiền có thể đang về theo mã này).
               setQr(null);

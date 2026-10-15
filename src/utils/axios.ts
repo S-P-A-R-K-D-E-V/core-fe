@@ -575,18 +575,28 @@ export const endpoints = {
   },
   bankAccounts: {
     list: '/bank-accounts',
+    // Thêm / sửa / tắt: Admin, chỉ dòng cửa hàng tự khai (dòng KiotViet chỉ đọc)
+    details: (id: string) => `/bank-accounts/${id}`,
+    // Mã VietQR dựng tại chỗ (mọi nhân viên): không amount = QR tĩnh in dán quầy
+    vietqr: (id: string) => `/bank-accounts/${id}/vietqr`,
   },
   paymentQr: {
     create: '/payment/qr/create',
     cancel: (id: string) => `/payment/qr/${id}/cancel`,
     status: (id: string) => `/payment/qr/${id}/status`,
   },
-  // Dịch vụ thanh toán (spark-payment) qua core-be: kết nối SePay/Casso/payOS/VNPay (Admin), đối soát (Admin, Manager).
+  // Dịch vụ thanh toán (spark-payment) qua core-be: kết nối SePay/Casso/payOS/VNPay/ngân hàng trực tiếp (Admin), đối
+  // soát (Admin, Manager).
   paymentSettings: {
     root: '/payment/settings',
+    providers: '/payment/settings/providers',
     connections: '/payment/settings/connections',
     connection: (id: string) => `/payment/settings/connections/${id}`,
     sync: (id: string) => `/payment/settings/connections/${id}/sync`,
+    test: (id: string) => `/payment/settings/connections/${id}/test`,
+    rotateWebhookSecret: (id: string) => `/payment/settings/connections/${id}/rotate-webhook-secret`,
+    // Tài khoản ngân hàng kèm kết nối đối soát của từng tài khoản (Admin)
+    bankAccounts: '/payment/bank-accounts',
   },
   paymentReconciliation: {
     summary: '/payment/reconciliation/summary',

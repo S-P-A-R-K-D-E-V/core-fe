@@ -7,6 +7,8 @@ import {
   secondsUntil,
   formatCountdown,
   BANK_TXN_STATUS,
+  qrTransactionRef,
+  paymentProviderLabel,
   normalizePaymentStatusEvent,
 } from '../payment-status';
 
@@ -128,5 +130,25 @@ describe('statusChip', () => {
     expect(statusChip(BANK_TXN_STATUS, 'unmatched').label).toBe('Chưa khớp');
     expect(statusChip(BANK_TXN_STATUS, 'reversed')).toEqual({ label: 'reversed', color: 'default' });
     expect(statusChip(BANK_TXN_STATUS, undefined).label).toBe('—');
+  });
+});
+
+describe('qrTransactionRef', () => {
+  it('có mã thanh toán → ghi mã thanh toán vào hoá đơn (core-be gắn QR với hoá đơn)', () => {
+    expect(qrTransactionRef({ id: 'f3a9c1d2-0000', paymentCode: 'SPK7Q2M9X', traceNumber: 'FT123' })).toBe('SPK7Q2M9X');
+  });
+
+  it('dịch vụ thanh toán tắt (không có mã) → như cũ: số trace, rồi 8 ký tự đầu id QR', () => {
+    expect(qrTransactionRef({ id: 'f3a9c1d2-0000', paymentCode: undefined, traceNumber: 'FT123' })).toBe('FT123');
+    expect(qrTransactionRef({ id: 'f3a9c1d2-0000', paymentCode: '', traceNumber: null })).toBe('f3a9c1d2');
+  });
+});
+
+describe('paymentProviderLabel', () => {
+  it('khoá đã biết → tên ngắn; khoá lạ hiện nguyên', () => {
+    expect(paymentProviderLabel('payos')).toBe('payOS');
+    expect(paymentProviderLabel('mbbank')).toBe('MB Bank');
+    expect(paymentProviderLabel('newpay')).toBe('newpay');
+    expect(paymentProviderLabel(undefined)).toBe('—');
   });
 });

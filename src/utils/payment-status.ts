@@ -86,12 +86,30 @@ export function formatCountdown(totalSeconds: number): string {
 
 type ChipColor = 'default' | 'info' | 'success' | 'warning' | 'error';
 
-export const PAYMENT_PROVIDER_LABEL: Record<PaymentProvider, string> = {
+export const PAYMENT_PROVIDER_LABEL: Record<string, string> = {
   sepay: 'SePay',
   casso: 'Casso',
   payos: 'payOS',
   vnpay: 'VNPay',
+  acb: 'ACB',
+  bidv: 'BIDV',
+  mbbank: 'MB Bank',
+  mockbank: 'Ngân hàng giả lập',
 };
+
+/** Tên ngắn của nhà cung cấp; khoá lạ (danh mục thêm nhà mới) hiện nguyên bản. */
+export function paymentProviderLabel(provider: PaymentProvider | null | undefined): string {
+  if (!provider) return '—';
+  return PAYMENT_PROVIDER_LABEL[provider] ?? provider;
+}
+
+/**
+ * Mã giao dịch ghi vào hoá đơn khi khách trả bằng mã QR ở quầy: mã thanh toán (SP + 7 ký tự) để core-be gắn QR với hoá
+ * đơn (mục 7c); dịch vụ thanh toán tắt (không có mã) → số trace của ngân hàng, rồi 8 ký tự đầu id QR như trước.
+ */
+export function qrTransactionRef(qr: { id: string; paymentCode?: string | null; traceNumber?: string | null }): string {
+  return qr.paymentCode || qr.traceNumber || qr.id.slice(0, 8);
+}
 
 export const PAYMENT_INTENT_STATUS: Record<PaymentIntentStatus, { label: string; color: ChipColor }> = {
   pending: { label: 'Chờ thanh toán', color: 'info' },

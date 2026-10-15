@@ -20,6 +20,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 
 import Iconify from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
+import { qrTransactionRef } from 'src/utils/payment-status';
 import { ICustomer } from 'src/types/corecms-api';
 
 import PosQrPayment from './pos-qr-payment';
@@ -446,7 +447,7 @@ export default function PosPaymentDrawer({
                           onPaymentCompleted={(qrStatus) => {
                             setQrPaymentCompleted(true);
                             handleAmountChange('BankTransfer', qrStatus.amount);
-                            handleRefChange('BankTransfer', qrStatus.traceNumber || qrStatus.id.slice(0, 8));
+                            handleRefChange('BankTransfer', qrTransactionRef(qrStatus));
                           }}
                         />
                       )}

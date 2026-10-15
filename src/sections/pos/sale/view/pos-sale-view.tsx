@@ -41,6 +41,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 import { fCurrency } from 'src/utils/format-number';
+import { qrTransactionRef } from 'src/utils/payment-status';
 import { salesOrderCreatedMessage } from 'src/utils/kiotviet-sync-status';
 import { useAuthContext } from 'src/auth/hooks';
 
@@ -1516,7 +1517,7 @@ export default function PosSaleView() {
                                   setQuickMethodAmounts((prev) => ({ ...prev, BankTransfer: qrStatus.amount }));
                                   setQuickMethodRefs((prev) => ({
                                     ...prev,
-                                    BankTransfer: qrStatus.traceNumber || qrStatus.id.slice(0, 8),
+                                    BankTransfer: qrTransactionRef(qrStatus),
                                   }));
                                 }}
                               />

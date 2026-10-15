@@ -2159,6 +2159,31 @@ export interface IKiotVietBankAccount {
   bin?: string;
   accountNumber?: string;
   description?: string;
+  /** Tên chủ tài khoản (viết hoa không dấu) — in trên mã VietQR */
+  accountHolder?: string | null;
+  isDefault?: boolean;
+  /** GET /bank-accounts?includeInactive=true (Admin) mới trả dòng đã tắt */
+  isActive?: boolean;
+  /** true = dòng đồng bộ từ KiotViet, chỉ đọc. Tên trường JSON của BankAccountResponse (core-be). */
+  managedByKiotViet?: boolean;
+}
+
+/** POST /bank-accounts (Admin) — tài khoản cửa hàng tự khai. isDefault bỏ trống = tài khoản đầu tiên tự thành mặc định. */
+export interface ICreateBankAccountRequest {
+  /** Mã BIN NAPAS 6 chữ số (VietQR) */
+  bin: string;
+  bankName: string;
+  shortName?: string | null;
+  /** 3–30 chữ số hoặc chữ cái, không khoảng trắng */
+  accountNumber: string;
+  accountHolder: string;
+  description?: string | null;
+  isDefault?: boolean;
+}
+
+/** PUT /bank-accounts/{id} (Admin) — chỉ dòng cửa hàng tự khai. isDefault / isActive bỏ trống = giữ nguyên. */
+export interface IUpdateBankAccountRequest extends ICreateBankAccountRequest {
+  isActive?: boolean;
 }
 
 // --- KiotViet Push/Webhook monitoring (Admin) ---
