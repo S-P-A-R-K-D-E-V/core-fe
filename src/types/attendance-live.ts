@@ -122,7 +122,27 @@ export type IStoreLiveInvokeResult = { ok: boolean; error?: string | null };
 export type IStoreLiveWatchResult = IStoreLiveInvokeResult & { sourceConnected?: boolean };
 
 /** ≈2 hình/giây mỗi camera; data là JPEG base64 không có tiền tố data:. */
-export type IStoreLiveFrame = { deviceId: string; cameraKey: string; data: string; at: string };
+/** Khung khuôn mặt agent vẽ lên hình (toạ độ tương đối 0..1 theo khung hình). */
+export type ILiveOverlayKind = 'matched' | 'no_match' | 'ambiguous' | 'liveness' | 'detecting' | 'small' | 'error';
+
+export type ILiveOverlayBox = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** vd "Xuân Vũ · 68%", "Không khớp · 48%". */
+  label: string | null;
+  kind: ILiveOverlayKind | string | null;
+};
+
+export type IStoreLiveFrame = {
+  deviceId: string;
+  cameraKey: string;
+  data: string;
+  at: string;
+  /** null/thiếu với agent cũ (< 0.5) hoặc camera không phải camera quầy. */
+  overlay?: ILiveOverlayBox[] | null;
+};
 
 export type IStoreLiveStatus = { deviceId: string; sourceConnected: boolean };
 

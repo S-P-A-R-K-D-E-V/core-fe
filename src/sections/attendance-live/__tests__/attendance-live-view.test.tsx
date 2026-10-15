@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within, act } from '@testing-library/react';
+import { render, screen, waitFor, within, act, fireEvent } from '@testing-library/react';
 
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
@@ -156,5 +156,39 @@ describe('AttendanceLiveView', () => {
     await waitFor(() => expect(screen.getByText(/Chưa có chi nhánh nào có camera chấm công/)).toBeTruthy());
     expect(screen.getByText('Thiết bị cửa hàng').getAttribute('href')).toContain('/attendance/kiosk-devices');
     expect(api.getBranchBoard).not.toHaveBeenCalled();
+  });
+  it('draws face boxes with the recognition result and hides them with the switch', async () => {
+    try {
+      localStorage.removeItem('attendance-live.showFaceBoxes');
+    } catch {
+      // ignore
+    }
+    hubState = {
+      connectionState: 'connected',
+      frames: {
+        'd1|quay1': {
+          data: 'QUJD',
+          at: '2026-10-15T03:00:00Z',
+          receivedAt: Date.now(),
+          overlay: [
+            { x: 0.25, y: 0.1, w: 0.1, h: 0.2, label: 'Xuân Vũ · 68%', kind: 'matched' },
+            { x: 0.6, y: 0.1, w: 0.1, h: 0.2, label: 'Không khớp · 48%', kind: 'no_match' },
+          ],
+        },
+      },
+      sources: { d1: true },
+      error: null,
+    };
+    renderView();
+    await waitFor(() => expect(screen.getByText('Trần Thị Lan')).toBeTruthy());
+
+    const boxes = screen.getAllByTestId('face-box');
+    expect(boxes).toHaveLength(2);
+    expect(screen.getByText('Xuân Vũ · 68%')).toBeTruthy();
+    expect(screen.getByText('Không khớp · 48%')).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText('Hiện khung nhận diện'));
+    expect(screen.queryAllByTestId('face-box')).toHaveLength(0);
+    expect(screen.queryByText('Xuân Vũ · 68%')).toBeNull();
   });
 });

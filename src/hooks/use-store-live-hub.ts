@@ -6,6 +6,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { HOST_API } from 'src/config-global';
 
 import type {
+  ILiveOverlayBox,
   IStoreLiveFrame,
   IStoreLiveStatus,
   IStoreLiveWatchResult,
@@ -34,6 +35,8 @@ export type LiveFrameState = {
   at: string;
   /** Lúc trình duyệt nhận (ms) — dùng để biết hình còn "LIVE" không, tránh lệch giờ giữa máy chủ và máy xem. */
   receivedAt: number;
+  /** Khung nhận diện kèm hình (agent ≥ 0.5, camera quầy); null = không có. */
+  overlay: ILiveOverlayBox[] | null;
 };
 
 export type UseStoreLiveHubOptions = {
@@ -154,7 +157,10 @@ export function useStoreLiveHub({ branchId, deviceIds, paused, onPresence }: Use
       // Hình còn bay tới sau khi Unwatch (tạm dừng) thì bỏ.
       if (!watchedRef.current.has(frame.deviceId)) return;
       const key = frameKey(frame.deviceId, frame.cameraKey);
-      setFrames((prev) => ({ ...prev, [key]: { data: frame.data, at: frame.at, receivedAt: Date.now() } }));
+      setFrames((prev) => ({
+        ...prev,
+        [key]: { data: frame.data, at: frame.at, receivedAt: Date.now(), overlay: frame.overlay ?? null },
+      }));
     });
 
     conn.on('live_status', (status: IStoreLiveStatus) => {

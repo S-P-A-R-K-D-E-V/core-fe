@@ -49,6 +49,7 @@ import type {
   IBranchBoardAssigned,
   IStorePresenceChanged,
   IBranchBoardUnassigned,
+  ILiveOverlayBox,
   IBranchBoardStaleOpen,
   StoreLiveConnectionState,
 } from 'src/types/attendance-live';
@@ -110,6 +111,78 @@ function errorMessage(err: any, fallback: string): string {
 
 type LiveTileModel = { device: IBranchBoardDevice; camera: IBranchBoardCamera };
 
+const FACE_BOXES_KEY = 'attendance-live.showFaceBoxes';
+
+function readFaceBoxesPref(): boolean {
+  try {
+    return localStorage.getItem(FACE_BOXES_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+const OVERLAY_COLOR: Record<string, 'success' | 'warning' | 'error' | 'info' | 'grey'> = {
+  matched: 'success',
+  no_match: 'warning',
+  ambiguous: 'warning',
+  liveness: 'error',
+  error: 'error',
+  detecting: 'info',
+  small: 'grey',
+};
+
+/** Khung khuôn mặt + nhãn kết quả nhận diện, đặt theo toạ độ tương đối của hình. */
+function FaceBoxes({ boxes }: { boxes: ILiveOverlayBox[] }) {
+  return (
+    <>
+      {boxes.map((b, i) => {
+        const tone = OVERLAY_COLOR[b.kind ?? ''] ?? 'info';
+        const color = tone === 'grey' ? 'grey.400' : `${tone}.main`;
+        return (
+          <Box
+            key={i}
+            data-testid="face-box"
+            sx={{
+              position: 'absolute',
+              left: `${b.x * 100}%`,
+              top: `${b.y * 100}%`,
+              width: `${b.w * 100}%`,
+              height: `${b.h * 100}%`,
+              border: 2,
+              borderColor: color,
+              borderRadius: 0.5,
+              pointerEvents: 'none',
+            }}
+          >
+            {b.label && (
+              <Box
+                component="span"
+                sx={{
+                  position: 'absolute',
+                  left: -2,
+                  bottom: '100%',
+                  mb: 0.25,
+                  px: 0.75,
+                  py: 0.125,
+                  borderRadius: 0.5,
+                  bgcolor: color,
+                  color: tone === 'grey' ? 'grey.900' : 'common.white',
+                  typography: 'caption',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.4,
+                }}
+              >
+                {b.label}
+              </Box>
+            )}
+          </Box>
+        );
+      })}
+    </>
+  );
+}
+
 /** Camera quầy (role counter_face); chi nhánh chưa khai báo vai trò camera → mọi camera chưa có vai trò. */
 export function counterTiles(devices: IBranchBoardDevice[]): LiveTileModel[] {
   const all = devices.flatMap((device) => (device.cameras ?? []).map((camera) => ({ device, camera })));
@@ -123,10 +196,13 @@ type LiveTileProps = {
   sourceConnected: boolean;
   paused: boolean;
   now: number;
+  showFaceBoxes: boolean;
 };
 
-function LiveTile({ tile, frame, sourceConnected, paused, now }: LiveTileProps) {
+function LiveTile({ tile, frame, sourceConnected, paused, now, showFaceBoxes }: LiveTileProps) {
   const { device, camera } = tile;
+  // Ô theo đúng tỉ lệ hình (Tapo 16:9) để toạ độ khung nhận diện 0..1 khớp hình, không bị viền đen.
+  const [aspect, setAspect] = useState(16 / 9);
   const isLive = !paused && !!frame && now - frame.receivedAt < LIVE_WINDOW_MS;
 
   let overlay: { text: string; icon: string | null } | null = null;
@@ -145,7 +221,7 @@ function LiveTile({ tile, frame, sourceConnected, paused, now }: LiveTileProps) 
           position: 'relative',
           width: 1,
           maxWidth: '100%',
-          aspectRatio: '4 / 3',
+          aspectRatio: `${aspect}`,
           overflow: 'hidden',
           borderRadius: 1.5,
           bgcolor: 'grey.900',
@@ -156,6 +232,13 @@ function LiveTile({ tile, frame, sourceConnected, paused, now }: LiveTileProps) 
             component="img"
             alt={title}
             src={`data:image/jpeg;base64,${frame.data}`}
+            onLoad={(e: React.SyntheticEvent<HTMLImageElement>) => {
+              const img = e.currentTarget;
+              if (img.naturalWidth && img.naturalHeight) {
+                const next = img.naturalWidth / img.naturalHeight;
+                setAspect((prev) => (Math.abs(prev - next) > 0.01 ? next : prev));
+              }
+            }}
             sx={{
               position: 'absolute',
               inset: 0,
@@ -167,6 +250,8 @@ function LiveTile({ tile, frame, sourceConnected, paused, now }: LiveTileProps) 
             }}
           />
         )}
+
+        {isLive && showFaceBoxes && frame?.overlay && frame.overlay.length > 0 && <FaceBoxes boxes={frame.overlay} />}
 
         {isLive && (
           <Chip
@@ -223,10 +308,20 @@ type LivePanelProps = {
   onPresence: (event: IStorePresenceChanged) => void;
 };
 
-/** Hình trực tiếp nằm riêng ở đây để ~2 hình/giây mỗi camera chỉ vẽ lại khối này, không vẽ lại các bảng. */
+/** Hình trực tiếp nằm riêng ở đây để ~4 hình/giây mỗi camera chỉ vẽ lại khối này, không vẽ lại các bảng. */
 function LivePanel({ branchId, devices, boardLoaded, onPresence }: LivePanelProps) {
   const [paused, setPaused] = useState(false);
+  const [showFaceBoxes, setShowFaceBoxes] = useState(readFaceBoxesPref);
   const [now, setNow] = useState(() => Date.now());
+
+  const toggleFaceBoxes = (checked: boolean) => {
+    setShowFaceBoxes(checked);
+    try {
+      localStorage.setItem(FACE_BOXES_KEY, checked ? '1' : '0');
+    } catch {
+      // trình duyệt chặn lưu: chỉ nhớ trong phiên này
+    }
+  };
 
   const tiles = useMemo(() => counterTiles(devices), [devices]);
   const deviceIds = useMemo(() => tiles.map((t) => t.device.id), [tiles]);
@@ -251,6 +346,18 @@ function LivePanel({ branchId, devices, boardLoaded, onPresence }: LivePanelProp
         action={
           <Stack direction="row" alignItems="center" spacing={1.5} sx={{ pr: 1 }}>
             {connection && <Chip size="small" variant="soft" color={connection.color} label={connection.label} />}
+            <FormControlLabel
+              sx={{ mr: 0 }}
+              control={
+                <Switch
+                  size="small"
+                  checked={showFaceBoxes}
+                  onChange={(e) => toggleFaceBoxes(e.target.checked)}
+                  inputProps={{ 'aria-label': 'Hiện khung nhận diện' }}
+                />
+              }
+              label="Hiện khung nhận diện"
+            />
             <FormControlLabel
               sx={{ mr: 0 }}
               control={<Switch size="small" checked={paused} onChange={(e) => setPaused(e.target.checked)} />}
@@ -292,6 +399,7 @@ function LivePanel({ branchId, devices, boardLoaded, onPresence }: LivePanelProp
                     sourceConnected={sources[tile.device.id] ?? tile.device.liveConnected}
                     paused={paused}
                     now={now}
+                    showFaceBoxes={showFaceBoxes}
                   />
                 </Grid>
               );
