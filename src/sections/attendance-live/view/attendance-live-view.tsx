@@ -9,20 +9,14 @@ import Link from '@mui/material/Link';
 import Grid from '@mui/material/Grid2';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
-import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
 import Switch from '@mui/material/Switch';
-import TableRow from '@mui/material/TableRow';
 import MenuItem from '@mui/material/MenuItem';
 import Container from '@mui/material/Container';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
 import TextField from '@mui/material/TextField';
 import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
-import TableContainer from '@mui/material/TableContainer';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import CircularProgress from '@mui/material/CircularProgress';
 
@@ -46,9 +40,7 @@ import type {
   IBranchBoardCamera,
   IBranchBoardBranch,
   IBranchBoardDevice,
-  IBranchBoardAssigned,
   IStorePresenceChanged,
-  IBranchBoardUnassigned,
   ILiveOverlayBox,
   IBranchBoardStaleOpen,
   StoreLiveConnectionState,
@@ -339,7 +331,7 @@ function LivePanel({ branchId, devices, boardLoaded, onPresence }: LivePanelProp
   const many = tiles.length >= 3;
 
   return (
-    <Card>
+    <Card sx={{ height: 1 }}>
       <CardHeader
         title="Camera quầy"
         subheader="Hình trực tiếp từ agent camera ở quầy chấm công"
@@ -392,7 +384,7 @@ function LivePanel({ branchId, devices, boardLoaded, onPresence }: LivePanelProp
             {tiles.map((tile) => {
               const key = frameKey(tile.device.id, tile.camera.key);
               return (
-                <Grid key={key} size={{ xs: 12, sm: 6, lg: many ? 4 : 6 }}>
+                <Grid key={key} size={tiles.length === 1 ? 12 : { xs: 12, sm: 6, lg: many ? 4 : 6 }}>
                   <LiveTile
                     tile={tile}
                     frame={frames[key]}
@@ -427,123 +419,149 @@ function StaffCell({ name, avatarUrl, children }: { name: string; avatarUrl: str
   );
 }
 
-function AssignedTable({ rows }: { rows: IBranchBoardAssigned[] }) {
-  if (rows.length === 0) {
-    return (
-      <Typography variant="body2" color="text.secondary" sx={{ p: 3 }}>
-        Hôm nay chưa phân ca cho ai ở chi nhánh này.
-      </Typography>
-    );
-  }
+/** Camera thấy trong khoảng này thì coi là "vừa thấy" (đang ở quầy). */
+const RECENT_SEEN_MS = 2 * 60_000;
 
+function SeenLine({ first, last, similarity: sim, count }: { first: string | null; last: string | null; similarity: number | null; count?: number }) {
+  if (!first && !last) return null;
   return (
-    <TableContainer sx={{ overflowX: 'auto' }}>
-      <Table size="small" sx={{ minWidth: 760 }}>
-        <TableHead>
-          <TableRow>
-            <TableCell>Nhân viên</TableCell>
-            <TableCell>Ca</TableCell>
-            <TableCell>Trạng thái</TableCell>
-            <TableCell>Vào</TableCell>
-            <TableCell>Ra</TableCell>
-            <TableCell>Camera thấy</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((s) => (
-            <TableRow key={s.assignmentId} hover>
-              <TableCell>
-                <StaffCell name={s.staffName} avatarUrl={s.avatarUrl} />
-              </TableCell>
-              <TableCell>
-                <Typography variant="body2">{s.shiftName}</Typography>
-                <Typography variant="caption" color="text.secondary" component="div">
-                  {s.startTime}–{s.endTime}
-                </Typography>
-                {!s.branchAssigned && (
-                  <Chip size="small" variant="outlined" color="warning" label="Ca chưa gắn chi nhánh" sx={{ mt: 0.5 }} />
-                )}
-              </TableCell>
-              <TableCell>
-                <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                  <Chip
-                    size="small"
-                    variant="soft"
-                    color={STAFF_STATUS[s.status]?.color ?? 'default'}
-                    label={STAFF_STATUS[s.status]?.label ?? s.status}
-                  />
-                  {s.lateMinutes > 0 && (
-                    <Chip size="small" variant="soft" color="error" label={`Muộn ${s.lateMinutes}′`} />
-                  )}
-                </Stack>
-              </TableCell>
-              <TableCell>{clock(s.checkInTime)}</TableCell>
-              <TableCell>{clock(s.checkOutTime)}</TableCell>
-              <TableCell>
-                {seenRange(s.firstSeenAt, s.lastSeenAt)}
-                {s.firstSeenAt && (
-                  <Typography variant="caption" color="text.secondary">
-                    {similarity(s.bestSimilarity)}
-                  </Typography>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+    <Typography variant="caption" color="text.secondary" component="div">
+      Camera thấy {seenRange(first, last)}
+      {count && count > 1 ? ` · ${num(count)} lần` : ''}
+      {similarity(sim)}
+    </Typography>
   );
 }
 
-function UnassignedTable({ rows }: { rows: IBranchBoardUnassigned[] }) {
-  if (rows.length === 0) {
-    return (
-      <Typography variant="body2" color="text.secondary" sx={{ p: 3 }}>
-        Hôm nay camera chưa thấy ai ngoài danh sách phân ca.
-      </Typography>
-    );
-  }
-
+function RecentDot({ last, now }: { last: string | null; now: number }) {
+  if (!last || now - new Date(last).getTime() > RECENT_SEEN_MS) return null;
   return (
-    <TableContainer sx={{ overflowX: 'auto' }}>
-      <Table size="small" sx={{ minWidth: 760 }}>
-        <TableHead>
-          <TableRow>
-            <TableCell>Nhân viên</TableCell>
-            <TableCell>Thấy lần đầu</TableCell>
-            <TableCell>Thấy lần cuối</TableCell>
-            <TableCell align="right">Số lần</TableCell>
-            <TableCell>Chấm công ngoài ca</TableCell>
-            <TableCell>Thao tác gần nhất</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((s) => (
-            <TableRow key={s.staffId} hover>
-              <TableCell>
-                <StaffCell name={s.staffName} avatarUrl={s.avatarUrl}>
-                  {s.hasShiftElsewhere && (
-                    <Chip size="small" variant="outlined" color="info" label="Có ca ở chi nhánh khác" sx={{ mt: 0.5 }} />
-                  )}
-                </StaffCell>
-              </TableCell>
-              <TableCell>{clock(s.firstSeenAt)}</TableCell>
-              <TableCell>{clock(s.lastSeenAt)}</TableCell>
-              <TableCell align="right">
-                {num(s.seenCount)}
+    <Box
+      component="span"
+      title="Camera vừa thấy (2 phút gần nhất)"
+      sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main', flexShrink: 0, boxShadow: 2 }}
+    />
+  );
+}
+
+function SideRow({ name, avatarUrl, right, children, last, now }: {
+  name: string;
+  avatarUrl: string | null;
+  right?: React.ReactNode;
+  children?: React.ReactNode;
+  last: string | null;
+  now: number;
+}) {
+  return (
+    <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ py: 1.25 }}>
+      <Avatar src={avatarUrl ?? undefined} alt={name} sx={{ width: 36, height: 36 }}>
+        {name.charAt(0)}
+      </Avatar>
+      <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+          <Typography variant="subtitle2" noWrap>
+            {name}
+          </Typography>
+          <RecentDot last={last} now={now} />
+        </Stack>
+        {children}
+      </Box>
+      {right && <Box sx={{ flexShrink: 0 }}>{right}</Box>}
+    </Stack>
+  );
+}
+
+/** Cột bên phải camera: người được phân ca hôm nay + người camera nhận ra ngoài ca. */
+function StaffSidePanel({ board }: { board: IBranchBoard | null }) {
+  const now = Date.now();
+  return (
+    <Card sx={{ height: 1, display: 'flex', flexDirection: 'column' }}>
+      <CardHeader
+        title="Nhân sự hôm nay"
+        subheader="Được phân ca và người camera nhận ra ngoài ca · chấm xanh = camera vừa thấy"
+      />
+      {!board ? (
+        <Stack alignItems="center" sx={{ py: 4 }}>
+          <CircularProgress size={28} />
+        </Stack>
+      ) : (
+        <Box sx={{ px: 2.5, pb: 2, overflowY: 'auto', maxHeight: { md: 560 }, flexGrow: 1 }}>
+          <Typography variant="overline" color="text.secondary" component="div" sx={{ mt: 1 }}>
+            Được phân ca ({num(board.assigned.length)})
+          </Typography>
+          {board.assigned.length === 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+              Hôm nay chưa phân ca cho ai ở chi nhánh này.
+            </Typography>
+          )}
+          <Stack divider={<Box sx={{ borderTop: 1, borderColor: 'divider' }} />}>
+            {board.assigned.map((s) => (
+              <SideRow
+                key={s.assignmentId}
+                name={s.staffName}
+                avatarUrl={s.avatarUrl}
+                last={s.lastSeenAt}
+                now={now}
+                right={
+                  <Stack spacing={0.5} alignItems="flex-end">
+                    <Chip
+                      size="small"
+                      variant="soft"
+                      color={STAFF_STATUS[s.status]?.color ?? 'default'}
+                      label={STAFF_STATUS[s.status]?.label ?? s.status}
+                    />
+                    {s.lateMinutes > 0 && <Chip size="small" variant="soft" color="error" label={`Muộn ${s.lateMinutes}′`} />}
+                  </Stack>
+                }
+              >
                 <Typography variant="caption" color="text.secondary" component="div">
-                  {similarity(s.bestSimilarity).replace(' · ', '')}
+                  {s.shiftName} {s.startTime}–{s.endTime} · Vào {clock(s.checkInTime)} · Ra {clock(s.checkOutTime)}
                 </Typography>
-              </TableCell>
-              <TableCell>
-                {s.checkInTime || s.checkOutTime ? `${clock(s.checkInTime)} / ${clock(s.checkOutTime)}` : '—'}
-              </TableCell>
-              <TableCell>{(s.lastAction && ACTION_LABEL[s.lastAction]) || '—'}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+                <SeenLine first={s.firstSeenAt} last={s.lastSeenAt} similarity={s.bestSimilarity} />
+                {!s.branchAssigned && (
+                  <Chip size="small" variant="outlined" color="warning" label="Ca chưa gắn chi nhánh" sx={{ mt: 0.5 }} />
+                )}
+              </SideRow>
+            ))}
+          </Stack>
+
+          <Typography variant="overline" color="text.secondary" component="div" sx={{ mt: 2 }}>
+            Ngoài ca — camera nhận ra ({num(board.unassigned.length)})
+          </Typography>
+          {board.unassigned.length === 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+              Hôm nay camera chưa nhận ra ai ngoài danh sách phân ca.
+            </Typography>
+          )}
+          <Stack divider={<Box sx={{ borderTop: 1, borderColor: 'divider' }} />}>
+            {board.unassigned.map((s) => (
+              <SideRow
+                key={s.staffId}
+                name={s.staffName}
+                avatarUrl={s.avatarUrl}
+                last={s.lastSeenAt}
+                now={now}
+                right={
+                  s.lastAction ? (
+                    <Chip size="small" variant="outlined" label={ACTION_LABEL[s.lastAction] ?? s.lastAction} />
+                  ) : undefined
+                }
+              >
+                <SeenLine first={s.firstSeenAt} last={s.lastSeenAt} similarity={s.bestSimilarity} count={s.seenCount} />
+                {(s.checkInTime || s.checkOutTime) && (
+                  <Typography variant="caption" color="text.secondary" component="div">
+                    Chấm công ngoài ca · Vào {clock(s.checkInTime)} · Ra {clock(s.checkOutTime)}
+                  </Typography>
+                )}
+                {s.hasShiftElsewhere && (
+                  <Chip size="small" variant="outlined" color="info" label="Có ca ở chi nhánh khác" sx={{ mt: 0.5 }} />
+                )}
+              </SideRow>
+            ))}
+          </Stack>
+        </Box>
+      )}
+    </Card>
   );
 }
 
@@ -783,12 +801,19 @@ export function AttendanceLiveView() {
         <Stack spacing={3}>
           {error && <Alert severity="error">{error}</Alert>}
 
-          <LivePanel
-            branchId={branchId}
-            devices={current?.devices ?? EMPTY_DEVICES}
-            boardLoaded={!!current}
-            onPresence={handlePresence}
-          />
+          <Grid container spacing={3}>
+            <Grid size={{ xs: 12, md: 7, xl: 8 }}>
+              <LivePanel
+                branchId={branchId}
+                devices={current?.devices ?? EMPTY_DEVICES}
+                boardLoaded={!!current}
+                onPresence={handlePresence}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, md: 5, xl: 4 }}>
+              <StaffSidePanel board={current} />
+            </Grid>
+          </Grid>
 
           {current && counts && (
             <>
@@ -852,22 +877,6 @@ export function AttendanceLiveView() {
               </Grid>
 
               {current.staleOpen.length > 0 && <StaleOpenCard rows={current.staleOpen} />}
-
-              <Card>
-                <CardHeader
-                  title="Nhân sự được phân ca hôm nay"
-                  subheader="Giờ vào/ra theo chấm công; “Camera thấy” là lần đầu – lần cuối camera chi nhánh nhận ra"
-                />
-                <AssignedTable rows={current.assigned} />
-              </Card>
-
-              <Card>
-                <CardHeader
-                  title="Có trong hình nhưng không được phân ca"
-                  subheader="Người camera chi nhánh nhận ra hôm nay mà không có ca ở chi nhánh này"
-                />
-                <UnassignedTable rows={current.unassigned} />
-              </Card>
             </>
           )}
 
