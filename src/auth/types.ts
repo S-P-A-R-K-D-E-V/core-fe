@@ -61,6 +61,8 @@ export type JWTContextType = CanRemove & {
   loginWithOAuth: (provider: 'google' | 'facebook' | 'apple', token: string, avatarUrl?: string) => Promise<void>;
   loginWithSso?: (code: string, state: string) => Promise<void>;
   loginWithQr?: (code: string, codeVerifier: string) => Promise<void>;
+  /** Máy quầy: nhận phiên BE trả về sau khi đổi mã 6 số / mật khẩu / QR (src/sections/counter). */
+  loginWithAuthResponse?: (data: import('src/types/corecms-api').IAuthResponse) => Promise<void>;
   pendingVerification: { email: string } | null;
   updateUser: (updates: Partial<NonNullable<AuthUserType>>) => void;
   /** Re-sync role/permissions from JWT + latest profile from server.

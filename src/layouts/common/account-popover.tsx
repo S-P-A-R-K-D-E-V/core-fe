@@ -13,6 +13,10 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { unpairCounter } from 'src/api/counter';
+
+import { clearCounterDevice, useCounterDevice } from 'src/sections/counter/counter-device';
+import { COUNTER_LOCK_PATH, useCounterSession } from 'src/sections/counter/counter-scope';
 
 import { varHover } from 'src/components/animate';
 import { useSnackbar } from 'src/components/snackbar';
@@ -44,11 +48,29 @@ export default function AccountPopover() {
 
   const popover = usePopover();
 
+  const counterSession = useCounterSession();
+  const counterDevice = useCounterDevice();
+  const isManager = !!user?.roles?.some((r: string) => r === 'Admin' || r === 'Manager');
+
+  const handleLeaveCounter = async () => {
+    popover.onClose();
+    if (!window.confirm('Thoát chế độ máy quầy trên trình duyệt này? Mọi người đang dùng máy quầy này sẽ bị đăng xuất.')) return;
+    try {
+      await unpairCounter();
+    } catch {
+      // Máy đã bị gỡ ở nơi khác / mất mạng: vẫn thoát ở trình duyệt này.
+    }
+    clearCounterDevice();
+    await logout();
+    router.replace('/');
+  };
+
   const handleLogout = async () => {
     try {
       await logout();
       popover.onClose();
-      router.replace('/');
+      // Máy quầy: đăng xuất là về màn chọn tên cho người tiếp theo.
+      router.replace(counterDevice ? COUNTER_LOCK_PATH : '/');
     } catch (error) {
       console.error(error);
       enqueueSnackbar('Unable to logout!', { variant: 'error' });
@@ -104,13 +126,26 @@ export default function AccountPopover() {
 
         <Divider sx={{ borderStyle: 'dashed' }} />
 
-        <Stack sx={{ p: 1 }}>
-          {OPTIONS.map((option) => (
-            <MenuItem key={option.label} onClick={() => handleClickItem(option.linkTo)}>
-              {option.label}
-            </MenuItem>
-          ))}
-        </Stack>
+        {counterSession ? (
+          <Stack sx={{ p: 1 }}>
+            <Typography variant="caption" sx={{ px: 1, color: 'text.secondary' }}>
+              {counterDevice ? `${counterDevice.deviceName} · ${counterDevice.branchName}` : 'Máy quầy'}
+            </Typography>
+            {isManager && (
+              <MenuItem onClick={handleLeaveCounter} sx={{ color: 'warning.main' }}>
+                Thoát chế độ máy quầy
+              </MenuItem>
+            )}
+          </Stack>
+        ) : (
+          <Stack sx={{ p: 1 }}>
+            {OPTIONS.map((option) => (
+              <MenuItem key={option.label} onClick={() => handleClickItem(option.linkTo)}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </Stack>
+        )}
 
         <Divider sx={{ borderStyle: 'dashed' }} />
 
@@ -118,7 +153,7 @@ export default function AccountPopover() {
           onClick={handleLogout}
           sx={{ m: 1, fontWeight: 'fontWeightBold', color: 'error.main' }}
         >
-          Đăng xuất
+          {counterSession ? 'Kết thúc phiên' : 'Đăng xuất'}
         </MenuItem>
       </CustomPopover>
     </>

@@ -41,6 +41,7 @@ import { labelSourceFromProduct, labelSourcesFromProducts } from 'src/sections/p
 
 import ProductTableToolbar from '../product-table-toolbar';
 import ProductTableRow from '../product-table-row';
+import { useCounterSession } from 'src/sections/counter/counter-scope';
 import ProductEditDialog from '../product-edit-dialog';
 
 // ----------------------------------------------------------------------
@@ -107,6 +108,7 @@ function getInitialVisibleColumns(): ColumnKey[] {
 // ----------------------------------------------------------------------
 
 export default function ProductListView() {
+  const counterSession = useCounterSession();
   const { enqueueSnackbar } = useSnackbar();
   const table = useTable({ defaultRowsPerPage: 25 });
   const router = useRouter();
@@ -266,6 +268,7 @@ export default function ProductListView() {
             { name: 'Sản phẩm' },
           ]}
           action={
+            counterSession ? undefined : (
             <Stack direction="row" spacing={1}>
               <Button
                 variant="outlined"
@@ -279,6 +282,7 @@ export default function ProductListView() {
                 Thêm sản phẩm
               </Button>
             </Stack>
+            )
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
@@ -304,7 +308,7 @@ export default function ProductListView() {
                   <Button color="primary" startIcon={<Iconify icon="solar:printer-bold" width={18} />} onClick={handlePrintSelectedLabels}>
                     In tem mã
                   </Button>
-                  <Button color="error" onClick={confirm.onTrue}>Xóa</Button>
+                  {!counterSession && <Button color="error" onClick={confirm.onTrue}>Xóa</Button>}
                 </Stack>
               }
             />

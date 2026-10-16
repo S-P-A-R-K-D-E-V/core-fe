@@ -40,6 +40,8 @@ import {
 
 import { ICustomer } from 'src/types/corecms-api';
 import { getAllCustomers, deleteCustomer } from 'src/api/customers';
+
+import { useCounterSession } from 'src/sections/counter/counter-scope';
 import { fCurrency } from 'src/utils/format-number';
 
 // ----------------------------------------------------------------------
@@ -58,6 +60,7 @@ const TABLE_HEAD = [
 // ----------------------------------------------------------------------
 
 export default function CustomerListView() {
+  const counterSession = useCounterSession();
   const { enqueueSnackbar } = useSnackbar();
   const table = useTable();
   const router = useRouter();
@@ -154,7 +157,7 @@ export default function CustomerListView() {
               numSelected={table.selected.length}
               rowCount={dataFiltered.length}
               onSelectAllRows={(checked) => table.onSelectAllRows(checked, dataFiltered.map((row) => row.id))}
-              action={<Button color="error" onClick={confirm.onTrue}>Xóa</Button>}
+              action={counterSession ? undefined : <Button color="error" onClick={confirm.onTrue}>Xóa</Button>}
             />
             <Scrollbar>
               <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 960 }}>
@@ -190,11 +193,13 @@ export default function CustomerListView() {
                             <Iconify icon="solar:pen-bold" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Xóa">
-                          <IconButton color="error" onClick={() => handleDeleteRow(row.id)}>
-                            <Iconify icon="solar:trash-bin-trash-bold" />
-                          </IconButton>
-                        </Tooltip>
+                        {!counterSession && (
+                          <Tooltip title="Xóa">
+                            <IconButton color="error" onClick={() => handleDeleteRow(row.id)}>
+                              <Iconify icon="solar:trash-bin-trash-bold" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

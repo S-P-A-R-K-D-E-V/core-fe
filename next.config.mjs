@@ -29,6 +29,10 @@ const BACKEND_API_PREFIXES = [
   'public',
   // Màn hình khách ở quầy (quảng cáo theo chi nhánh). Trang /customer-display/ là của Next, API dùng tiền tố khác.
   'pos-display',
+  // Đặt trình duyệt làm máy quầy (JWT quản lý). /counter/* (key máy quầy) gọi qua /api — trùng trang /counter của Next.
+  'counter-devices',
+  // Trả hàng từ hoá đơn (máy quầy + quản lý).
+  'sales-returns',
 ];
 
 const nextConfig = {

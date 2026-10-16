@@ -21,6 +21,7 @@ import AccountPopover from '../common/account-popover';
 import UsersPopover from '../common/users-popover';
 import LanguagePopover from '../common/language-popover';
 import NotificationsPopover from '../common/notifications-popover';
+import { useCounterSession } from '../../sections/counter/counter-scope';
 
 // ----------------------------------------------------------------------
 
@@ -40,6 +41,8 @@ export default function Header({ onOpenNav }: Props) {
   const lgUp = useResponsive('up', 'lg');
 
   const offset = useOffSetTop(HEADER.H_DESKTOP);
+
+  const counterSession = useCounterSession();
 
   const offsetTop = offset && !isNavHorizontal;
 
@@ -66,9 +69,9 @@ export default function Header({ onOpenNav }: Props) {
       >
         <LanguagePopover />
 
-        <NotificationsPopover />
+        {!counterSession && <NotificationsPopover />}
 
-        <UsersPopover />
+        {!counterSession && <UsersPopover />}
 
         <SettingsButton />
 

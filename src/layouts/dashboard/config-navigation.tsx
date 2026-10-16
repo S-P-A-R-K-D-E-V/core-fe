@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 
 import { paths } from 'src/routes/paths';
 
+import { useCounterSession } from 'src/sections/counter/counter-scope';
+
 import { useTranslate } from 'src/locales';
 
 import Label from 'src/components/label';
@@ -118,8 +120,62 @@ export function useNavData(
     [userRoles, branch, branchOptions]
   );
 
+  const counterSession = useCounterSession();
+
   const data = useMemo(
     () => {
+      // Máy quầy (ai đăng nhập cũng vậy): chỉ bán hàng — không lọc theo vai trò, vẫn lọc theo tính năng cửa hàng và
+      // loại chi nhánh. Server chặn cùng phạm vi (CounterScopeMiddleware).
+      if (counterSession) {
+        const counterNav = [
+          {
+            subheader: 'Máy quầy',
+            items: [
+              { title: 'Bán hàng', path: paths.dashboard.pos.sale.root, icon: ICONS.ecommerce, featureKey: 'commerce.retail.pos' },
+              {
+                title: 'Bán hàng F&B',
+                path: paths.dashboard.fnb.pos,
+                icon: ICONS.ecommerce,
+                featureKey: 'commerce.fnb.pos',
+                branchType: 'fnb' as BranchType,
+              },
+              {
+                title: 'Máy in phiếu',
+                path: paths.dashboard.fnb.printStation,
+                icon: ICONS.invoice,
+                featureKey: 'commerce.fnb.pos',
+                branchType: 'fnb' as BranchType,
+              },
+              {
+                title: 'Hoá đơn',
+                path: paths.dashboard.pos.salesOrder.list,
+                icon: ICONS.order,
+                featureKey: ['commerce.retail.pos', 'commerce.fnb.pos'],
+              },
+              {
+                title: 'Hàng hoá',
+                path: paths.dashboard.pos.product.list,
+                icon: ICONS.product,
+                featureKey: ['commerce.retail.inventory', 'commerce.fnb.pos'],
+              },
+              {
+                title: 'Khách hàng',
+                path: paths.dashboard.pos.customer.list,
+                icon: ICONS.user,
+                featureKey: ['commerce.retail.pos', 'commerce.fnb.pos'],
+              },
+              { title: t('shiftCash'), path: paths.dashboard.shiftCash.root, icon: ICONS.banking },
+            ],
+          },
+        ];
+        return counterNav
+          .map((group) => ({
+            ...group,
+            items: filterNavItems(group.items as any[], { roles: userRoles, permissions }, enabledFeatures ?? [], branchTypes),
+          }))
+          .filter((group) => group.items.length > 0);
+      }
+
       const fullNav = [
       {
         subheader: t('overview'),
@@ -643,7 +699,7 @@ export function useNavData(
         .filter((group) => group.items.length > 0);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, userRoles, enabledFeatures, permissions, isCiCi, branchTypes]
+    [t, userRoles, enabledFeatures, permissions, isCiCi, branchTypes, counterSession]
   );
 
   return data;

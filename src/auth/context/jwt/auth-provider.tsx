@@ -429,6 +429,20 @@ export function AuthProvider({ children }: Props) {
     fetchAndPatchAvatar(user);
   }, [fetchAndPatchAvatar]);
 
+  // Máy quầy (src/sections/counter): mã 6 số / mật khẩu / QR đã đổi xong ở đó — nhận thẳng phiên BE trả về. Phiên cố
+  // định tới hết ca, không refreshToken (như loginWithQr).
+  const loginWithAuthResponse = useCallback(async (data: IAuthResponse) => {
+    const { token: accessToken, refreshToken, sessionToken } = data;
+    setSession(null);
+    setSession(accessToken, refreshToken);
+    if (sessionToken) {
+      localStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
+    }
+    const user = buildUserFromResponse(data);
+    dispatch({ type: Types.LOGIN, payload: { user } });
+    fetchAndPatchAvatar(user);
+  }, [fetchAndPatchAvatar]);
+
   const loginWithOAuth = useCallback(async (provider: 'google' | 'facebook' | 'apple', token: string, avatarUrl?: string) => {
     const data: IOAuthLoginRequest = { provider, token };
     const res = await axios.post<IAuthResponse>(endpoints.auth.oauthLogin, data);
@@ -545,11 +559,12 @@ export function AuthProvider({ children }: Props) {
       loginWithOAuth,
       loginWithSso,
       loginWithQr,
+      loginWithAuthResponse,
       pendingVerification,
       updateUser,
       refreshUser,
     }),
-    [login, logout, register, verifyOtp, resendOtp, restoreSession, loginWithOAuth, loginWithSso, loginWithQr, updateUser, refreshUser, state.user, status, pendingVerification]
+    [login, logout, register, verifyOtp, resendOtp, restoreSession, loginWithOAuth, loginWithSso, loginWithQr, loginWithAuthResponse, updateUser, refreshUser, state.user, status, pendingVerification]
   );
 
   return <AuthContext.Provider value={memoizedValue}>{children}</AuthContext.Provider>;
