@@ -26,6 +26,7 @@ const NAV_ITEMS: NavBottomItem[] = [
     label: 'Kiểm tiền',
     path: paths.dashboard.shiftCash.root,
     icon: 'solar:wallet-money-bold-duotone',
+    platformFeature: PLATFORM_FEATURES.shiftCash,
   },
   {
     label: 'Check-in',
@@ -56,7 +57,7 @@ export default function NavBottom({ onOpenMenu }: Props) {
   const pathname = usePathname();
   const { user } = useAuthContext();
 
-  // Chủ cửa hàng tắt tự chấm công trên web với người này → bỏ nút Check-in (chấm công bằng app).
+  // Chủ cửa hàng tắt tính năng trên web với người này (vd tự chấm công, kiểm quầy) → bỏ nút tương ứng.
   const blockedKey = ((user?.blockedFeatures as string[] | undefined) ?? []).join('|');
   const items = useMemo(
     () =>

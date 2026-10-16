@@ -26,8 +26,9 @@ import { getPlatformAccessLogs, type PlatformAccessLog } from 'src/api/platform-
 import Label from 'src/components/label';
 
 // ----------------------------------------------------------------------
-// Nhật ký gọi tính năng theo nền tảng (Core-be PlatformAccessLogs): ai chấm công lúc nào, trên web hay app, có bị chặn
-// không, và có dấu hiệu sửa nền tảng không (vd khai là app nhưng gọi từ trình duyệt).
+// Nhật ký gọi tính năng theo nền tảng (Core-be PlatformAccessLogs): ai dùng tính năng nào lúc nào, trên web hay app, có bị
+// chặn không, và có dấu hiệu sửa nền tảng không (vd khai là app nhưng gọi từ trình duyệt). Tự chấm công ghi mọi lượt; tính
+// năng khác chỉ ghi lượt bị chặn hoặc nghi sửa nền tảng.
 
 const ACTION_LABELS: Record<string, string> = {
   CheckIn: 'Vào ca',
@@ -41,6 +42,11 @@ const ACTION_LABELS: Record<string, string> = {
 
 const PLATFORM_TEXT: Record<string, string> = { web: 'Web', app: 'App' };
 
+type Props = {
+  /** Tên tính năng theo mã (GET /platform-features) — log cũ / mã lạ hiện nguyên mã. */
+  featureLabels?: Record<string, string>;
+};
+
 /** Lý do bị đánh dấu nghi sửa nền tảng, dễ hiểu với chủ cửa hàng. */
 export function suspicionReason(log: PlatformAccessLog): string {
   if (log.isBrowser && log.declaredPlatform === 'app') return 'Khai là app nhưng gọi từ trình duyệt (đã sửa header).';
@@ -52,7 +58,7 @@ export function suspicionReason(log: PlatformAccessLog): string {
 
 const PAGE_SIZE = 20;
 
-export default function PlatformAccessLogCard() {
+export default function PlatformAccessLogCard({ featureLabels = {} }: Props) {
   const [suspiciousOnly, setSuspiciousOnly] = useState(false);
   const [page, setPage] = useState(0);
   const [rows, setRows] = useState<PlatformAccessLog[]>([]);
@@ -81,7 +87,7 @@ export default function PlatformAccessLogCard() {
   return (
     <Card sx={{ p: 3 }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }} spacing={2}>
-        <Typography variant="h6">Nhật ký chấm công theo nền tảng</Typography>
+        <Typography variant="h6">Nhật ký theo nền tảng</Typography>
         <FormControlLabel
           control={
             <Switch
@@ -96,8 +102,9 @@ export default function PlatformAccessLogCard() {
         />
       </Stack>
       <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-        Mỗi lần tự chấm công đều được ghi lại. Hệ thống tự nhận ra trình duyệt nên sửa cài đặt trên web không thành app
-        được; lượt có dấu hiệu sửa được đánh dấu để chủ cửa hàng kiểm tra.
+        Mỗi lần tự chấm công đều được ghi lại; các tính năng khác chỉ ghi lượt bị chặn hoặc nghi sửa nền tảng. Hệ thống tự
+        nhận ra trình duyệt nên sửa cài đặt trên web không thành app được; lượt có dấu hiệu sửa được đánh dấu để chủ cửa
+        hàng kiểm tra.
       </Typography>
 
       {error && <Alert severity="error">{error}</Alert>}
@@ -109,7 +116,7 @@ export default function PlatformAccessLogCard() {
               <TableRow>
                 <TableCell>Thời gian</TableCell>
                 <TableCell>Nhân viên</TableCell>
-                <TableCell>Thao tác</TableCell>
+                <TableCell>Tính năng</TableCell>
                 <TableCell>Nền tảng</TableCell>
                 <TableCell>Kết quả</TableCell>
                 <TableCell>Cảnh báo</TableCell>
@@ -135,7 +142,14 @@ export default function PlatformAccessLogCard() {
                   <TableRow key={log.id} hover>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{fDateTime(log.createdAt)}</TableCell>
                     <TableCell>{log.userName || '—'}</TableCell>
-                    <TableCell>{ACTION_LABELS[log.action] ?? log.action}</TableCell>
+                    <TableCell>
+                      {featureLabels[log.featureKey] ?? log.featureKey}
+                      {ACTION_LABELS[log.action] && (
+                        <Typography component="div" variant="caption" sx={{ color: 'text.secondary' }}>
+                          {ACTION_LABELS[log.action]}
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Tooltip title={[log.userAgent, log.ipAddress].filter(Boolean).join(' · ') || ''}>
                         <span>{log.platform ? PLATFORM_TEXT[log.platform] ?? log.platform : 'Không rõ'}</span>

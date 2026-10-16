@@ -2,13 +2,21 @@
 // Bật / tắt tính năng theo nền tảng — trùng Core-be (CoreCms.Domain/Common/PlatformFeatures.cs). Chủ cửa hàng giới hạn ai
 // được dùng một tính năng trên web / app (vd tắt tự chấm công trên web với nhân viên, buộc dùng app). Server tự nhận ra
 // trình duyệt (luôn là web) và gắn nền tảng vào phiên đăng nhập; header X-Client-Platform (src/utils/axios.ts) chỉ còn là
-// tín hiệu phụ. GET /users/me trả blockedFeatures cho nền tảng đó. API vẫn tự chặn (403 platform_feature_disabled) — web
-// chỉ ẩn cho khớp.
+// tín hiệu phụ. GET /users/me trả blockedFeatures cho nền tảng đó (máy quầy: không chặn gì). API vẫn tự chặn (403
+// platform_feature_disabled) — web chỉ ẩn cho khớp.
 // ----------------------------------------------------------------------
 
 export const PLATFORM_FEATURES = {
   /** Tự chấm công vào / ra ca (GPS, khuôn mặt). Máy chấm công (kiosk) không bị ảnh hưởng. */
   selfCheckIn: 'attendance.self-checkin',
+  /** Màn bán hàng: tạo hoá đơn, giỏ hàng chờ. */
+  posSale: 'sales.pos',
+  /** Kiểm quầy: thu chi trong ca, đếm tiền, chốt ca. */
+  shiftCash: 'shift-cash.counter',
+  /** Checklist vệ sinh của mình: hoàn thành việc, gửi ảnh. Không gồm chấm / phạt của quản lý. */
+  cleaningTasks: 'cleaning.tasks',
+  /** Báo cáo kinh doanh (/dashboard/pos/report/*). */
+  reports: 'analytics.reports',
 } as const;
 
 export type PlatformFeatureKey = (typeof PLATFORM_FEATURES)[keyof typeof PLATFORM_FEATURES];

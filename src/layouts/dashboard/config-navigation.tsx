@@ -149,7 +149,7 @@ export function useNavData(
           {
             subheader: 'Máy quầy',
             items: [
-              { title: 'Bán hàng', path: paths.dashboard.pos.sale.root, icon: ICONS.ecommerce, featureKey: 'commerce.retail.pos' },
+              { title: 'Bán hàng', path: paths.dashboard.pos.sale.root, icon: ICONS.ecommerce, featureKey: 'commerce.retail.pos', platformFeature: PLATFORM_FEATURES.posSale },
               {
                 title: 'Bán hàng F&B',
                 path: paths.dashboard.fnb.pos,
@@ -182,7 +182,7 @@ export function useNavData(
                 icon: ICONS.user,
                 featureKey: ['commerce.retail.pos', 'commerce.fnb.pos'],
               },
-              { title: t('shiftCash'), path: paths.dashboard.shiftCash.root, icon: ICONS.banking },
+              { title: t('shiftCash'), path: paths.dashboard.shiftCash.root, icon: ICONS.banking, platformFeature: PLATFORM_FEATURES.shiftCash },
             ],
           },
         ];
@@ -217,6 +217,7 @@ export function useNavData(
             path: paths.dashboard.shiftCash.root,
             icon: ICONS.banking,
             roles: ['Admin', 'Manager', 'Staff'],
+            platformFeature: PLATFORM_FEATURES.shiftCash,
           },
         ]
       },
@@ -381,7 +382,7 @@ export function useNavData(
             roles: ['Admin', 'Manager', 'Staff'],
             featureKey: 'workforce.cleaning',
             children: [
-              { title: t('cleaningMyChecklist'), path: paths.dashboard.cleaning.myChecklist },
+              { title: t('cleaningMyChecklist'), path: paths.dashboard.cleaning.myChecklist, platformFeature: PLATFORM_FEATURES.cleaningTasks },
               { title: t('cleaningTaskLibrary'), path: paths.dashboard.cleaning.taskLibrary, permissions: [CLEANING.templateManage] },
               { title: t('cleaningWeekBuilder'), path: paths.dashboard.cleaning.weekBuilder, permissions: [CLEANING.templateManage] },
               { title: t('cleaningTemplates'), path: paths.dashboard.cleaning.templates, permissions: [CLEANING.templateManage] },
@@ -639,6 +640,7 @@ export function useNavData(
             icon: ICONS.ecommerce,
             roles: ['Admin'],
             featureKey: 'commerce.retail.pos',
+            platformFeature: PLATFORM_FEATURES.posSale,
           },
           // BÁN HÀNG F&B (sơ đồ bàn, gọi món, gửi bar, thanh toán) — mọi vai trò, trong phạm vi chi nhánh được phân công.
           {
@@ -683,7 +685,7 @@ export function useNavData(
             featureKey: 'commerce.retail.pos',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.salesOrder.list },
-              { title: 'Tạo đơn', path: paths.dashboard.pos.salesOrder.new },
+              { title: 'Tạo đơn', path: paths.dashboard.pos.salesOrder.new, platformFeature: PLATFORM_FEATURES.posSale },
             ],
           },
           // ĐƠN ONLINE (storefront): chỉ sinh hoá đơn khi khách đã thanh toán.
@@ -738,6 +740,7 @@ export function useNavData(
             icon: ICONS.analytics,
             // Theo quyền analytics.* (Core-be /reports/*): chủ cửa hàng có đủ; vai trò tuỳ chỉnh được cấp từng báo cáo.
             permissions: REPORT_VIEW_PERMISSIONS,
+            platformFeature: PLATFORM_FEATURES.reports,
             children: REPORT_PAGES.map((page) => ({
               title: page.title,
               path: page.path,

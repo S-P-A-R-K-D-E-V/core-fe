@@ -6,6 +6,7 @@ import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
 import Dialog from '@mui/material/Dialog';
 import Tooltip from '@mui/material/Tooltip';
 import TableRow from '@mui/material/TableRow';
@@ -43,6 +44,7 @@ import {
   getPermissionCatalog,
 } from 'src/api/custom-roles';
 
+import SystemRoleBaseline from '../system-role-baseline';
 import PermissionChecklist from '../permission-checklist';
 
 // ----------------------------------------------------------------------
@@ -55,7 +57,7 @@ export default function RoleListView() {
 
   const [catalog, setCatalog] = useState<IPermissionCatalog | null>(null);
   const [customRoles, setCustomRoles] = useState<ICustomRole[] | null>(null);
-  const [viewing, setViewing] = useState<{ name: string; permissions: string[] } | null>(null);
+  const [viewing, setViewing] = useState<IPermissionCatalog['systemRoles'][number] | null>(null);
   const [deleting, setDeleting] = useState<ICustomRole | null>(null);
 
   const total = catalog?.groups.reduce((n, g) => n + g.permissions.length, 0) ?? 0;
@@ -114,8 +116,9 @@ export default function RoleListView() {
         />
 
         <Alert severity="info" sx={{ mb: 3 }}>
-          Vai trò hệ thống có quyền cố định. Muốn cấp quyền khác (vd Thu ngân chỉ bán hàng, Kế toán xem báo cáo) thì tạo
-          vai trò tuỳ chỉnh rồi gán trong mục Người dùng.
+          Vai trò hệ thống có quyền cố định: việc làm được sẵn theo vai trò (bấm Xem quyền) cộng các quyền chi tiết. Muốn
+          cấp quyền khác (vd Thu ngân chỉ bán hàng, Kế toán xem báo cáo) thì tạo vai trò tuỳ chỉnh rồi gán trong mục Người
+          dùng.
         </Alert>
 
         <Card sx={{ mb: 3 }}>
@@ -199,10 +202,17 @@ export default function RoleListView() {
               <TableBody>
                 {catalog?.systemRoles.map((role) => (
                   <TableRow key={role.name} hover>
-                    <TableCell>{SYSTEM_ROLE_LABELS[role.name] ?? role.name}</TableCell>
+                    <TableCell>
+                      <strong>{SYSTEM_ROLE_LABELS[role.name] ?? role.name}</strong>
+                      {role.summary && (
+                        <Typography variant="caption" component="div" sx={{ color: 'text.secondary' }}>
+                          {role.summary}
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Label variant="soft" color={role.permissions.length > 0 ? 'success' : 'default'}>
-                        {countLabel(role.permissions)}
+                        {role.permissions.length > 0 ? countLabel(role.permissions) : 'Không có quyền chi tiết'}
                       </Label>
                     </TableCell>
                     <TableCell align="right">
@@ -221,7 +231,24 @@ export default function RoleListView() {
       <Dialog fullWidth maxWidth="md" open={!!viewing} onClose={() => setViewing(null)}>
         <DialogTitle>Quyền của {viewing ? SYSTEM_ROLE_LABELS[viewing.name] ?? viewing.name : ''}</DialogTitle>
         <DialogContent dividers>
-          {viewing && catalog && <PermissionChecklist catalog={catalog} selected={viewing.permissions} />}
+          {viewing && catalog && (
+            <Stack spacing={3}>
+              {viewing.summary && <Typography variant="body2">{viewing.summary}</Typography>}
+              <SystemRoleBaseline baseline={viewing.baseline} />
+              {viewing.permissions.length > 0 ? (
+                <div>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Quyền chi tiết
+                  </Typography>
+                  <PermissionChecklist catalog={catalog} selected={viewing.permissions} />
+                </div>
+              ) : (
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  Không có quyền chi tiết nào. Muốn cấp thêm thì tạo vai trò tuỳ chỉnh.
+                </Typography>
+              )}
+            </Stack>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setViewing(null)}>Đóng</Button>

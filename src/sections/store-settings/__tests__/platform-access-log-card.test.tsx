@@ -7,8 +7,8 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import type { PlatformAccessLog } from 'src/api/platform-features';
 
 // ----------------------------------------------------------------------
-// Nhật ký chấm công theo nền tảng: chủ cửa hàng thấy lượt bị chặn, lượt nghi sửa nền tảng (kèm lý do dễ hiểu), lọc chỉ
-// lượt nghi sửa.
+// Nhật ký theo nền tảng: chủ cửa hàng thấy lượt bị chặn, lượt nghi sửa nền tảng (kèm lý do dễ hiểu) của từng tính năng,
+// lọc chỉ lượt nghi sửa.
 // ----------------------------------------------------------------------
 
 vi.mock('src/components/label', () => ({ default: ({ children }: any) => <span>{children}</span> }));
@@ -40,10 +40,10 @@ const log = (over: Partial<PlatformAccessLog>): PlatformAccessLog => ({
   ...over,
 });
 
-function renderCard() {
+function renderCard(featureLabels?: Record<string, string>) {
   return render(
     <ThemeProvider theme={createTheme()}>
-      <PlatformAccessLogCard />
+      <PlatformAccessLogCard featureLabels={featureLabels} />
     </ThemeProvider>
   );
 }
@@ -70,6 +70,23 @@ describe('PlatformAccessLogCard', () => {
     expect(screen.getByText('Nghi sửa nền tảng')).toBeInTheDocument();
     expect(screen.getByText('Thành công')).toBeInTheDocument();
     expect(screen.getByText('Ra ca')).toBeInTheDocument();
+  });
+
+  it('hiện tên tính năng theo danh mục, mã lạ hiện nguyên mã', async () => {
+    getPlatformAccessLogs.mockResolvedValue({
+      total: 2,
+      page: 1,
+      pageSize: 20,
+      data: [
+        log({ featureKey: 'sales.pos', action: 'Create', blocked: true, statusCode: 403 }),
+        log({ featureKey: 'feature.removed', action: 'Old', suspicious: true }),
+      ],
+    });
+
+    renderCard({ 'sales.pos': 'Bán hàng' });
+
+    expect(await screen.findByText('Bán hàng')).toBeInTheDocument();
+    expect(screen.getByText('feature.removed')).toBeInTheDocument();
   });
 
   it('bật "chỉ hiện nghi sửa" thì tải lại với bộ lọc', async () => {

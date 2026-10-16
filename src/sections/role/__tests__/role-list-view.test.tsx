@@ -58,7 +58,18 @@ const catalog: IPermissionCatalog = {
   ],
   systemRoles: [
     { name: 'Admin', permissions: ['analytics.export', 'analytics.revenue.read'] },
-    { name: 'Staff', permissions: [] },
+    {
+      name: 'Staff',
+      permissions: [],
+      summary: 'Nhân viên: việc thường ngày ở cửa hàng.',
+      baseline: ['Bán hàng tại quầy, xem hoá đơn mình bán trong ngày'],
+    },
+    {
+      name: 'User',
+      permissions: [],
+      summary: 'Người dùng: tài khoản tự đăng ký.',
+      baseline: ['Không vào được chức năng quản lý cửa hàng nào'],
+    },
   ],
   baseRoles: ['Manager', 'Staff'],
 };
@@ -86,7 +97,26 @@ describe('RoleListView', () => {
     expect(await screen.findByText('Kế toán')).toBeInTheDocument();
     expect(screen.getByText('1/2 quyền')).toBeInTheDocument();
     expect(screen.getByText('Toàn quyền')).toBeInTheDocument(); // Admin
-    expect(screen.getByText('0/2 quyền')).toBeInTheDocument(); // Staff
+    expect(screen.getAllByText('Không có quyền chi tiết')).toHaveLength(2); // Staff, User
+    // Cùng 0 quyền chi tiết nhưng mô tả khác nhau.
+    expect(screen.getByText('Nhân viên: việc thường ngày ở cửa hàng.')).toBeInTheDocument();
+    expect(screen.getByText('Người dùng: tài khoản tự đăng ký.')).toBeInTheDocument();
+  });
+
+  it('xem vai trò Nhân viên: hiện việc làm được sẵn thay cho danh sách quyền trống', async () => {
+    getPermissionCatalog.mockResolvedValue(catalog);
+    getCustomRoles.mockResolvedValue([]);
+    const user = userEvent.setup();
+
+    render(<RoleListView />);
+
+    await screen.findByText('Chưa có vai trò tuỳ chỉnh.');
+    await user.click(screen.getAllByRole('button', { name: 'Xem quyền' })[1]);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Làm được sẵn theo vai trò')).toBeInTheDocument();
+    expect(within(dialog).getByText('Bán hàng tại quầy, xem hoá đơn mình bán trong ngày')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Không có quyền chi tiết nào/)).toBeInTheDocument();
+    expect(within(dialog).queryAllByRole('checkbox')).toHaveLength(0);
   });
 
   it('vai trò còn người mang thì không xoá được; vai trò trống xoá sau khi xác nhận', async () => {
