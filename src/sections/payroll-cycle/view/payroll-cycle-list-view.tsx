@@ -37,6 +37,8 @@ import {
 
 import type { IPayrollCycle } from 'src/types/corecms-api';
 
+import { usePayrollAccess } from 'src/sections/payroll/payroll-access';
+
 import {
   createPayrollCycle,
   getAllPayrollCycles,
@@ -88,6 +90,8 @@ export default function PayrollCycleListView() {
   const { enqueueSnackbar } = useSnackbar();
 
   const [cycles, setCycles] = useState<IPayrollCycle[]>([]);
+  // Tạo / sửa / khoá kỳ: payroll.cycle.manage (Admin, Manager mặc định).
+  const { canManageCycles } = usePayrollAccess();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
@@ -200,13 +204,15 @@ export default function PayrollCycleListView() {
           { name: 'Chu kỳ lương' },
         ]}
         action={
-          <Button
-            variant="contained"
-            startIcon={<Iconify icon="mingcute:add-line" />}
-            onClick={() => handleOpenDialog()}
-          >
-            Thêm chu kỳ
-          </Button>
+          canManageCycles && (
+            <Button
+              variant="contained"
+              startIcon={<Iconify icon="mingcute:add-line" />}
+              onClick={() => handleOpenDialog()}
+            >
+              Thêm chu kỳ
+            </Button>
+          )
         }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
@@ -247,7 +253,7 @@ export default function PayrollCycleListView() {
                         </TableCell>
                         <TableCell>
                           <Stack direction="row" spacing={1}>
-                            {!cycle.isLocked && (
+                            {!cycle.isLocked && canManageCycles && (
                               <Button size="small" onClick={() => handleOpenDialog(cycle)}>
                                 Sửa
                               </Button>
@@ -256,6 +262,7 @@ export default function PayrollCycleListView() {
                               size="small"
                               color={cycle.isLocked ? 'success' : 'warning'}
                               variant="outlined"
+                              disabled={!canManageCycles}
                               onClick={() => handleToggleLock(cycle)}
                               startIcon={
                                 <Iconify

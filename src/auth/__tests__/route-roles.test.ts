@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { paths } from 'src/routes/paths';
-import { requiredRolesFor } from 'src/auth/route-roles';
+import { PERMISSIONS } from 'src/auth/permissions';
+import { requiredRolesFor, requiredPermissionsFor } from 'src/auth/route-roles';
 import { ADMIN_ROLES, MANAGER_ROLES } from 'src/auth/roles';
 
 // ----------------------------------------------------------------------
@@ -19,11 +20,6 @@ describe('requiredRolesFor', () => {
     [paths.dashboard.shift.schedules.edit('s1'), MANAGER_ROLES],
     [paths.dashboard.shift.reminderRules.new, ADMIN_ROLES],
     [paths.dashboard.shiftAudit.root, MANAGER_ROLES],
-    [paths.dashboard.salary.configuration, MANAGER_ROLES],
-    [paths.dashboard.holidayPolicy.list, MANAGER_ROLES],
-    [paths.dashboard.penaltyPolicy.list, MANAGER_ROLES],
-    [paths.dashboard.payroll.cycles, MANAGER_ROLES],
-    [paths.dashboard.payroll.batch, MANAGER_ROLES],
     [paths.dashboard.user.list, MANAGER_ROLES],
     [paths.dashboard.user.edit('u1'), MANAGER_ROLES],
   ])('%s → chỉ %j', (path, roles) => {
@@ -47,5 +43,27 @@ describe('requiredRolesFor', () => {
     expect(requiredRolesFor(`${paths.dashboard.role.list}/`)).toEqual(ADMIN_ROLES);
     expect(requiredRolesFor(null)).toBeNull();
     expect(requiredRolesFor(paths.dashboard.root)).toBeNull();
+  });
+});
+
+// Trang lương chuyển sang quyền payroll.* (Core-be): Admin, Manager có mặc định; vai trò tuỳ chỉnh được cấp thêm.
+describe('requiredPermissionsFor', () => {
+  const P = PERMISSIONS.payroll;
+
+  it.each([
+    [paths.dashboard.salary.configuration, [P.salaryConfigRead]],
+    [paths.dashboard.salary.history, [P.salaryConfigRead]],
+    [paths.dashboard.holidayPolicy.list, [P.policyManage]],
+    [paths.dashboard.penaltyPolicy.list, [P.policyManage]],
+    [paths.dashboard.payroll.cycles, [P.recordsRead]],
+    [paths.dashboard.payroll.batch, [P.recordsRead]],
+  ])('%s → cần %j, không còn giới hạn theo vai trò', (path, permissions) => {
+    expect(requiredPermissionsFor(path)).toEqual(permissions);
+    expect(requiredRolesFor(path)).toBeNull();
+  });
+
+  it('lương của chính mình và trang chưa chuyển không xét quyền', () => {
+    expect(requiredPermissionsFor(paths.dashboard.payroll.myPayroll)).toBeNull();
+    expect(requiredPermissionsFor(paths.dashboard.role.list)).toBeNull();
   });
 });
