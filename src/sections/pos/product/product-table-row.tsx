@@ -18,6 +18,8 @@ import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import MenuItem from '@mui/material/MenuItem';
 
+import { useCounterSession } from 'src/sections/counter/counter-scope';
+
 import { useBoolean } from 'src/hooks/use-boolean';
 
 import Label from 'src/components/label';
@@ -560,6 +562,8 @@ function ProductExpandedDetail({
   onPrintLabel: (product: IProduct) => void;
 }) {
   const [tab, setTab] = useState(0);
+  // Máy quầy: chỉ xem hàng + in tem — không sửa / xoá / thêm (server cũng chặn).
+  const counterSession = useCounterSession();
 
   const {
     name, code, barCode, categoryName, description,
@@ -726,24 +730,32 @@ function ProductExpandedDetail({
 
       {/* Action bar */}
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 2.5, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-        <Button size="small" color="error" startIcon={<Iconify icon="solar:trash-bin-trash-bold" width={18} />} onClick={onDelete}>
-          Xóa
-        </Button>
-        <Button size="small" color="inherit" startIcon={<Iconify icon="solar:copy-bold" width={18} />}>
-          Sao chép
-        </Button>
+        {!counterSession && (
+          <>
+            <Button size="small" color="error" startIcon={<Iconify icon="solar:trash-bin-trash-bold" width={18} />} onClick={onDelete}>
+              Xóa
+            </Button>
+            <Button size="small" color="inherit" startIcon={<Iconify icon="solar:copy-bold" width={18} />}>
+              Sao chép
+            </Button>
+          </>
+        )}
 
         <Box sx={{ flex: 1 }} />
 
-        <Button size="small" variant="contained" startIcon={<Iconify icon="solar:pen-bold" width={18} />} onClick={() => onEdit(row.id)}>
-          Chỉnh sửa
-        </Button>
+        {!counterSession && (
+          <Button size="small" variant="contained" startIcon={<Iconify icon="solar:pen-bold" width={18} />} onClick={() => onEdit(row.id)}>
+            Chỉnh sửa
+          </Button>
+        )}
         <Button size="small" variant="outlined" startIcon={<Iconify icon="solar:printer-bold" width={18} />} onClick={() => onPrintLabel(row)}>
           In tem mã
         </Button>
-        <Button size="small" variant="outlined" startIcon={<Iconify icon="mingcute:add-line" width={18} />} onClick={onAddSameCategory}>
-          Thêm hàng hóa cùng loại
-        </Button>
+        {!counterSession && (
+          <Button size="small" variant="outlined" startIcon={<Iconify icon="mingcute:add-line" width={18} />} onClick={onAddSameCategory}>
+            Thêm hàng hóa cùng loại
+          </Button>
+        )}
       </Stack>
     </Box>
   );

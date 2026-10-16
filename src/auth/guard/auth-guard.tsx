@@ -5,6 +5,8 @@ import { useRouter } from 'src/routes/hooks';
 
 import { SplashScreen } from 'src/components/loading-screen';
 
+import { getCounterDevice } from 'src/sections/counter/counter-device';
+
 import { useAuthContext } from '../hooks';
 
 // ----------------------------------------------------------------------
@@ -40,6 +42,10 @@ function Container({ children }: Props) {
 
   const check = useCallback(() => {
     if (!authenticated) {
+      if (getCounterDevice()) {
+        router.replace('/counter');
+        return;
+      }
       const searchParams = new URLSearchParams({
         returnTo: window.location.pathname,
       }).toString();

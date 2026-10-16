@@ -9,6 +9,8 @@ import type { INotification, NotificationCategory } from 'src/types/notification
 import { setSession } from 'src/auth/context/jwt/utils';
 
 import axios, { endpoints } from 'src/utils/axios';
+
+import { counterDeviceOfToken } from 'src/sections/counter/counter-device';
 import { PAYMENT_STATUS_EVENT, normalizePaymentStatusEvent } from 'src/utils/payment-status';
 import {
   getNotifications,
@@ -174,6 +176,8 @@ export function SyncNotificationProvider({ children }: Props) {
   // --- Load initial DB notifications ---
   const loadNotifications = useCallback(
     async (page: number = 1, category?: NotificationCategory) => {
+      // Phiên máy quầy không có thông báo cá nhân (API bị chặn) — xem src/sections/counter.
+      if (counterDeviceOfToken(sessionStorage.getItem('accessToken'))) return;
       try {
         const data = await getNotifications({ page, pageSize: 20, category });
         if (page === 1) {

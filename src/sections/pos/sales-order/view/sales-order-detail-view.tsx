@@ -30,6 +30,10 @@ import { ISalesOrder } from 'src/types/corecms-api';
 import { getSalesOrderById, cancelSalesOrder } from 'src/api/sales-orders';
 
 import ReceiptPrintDialog from 'src/sections/pos/receipt-print/receipt-print-dialog';
+import { useAuthContext } from 'src/auth/hooks';
+import { useCounterSession } from 'src/sections/counter/counter-scope';
+
+import SalesReturnDialog from '../sales-return-dialog';
 
 import KiotVietSyncLabel from '../kiotviet-sync-label';
 
@@ -81,6 +85,11 @@ export default function SalesOrderDetailView({ id }: Props) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
+  const [returnOpen, setReturnOpen] = useState(false);
+  const { user } = useAuthContext();
+  // Máy quầy: in lại, trả hàng — không sửa / huỷ hoá đơn (server cũng chặn).
+  const counterSession = useCounterSession();
+  const isManager = !!user?.roles?.some((r: string) => r === 'Admin' || r === 'Manager');
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -135,7 +144,16 @@ export default function SalesOrderDetailView({ id }: Props) {
             >
               In hoá đơn
             </Button>
-            {canCancel && order.status !== 'Cancelled' && (
+            {order.status !== 'Cancelled' && (counterSession || isManager) && (
+              <Button
+                variant="outlined"
+                onClick={() => setReturnOpen(true)}
+                startIcon={<Iconify icon="solar:undo-left-round-bold" />}
+              >
+                Trả hàng
+              </Button>
+            )}
+            {!counterSession && canCancel && order.status !== 'Cancelled' && (
               <>
                 <Button
                   variant="outlined"
@@ -153,6 +171,7 @@ export default function SalesOrderDetailView({ id }: Props) {
           </Stack>
         </Stack>
         <ReceiptPrintDialog open={printOpen} onClose={() => setPrintOpen(false)} orderId={id} />
+        <SalesReturnDialog order={order} open={returnOpen} onClose={() => setReturnOpen(false)} onDone={() => {}} />
       </Grid>
 
       {/* Info */}

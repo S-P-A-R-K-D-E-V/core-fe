@@ -27,6 +27,9 @@ import ShiftPreferencePromptDialog from 'src/components/shift-preference-prompt/
 
 import { useAuthContext } from 'src/auth/hooks';
 
+import CounterSessionGuard from 'src/sections/counter/counter-session-guard';
+import { useCounterSession } from 'src/sections/counter/counter-scope';
+
 import Main from './main';
 import Header from './header';
 import NavMini from './nav-mini';
@@ -43,6 +46,11 @@ function ShiftNotificationAlert() {
   return null;
 }
 
+// Máy quầy không có tin nhắn: không mở kết nối messenger (API cũng bị chặn với phiên máy quầy).
+function MaybeMessenger({ off, children }: { off: boolean; children: React.ReactNode }) {
+  return off ? <>{children}</> : <MessengerProvider>{children}</MessengerProvider>;
+}
+
 // ----------------------------------------------------------------------
 
 type Props = {
@@ -52,6 +60,8 @@ type Props = {
 export default function DashboardLayout({ children }: Props) {
   const settings = useSettingsContext();
   const { user, updateUser, refreshUser } = useAuthContext();
+  // Máy quầy: không tin nhắn, trợ lý, nhắc ca, hộp thoại hồ sơ — chỉ bán hàng (server cũng chặn).
+  const counterSession = useCounterSession();
 
   // Safety net: re-sync role/permissions from JWT + server on first dashboard mount.
   // Catches cases where login (especially Google OAuth redirect) left stale auth state.
@@ -80,7 +90,7 @@ export default function DashboardLayout({ children }: Props) {
   const showMobilePrompt = loaded && !lgUp && pref === null;
 
   const showShiftPreferencePrompt =
-    !!user && user.hasShiftPreference === false && user.roles?.includes('Staff');
+    !counterSession && !!user && user.hasShiftPreference === false && user.roles?.includes('Staff');
   const isMobileView = !lgUp && pref === 'mobile';
 
   const renderNavMini = <NavMini />;
@@ -136,20 +146,21 @@ export default function DashboardLayout({ children }: Props) {
   if (isHorizontal) {
     return (
       <SyncNotificationProvider>
-        <MessengerProvider>
-          <ShiftNotificationAlert />
+        <MaybeMessenger off={counterSession}>
+          {!counterSession && <ShiftNotificationAlert />}
+          <CounterSessionGuard />
           <Header onOpenNav={nav.onTrue} />
           {lgUp ? renderHorizontal : renderNavVertical}
           <Main sx={mobileNavSx}>{children}</Main>
           {isMobileView && <NavBottom onOpenMenu={nav.onTrue} />}
-          <ChatbotWidget />
+          {!counterSession && <ChatbotWidget />}
           {renderMobilePrompt}
-          <ProfileCompletionDialog />
+          {!counterSession && <ProfileCompletionDialog />}
           <ShiftPreferencePromptDialog
             open={showShiftPreferencePrompt}
             onCompleted={() => updateUser?.({ hasShiftPreference: true })}
           />
-        </MessengerProvider>
+        </MaybeMessenger>
       </SyncNotificationProvider>
     );
   }
@@ -157,8 +168,9 @@ export default function DashboardLayout({ children }: Props) {
   if (isMini) {
     return (
       <SyncNotificationProvider>
-        <MessengerProvider>
-          <ShiftNotificationAlert />
+        <MaybeMessenger off={counterSession}>
+          {!counterSession && <ShiftNotificationAlert />}
+          <CounterSessionGuard />
           <Header onOpenNav={nav.onTrue} />
           <Box
             sx={{
@@ -171,22 +183,23 @@ export default function DashboardLayout({ children }: Props) {
             <Main sx={mobileNavSx}>{children}</Main>
           </Box>
           {isMobileView && <NavBottom onOpenMenu={nav.onTrue} />}
-          <ChatbotWidget />
+          {!counterSession && <ChatbotWidget />}
           {renderMobilePrompt}
-          <ProfileCompletionDialog />
+          {!counterSession && <ProfileCompletionDialog />}
           <ShiftPreferencePromptDialog
             open={showShiftPreferencePrompt}
             onCompleted={() => updateUser?.({ hasShiftPreference: true })}
           />
-        </MessengerProvider>
+        </MaybeMessenger>
       </SyncNotificationProvider>
     );
   }
 
   return (
     <SyncNotificationProvider>
-      <MessengerProvider>
-        <ShiftNotificationAlert />
+      <MaybeMessenger off={counterSession}>
+        {!counterSession && <ShiftNotificationAlert />}
+        <CounterSessionGuard />
         <Header onOpenNav={nav.onTrue} />
         <Box
           sx={{
@@ -199,14 +212,14 @@ export default function DashboardLayout({ children }: Props) {
           <Main sx={mobileNavSx}>{children}</Main>
         </Box>
         {isMobileView && <NavBottom onOpenMenu={nav.onTrue} />}
-        <ChatbotWidget />
+        {!counterSession && <ChatbotWidget />}
         {renderMobilePrompt}
-        <ProfileCompletionDialog />
+        {!counterSession && <ProfileCompletionDialog />}
         <ShiftPreferencePromptDialog
           open={showShiftPreferencePrompt}
           onCompleted={() => updateUser?.({ hasShiftPreference: true })}
         />
-      </MessengerProvider>
+      </MaybeMessenger>
     </SyncNotificationProvider>
   );
 }
