@@ -44,6 +44,8 @@ import { kiotVietRetryError, canRetryKiotVietPush } from 'src/utils/kiotviet-syn
 
 import { ISalesOrder, IKiotVietBankAccount } from 'src/types/corecms-api';
 import { getAllSalesOrders, exportSalesOrdersExcel, retryPushSalesOrder } from 'src/api/sales-orders';
+
+import { useSalesAccess } from '../sales-access';
 import { getBankAccounts } from 'src/api/bank-accounts';
 
 import ReceiptPrintDialog from 'src/sections/pos/receipt-print/receipt-print-dialog';
@@ -97,6 +99,7 @@ const TABLE_HEAD = [
 // ----------------------------------------------------------------------
 
 export default function SalesOrderListView() {
+  const access = useSalesAccess();
   const { enqueueSnackbar } = useSnackbar();
   const table = useTable();
   const router = useRouter();
@@ -226,16 +229,18 @@ export default function SalesOrderListView() {
                 ),
               }}
             />
-            <Button
-              variant="outlined"
-              color="primary"
-              startIcon={<Iconify icon="solar:export-bold" />}
-              onClick={handleExport}
-              disabled={exporting}
-              sx={{ minWidth: 160, whiteSpace: 'nowrap' }}
-            >
-              {exporting ? 'Đang xuất...' : 'Xuất Excel'}
-            </Button>
+            {access.canExport && (
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<Iconify icon="solar:export-bold" />}
+                onClick={handleExport}
+                disabled={exporting}
+                sx={{ minWidth: 160, whiteSpace: 'nowrap' }}
+              >
+                {exporting ? 'Đang xuất...' : 'Xuất Excel'}
+              </Button>
+            )}
           </Stack>
           <Stack spacing={2} direction={{ xs: 'column', md: 'row' }}>
             <DatePicker

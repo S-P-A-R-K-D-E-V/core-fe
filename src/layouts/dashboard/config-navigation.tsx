@@ -602,15 +602,16 @@ export function useNavData(
               { title: 'Tạo đơn', path: paths.dashboard.pos.purchaseOrder.new, allPermissions: [PERMISSIONS.purchase.create] },
             ],
           },
+          // Khách hàng, đơn bán — theo quyền customer.* / sales.* (Core-be; mặc định Admin, Manager).
           {
             title: 'Khách hàng',
             path: paths.dashboard.pos.customer.root,
             icon: ICONS.user,
-            roles: ['Admin'],
+            permissions: [PERMISSIONS.customer.read],
             featureKey: 'commerce.retail.pos',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.customer.list },
-              { title: 'Thêm mới', path: paths.dashboard.pos.customer.new },
+              { title: 'Thêm mới', path: paths.dashboard.pos.customer.new, allPermissions: [PERMISSIONS.customer.manage] },
             ],
           },
           {
@@ -659,7 +660,7 @@ export function useNavData(
             title: 'Đơn bán hàng',
             path: paths.dashboard.pos.salesOrder.root,
             icon: ICONS.banking,
-            roles: ['Admin'],
+            permissions: [PERMISSIONS.sales.orderRead],
             featureKey: 'commerce.retail.pos',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.salesOrder.list },
