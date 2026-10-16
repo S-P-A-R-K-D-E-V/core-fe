@@ -19,7 +19,6 @@ import Label from 'src/components/label';
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
-import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
@@ -30,6 +29,7 @@ import { ConfirmDialog } from 'src/components/custom-dialog';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import { AppDatePicker } from 'src/components/date-time-picker';
 import { fCurrency } from 'src/utils/format-number';
+import { apiErrorMessage } from 'src/utils/api-error';
 import {
   useTable,
   emptyRows,
@@ -41,6 +41,8 @@ import {
 
 import { IExpense } from 'src/types/corecms-api';
 import { getExpenses, deleteExpense } from 'src/api/expenses';
+
+import { useExpenseAccess, lockedByShareholderFunds, SHAREHOLDER_FUNDS_LOCKED_TEXT } from '../expense-access';
 
 // ----------------------------------------------------------------------
 
@@ -69,6 +71,7 @@ export default function ExpenseListView() {
   const router = useRouter();
   const confirm = useBoolean();
   const defaults = getDefaultDates();
+  const access = useExpenseAccess();
 
   const [tableData, setTableData] = useState<IExpense[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -105,7 +108,7 @@ export default function ExpenseListView() {
       enqueueSnackbar('Xóa thành công!');
       fetchData();
     } catch (error) {
-      enqueueSnackbar('Xóa thất bại', { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(error, 'Xóa thất bại'), { variant: 'error' });
     } finally {
       setDeleteId(null);
       confirm.onFalse();
@@ -113,7 +116,7 @@ export default function ExpenseListView() {
   }, [deleteId, enqueueSnackbar, fetchData, confirm]);
 
   return (
-    <RoleBasedGuard hasContent roles={['Admin']}>
+    <>
       <Container maxWidth="lg">
         <CustomBreadcrumbs
           heading="Chi phí vận hành"
@@ -140,14 +143,16 @@ export default function ExpenseListView() {
               >
                 Danh mục
               </Button>
-              <Button
-                component={RouterLink}
-                href={paths.dashboard.pos.expense.new}
-                variant="contained"
-                startIcon={<Iconify icon="mingcute:add-line" />}
-              >
-                Thêm chi phí
-              </Button>
+              {access.canCreate && (
+                <Button
+                  component={RouterLink}
+                  href={paths.dashboard.pos.expense.new}
+                  variant="contained"
+                  startIcon={<Iconify icon="mingcute:add-line" />}
+                >
+                  Thêm chi phí
+                </Button>
+              )}
             </Stack>
           }
           sx={{ mb: { xs: 3, md: 5 } }}
@@ -175,43 +180,61 @@ export default function ExpenseListView() {
                   onSort={table.onSort}
                 />
                 <TableBody>
-                  {tableData.map((row) => (
-                    <TableRow key={row.id} hover>
-                      <TableCell>{new Date(row.expenseDate).toLocaleDateString('vi-VN')}</TableCell>
-                      <TableCell>{row.categoryName}</TableCell>
-                      <TableCell align="right">{fCurrency(row.amount)}</TableCell>
-                      <TableCell>{row.note || '—'}</TableCell>
-                      <TableCell>{row.paidByShareholderName || '—'}</TableCell>
-                      <TableCell>
-                        {row.sourceTemplateId ? (
-                          <Label variant="soft" color="info">Định kỳ</Label>
-                        ) : (
-                          <Label variant="soft" color="default">Nhập tay</Label>
-                        )}
-                      </TableCell>
-                      <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }}>
-                        <Tooltip title="Sửa">
-                          <IconButton onClick={() => router.push(paths.dashboard.pos.expense.edit(row.id))}>
-                            <Iconify icon="solar:pen-bold" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title={row.sourceTemplateId ? 'Không thể xóa khoản chi định kỳ' : 'Xóa'}>
-                          <span>
-                            <IconButton
-                              color="error"
-                              disabled={Boolean(row.sourceTemplateId)}
-                              onClick={() => {
-                                setDeleteId(row.id);
-                                confirm.onTrue();
-                              }}
+                  {tableData.map((row) => {
+                    const locked = lockedByShareholderFunds(access, row);
+                    return (
+                      <TableRow key={row.id} hover>
+                        <TableCell>{new Date(row.expenseDate).toLocaleDateString('vi-VN')}</TableCell>
+                        <TableCell>{row.categoryName}</TableCell>
+                        <TableCell align="right">{fCurrency(row.amount)}</TableCell>
+                        <TableCell>{row.note || '—'}</TableCell>
+                        <TableCell>{row.paidByShareholderName || '—'}</TableCell>
+                        <TableCell>
+                          {row.sourceTemplateId ? (
+                            <Label variant="soft" color="info">Định kỳ</Label>
+                          ) : (
+                            <Label variant="soft" color="default">Nhập tay</Label>
+                          )}
+                        </TableCell>
+                        <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }}>
+                          {access.canUpdate && (
+                            <Tooltip title={locked ? SHAREHOLDER_FUNDS_LOCKED_TEXT : 'Sửa'}>
+                              <span>
+                                <IconButton
+                                  disabled={locked}
+                                  onClick={() => router.push(paths.dashboard.pos.expense.edit(row.id))}
+                                >
+                                  <Iconify icon="solar:pen-bold" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
+                          {access.canDelete && (
+                            <Tooltip
+                              title={
+                                (row.sourceTemplateId && 'Không thể xóa khoản chi định kỳ') ||
+                                (locked && SHAREHOLDER_FUNDS_LOCKED_TEXT) ||
+                                'Xóa'
+                              }
                             >
-                              <Iconify icon="solar:trash-bin-trash-bold" />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                              <span>
+                                <IconButton
+                                  color="error"
+                                  disabled={Boolean(row.sourceTemplateId) || locked}
+                                  onClick={() => {
+                                    setDeleteId(row.id);
+                                    confirm.onTrue();
+                                  }}
+                                >
+                                  <Iconify icon="solar:trash-bin-trash-bold" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                   <TableEmptyRows
                     height={table.dense ? 56 : 76}
                     emptyRows={emptyRows(table.page, table.rowsPerPage, tableData.length)}
@@ -247,6 +270,6 @@ export default function ExpenseListView() {
           </Button>
         }
       />
-    </RoleBasedGuard>
+    </>
   );
 }

@@ -23,6 +23,15 @@ export const PERMISSIONS = {
     /** Xuất Excel — cần thêm quyền xem báo cáo tương ứng. */
     export: 'analytics.export',
   },
+  /** Chi phí vận hành (/expenses/*) — mọi thao tác ghi cần thêm quyền xem (API kiểm cả hai). */
+  expense: {
+    read: 'expense.read',
+    create: 'expense.create',
+    update: 'expense.update',
+    delete: 'expense.delete',
+    categoryManage: 'expense.category.manage',
+    recurringManage: 'expense.recurring.manage',
+  },
 } as const;
 
 type PermissionSource = { role?: unknown; roles?: unknown; permissions?: unknown } | null | undefined;

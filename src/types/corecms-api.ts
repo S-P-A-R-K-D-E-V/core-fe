@@ -199,7 +199,12 @@ export interface ICustomRoleRequest {
 
 /** GET /permissions/catalog — quyền API đang kiểm, quyền cố định của vai trò hệ thống, vai trò gốc được chọn. */
 export interface IPermissionCatalog {
-  groups: { key: string; label: string; permissions: { code: string; label: string }[] }[];
+  groups: {
+    key: string;
+    label: string;
+    /** requires: quyền phải có kèm (vd sửa chi phí cần xem chi phí) — API kiểm cả hai, lưu vai trò tự thêm. */
+    permissions: { code: string; label: string; requires?: string[] }[];
+  }[];
   systemRoles: { name: string; permissions: string[] }[];
   baseRoles: string[];
 }

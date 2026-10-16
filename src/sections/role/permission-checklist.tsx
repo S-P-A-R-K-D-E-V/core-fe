@@ -7,6 +7,8 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 
 import type { IPermissionCatalog } from 'src/types/corecms-api';
 
+import { withRequired, requiredLabels, withoutDependents } from './permission-dependencies';
+
 // ----------------------------------------------------------------------
 
 type Props = {
@@ -16,16 +18,25 @@ type Props = {
   onChange?: (selected: string[]) => void;
 };
 
-/** Danh mục quyền theo nhóm (GET /permissions/catalog) — chọn từng quyền hoặc cả nhóm. */
+/**
+ * Danh mục quyền theo nhóm (GET /permissions/catalog) — chọn từng quyền hoặc cả nhóm. Chọn quyền thì tự chọn quyền nó
+ * cần (requires), bỏ quyền thì bỏ luôn quyền đang cần nó.
+ */
 export default function PermissionChecklist({ catalog, selected, onChange }: Props) {
   const readOnly = !onChange;
 
   const toggle = (code: string) =>
-    onChange?.(selected.includes(code) ? selected.filter((c) => c !== code) : [...selected, code]);
+    onChange?.(
+      selected.includes(code)
+        ? withoutDependents(selected, [code], catalog)
+        : withRequired(selected, [code], catalog)
+    );
 
   const toggleGroup = (codes: string[]) => {
     const all = codes.every((c) => selected.includes(c));
-    onChange?.(all ? selected.filter((c) => !codes.includes(c)) : Array.from(new Set([...selected, ...codes])));
+    onChange?.(
+      all ? withoutDependents(selected, codes, catalog) : withRequired(selected, codes, catalog)
+    );
   };
 
   return (
@@ -64,6 +75,15 @@ export default function PermissionChecklist({ catalog, selected, onChange }: Pro
                       <Typography variant="caption" sx={{ color: 'text.disabled' }}>
                         {permission.code}
                       </Typography>
+                      {requiredLabels(permission.code, catalog).length > 0 && (
+                        <Typography
+                          variant="caption"
+                          component="div"
+                          sx={{ color: 'text.secondary' }}
+                        >
+                          Cần kèm: {requiredLabels(permission.code, catalog).join(', ')}
+                        </Typography>
+                      )}
                     </Box>
                   }
                   control={
