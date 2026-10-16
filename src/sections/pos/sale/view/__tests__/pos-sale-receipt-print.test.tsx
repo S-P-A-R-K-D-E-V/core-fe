@@ -47,6 +47,8 @@ const PRODUCT = {
   createdDate: '2026-10-01T02:00:00Z',
 };
 
+// Màn hình khách: không gọi API quảng cáo / kênh trình duyệt trong test này.
+vi.mock('src/sections/customer-display/use-customer-display-sync', () => ({ useCustomerDisplaySync: () => {} }));
 vi.mock('src/api/products', () => ({
   getAllProducts: () => Promise.resolve({ items: [PRODUCT], totalCount: 1 }),
 }));
