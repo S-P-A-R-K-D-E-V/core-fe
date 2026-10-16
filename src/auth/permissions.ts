@@ -40,6 +40,22 @@ export const PERMISSIONS = {
     oversightRead: 'shift-cash.oversight.read',
     oversightManage: 'shift-cash.oversight.manage',
   },
+  /** Lương — lương của chính mình (my-payroll) không cần quyền. Quyền ghi cần kèm quyền xem tương ứng. */
+  payroll: {
+    recordsRead: 'payroll.records.read',
+    calculate: 'payroll.calculate',
+    recalculate: 'payroll.recalculate',
+    finalize: 'payroll.finalize',
+    paymentPrepare: 'payroll.payment.prepare',
+    markPaid: 'payroll.mark-paid',
+    cycleManage: 'payroll.cycle.manage',
+    cyclePublish: 'payroll.cycle.publish',
+    cycleDelete: 'payroll.cycle.delete',
+    penaltyManage: 'payroll.penalty.manage',
+    policyManage: 'payroll.policy.manage',
+    salaryConfigRead: 'payroll.salary-config.read',
+    salaryConfigManage: 'payroll.salary-config.manage',
+  },
 } as const;
 
 type PermissionSource = { role?: unknown; roles?: unknown; permissions?: unknown } | null | undefined;

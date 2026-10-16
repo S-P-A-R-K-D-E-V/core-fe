@@ -38,6 +38,8 @@ import {
 
 import type { ISalaryConfiguration } from 'src/types/corecms-api';
 
+import { usePayrollAccess } from 'src/sections/payroll/payroll-access';
+
 import {
   createSalaryConfiguration,
   deleteSalaryConfiguration,
@@ -82,6 +84,8 @@ export default function SalaryConfigurationView() {
   const { enqueueSnackbar } = useSnackbar();
 
   const [salaries, setSalaries] = useState<ISalaryConfiguration[]>([]);
+  // Thêm / sửa / xoá: payroll.salary-config.manage (Admin, Manager mặc định).
+  const { canManageSalaryConfig } = usePayrollAccess();
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<any[]>([]);
 
@@ -245,13 +249,15 @@ export default function SalaryConfigurationView() {
           { name: 'Cấu hình' },
         ]}
         action={
-          <Button
-            variant="contained"
-            startIcon={<Iconify icon="mingcute:add-line" />}
-            onClick={handleOpenCreateDialog}
-          >
-            Thêm cấu hình lương
-          </Button>
+          canManageSalaryConfig && (
+            <Button
+              variant="contained"
+              startIcon={<Iconify icon="mingcute:add-line" />}
+              onClick={handleOpenCreateDialog}
+            >
+              Thêm cấu hình lương
+            </Button>
+          )
         }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
@@ -281,22 +287,24 @@ export default function SalaryConfigurationView() {
                         <td style={{ padding: '16px' }}>{row.note || '-'}</td>
                         <td style={{ padding: '16px' }}>{formatDate(row.createdAt)}</td>
                         <td style={{ padding: '8px' }}>
-                          <Stack direction="row" spacing={0.5}>
-                            <Tooltip title="Chỉnh sửa">
-                              <IconButton size="small" onClick={() => handleOpenEdit(row)}>
-                                <Iconify icon="solar:pen-bold" width={16} />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Xóa">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => handleOpenDelete(row)}
-                              >
-                                <Iconify icon="solar:trash-bin-trash-bold" width={16} />
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
+                          {canManageSalaryConfig && (
+                            <Stack direction="row" spacing={0.5}>
+                              <Tooltip title="Chỉnh sửa">
+                                <IconButton size="small" onClick={() => handleOpenEdit(row)}>
+                                  <Iconify icon="solar:pen-bold" width={16} />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Xóa">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => handleOpenDelete(row)}
+                                >
+                                  <Iconify icon="solar:trash-bin-trash-bold" width={16} />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          )}
                         </td>
                       </tr>
                     ))}

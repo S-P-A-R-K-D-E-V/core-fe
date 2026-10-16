@@ -60,6 +60,35 @@ describe('RouteRoleGuard', () => {
     expect(screen.getByText('nội dung trang')).toBeInTheDocument();
   });
 
+  // Trang lương theo quyền payroll.* (Admin, Manager có mặc định — quyền từ /users/me).
+  it('trang lương: quản lý có quyền mặc định vào được, nhân viên thường bị chặn', () => {
+    renderAt(paths.dashboard.payroll.batch, {
+      role: 'Manager',
+      roles: ['Manager'],
+      permissions: ['payroll.records.read'],
+    });
+    expect(screen.getByText('nội dung trang')).toBeInTheDocument();
+  });
+
+  it('trang lương: nhân viên được cấp quyền qua vai trò tuỳ chỉnh vào được; không có quyền thì chặn', () => {
+    renderAt(paths.dashboard.salary.configuration, {
+      role: 'Staff',
+      roles: ['Staff'],
+      permissions: ['payroll.salary-config.read'],
+    });
+    expect(screen.getByText('nội dung trang')).toBeInTheDocument();
+  });
+
+  it('trang lương: nhân viên không có quyền → chặn', () => {
+    renderAt(paths.dashboard.payroll.cycles, { role: 'Staff', roles: ['Staff'], permissions: [] });
+    expect(screen.getByText('Không có quyền truy cập')).toBeInTheDocument();
+  });
+
+  it('trang lương: chưa nạp quyền (/users/me) → chờ, chưa hiện gì', () => {
+    const { container } = renderAt(paths.dashboard.payroll.cycles, { role: 'Manager', roles: ['Manager'] });
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('trang không có quy tắc → không chặn thêm', () => {
     renderAt(paths.dashboard.shiftCash.root, { role: 'Staff', roles: ['Staff'] });
 

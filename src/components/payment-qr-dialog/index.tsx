@@ -96,9 +96,11 @@ type Props = {
   record: IPayrollRecord | null;
   onClose: VoidFunction;
   onPaid: (detail: IPayrollPaymentDetail) => void;
+  /** payroll.mark-paid (mặc định chỉ Admin): không có thì chỉ xem QR / lệnh chi, không xác nhận đã trả. */
+  canMarkPaid?: boolean;
 };
 
-export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props) {
+export default function PaymentQRDialog({ open, record, onClose, onPaid, canMarkPaid = true }: Props) {
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
 
@@ -578,7 +580,7 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid }: Props
         <Button variant="outlined" onClick={onClose}>
           {isPaid ? 'Đóng' : 'Huỷ'}
         </Button>
-        {!isPaid && prepare?.canPay && (
+        {!isPaid && prepare?.canPay && canMarkPaid && (
           <LoadingButton
             variant="contained"
             color="success"

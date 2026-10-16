@@ -94,6 +94,8 @@ import { needTypeLabel, partialSideLabel, poolStatusLabel } from 'src/sections/s
 
 import SalaryConfigPreviewDialog from 'src/components/salary-config-preview-dialog';
 import PaymentQRDialog from 'src/components/payment-qr-dialog';
+
+import { usePayrollAccess } from '../payroll-access';
 import PenaltyDetailDialog from 'src/components/penalty-detail-dialog';
 import ShiftCrossCheckBadge from 'src/components/shift-cross-check-badge';
 
@@ -142,6 +144,8 @@ export default function PayrollBatchView() {
   // Checkbox selection state (Set<id> for O(1) lookup)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkApproving, setBulkApproving] = useState(false);
+  // Nút theo quyền payroll.* (Manager mặc định không chốt / không tính lại hàng loạt / không công bố kỳ — như API).
+  const access = usePayrollAccess();
   const [confirmBulkOpen, setConfirmBulkOpen] = useState(false);
 
   // Payment QR dialog state
@@ -723,7 +727,7 @@ export default function PayrollBatchView() {
 
     return (
       <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-        {!isFinalized && unwaived.length > 0 && (
+        {!isFinalized && access.canManagePenalty && unwaived.length > 0 && (
           isWaiving ? (
             <Stack spacing={0.5} onClick={(e) => e.stopPropagation()}>
               {unwaived.map((vt) => (
@@ -800,7 +804,7 @@ export default function PayrollBatchView() {
                 {w.reason}
               </Typography>
             )}
-            {!isFinalized && (
+            {!isFinalized && access.canManagePenalty && (
               <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); handleRemoveWaiver(w.waiverId); }}>
                 <Iconify icon="mingcute:close-line" width={14} />
               </IconButton>
@@ -1054,7 +1058,7 @@ export default function PayrollBatchView() {
         ]}
         action={
           <Stack direction="row" spacing={1}>
-            {selectedCycleId && (
+            {selectedCycleId && access.canRecalculate && (
               <Button
                 variant="outlined"
                 color="warning"
@@ -1071,13 +1075,15 @@ export default function PayrollBatchView() {
                 Tính lại lương
               </Button>
             )}
-            <Button
-              variant="contained"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-              onClick={() => setOpenDialog(true)}
-            >
-              Tạo bảng lương
-            </Button>
+            {access.canRecalculate && (
+              <Button
+                variant="contained"
+                startIcon={<Iconify icon="mingcute:add-line" />}
+                onClick={() => setOpenDialog(true)}
+              >
+                Tạo bảng lương
+              </Button>
+            )}
           </Stack>
         }
         sx={{ mb: { xs: 3, md: 5 } }}
@@ -1156,7 +1162,7 @@ export default function PayrollBatchView() {
                         color="success"
                         checked={cycleDetail.isVisibleToStaff}
                         onChange={handleToggleVisibility}
-                        disabled={visibilityUpdating}
+                        disabled={visibilityUpdating || !access.canPublishCycle}
                       />
                     }
                     label={
@@ -1171,7 +1177,7 @@ export default function PayrollBatchView() {
             )}
 
             {/* Bulk approve toolbar — shown when ≥1 row selected */}
-            {selectedIds.size > 0 && (
+            {selectedIds.size > 0 && access.canFinalize && (
               <Stack
                 direction="row"
                 spacing={1.5}
@@ -1358,7 +1364,7 @@ export default function PayrollBatchView() {
                                   size="small"
                                   variant="contained"
                                   color="primary"
-                                  disabled={!row.isFinalized}
+                                  disabled={!row.isFinalized || !access.canPreparePayment}
                                   startIcon={<Iconify icon="solar:wallet-money-bold" width={16} />}
                                   onClick={() => setPaymentDialogRecord(row)}
                                   sx={{ minWidth: 100 }}
@@ -1381,7 +1387,7 @@ export default function PayrollBatchView() {
                                 size="small"
                                 variant="outlined"
                                 color="warning"
-                                disabled={!!cycleDetail?.isLocked || recalculatingRecordId === row.id}
+                                disabled={!!cycleDetail?.isLocked || recalculatingRecordId === row.id || !access.canRecalculate}
                                 startIcon={
                                   recalculatingRecordId === row.id ? (
                                     <CircularProgress size={14} />
@@ -1710,7 +1716,7 @@ export default function PayrollBatchView() {
                       )
                     }
                     onClick={() => handleFinalizeRecord(false)}
-                    disabled={finalizing}
+                    disabled={finalizing || !access.canFinalize}
                   >
                     Hủy chốt
                   </Button>
@@ -1729,13 +1735,13 @@ export default function PayrollBatchView() {
                       )
                     }
                     onClick={() => handleFinalizeRecord(true)}
-                    disabled={finalizing}
+                    disabled={finalizing || !access.canFinalize}
                   >
                     Chốt lương
                   </Button>
                 </Tooltip>
               )}
-              {!selectedPayrollRecord?.isFinalized && selectedPayrollRecord?.payrollCycleId && (
+              {!selectedPayrollRecord?.isFinalized && selectedPayrollRecord?.payrollCycleId && access.canManagePenalty && (
                 <Tooltip title="Thêm khoản phạt thủ công — không thuộc 5 loại vi phạm chuẩn">
                   <Button
                     size="small"
@@ -1778,7 +1784,7 @@ export default function PayrollBatchView() {
                     {formatCurrency(p.amount)} — {p.description}
                     {p.createdByName ? ` (${p.createdByName})` : ''}
                   </Typography>
-                  {!p.voidedAt && !selectedPayrollRecord?.isFinalized && (
+                  {!p.voidedAt && !selectedPayrollRecord?.isFinalized && access.canManagePenalty && (
                     <Button size="small" color="inherit" onClick={() => handleVoidManualPenalty(p.id)}>
                       Huỷ
                     </Button>
@@ -2415,6 +2421,7 @@ export default function PayrollBatchView() {
         open={!!paymentDialogRecord}
         record={paymentDialogRecord}
         onClose={() => setPaymentDialogRecord(null)}
+        canMarkPaid={access.canMarkPaid}
         onPaid={(detail) => {
           // Optimistically update the row payment summary
           if (selectedCycleId) fetchCycleDetail(selectedCycleId);
