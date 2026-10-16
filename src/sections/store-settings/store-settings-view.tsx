@@ -17,6 +17,7 @@ import BankAccountsTab from './bank-accounts-tab';
 import StoreBrandingTab from './store-branding-tab';
 import PaymentConnectionsTab from './payment-connections-tab';
 import KiotVietConnectionTab from './kiotviet-connection-tab';
+import CustomerDisplayTab from './customer-display-tab';
 
 // ----------------------------------------------------------------------
 
@@ -25,6 +26,7 @@ const TABS = [
   { value: 'kiotviet', label: 'Kết nối KiotViet', icon: 'solar:link-round-bold' },
   { value: 'bank-accounts', label: 'Tài khoản ngân hàng', icon: 'solar:wallet-money-bold' },
   { value: 'payment', label: 'Thanh toán', icon: 'solar:card-transfer-bold' },
+  { value: 'customer-display', label: 'Màn hình khách', icon: 'solar:monitor-bold' },
   { value: 'agent-keys', label: 'Kết nối MCP & khoá API', icon: 'solar:key-bold' },
 ] as const;
 
@@ -58,6 +60,7 @@ export default function StoreSettingsView() {
       {tab === 'kiotviet' && <KiotVietConnectionTab />}
       {tab === 'bank-accounts' && <BankAccountsTab />}
       {tab === 'payment' && <PaymentConnectionsTab />}
+      {tab === 'customer-display' && <CustomerDisplayTab />}
       {tab === 'agent-keys' && <AgentKeysTab />}
     </Container>
   );

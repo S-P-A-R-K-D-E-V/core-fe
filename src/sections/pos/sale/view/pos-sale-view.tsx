@@ -58,6 +58,13 @@ import PosProductDetailDrawer from '../pos-product-detail-drawer';
 import PosVariantPickerDrawer from '../pos-variant-picker-drawer';
 import PosPaymentDrawer, { PaymentLine } from '../pos-payment-drawer';
 import PosQrPayment from '../pos-qr-payment';
+import { useWorkingBranch } from 'src/store/working-branch-store';
+import { useCustomerDisplaySync } from 'src/sections/customer-display/use-customer-display-sync';
+import {
+  customerDisplay,
+  openCustomerDisplayWindow,
+  type CustomerDisplayCart,
+} from 'src/sections/customer-display/customer-display-bus';
 
 // ======================================================================
 // Types
@@ -357,6 +364,35 @@ export default function PosSaleView() {
     () => activeOrder.items.reduce((s, i) => s + i.quantity, 0),
     [activeOrder.items]
   );
+
+  // Màn hình khách (màn phụ hướng về khách): giỏ đang bán + quảng cáo của chi nhánh đang làm việc.
+  const workingBranchId = useWorkingBranch((st) => st.branch?.id ?? null);
+  const displayCart = useMemo<CustomerDisplayCart | null>(
+    () =>
+      activeOrder.items.length === 0
+        ? null
+        : {
+            lines: activeOrder.items.map((item) => ({
+              key: getItemKey(item),
+              name: item.name,
+              detail: item.attributes?.length
+                ? item.attributes.map((a) => `${a.attributeName}: ${a.attributeValue}`).join(', ')
+                : null,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              discount: item.discountAmount,
+              amount: item.quantity * item.unitPrice - item.discountAmount,
+            })),
+            itemCount: totalItemCount,
+            subtotal: subTotal,
+            vat: vatTotal,
+            orderDiscount: activeOrder.discountAmount,
+            total: grandTotal,
+            customerName: activeOrder.customerName ?? null,
+          },
+    [activeOrder, totalItemCount, subTotal, vatTotal, grandTotal]
+  );
+  useCustomerDisplaySync(displayCart, workingBranchId);
 
   // Filtered products for the right sidebar
   const filteredProducts = useMemo(() => {
@@ -664,6 +700,7 @@ export default function PosSaleView() {
         });
         if (created?.id) setLastSaleId(created.id);
         setPaymentDrawerOpen(false);
+        customerDisplay.paid(grandTotal > 0 ? grandTotal : 0);
 
         // Reset current order and relabel
         setOrders((prev) => {
@@ -989,6 +1026,11 @@ export default function PosSaleView() {
           <IconButton sx={{ color: 'white' }}>
             <Iconify icon="solar:refresh-bold" />
           </IconButton>
+          <Tooltip title="Mở màn hình khách (màn phụ hướng về khách)">
+            <IconButton sx={{ color: 'white' }} onClick={() => openCustomerDisplayWindow()}>
+              <Iconify icon="solar:monitor-bold" />
+            </IconButton>
+          </Tooltip>
           <Tooltip title={lastSaleId ? 'In hoá đơn vừa bán' : 'In hoá đơn (chưa có hoá đơn vừa bán)'}>
             <IconButton sx={{ color: 'white' }} onClick={handlePrintLastSale}>
               <Badge color="warning" variant="dot" invisible={!lastSaleId}>

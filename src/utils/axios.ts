@@ -97,6 +97,10 @@ export const endpoints = {
     // tần suất app-hub tính theo IP client, đi qua core-fe thì mọi người dùng chung IP của ingress.
     appWebHandoff: '/api/app-hub/web-handoff',
     appHubLink: '/api/app-hub/link',
+    // QR trên trang đăng nhập chung (gọi thẳng ingress /api/app-hub — tên miền auth không thuộc cửa hàng nào).
+    appHubQrStart: '/api/app-hub/qr/start',
+    appHubQrStatus: '/api/app-hub/qr/status',
+    appHubQrExchange: '/api/app-hub/qr/exchange',
     deleteAccount: '/auth/account',
   },
   users: {
@@ -677,6 +681,12 @@ export const endpoints = {
     stockContext: '/chatbot/context/stock',
     customerContext: '/chatbot/context/customer',
     callbackOrder: '/chatbot/callback-order',
+  },
+  customerDisplay: {
+    config: '/pos-display/config',
+    settings: '/pos-display/settings',
+    branchSettings: (branchId: string) => `/pos-display/settings/${branchId}`,
+    presign: '/pos-display/media/presign',
   },
   kiosk: {
     confirmCheckIn: '/kiosk/confirm-checkin',

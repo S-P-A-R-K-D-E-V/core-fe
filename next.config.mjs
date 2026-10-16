@@ -27,6 +27,8 @@ const BACKEND_API_PREFIXES = [
   'online-orders',
   // API công khai của cửa hàng (thương hiệu, sản phẩm) — app mobile bản cửa hàng dùng để kiểm tra mã cửa hàng.
   'public',
+  // Màn hình khách ở quầy (quảng cáo theo chi nhánh). Trang /customer-display/ là của Next, API dùng tiền tố khác.
+  'pos-display',
 ];
 
 const nextConfig = {

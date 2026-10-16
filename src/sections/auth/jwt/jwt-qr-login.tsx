@@ -42,9 +42,20 @@ type Props = {
   onSuccess: () => void;
   /** Quay lại đăng nhập bằng mật khẩu. */
   onBack: () => void;
+  /**
+   * Mã đã được duyệt: tự xử lý thay cho đăng nhập vào trang hiện tại (trang đăng nhập chung auth.devbyspark.com đổi mã
+   * lấy vé của cửa hàng người duyệt rồi chuyển sang cửa hàng đó). Không truyền = đăng nhập ngay trên trang này.
+   */
+  onApproved?: (code: string, verifier: string) => Promise<void>;
+  /** Chữ hướng dẫn dưới mã (mặc định: quét bằng app của cửa hàng). */
+  hint?: string;
+  /** Đường xin mã / hỏi trạng thái (mặc định /auth/qr/* của cửa hàng; trang chung dùng /api/app-hub/qr/*). */
+  api?: { start: string; status: string };
 };
 
-export default function JwtQrLogin({ onSuccess, onBack }: Props) {
+export default function JwtQrLogin({ onSuccess, onBack, onApproved, hint, api }: Props) {
+  const startUrl = api?.start ?? endpoints.auth.qrStart;
+  const statusUrl = api?.status ?? endpoints.auth.qrStatus;
   const { loginWithQr } = useAuthContext();
 
   const [phase, setPhase] = useState<Phase>('loading');
@@ -58,9 +69,11 @@ export default function JwtQrLogin({ onSuccess, onBack }: Props) {
 
   // Trang cha truyền hàm mới mỗi lần render — giữ qua ref để không dựng lại vòng hỏi trạng thái.
   const onSuccessRef = useRef(onSuccess);
+  const onApprovedRef = useRef(onApproved);
   useEffect(() => {
     onSuccessRef.current = onSuccess;
-  }, [onSuccess]);
+    onApprovedRef.current = onApproved;
+  }, [onSuccess, onApproved]);
 
   const begin = useCallback(async (auto: boolean) => {
     generation.current += 1;
@@ -73,7 +86,7 @@ export default function JwtQrLogin({ onSuccess, onBack }: Props) {
 
     try {
       const verifier = randomToken(32);
-      const res = await axios.post<IQrLoginStartResponse>(endpoints.auth.qrStart, {
+      const res = await axios.post<IQrLoginStartResponse>(startUrl, {
         codeChallenge: await sha256Hex(verifier),
       });
       const { code, expiresInSeconds, pollIntervalSeconds } = res.data;
@@ -101,7 +114,7 @@ export default function JwtQrLogin({ onSuccess, onBack }: Props) {
       );
       setPhase('error');
     }
-  }, []);
+  }, [startUrl]);
 
   useEffect(() => {
     begin(false);
@@ -126,7 +139,7 @@ export default function JwtQrLogin({ onSuccess, onBack }: Props) {
       if (busy) return;
       busy = true;
       try {
-        const res = await axios.post<IQrLoginStatusResponse>(endpoints.auth.qrStatus, { code: ticket.code });
+        const res = await axios.post<IQrLoginStatusResponse>(statusUrl, { code: ticket.code });
         if (current !== generation.current) return;
 
         const { status } = res.data;
@@ -134,7 +147,8 @@ export default function JwtQrLogin({ onSuccess, onBack }: Props) {
           clearInterval(timer);
           setPhase('signing-in');
           try {
-            await loginWithQr?.(ticket.code, ticket.verifier);
+            if (onApprovedRef.current) await onApprovedRef.current(ticket.code, ticket.verifier);
+            else await loginWithQr?.(ticket.code, ticket.verifier);
             if (current === generation.current) onSuccessRef.current();
           } catch (error) {
             if (current !== generation.current) return;
@@ -162,7 +176,7 @@ export default function JwtQrLogin({ onSuccess, onBack }: Props) {
     }, ticket.pollMs);
 
     return () => clearInterval(timer);
-  }, [ticket, phase, begin, loginWithQr]);
+  }, [ticket, phase, begin, loginWithQr, statusUrl]);
 
   const renderQr = qrDataUrl && (phase === 'waiting' || phase === 'scanned' || phase === 'signing-in') && (
     <Box sx={{ position: 'relative', width: 220, height: 220 }}>
@@ -204,8 +218,12 @@ export default function JwtQrLogin({ onSuccess, onBack }: Props) {
   return (
     <Stack spacing={2.5} alignItems="center">
       <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>
-        Mở app trên điện thoại đã đăng nhập, vào <strong>Hồ sơ → Quét mã đăng nhập web</strong> rồi quét mã
-        này.
+        {hint ?? (
+          <>
+            Mở app trên điện thoại đã đăng nhập, vào <strong>Hồ sơ → Quét mã đăng nhập web</strong> rồi quét mã
+            này.
+          </>
+        )}
       </Typography>
 
       {phase === 'loading' && (

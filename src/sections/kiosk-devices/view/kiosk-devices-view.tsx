@@ -307,14 +307,14 @@ export function KioskDevicesView() {
                       <TableCell>
                         <Stack direction="row" spacing={1.5} alignItems="center">
                           <Iconify
-                            icon={isAgent ? 'solar:videocamera-record-bold' : 'solar:monitor-smartphone-bold'}
+                            icon={isAgent ? 'solar:videocamera-record-bold' : d.kind === 'counter' ? 'solar:cash-out-bold' : 'solar:monitor-smartphone-bold'}
                             width={22}
                             sx={{ color: 'text.secondary', flexShrink: 0 }}
                           />
                           <Box>
                             <Typography variant="subtitle2">{d.name}</Typography>
                             <Typography variant="caption" color="text.secondary">
-                              {isAgent ? agentCaption(d) : 'Kiosk chấm công'}
+                              {isAgent ? agentCaption(d) : d.kind === 'counter' ? 'Máy quầy (app)' : 'Kiosk chấm công'}
                             </Typography>
                           </Box>
                         </Stack>

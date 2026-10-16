@@ -396,6 +396,8 @@ export function AuthProvider({ children }: Props) {
     const res = await axios.post<IAuthResponse>(endpoints.auth.ssoExchange, { code, state });
     const { token: accessToken, refreshToken, sessionToken } = res.data;
 
+    // Vé từ QR trên trang chung: phiên cố định, BE không trả refreshToken — xoá token còn sót của lần trước (như loginWithQr).
+    if (!refreshToken) setSession(null);
     setSession(accessToken, refreshToken);
 
     if (sessionToken) {

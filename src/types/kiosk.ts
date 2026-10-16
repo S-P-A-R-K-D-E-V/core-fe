@@ -110,7 +110,7 @@ export interface IKioskDeviceItem {
   createdAt: string;
   lastSeenAt: string | null;
   /** camera-agent: Spark Camera Agent (đếm khách) đã gửi heartbeat; kiosk: màn chấm công web. */
-  kind: 'camera-agent' | 'kiosk';
+  kind: 'camera-agent' | 'kiosk' | 'counter';
   agentVersion: string | null;
   lastHeartbeatAt: string | null;
   /** null với kiosk web (không gửi heartbeat). */
