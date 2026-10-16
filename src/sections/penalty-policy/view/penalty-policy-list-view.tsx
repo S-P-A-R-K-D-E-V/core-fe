@@ -44,6 +44,7 @@ import {
   getAllPenaltyPolicies,
   updatePenaltyPolicy,
 } from 'src/api/penaltyPolicy';
+import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -75,6 +76,7 @@ const PENALTY_TYPES = [
 // ----------------------------------------------------------------------
 
 export default function PenaltyPolicyListView() {
+  const [confirm, confirmDialog] = useConfirmDialog();
   const table = useTable();
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
@@ -164,7 +166,8 @@ export default function PenaltyPolicyListView() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Bạn có chắc muốn xóa chính sách này?')) return;
+    const ok = await confirm({ title: 'Xoá chính sách?', content: 'Bạn có chắc muốn xoá chính sách này?', confirmText: 'Xoá', destructive: true });
+    if (!ok) return;
 
     try {
       await deletePenaltyPolicy(id);
@@ -196,6 +199,7 @@ export default function PenaltyPolicyListView() {
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
+      {confirmDialog}
       <CustomBreadcrumbs
         heading="Quản lý chính sách chế tài"
         links={[

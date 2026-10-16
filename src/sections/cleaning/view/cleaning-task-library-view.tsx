@@ -38,6 +38,7 @@ import {
   getCleaningTaskDefinitions,
   updateCleaningTaskDefinition,
 } from 'src/api/cleaning';
+import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -51,6 +52,7 @@ const TABLE_HEAD = [
 // ----------------------------------------------------------------------
 
 export default function CleaningTaskLibraryView() {
+  const [confirm, confirmDialog] = useConfirmDialog();
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
 
@@ -119,7 +121,13 @@ export default function CleaningTaskLibraryView() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Xoá đầu việc này khỏi thư viện? Các ca đã gán trước đó không bị ảnh hưởng.')) return;
+    const ok = await confirm({
+      title: 'Xoá đầu việc?',
+      content: 'Xoá đầu việc này khỏi thư viện? Các ca đã gán trước đó không bị ảnh hưởng.',
+      confirmText: 'Xoá',
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await deleteCleaningTaskDefinition(id);
       enqueueSnackbar('Xoá thành công');
@@ -131,6 +139,7 @@ export default function CleaningTaskLibraryView() {
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'lg'}>
+      {confirmDialog}
       <CustomBreadcrumbs
         heading="Thư viện đầu việc"
         links={[

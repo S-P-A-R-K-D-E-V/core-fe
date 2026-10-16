@@ -49,6 +49,7 @@ import {
   type ComboGroupDraft,
   type ComboOptionDraft,
 } from './lib/combo';
+import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
 // ----------------------------------------------------------------------
 // Combo: một món không có size (tạo ở trang Hàng hoá, giá bán = giá combo) gồm các nhóm thành phần; mỗi nhóm khách chọn
@@ -62,6 +63,7 @@ const money = (value: number) => fCurrency(value) || '0 đ';
 type Target = { productId: string; name: string; price: number; combo: IFnbComboItem | null };
 
 export default function FnbComboTab({ branchId }: { branchId: string }) {
+  const [confirm, confirmDialog] = useConfirmDialog();
   const { enqueueSnackbar } = useSnackbar();
   const [book, setBook] = useState<IFnbComboBook | null>(null);
   const [editing, setEditing] = useState<Target | null>(null);
@@ -83,7 +85,13 @@ export default function FnbComboTab({ branchId }: { branchId: string }) {
   if (!book) return null;
 
   const remove = async (combo: IFnbComboItem) => {
-    if (!window.confirm(`Bỏ combo "${combo.name}"? Món vẫn còn trên thực đơn như một món thường.`)) return;
+    const ok = await confirm({
+      title: 'Bỏ combo?',
+      content: `Bỏ combo "${combo.name}"? Món vẫn còn trên thực đơn như một món thường.`,
+      confirmText: 'Bỏ combo',
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await setFnbCombo(combo.productId, []);
       enqueueSnackbar('Đã bỏ combo');
@@ -95,6 +103,7 @@ export default function FnbComboTab({ branchId }: { branchId: string }) {
 
   return (
     <Stack spacing={2}>
+      {confirmDialog}
       <Alert severity="info">
         Combo là một món không có size, giá bán của món là giá combo. Mỗi nhóm khách chọn đúng một lựa chọn — nhóm chỉ có
         một lựa chọn là thành phần cố định, lựa chọn đứng đầu là mặc định, lựa chọn đắt hơn có thể đặt phụ thu. Nguyên

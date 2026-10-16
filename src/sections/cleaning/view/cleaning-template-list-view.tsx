@@ -57,6 +57,7 @@ import {
   templateToFormValues,
   type CleaningTemplateSchemaType,
 } from '../cleaning-template-schema';
+import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -99,6 +100,7 @@ function formatDateVi(value: string) {
 // ----------------------------------------------------------------------
 
 export default function CleaningTemplateListView() {
+  const [confirm, confirmDialog] = useConfirmDialog();
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
   const { user: authUser } = useAuthContext();
@@ -212,7 +214,13 @@ export default function CleaningTemplateListView() {
   });
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Xoá đầu việc này? Không thể xoá nếu đã có lịch sử phát sinh.')) return;
+    const ok = await confirm({
+      title: 'Xoá đầu việc?',
+      content: 'Xoá đầu việc này? Không thể xoá nếu đã có lịch sử phát sinh.',
+      confirmText: 'Xoá',
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await deleteCleaningTaskTemplate(id);
       enqueueSnackbar('Xoá thành công');
@@ -227,6 +235,7 @@ export default function CleaningTemplateListView() {
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
+      {confirmDialog}
       <CustomBreadcrumbs
         heading="Checklist vệ sinh"
         links={[
