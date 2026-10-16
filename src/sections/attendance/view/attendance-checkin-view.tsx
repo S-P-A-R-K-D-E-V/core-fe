@@ -37,6 +37,7 @@ import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { isPlatformFeatureDisabledError } from 'src/auth/platform-features';
 
 import { usePageTours } from 'src/hooks/use-tour';
 import type { TourDefinition } from 'src/hooks/use-tour';
@@ -129,7 +130,7 @@ function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: numbe
 export default function AttendanceCheckinView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
-  const { user } = useAuthContext();
+  const { user, refreshUser } = useAuthContext();
   const hasFaceEmbedding = !!user?.hasFaceEmbedding;
   const router = useRouter();
   const theme = useTheme();
@@ -650,11 +651,16 @@ export default function AttendanceCheckinView() {
     } catch (error: any) {
       console.error(error);
       enqueueSnackbar(extractApiError(error), { variant: 'error' });
+      // Chủ cửa hàng vừa tắt chấm công trên web với người này: nạp lại /users/me để trang chuyển sang báo dùng app.
+      if (isPlatformFeatureDisabledError(error)) {
+        closeFaceDialog();
+        refreshUser();
+      }
     } finally {
       setSubmitting(false);
       setActionLoading(null);
     }
-  }, [capturedImage, pendingCheckin, activeSmartShift, user, geoLocation, geoAccuracy, isWithinGeofence, nearestBranch, enqueueSnackbar, closeFaceDialog, fetchData]);
+  }, [capturedImage, pendingCheckin, activeSmartShift, user, geoLocation, geoAccuracy, isWithinGeofence, nearestBranch, enqueueSnackbar, closeFaceDialog, fetchData, refreshUser]);
 
 
   useEffect(

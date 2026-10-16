@@ -22,8 +22,13 @@ import { useNavData } from 'src/layouts/dashboard/config-navigation';
 
 import { useWorkingBranch } from 'src/store/working-branch-store';
 
-function navPaths(userRole?: string | string[], enabledFeatures: string[] = [], permissions?: string[]) {
-  const { result } = renderHook(() => useNavData(userRole, enabledFeatures, permissions));
+function navPaths(
+  userRole?: string | string[],
+  enabledFeatures: string[] = [],
+  permissions?: string[],
+  blockedFeatures?: string[]
+) {
+  const { result } = renderHook(() => useNavData(userRole, enabledFeatures, permissions, blockedFeatures));
   const out: string[] = [];
   result.current.forEach((group: any) =>
     group.items.forEach((item: any) => {
@@ -391,5 +396,22 @@ describe('useNavData — nhân viên theo quyền', () => {
     expect(navPaths('Manager', [], ['user.read'])).toContain(paths.dashboard.user.list);
     expect(navPaths('Staff', [], ['user.read', 'user.update'])).toContain(paths.dashboard.user.list);
     expect(navPaths('Staff', [], [])).not.toContain(paths.dashboard.user.root);
+  });
+});
+
+// Chủ cửa hàng tắt tự chấm công trên web với người này (GET /users/me blockedFeatures) → ẩn mục Check In/Out.
+describe('useNavData — tính năng tắt theo nền tảng', () => {
+  const ATTENDANCE_FEATURES = ['workforce.attendance'];
+
+  it('ẩn Check In/Out khi tự chấm công bị tắt trên web, mục khác giữ nguyên', () => {
+    const blocked = navPaths('Staff', ATTENDANCE_FEATURES, [], ['attendance.self-checkin']);
+
+    expect(blocked).not.toContain(paths.dashboard.attendance.checkin);
+    expect(blocked).toContain(paths.dashboard.attendance.faceEnrollment);
+  });
+
+  it('không bị tắt (hoặc chưa nạp) thì vẫn hiện', () => {
+    expect(navPaths('Staff', ATTENDANCE_FEATURES, [])).toContain(paths.dashboard.attendance.checkin);
+    expect(navPaths('Staff', ATTENDANCE_FEATURES, [], [])).toContain(paths.dashboard.attendance.checkin);
   });
 });

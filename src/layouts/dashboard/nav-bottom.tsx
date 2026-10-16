@@ -1,5 +1,7 @@
 'use client';
 
+import { useMemo } from 'react';
+
 import Paper from '@mui/material/Paper';
 import BottomNavigation from '@mui/material/BottomNavigation';
 import BottomNavigationAction from '@mui/material/BottomNavigationAction';
@@ -8,13 +10,18 @@ import { useRouter, usePathname } from 'src/routes/hooks';
 
 import { paths } from 'src/routes/paths';
 
+import { useAuthContext } from 'src/auth/hooks';
+import { PLATFORM_FEATURES, isPlatformFeatureBlocked } from 'src/auth/platform-features';
+
 import Iconify from 'src/components/iconify';
 
 import { BOTTOM_NAV } from '../config-layout';
 
 // ----------------------------------------------------------------------
 
-const NAV_ITEMS = [
+type NavBottomItem = { label: string; path: string; icon: string; platformFeature?: string };
+
+const NAV_ITEMS: NavBottomItem[] = [
   {
     label: 'Kiểm tiền',
     path: paths.dashboard.shiftCash.root,
@@ -24,6 +31,7 @@ const NAV_ITEMS = [
     label: 'Check-in',
     path: paths.dashboard.attendance.checkin,
     icon: 'solar:clock-circle-bold-duotone',
+    platformFeature: PLATFORM_FEATURES.selfCheckIn,
   },
   {
     label: 'Lịch làm',
@@ -46,14 +54,25 @@ type Props = {
 export default function NavBottom({ onOpenMenu }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+  const { user } = useAuthContext();
 
-  const activeIndex = NAV_ITEMS.findIndex((item) => pathname.startsWith(item.path));
+  // Chủ cửa hàng tắt tự chấm công trên web với người này → bỏ nút Check-in (chấm công bằng app).
+  const blockedKey = ((user?.blockedFeatures as string[] | undefined) ?? []).join('|');
+  const items = useMemo(
+    () =>
+      NAV_ITEMS.filter(
+        (item) => !item.platformFeature || !isPlatformFeatureBlocked({ blockedFeatures: blockedKey.split('|') }, item.platformFeature)
+      ),
+    [blockedKey]
+  );
+
+  const activeIndex = items.findIndex((item) => pathname.startsWith(item.path));
 
   const handleChange = (_: React.SyntheticEvent, newValue: number) => {
-    if (newValue === NAV_ITEMS.length) {
+    if (newValue === items.length) {
       onOpenMenu();
     } else {
-      router.push(NAV_ITEMS[newValue].path);
+      router.push(items[newValue].path);
     }
   };
 
@@ -88,7 +107,7 @@ export default function NavBottom({ onOpenMenu }: Props) {
           },
         }}
       >
-        {NAV_ITEMS.map((item) => (
+        {items.map((item) => (
           <BottomNavigationAction
             key={item.path}
             label={item.label}
@@ -97,7 +116,7 @@ export default function NavBottom({ onOpenMenu }: Props) {
         ))}
         <BottomNavigationAction
           label="Menu"
-          value={NAV_ITEMS.length}
+          value={items.length}
           icon={<Iconify icon="solar:hamburger-menu-bold" width={22} />}
         />
       </BottomNavigation>

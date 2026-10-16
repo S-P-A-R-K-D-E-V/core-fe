@@ -19,6 +19,7 @@ import StoreBrandingTab from './store-branding-tab';
 import PaymentConnectionsTab from './payment-connections-tab';
 import KiotVietConnectionTab from './kiotviet-connection-tab';
 import CustomerDisplayTab from './customer-display-tab';
+import PlatformFeaturesTab from './platform-features-tab';
 
 // ----------------------------------------------------------------------
 
@@ -30,6 +31,8 @@ const TABS = [
   { value: 'customer-display', label: 'Màn hình khách', icon: 'solar:monitor-bold' },
   // Mở trang riêng Thiết bị cửa hàng (máy quầy, kiosk, camera — quản lý cũng vào được).
   { value: 'devices', label: 'Thiết bị cửa hàng', icon: 'solar:monitor-smartphone-bold' },
+  // Giới hạn tính năng theo nền tảng + vai trò (vd chấm công chỉ trên app với nhân viên).
+  { value: 'platform-features', label: 'Tính năng web / app', icon: 'solar:smartphone-2-bold' },
   { value: 'agent-keys', label: 'Kết nối MCP & khoá API', icon: 'solar:key-bold' },
 ] as const;
 
@@ -65,6 +68,7 @@ export default function StoreSettingsView() {
       {tab === 'bank-accounts' && <BankAccountsTab />}
       {tab === 'payment' && <PaymentConnectionsTab />}
       {tab === 'customer-display' && <CustomerDisplayTab />}
+      {tab === 'platform-features' && <PlatformFeaturesTab />}
       {tab === 'agent-keys' && <AgentKeysTab />}
     </Container>
   );

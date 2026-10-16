@@ -13,6 +13,7 @@ import { useStoreBrand } from 'src/components/branding';
 
 import { hasAnyRole, normalizeRoles } from 'src/auth/roles';
 import { PERMISSIONS, hasAnyPermission, hasAllPermissions } from 'src/auth/permissions';
+import { PLATFORM_FEATURES } from 'src/auth/platform-features';
 
 import { REPORT_PAGES, REPORT_VIEW_PERMISSIONS } from 'src/sections/pos/report/report-access';
 
@@ -67,7 +68,12 @@ const SHIFT = PERMISSIONS.shift;
 const ATTENDANCE = PERMISSIONS.attendance;
 const PRODUCTS = PERMISSIONS.products;
 
-type NavAccess = { roles: readonly string[]; permissions: readonly string[] | undefined };
+type NavAccess = {
+  roles: readonly string[];
+  permissions: readonly string[] | undefined;
+  /** Tính năng chủ cửa hàng tắt trên web với người này (GET /users/me blockedFeatures). */
+  blockedFeatures?: readonly string[];
+};
 
 function filterNavItems<
   T extends {
@@ -77,6 +83,8 @@ function filterNavItems<
     /** Có ĐỦ các quyền. */
     allPermissions?: readonly string[];
     featureKey?: string | string[];
+    /** Tính năng bật / tắt theo nền tảng (src/auth/platform-features.ts) — ẩn khi bị tắt trên web với người này. */
+    platformFeature?: string;
     branchType?: BranchType;
     children?: T[];
   },
@@ -85,6 +93,7 @@ function filterNavItems<
   return items
     .filter((item) => hasAnyRole(userRoles, item.roles))
     .filter((item) => hasAnyPermission(access, item.permissions) && hasAllPermissions(access, item.allPermissions))
+    .filter((item) => !item.platformFeature || !access.blockedFeatures?.includes(item.platformFeature))
     .filter((item) => !item.branchType || !branchTypes || branchTypes.includes(item.branchType))
     .filter(
       (item) =>
@@ -108,13 +117,16 @@ function filterNavItems<
 export function useNavData(
   roles?: string | readonly string[],
   enabledFeatures?: string[],
-  permissions?: readonly string[]
+  permissions?: readonly string[],
+  blockedFeatures?: readonly string[]
 ) {
   const { t } = useTranslate();
 
   // Khoá chuỗi cho deps: mảng vai trò tạo mới mỗi lần render.
   const rolesKey = normalizeRoles(roles).join('|');
   const userRoles = useMemo(() => (rolesKey ? rolesKey.split('|') : []), [rolesKey]);
+  const blockedKey = (blockedFeatures ?? []).join('|');
+  const blocked = useMemo(() => (blockedKey ? blockedKey.split('|') : []), [blockedKey]);
 
   const { isCiCi } = useStoreBrand();
 
@@ -176,7 +188,12 @@ export function useNavData(
         return counterNav
           .map((group) => ({
             ...group,
-            items: filterNavItems(group.items as any[], { roles: userRoles, permissions }, enabledFeatures ?? [], branchTypes),
+            items: filterNavItems(
+              group.items as any[],
+              { roles: userRoles, permissions, blockedFeatures: blocked },
+              enabledFeatures ?? [],
+              branchTypes
+            ),
           }))
           .filter((group) => group.items.length > 0);
       }
@@ -212,6 +229,7 @@ export function useNavData(
             icon: ICONS.job,
             roles: ['Admin', 'Manager', 'Staff'],
             featureKey: 'workforce.attendance',
+            platformFeature: PLATFORM_FEATURES.selfCheckIn,
           },
           {
             title: t('mySchedule'),
@@ -741,7 +759,7 @@ export function useNavData(
           ...group,
           items: filterNavItems(
             group.items as any[],
-            { roles: userRoles, permissions },
+            { roles: userRoles, permissions, blockedFeatures: blocked },
             enabledFeatures ?? [],
             branchTypes
           ),
@@ -749,7 +767,7 @@ export function useNavData(
         .filter((group) => group.items.length > 0);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, userRoles, enabledFeatures, permissions, isCiCi, branchTypes, counterSession]
+    [t, userRoles, enabledFeatures, permissions, blocked, isCiCi, branchTypes, counterSession]
   );
 
   return data;
