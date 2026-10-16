@@ -19,6 +19,7 @@ import { getBranchLocations } from 'src/api/attendance';
 import { unpairCounter, provisionCounterDevice } from 'src/api/counter';
 
 import { useSnackbar } from 'src/components/snackbar';
+import { ConfirmDialog } from 'src/components/custom-dialog';
 
 import { saveCounterDevice, useCounterDevice, clearCounterDevice } from 'src/sections/counter/counter-device';
 
@@ -40,6 +41,9 @@ export default function CounterBrowserCard({ onProvisioned }: { onProvisioned?: 
   const [branchId, setBranchId] = useState('');
   const [name, setName] = useState('Quầy 1');
   const [saving, setSaving] = useState(false);
+  // Hộp thoại xác nhận của giao diện — KHÔNG dùng window.confirm: trình duyệt nhúng (app desktop, webview) chặn hộp thoại
+  // hệ thống và trả "huỷ" ngay, nút bấm như không phản hồi.
+  const [confirming, setConfirming] = useState<'provision' | 'leave' | null>(null);
 
   useEffect(() => {
     getBranchLocations()
@@ -50,15 +54,11 @@ export default function CounterBrowserCard({ onProvisioned }: { onProvisioned?: 
       .catch(() => setBranches([]));
   }, []);
 
+  const branchName = branches.find((b) => b.id === branchId)?.branchName ?? '';
+
   async function provision() {
     if (!branchId || !name.trim()) return;
-    const branchName = branches.find((b) => b.id === branchId)?.branchName ?? '';
-    if (
-      !window.confirm(
-        `Đặt trình duyệt này làm máy quầy của ${branchName}? Bạn sẽ được đăng xuất; nhân viên có ca chọn tên và nhập mã gửi về app điện thoại (hoặc mật khẩu) để đăng nhập.`
-      )
-    )
-      return;
+    setConfirming(null);
     setSaving(true);
     try {
       const res = await provisionCounterDevice(branchId, name.trim(), 'web');
@@ -79,7 +79,7 @@ export default function CounterBrowserCard({ onProvisioned }: { onProvisioned?: 
   }
 
   async function leave() {
-    if (!window.confirm('Thoát chế độ máy quầy trên trình duyệt này?')) return;
+    setConfirming(null);
     try {
       await unpairCounter();
     } catch {
@@ -107,7 +107,7 @@ export default function CounterBrowserCard({ onProvisioned }: { onProvisioned?: 
           <Alert
             severity="info"
             action={
-              <Button color="inherit" size="small" onClick={leave}>
+              <Button color="inherit" size="small" onClick={() => setConfirming('leave')}>
                 Thoát chế độ máy quầy
               </Button>
             }
@@ -137,12 +137,34 @@ export default function CounterBrowserCard({ onProvisioned }: { onProvisioned?: 
               onChange={(e) => setName(e.target.value)}
               inputProps={{ maxLength: 100 }}
             />
-            <LoadingButton variant="contained" loading={saving} disabled={!branchId || !name.trim()} onClick={provision}>
+            <LoadingButton variant="contained" loading={saving} disabled={!branchId || !name.trim()} onClick={() => setConfirming('provision')}>
               Đặt trình duyệt này làm máy quầy
             </LoadingButton>
           </Stack>
         )}
       </Stack>
+      <ConfirmDialog
+        open={confirming === 'provision'}
+        onClose={() => setConfirming(null)}
+        title="Đặt trình duyệt này làm máy quầy?"
+        content={`Máy quầy “${name.trim()}” của ${branchName}. Bạn sẽ được đăng xuất; nhân viên có ca chọn tên rồi nhập mã gửi về app điện thoại (hoặc mật khẩu) để đăng nhập.`}
+        action={
+          <Button variant="contained" onClick={provision}>
+            Đặt làm máy quầy
+          </Button>
+        }
+      />
+      <ConfirmDialog
+        open={confirming === 'leave'}
+        onClose={() => setConfirming(null)}
+        title="Thoát chế độ máy quầy?"
+        content="Trình duyệt này không còn là máy quầy; người đang dùng máy quầy này bị đăng xuất."
+        action={
+          <Button variant="contained" color="error" onClick={leave}>
+            Thoát chế độ máy quầy
+          </Button>
+        }
+      />
     </Card>
   );
 }

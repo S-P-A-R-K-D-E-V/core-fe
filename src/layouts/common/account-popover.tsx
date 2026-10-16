@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { m } from 'framer-motion';
 
 import Box from '@mui/material/Box';
@@ -5,6 +6,7 @@ import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Divider from '@mui/material/Divider';
 import { alpha } from '@mui/material/styles';
+import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
@@ -21,6 +23,7 @@ import { COUNTER_LOCK_PATH, useCounterSession } from 'src/sections/counter/count
 import { varHover } from 'src/components/animate';
 import { useSnackbar } from 'src/components/snackbar';
 import CustomPopover, { usePopover } from 'src/components/custom-popover';
+import { ConfirmDialog } from 'src/components/custom-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -52,9 +55,11 @@ export default function AccountPopover() {
   const counterDevice = useCounterDevice();
   const isManager = !!user?.roles?.some((r: string) => r === 'Admin' || r === 'Manager');
 
+  // Hộp thoại của giao diện, không window.confirm (trình duyệt nhúng chặn hộp thoại hệ thống → nút như không phản hồi).
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
   const handleLeaveCounter = async () => {
-    popover.onClose();
-    if (!window.confirm('Thoát chế độ máy quầy trên trình duyệt này? Mọi người đang dùng máy quầy này sẽ bị đăng xuất.')) return;
+    setConfirmLeave(false);
     try {
       await unpairCounter();
     } catch {
@@ -132,7 +137,13 @@ export default function AccountPopover() {
               {counterDevice ? `${counterDevice.deviceName} · ${counterDevice.branchName}` : 'Máy quầy'}
             </Typography>
             {isManager && (
-              <MenuItem onClick={handleLeaveCounter} sx={{ color: 'warning.main' }}>
+              <MenuItem
+                onClick={() => {
+                  popover.onClose();
+                  setConfirmLeave(true);
+                }}
+                sx={{ color: 'warning.main' }}
+              >
                 Thoát chế độ máy quầy
               </MenuItem>
             )}
@@ -156,6 +167,18 @@ export default function AccountPopover() {
           {counterSession ? 'Kết thúc phiên' : 'Đăng xuất'}
         </MenuItem>
       </CustomPopover>
+
+      <ConfirmDialog
+        open={confirmLeave}
+        onClose={() => setConfirmLeave(false)}
+        title="Thoát chế độ máy quầy?"
+        content="Trình duyệt này không còn là máy quầy; mọi người đang dùng máy quầy này sẽ bị đăng xuất."
+        action={
+          <Button variant="contained" color="error" onClick={handleLeaveCounter}>
+            Thoát chế độ máy quầy
+          </Button>
+        }
+      />
     </>
   );
 }
