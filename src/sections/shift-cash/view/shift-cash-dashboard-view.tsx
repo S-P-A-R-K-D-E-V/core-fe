@@ -1333,7 +1333,9 @@ function ShiftCashDashboardContent() {
                                   </Typography>
                                 </TableCell>
                                 <TableCell align="right">
-                                  {canEdit && (
+                                  {/* Khoản gắn cổ đông vào chốt sổ cổ đông — chỉ chủ cửa hàng sửa / xoá (Core-be
+                                      Till.ShareholderOwnerOnly). */}
+                                  {canEdit && (isOwner || !tx.shareholderId) && (
                                     <>
                                       <IconButton
                                         size="small"
