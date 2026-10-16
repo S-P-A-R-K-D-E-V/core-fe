@@ -102,6 +102,7 @@ import { getActiveStaffUsers, setSchedulingPriority } from 'src/api/users';
 
 import { StyledCalendar } from '../../calendar/styles';
 import CalendarToolbar from '../../calendar/calendar-toolbar';
+import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -190,6 +191,7 @@ const isShiftStarted = (date: string, startTime?: string): boolean => {
 const hasAttendance = (u?: { attendance?: any }): boolean => !!u?.attendance?.checkInTime;
 
 export default function AttendanceAssignmentsView() {
+  const [askConfirm, confirmDialog] = useConfirmDialog();
   const theme = useTheme();
   const { user: authUser } = useAuthContext();
   // Manager bị chặn thao tác với ca đã bắt đầu / đã có chấm công — chỉ Admin được
@@ -481,13 +483,12 @@ export default function AttendanceAssignmentsView() {
     const from = toLocalDateStr(bulkWeekStart);
     const to = toLocalDateStr(weekEnd);
 
-    // eslint-disable-next-line no-alert
-    if (
-      !window.confirm(
-        `Đặt lại phân công TẤT CẢ ca trong tuần (${from} → ${to}) = đúng tập nhân viên đã check-in?\n\nThêm người đã check-in chưa được phân, gỡ người được phân nhưng không check-in.`
-      )
-    )
-      return;
+    const confirmed = await askConfirm({
+      title: 'Đặt lại phân công cả tuần?',
+      content: `Đặt lại phân công TẤT CẢ ca trong tuần (${from} → ${to}) = đúng tập nhân viên đã check-in?\n\nThêm người đã check-in chưa được phân, gỡ người được phân nhưng không check-in.`,
+      confirmText: 'Đặt lại',
+    });
+    if (!confirmed) return;
 
     setSyncingWeek(true);
     try {
@@ -1238,8 +1239,7 @@ export default function AttendanceAssignmentsView() {
   };
 
   const handleUndo = async (id: string) => {
-    // eslint-disable-next-line no-alert
-    if (!window.confirm('Hoàn tác thao tác phân công này?')) return;
+    if (!(await askConfirm({ title: 'Hoàn tác?', content: 'Hoàn tác thao tác phân công này?', confirmText: 'Hoàn tác' }))) return;
     setUndoingId(id);
     try {
       const res = await undoAssignmentOperation(id);
@@ -1553,10 +1553,11 @@ export default function AttendanceAssignmentsView() {
         return;
       }
 
-      // eslint-disable-next-line no-alert
-      const ok = window.confirm(
-        `Đồng bộ phân công theo chấm công:\n+ Thêm ${toAdd.length} người đã check-in\n- Gỡ ${toRemove.length} người không check-in\n\nÁp dụng?`
-      );
+      const ok = await askConfirm({
+        title: 'Đồng bộ phân công theo chấm công?',
+        content: `+ Thêm ${toAdd.length} người đã check-in\n- Gỡ ${toRemove.length} người không check-in\n\nÁp dụng?`,
+        confirmText: 'Áp dụng',
+      });
       if (!ok) {
         setSyncingFromCheckin(false);
         return;
@@ -1709,6 +1710,7 @@ export default function AttendanceAssignmentsView() {
 
   return (
     <>
+      {confirmDialog}
       <Container maxWidth={settings.themeStretch ? false : 'xl'}>
         <CustomBreadcrumbs
           heading="Phân công ca làm việc"

@@ -141,7 +141,7 @@ describe('StoreMonitorView', () => {
     renderView();
 
     await waitFor(() => expect(screen.getByText(/Chưa có camera đếm khách/)).toBeTruthy());
-    expect(screen.getByText('Thiết bị cửa hàng').getAttribute('href')).toContain('/attendance/kiosk-devices');
+    expect(screen.getByText('Thiết bị cửa hàng').getAttribute('href')).toContain('/store-settings/devices');
     expect(within(screen.getByText('Tỉ lệ chuyển đổi').parentElement!).getByText('—')).toBeTruthy();
     expect(screen.getByText('Chưa lắp')).toBeTruthy();
   });

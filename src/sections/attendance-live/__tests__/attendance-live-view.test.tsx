@@ -160,7 +160,7 @@ describe('AttendanceLiveView', () => {
     renderView();
 
     await waitFor(() => expect(screen.getByText(/Chưa có chi nhánh nào có camera chấm công/)).toBeTruthy());
-    expect(screen.getByText('Thiết bị cửa hàng').getAttribute('href')).toContain('/attendance/kiosk-devices');
+    expect(screen.getByText('Thiết bị cửa hàng').getAttribute('href')).toContain('/store-settings/devices');
     expect(api.getBranchBoard).not.toHaveBeenCalled();
   });
   it('draws face boxes with the recognition result and hides them with the switch', async () => {
