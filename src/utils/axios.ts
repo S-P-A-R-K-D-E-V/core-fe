@@ -631,6 +631,8 @@ export const endpoints = {
     sync: (id: string) => `/payment/settings/connections/${id}/sync`,
     test: (id: string) => `/payment/settings/connections/${id}/test`,
     rotateWebhookSecret: (id: string) => `/payment/settings/connections/${id}/rotate-webhook-secret`,
+    // Hạn mức gói ApiPay trong chu kỳ hiện tại (ước tính)
+    usage: (id: string) => `/payment/settings/connections/${id}/usage`,
     // Liên kết ngân hàng vào tài khoản ApiPay của kết nối (thay cho my.apipay.vn)
     apipayBanks: (id: string) => `/payment/settings/connections/${id}/apipay/banks`,
     apipayAvailableBanks: (id: string) =>

@@ -7,6 +7,7 @@ import type {
   IApiPayAvailableBank,
   IApiPayConfirmOtpRequest,
   IPaymentSettings,
+  IPaymentQuotaUsage,
   IPaymentConnection,
   IPaymentProviderInfo,
   IPaymentConnectionSyncResult,
@@ -76,6 +77,15 @@ export async function rotatePaymentWebhookSecret(id: string): Promise<IPaymentCo
   const res = await axios.post<IPaymentConnection>(
     endpoints.paymentSettings.rotateWebhookSecret(id)
   );
+  return res.data;
+}
+
+/**
+ * Hạn mức gói ApiPay của kết nối trong chu kỳ hiện tại — ước tính từ giao dịch đã ghi nhận, cộng mọi kết nối cùng tài
+ * khoản ApiPay. Kết nối không phải ApiPay → 400 no_quota.
+ */
+export async function getPaymentConnectionUsage(id: string): Promise<IPaymentQuotaUsage> {
+  const res = await axios.get<IPaymentQuotaUsage>(endpoints.paymentSettings.usage(id));
   return res.data;
 }
 

@@ -34,12 +34,14 @@ import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 
 import CopyField from './copy-field';
+import ApiPayQuotaUsage from './apipay-quota-usage';
 import ConnectionTestDialog from './connection-test-dialog';
 import ConfirmActionDialog from './confirm-action-dialog';
 import ConnectionFormDialog from './connection-form-dialog';
 import ConnectionResultDialog from './connection-result-dialog';
 import {
   canSync,
+  hasQuota,
   isBankDirect,
   findProvider,
   credentialLabel,
@@ -357,6 +359,8 @@ function ConnectionItem({
       )}
 
       {!!c.lastError && <Alert severity="error">{c.lastError}</Alert>}
+
+      {hasQuota(c) && <ApiPayQuotaUsage connection={c} onEdit={anyBusy ? undefined : onEdit} />}
 
       {urls.length > 0 && (
         <>

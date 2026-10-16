@@ -81,6 +81,26 @@ export type IPaymentConnection = {
   missingSettings?: string[] | null;
 };
 
+/** ok | warning (≥ 80%) | exceeded (vượt — ApiPay vẫn chạy, trừ phí vượt vào số dư trả trước). */
+export type PaymentQuotaStatus = 'ok' | 'warning' | 'exceeded';
+
+/**
+ * GET payment/settings/connections/{id}/usage — hạn mức gói ApiPay trong chu kỳ hiện tại. Hạn mức tính theo TÀI KHOẢN
+ * ApiPay (mọi ngân hàng / kết nối cùng access key dùng chung); số đã dùng là ước tính từ giao dịch đã ghi nhận.
+ */
+export type IPaymentQuotaUsage = {
+  /** yyyy-MM-dd (giờ VN) — ApiPay tính từ ngày kích hoạt gói (quotaCycleDay) */
+  cycleStart: string;
+  /** yyyy-MM-dd — ngày bắt đầu chu kỳ sau (ApiPay hiện "15/10 → 15/11") */
+  cycleEnd: string;
+  used: number;
+  quota: number;
+  remaining: number;
+  status: PaymentQuotaStatus;
+  /** Số kết nối dùng chung tài khoản ApiPay này */
+  connections: number;
+};
+
 export type ICreatePaymentConnectionRequest = {
   provider: PaymentProvider;
   displayName: string;

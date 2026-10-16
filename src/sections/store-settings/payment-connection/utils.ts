@@ -1,5 +1,6 @@
 import type {
   PaymentProvider,
+  IPaymentQuotaUsage,
   IPaymentConnection,
   IPaymentProviderInfo,
   IPaymentProviderField,
@@ -204,3 +205,48 @@ export const canSync = (c: Pick<IPaymentConnection, 'kind' | 'provider'>) =>
 
 /** Kiểm tra kết nối / tạo lại khoá webhook chỉ có ở ngân hàng trực tiếp. */
 export const isBankDirect = (c: Pick<IPaymentConnection, 'kind'>) => c.kind === 'bank_direct';
+
+// ---------------------------------------------------------------------- Hạn mức gói ApiPay
+
+/** Chỉ ApiPay có hạn mức giao dịch theo gói (tính cho cả tài khoản ApiPay). */
+export const hasQuota = (c: Pick<IPaymentConnection, 'provider'>) => c.provider === 'apipay';
+
+/** "2026-10-15" → "15/10" (đọc thẳng chuỗi, không qua múi giờ trình duyệt). */
+export function cycleDayMonth(date: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(date ?? '');
+  return m ? `${m[3]}/${m[2]}` : date;
+}
+
+export type QuotaUsageView = {
+  /** "Đã dùng 49 / 60 GD · chu kỳ 15/10 → 15/11 · còn 11" */
+  summary: string;
+  /** 0–100 cho thanh tiến độ (vượt thì 100) */
+  percent: number;
+  color: 'primary' | 'warning' | 'error';
+  /** Cảnh báo khi sắp hết / đã vượt */
+  warning: string | null;
+  /** Ghi chú: ước tính + kết nối dùng chung */
+  note: string;
+};
+
+const OVERAGE_FEE = 'trừ phí vượt (350đ/GD hoặc theo giá gói) vào số dư trả trước';
+
+export function quotaUsageView(u: IPaymentQuotaUsage): QuotaUsageView {
+  const over = Math.max(0, u.used - u.quota);
+  const percent = u.quota > 0 ? Math.min(100, Math.round((u.used * 100) / u.quota)) : 100;
+  const tail = over > 0 ? `vượt ${over}` : `còn ${u.remaining}`;
+  const shared =
+    u.connections > 1 ? ` Cộng chung ${u.connections} kết nối dùng cùng tài khoản ApiPay.` : '';
+  return {
+    summary: `Đã dùng ${u.used} / ${u.quota} GD · chu kỳ ${cycleDayMonth(u.cycleStart)} → ${cycleDayMonth(u.cycleEnd)} · ${tail}`,
+    percent,
+    color: u.status === 'exceeded' ? 'error' : u.status === 'warning' ? 'warning' : 'primary',
+    warning:
+      u.status === 'exceeded'
+        ? `Đã vượt hạn mức gói — ApiPay vẫn báo tiền về bình thường, nhưng ${OVERAGE_FEE} trên my.apipay.vn. Nạp số dư hoặc nâng gói nếu cần.`
+        : u.status === 'warning'
+          ? `Sắp hết hạn mức gói — vượt thì ApiPay vẫn chạy nhưng ${OVERAGE_FEE}.`
+          : null,
+    note: `Ước tính từ giao dịch đã ghi nhận — số chính xác xem my.apipay.vn → Tổng quan.${shared}`,
+  };
+}
