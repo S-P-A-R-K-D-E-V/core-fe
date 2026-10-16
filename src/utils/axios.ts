@@ -140,6 +140,7 @@ export const endpoints = {
     list: '/platform-features',
     policy: (featureKey: string, platform: string) =>
       `/platform-features/${encodeURIComponent(featureKey)}/${encodeURIComponent(platform)}`,
+    accessLogs: '/platform-features/access-logs',
   },
   customRoles: {
     list: '/custom-roles',
