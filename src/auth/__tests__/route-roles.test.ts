@@ -86,6 +86,24 @@ describe('requiredPermissionsFor', () => {
     expect(requiredPermissionsFor(paths.dashboard.shiftSwap.myRequests)).toBeNull();
   });
 
+  const PR = PERMISSIONS.products;
+
+  it.each([
+    [paths.dashboard.pos.product.new, [PR.create]],
+    [paths.dashboard.pos.category.list, [PR.catalogManage]],
+    [paths.dashboard.pos.category.edit('c1'), [PR.catalogManage]],
+    [paths.dashboard.pos.unitOfMeasure.list, [PR.catalogManage]],
+    [paths.dashboard.pos.warehouse.new, [PERMISSIONS.inventory.warehouseManage]],
+  ])('hàng hoá / kho: %s → cần %j', (path, permissions) => {
+    expect(requiredPermissionsFor(path)).toEqual(permissions);
+    expect(requiredRolesFor(path)).toBeNull();
+  });
+
+  it('danh sách hàng hoá (chỉ xem) mở cho mọi nhân viên; trang sửa hàng tự chặn', () => {
+    expect(requiredPermissionsFor(paths.dashboard.pos.product.list)).toBeNull();
+    expect(requiredPermissionsFor(paths.dashboard.pos.product.edit('p1'))).toBeNull();
+  });
+
   it('lương của chính mình và trang chưa chuyển không xét quyền', () => {
     expect(requiredPermissionsFor(paths.dashboard.payroll.myPayroll)).toBeNull();
     expect(requiredPermissionsFor(paths.dashboard.role.list)).toBeNull();

@@ -15,6 +15,8 @@ import { ADMIN_ROLES, MANAGER_ROLES } from './roles';
 //     (Core-be; mặc định Admin, Manager — nhắc ca chỉ Admin)
 //   - salary, holiday-policy, penalty-policy, payroll/cycles, payroll/batch: theo quyền payroll.* (Core-be Payroll*,
 //     mặc định Admin, Manager; vai trò tuỳ chỉnh được cấp thêm) — `permissions`: cần MỘT trong các quyền
+//   - pos/product/new, pos/category, pos/warehouse, pos/unit-of-measure: theo quyền products.* / inventory.* (Core-be;
+//     mặc định Admin, Manager). Danh sách hàng (pos/product/list) mở cho mọi nhân viên; trang sửa hàng tự chặn.
 //   - user               : UsersController quản trị người khác — Admin, Manager (trừ trang tài khoản của chính mình)
 // Trang không có trong danh sách: chỉ cần là nhân viên cửa hàng (guard của app/dashboard/layout.tsx), trang tự chặn
 // thêm nếu cần. `roles: null` = mở lại cho mọi nhân viên bên trong một tiền tố đã bị chặn.
@@ -30,6 +32,7 @@ export type RouteRoleRule = {
 const PAYROLL = PERMISSIONS.payroll;
 const SHIFT = PERMISSIONS.shift;
 const ATTENDANCE = PERMISSIONS.attendance;
+const PRODUCTS = PERMISSIONS.products;
 
 export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   { prefix: paths.dashboard.role.root, roles: ADMIN_ROLES },
@@ -53,6 +56,11 @@ export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   { prefix: paths.dashboard.penaltyPolicy.root, roles: null, permissions: [PAYROLL.policyManage] },
   { prefix: paths.dashboard.payroll.cycles, roles: null, permissions: [PAYROLL.recordsRead] },
   { prefix: paths.dashboard.payroll.batch, roles: null, permissions: [PAYROLL.recordsRead] },
+
+  { prefix: paths.dashboard.pos.product.new, roles: null, permissions: [PRODUCTS.create] },
+  { prefix: paths.dashboard.pos.category.root, roles: null, permissions: [PRODUCTS.catalogManage] },
+  { prefix: paths.dashboard.pos.unitOfMeasure.root, roles: null, permissions: [PRODUCTS.catalogManage] },
+  { prefix: paths.dashboard.pos.warehouse.root, roles: null, permissions: [PERMISSIONS.inventory.warehouseManage] },
 
   { prefix: paths.dashboard.user.root, roles: MANAGER_ROLES },
   { prefix: paths.dashboard.user.account, roles: null },

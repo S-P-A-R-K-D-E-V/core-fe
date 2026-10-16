@@ -65,6 +65,7 @@ const ICONS = {
 const PAYROLL = PERMISSIONS.payroll;
 const SHIFT = PERMISSIONS.shift;
 const ATTENDANCE = PERMISSIONS.attendance;
+const PRODUCTS = PERMISSIONS.products;
 
 type NavAccess = { roles: readonly string[]; permissions: readonly string[] | undefined };
 
@@ -517,23 +518,25 @@ export function useNavData(
       {
         subheader: 'Quản lý kho & hàng hóa',
         items: [
+          // Hàng hoá, nhóm hàng, kho, đơn vị tính — theo quyền products.* / inventory.* (Core-be; mặc định Admin, Manager).
+          // Danh sách hàng (chỉ xem) mọi nhân viên đã có ở mục "Hàng hoá" phía trên.
           {
             title: 'Sản phẩm',
             path: paths.dashboard.pos.product.root,
             icon: ICONS.product,
-            roles: ['Admin'],
+            permissions: [PRODUCTS.create, PRODUCTS.update, PRODUCTS.delete],
             // Hàng hoá / nhóm hàng dùng chung bán lẻ và F&B (món là hàng hoá có Loại mặt hàng = Món).
             featureKey: ['commerce.retail.inventory', 'commerce.fnb.pos'],
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.product.list },
-              { title: 'Thêm mới', path: paths.dashboard.pos.product.new },
+              { title: 'Thêm mới', path: paths.dashboard.pos.product.new, allPermissions: [PRODUCTS.create] },
             ],
           },
           {
             title: 'Danh mục',
             path: paths.dashboard.pos.category.root,
             icon: ICONS.folder,
-            roles: ['Admin'],
+            permissions: [PRODUCTS.catalogManage],
             // Hàng hoá / nhóm hàng dùng chung bán lẻ và F&B (món là hàng hoá có Loại mặt hàng = Món).
             featureKey: ['commerce.retail.inventory', 'commerce.fnb.pos'],
             children: [
@@ -557,7 +560,7 @@ export function useNavData(
             title: 'Kho hàng',
             path: paths.dashboard.pos.warehouse.root,
             icon: ICONS.banking,
-            roles: ['Admin'],
+            permissions: [PERMISSIONS.inventory.warehouseManage],
             featureKey: 'commerce.retail.inventory',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.warehouse.list },
@@ -567,11 +570,12 @@ export function useNavData(
             title: 'Cấu hình',
             path: paths.dashboard.pos.unitOfMeasure.root,
             icon: ICONS.label,
-            roles: ['Admin'],
+            permissions: [PRODUCTS.catalogManage],
             featureKey: 'commerce.retail.inventory',
             children: [
               { title: 'Đơn vị tính', path: paths.dashboard.pos.unitOfMeasure.list },
-              { title: 'Thuộc tính biến thể', path: paths.dashboard.pos.variantAttribute.list },
+              // Core-be chưa có /variant-attributes — giữ như cũ (chỉ Admin), không mở thêm.
+              { title: 'Thuộc tính biến thể', path: paths.dashboard.pos.variantAttribute.list, roles: ['Admin'] },
             ],
           },
           {
