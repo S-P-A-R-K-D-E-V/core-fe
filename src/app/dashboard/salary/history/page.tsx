@@ -1,3 +1,6 @@
+import PlatformFeatureGuard from 'src/auth/guard/platform-feature-guard';
+import { PLATFORM_FEATURES } from 'src/auth/platform-features';
+
 import SalaryHistoryView from 'src/sections/salary-history/view/salary-history-view';
 
 // ----------------------------------------------------------------------
@@ -7,5 +10,9 @@ export const metadata = {
 };
 
 export default function SalaryHistoryPage() {
-  return <SalaryHistoryView />;
+  return (
+    <PlatformFeatureGuard feature={PLATFORM_FEATURES.payroll} label="Xem bảng lương">
+      <SalaryHistoryView />
+    </PlatformFeatureGuard>
+  );
 }

@@ -415,6 +415,16 @@ describe('useNavData — tính năng tắt theo nền tảng', () => {
     expect(navPaths('Staff', ATTENDANCE_FEATURES, [], [])).toContain(paths.dashboard.attendance.checkin);
   });
 
+  it('Quản lý lương ẩn khi "Xem bảng lương" bị tắt; Lương của tôi vẫn còn', () => {
+    const FEATURES = ['payroll.core', 'payroll.penalty'];
+    expect(navPaths('Admin', FEATURES, [])).toContain(paths.dashboard.payroll.cycles);
+
+    const blocked = navPaths('Admin', FEATURES, [], ['payroll.records']);
+    expect(blocked).not.toContain(paths.dashboard.salary.root);
+    expect(blocked).not.toContain(paths.dashboard.payroll.cycles);
+    expect(blocked).not.toContain(paths.dashboard.salary.configuration);
+  });
+
   it('kiểm quầy, checklist vệ sinh, bán hàng, báo cáo ẩn theo đúng tính năng bị tắt', () => {
     const FEATURES = ['commerce.retail.pos', 'workforce.cleaning'];
     const all = navPaths('Admin', FEATURES, []);

@@ -17,6 +17,8 @@ export const PLATFORM_FEATURES = {
   cleaningTasks: 'cleaning.tasks',
   /** Báo cáo kinh doanh (/dashboard/pos/report/*). */
   reports: 'analytics.reports',
+  /** Quản lý lương: bảng lương, kỳ lương, mức lương, chính sách. Không gồm "Lương của tôi". */
+  payroll: 'payroll.records',
 } as const;
 
 export type PlatformFeatureKey = (typeof PLATFORM_FEATURES)[keyof typeof PLATFORM_FEATURES];
