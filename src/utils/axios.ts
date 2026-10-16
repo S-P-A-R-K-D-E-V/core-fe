@@ -6,6 +6,13 @@ import { HOST_API } from 'src/config-global';
 
 const axiosInstance = axios.create({ baseURL: HOST_API });
 
+/**
+ * Nền tảng của client — Core-be chặn / ẩn tính năng chủ cửa hàng đã tắt trên web (vd tự chấm công, xem
+ * src/auth/platform-features.ts).
+ */
+export const CLIENT_PLATFORM_HEADER = 'X-Client-Platform';
+axiosInstance.defaults.headers.common[CLIENT_PLATFORM_HEADER] = 'web';
+
 export const FORBIDDEN_MESSAGE = 'Bạn không có quyền thực hiện thao tác này.';
 
 /**
@@ -127,6 +134,12 @@ export const endpoints = {
     update: (id: string) => `/roles/${id}`,
     delete: (id: string) => `/roles/${id}`,
     assign: '/roles/assign',
+  },
+  // Bật / tắt tính năng theo nền tảng (web / app) và vai trò — chỉ Admin.
+  platformFeatures: {
+    list: '/platform-features',
+    policy: (featureKey: string, platform: string) =>
+      `/platform-features/${encodeURIComponent(featureKey)}/${encodeURIComponent(platform)}`,
   },
   customRoles: {
     list: '/custom-roles',

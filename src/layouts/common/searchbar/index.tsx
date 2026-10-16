@@ -45,7 +45,7 @@ function Searchbar() {
   const { user } = useAuthContext();
 
   // Cùng bộ lọc vai trò + tính năng với thanh menu — không truyền thì ô tìm kiếm liệt kê mọi mục.
-  const navData = useNavData(getUserRoles(user), user?.enabledFeatures, user?.permissions);
+  const navData = useNavData(getUserRoles(user), user?.enabledFeatures, user?.permissions, user?.blockedFeatures);
 
   const handleClose = useCallback(() => {
     search.onFalse();

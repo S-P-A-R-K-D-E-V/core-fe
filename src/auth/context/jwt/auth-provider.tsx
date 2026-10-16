@@ -239,6 +239,7 @@ export function AuthProvider({ children }: Props) {
       const hasFaceEmbedding: boolean | undefined = res.data?.hasFaceEmbedding;
       const enabledFeatures: string[] | undefined = res.data?.enabledFeatures;
       const permissions: string[] | undefined = res.data?.permissions;
+      const blockedFeatures: string[] | undefined = res.data?.blockedFeatures;
       dispatch({
         type: Types.LOGIN,
         payload: {
@@ -249,6 +250,8 @@ export function AuthProvider({ children }: Props) {
             enabledFeatures: enabledFeatures ?? [],
             // Quyền hiệu lực ở cửa hàng này (Core-be tính phía server).
             permissions: Array.isArray(permissions) ? permissions : baseUser.permissions ?? [],
+            // Tính năng chủ cửa hàng tắt trên web với người này (src/auth/platform-features.ts).
+            blockedFeatures: Array.isArray(blockedFeatures) ? blockedFeatures : [],
           },
         },
       });
@@ -494,6 +497,7 @@ export function AuthProvider({ children }: Props) {
       const hasFaceEmbedding: boolean | undefined = res.data?.hasFaceEmbedding;
       const enabledFeatures: string[] | undefined = res.data?.enabledFeatures;
       const permissions: string[] | undefined = res.data?.permissions;
+      const blockedFeatures: string[] | undefined = res.data?.blockedFeatures;
       dispatch({
         type: Types.LOGIN,
         payload: {
@@ -503,6 +507,7 @@ export function AuthProvider({ children }: Props) {
             hasFaceEmbedding: !!hasFaceEmbedding,
             enabledFeatures: enabledFeatures ?? (merged as any).enabledFeatures ?? [],
             permissions: Array.isArray(permissions) ? permissions : (merged as any).permissions ?? [],
+            blockedFeatures: Array.isArray(blockedFeatures) ? blockedFeatures : [],
           },
         },
       });

@@ -24,7 +24,7 @@ function NavHorizontal() {
   const { user } = useAuthContext();
   const userRoles = getUserRoles(user);
 
-  const navData = useNavData(userRoles, user?.enabledFeatures, user?.permissions);
+  const navData = useNavData(userRoles, user?.enabledFeatures, user?.permissions, user?.blockedFeatures);
 
   return (
     <AppBar
