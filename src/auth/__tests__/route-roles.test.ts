@@ -119,6 +119,23 @@ describe('requiredPermissionsFor', () => {
     expect(requiredRolesFor(path)).toBeNull();
   });
 
+  const C = PERMISSIONS.cleaning;
+
+  it.each([
+    [paths.dashboard.cleaning.taskLibrary, [C.templateManage]],
+    [paths.dashboard.cleaning.templates, [C.templateManage]],
+    [paths.dashboard.cleaning.weekBuilder, [C.templateManage]],
+    [paths.dashboard.cleaning.review, [C.read]],
+    [paths.dashboard.cleaning.weekOverview, [C.read]],
+  ])('vệ sinh: %s → cần %j', (path, permissions) => {
+    expect(requiredPermissionsFor(path)).toEqual(permissions);
+    expect(requiredRolesFor(path)).toBeNull();
+  });
+
+  it('checklist vệ sinh của chính mình không xét quyền', () => {
+    expect(requiredPermissionsFor(paths.dashboard.cleaning.myChecklist)).toBeNull();
+  });
+
   it('trang tài khoản / hồ sơ của chính mình không xét quyền', () => {
     expect(requiredPermissionsFor(paths.dashboard.user.account)).toBeNull();
     expect(requiredPermissionsFor(paths.dashboard.user.profile)).toBeNull();
