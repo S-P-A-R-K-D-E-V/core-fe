@@ -100,6 +100,13 @@ export async function requestCounterLogin(userId: string): Promise<CounterLoginR
   return (await counterAxios.post<CounterLoginRequested>('/counter/login-requests', { userId })).data;
 }
 
+/** Hỏi: người được gửi mã đã bấm Đồng ý trong app chưa (approved kèm phiên). */
+export type CounterLoginPoll = { status: 'pending' | 'approved' | 'rejected' | 'expired'; auth?: IAuthResponse | null };
+
+export async function pollCounterLogin(requestId: string): Promise<CounterLoginPoll> {
+  return (await counterAxios.get<CounterLoginPoll>(`/counter/login-requests/${encodeURIComponent(requestId)}`)).data;
+}
+
 export async function verifyCounterLogin(requestId: string, code: string): Promise<IAuthResponse> {
   const url = `/counter/login-requests/${encodeURIComponent(requestId)}/verify`;
   return (await counterAxios.post<IAuthResponse>(url, { code })).data;

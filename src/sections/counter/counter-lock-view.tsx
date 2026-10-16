@@ -19,6 +19,7 @@ import { getStorageUrl } from 'src/utils/storage';
 import { useAuthContext } from 'src/auth/hooks';
 import {
   getCounterRoster,
+  pollCounterLogin,
   exchangeCounterQr,
   verifyCounterLogin,
   requestCounterLogin,
@@ -337,6 +338,38 @@ function CodeEntry({
     inputRef.current?.focus();
   }, [pending.requestId]);
 
+  // Người được gửi mã có thể bấm Đồng ý trong app (mở app là thấy mã) — hỏi trạng thái vài giây một lần.
+  useEffect(() => {
+    let stopped = false;
+    let busy = false;
+    const id = setInterval(async () => {
+      if (busy || stopped) return;
+      busy = true;
+      try {
+        const res = await pollCounterLogin(pending.requestId);
+        if (stopped) return;
+        if (res.status === 'approved' && res.auth) {
+          stopped = true;
+          clearInterval(id);
+          setChecking(true);
+          await onSignedIn(res.auth);
+        } else if (res.status === 'rejected') {
+          stopped = true;
+          clearInterval(id);
+          setError('Đã từ chối trên điện thoại.');
+        }
+      } catch {
+        // Lỗi mạng — vẫn gõ mã được.
+      } finally {
+        busy = false;
+      }
+    }, 2000);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
+  }, [pending.requestId, onSignedIn]);
+
   const secondsLeft = Math.max(0, Math.ceil((pending.expiresAt - tick) / 1000));
   const resendIn = Math.max(0, Math.ceil((pending.resendAt - tick) / 1000));
   const expired = secondsLeft === 0;
@@ -364,10 +397,9 @@ function CodeEntry({
     if (next.length === CODE_LENGTH) submit(next);
   }
 
-  const sentText =
-    pending.sentTo > 1
-      ? `Mã đã gửi tới app trên ${pending.sentTo} thiết bị của bạn.`
-      : 'Mã đã gửi tới app trên điện thoại của bạn.';
+  let sentText = 'Mở app trên điện thoại — mã hiện ngay khi mở app, bấm Đồng ý hoặc gõ mã vào đây.';
+  if (pending.sentTo === 1) sentText = 'Mã đã gửi tới app trên điện thoại của bạn (mở app cũng thấy mã).';
+  if (pending.sentTo > 1) sentText = `Mã đã gửi tới app trên ${pending.sentTo} thiết bị của bạn (mở app cũng thấy mã).`;
 
   return (
     <Card sx={{ p: 4, maxWidth: 520, mx: 'auto', textAlign: 'center' }}>
