@@ -33,6 +33,9 @@ import { TableHeadCustom, TableNoData } from 'src/components/table';
 
 import { getStorageUrl } from 'src/utils/storage';
 
+import { useAuthContext } from 'src/auth/hooks';
+import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
+
 import type { ICleaningTaskInstance, IShiftStaffForPenalty } from 'src/types/corecms-api';
 
 import {
@@ -113,6 +116,10 @@ type Props = {
 
 export default function CleaningReviewChecklist({ date, block, onChanged }: Props) {
   const { enqueueSnackbar } = useSnackbar();
+  const { user } = useAuthContext();
+  // Xem checklist cần cleaning.read (route); chấm điểm / phạt là quyền riêng (Core-be cleaning.review / penalty.manage).
+  const mayReview = hasPermission(user, PERMISSIONS.cleaning.review);
+  const mayPenalize = hasPermission(user, PERMISSIONS.cleaning.penaltyManage);
 
   const [tasks, setTasks] = useState<ICleaningTaskInstance[]>([]);
   const [loading, setLoading] = useState(true);
@@ -259,7 +266,7 @@ export default function CleaningReviewChecklist({ date, block, onChanged }: Prop
                 <TableBody>
                   {tasks.map((task) => {
                     const activePenalties = task.penalties.filter((p) => !p.voidedAt);
-                    const canReview = task.status === 'Done' || task.status === 'Pending';
+                    const canReview = mayReview && (task.status === 'Done' || task.status === 'Pending');
                     return (
                       <TableRow key={task.id}>
                         <TableCell>{task.name}</TableCell>
@@ -312,7 +319,7 @@ export default function CleaningReviewChecklist({ date, block, onChanged }: Prop
                                 </Tooltip>
                               </>
                             )}
-                            {task.status === 'Failed' && (
+                            {mayPenalize && task.status === 'Failed' && (
                               <Button size="small" color="warning" onClick={() => handleOpenPenalty(task)}>
                                 Phạt
                               </Button>

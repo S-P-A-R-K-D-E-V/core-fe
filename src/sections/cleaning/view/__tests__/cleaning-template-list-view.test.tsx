@@ -12,7 +12,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 // API — this is the client-side half of the shiftTemplateIds bug fix.
 // ----------------------------------------------------------------------
 
-let mockUser: { role: string; roles: string[] } = { role: 'Admin', roles: ['Admin'] };
+let mockUser: { role: string; roles: string[]; permissions?: string[] } = { role: 'Admin', roles: ['Admin'] };
 vi.mock('src/auth/hooks', () => ({
   useAuthContext: () => ({ user: mockUser }),
 }));
@@ -83,8 +83,9 @@ afterEach(() => {
 });
 
 describe('CleaningTemplateListView role gating', () => {
-  it('shows the manage-template actions (thêm/sửa/xoá) for a Manager, not just Admin', async () => {
-    mockUser = { role: 'Manager', roles: ['Manager'] };
+  it('shows the manage-template actions (thêm/sửa/xoá) to anyone with cleaning.template.manage, not just Admin', async () => {
+    // Quản lý có quyền này mặc định (Core-be); vai trò tuỳ chỉnh được cấp thêm.
+    mockUser = { role: 'Manager', roles: ['Manager'], permissions: ['cleaning.template.manage'] };
     getCleaningTaskTemplates.mockResolvedValue([
       {
         id: 'tpl-1',

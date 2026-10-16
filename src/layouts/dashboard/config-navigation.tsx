@@ -66,6 +66,7 @@ const ICONS = {
 const PAYROLL = PERMISSIONS.payroll;
 const SHIFT = PERMISSIONS.shift;
 const ATTENDANCE = PERMISSIONS.attendance;
+const CLEANING = PERMISSIONS.cleaning;
 const PRODUCTS = PERMISSIONS.products;
 
 type NavAccess = {
@@ -372,7 +373,7 @@ export function useNavData(
             ],
           },
 
-          // CLEANING SCHEDULE (checklist của tôi: mọi nhân viên - còn lại: Admin/Manager)
+          // CLEANING SCHEDULE (checklist của tôi: mọi nhân viên - còn lại theo quyền cleaning.*, mặc định Admin/Manager)
           {
             title: t('cleaning'),
             path: paths.dashboard.cleaning.root,
@@ -381,11 +382,11 @@ export function useNavData(
             featureKey: 'workforce.cleaning',
             children: [
               { title: t('cleaningMyChecklist'), path: paths.dashboard.cleaning.myChecklist },
-              { title: t('cleaningTaskLibrary'), path: paths.dashboard.cleaning.taskLibrary, roles: ['Admin', 'Manager'] },
-              { title: t('cleaningWeekBuilder'), path: paths.dashboard.cleaning.weekBuilder, roles: ['Admin', 'Manager'] },
-              { title: t('cleaningTemplates'), path: paths.dashboard.cleaning.templates, roles: ['Admin', 'Manager'] },
-              { title: t('cleaningReview'), path: paths.dashboard.cleaning.review, roles: ['Admin', 'Manager'] },
-              { title: t('cleaningWeekOverview'), path: paths.dashboard.cleaning.weekOverview, roles: ['Admin', 'Manager'] },
+              { title: t('cleaningTaskLibrary'), path: paths.dashboard.cleaning.taskLibrary, permissions: [CLEANING.templateManage] },
+              { title: t('cleaningWeekBuilder'), path: paths.dashboard.cleaning.weekBuilder, permissions: [CLEANING.templateManage] },
+              { title: t('cleaningTemplates'), path: paths.dashboard.cleaning.templates, permissions: [CLEANING.templateManage] },
+              { title: t('cleaningReview'), path: paths.dashboard.cleaning.review, permissions: [CLEANING.read] },
+              { title: t('cleaningWeekOverview'), path: paths.dashboard.cleaning.weekOverview, permissions: [CLEANING.read] },
             ],
           },
 

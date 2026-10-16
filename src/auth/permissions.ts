@@ -62,6 +62,13 @@ export const PERMISSIONS = {
     adjust: 'attendance.adjust',
     requestProcess: 'attendance.request.process',
   },
+  /** Vệ sinh — checklist của mình, chụp ảnh, đánh dấu xong không cần quyền. Chấm điểm / phạt cần kèm quyền xem. */
+  cleaning: {
+    read: 'cleaning.read',
+    templateManage: 'cleaning.template.manage',
+    review: 'cleaning.review',
+    penaltyManage: 'cleaning.penalty.manage',
+  },
   /** Ca làm — xem mẫu / lịch ca, lịch của mình, đăng ký / nhường / đổi ca của mình không cần quyền. */
   shift: {
     templateManage: 'shift.template.manage',

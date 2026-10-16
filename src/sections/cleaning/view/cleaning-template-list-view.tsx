@@ -24,6 +24,7 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import { paths } from 'src/routes/paths';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
@@ -104,14 +105,9 @@ export default function CleaningTemplateListView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
   const { user: authUser } = useAuthContext();
-  // Quản lý checklist tuần (thêm/sửa/xoá đầu việc) mở cho cả Admin và Manager - đánh giá + phạt đã
-  // mở sẵn cho Manager từ trước (xem CleaningController), đây là phần còn thiếu để Manager tự vận
-  // hành trọn vẹn checklist vệ sinh của cửa hàng mình mà không cần Admin.
-  const canManageTemplates =
-    authUser?.role === 'Admin' ||
-    authUser?.role === 'Manager' ||
-    (authUser?.roles || []).includes('Admin') ||
-    (authUser?.roles || []).includes('Manager');
+  // Quản lý checklist tuần (thêm/sửa/xoá đầu việc) theo quyền cleaning.template.manage (Core-be, mặc định Admin +
+  // Manager; vai trò tuỳ chỉnh được cấp thêm).
+  const canManageTemplates = hasPermission(authUser, PERMISSIONS.cleaning.templateManage);
 
   const [templates, setTemplates] = useState<ICleaningTaskTemplate[]>([]);
   const [shiftTemplates, setShiftTemplates] = useState<IShiftTemplate[]>([]);
