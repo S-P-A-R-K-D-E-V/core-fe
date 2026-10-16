@@ -23,14 +23,14 @@ import { useSnackbar } from 'src/components/snackbar';
 import { saveCounterDevice, useCounterDevice, clearCounterDevice } from 'src/sections/counter/counter-device';
 
 // ----------------------------------------------------------------------
-// Cài đặt cửa hàng → Máy quầy: đặt CHÍNH trình duyệt này (PC ở quầy, có thể kèm màn hình khách) làm máy quầy của một
+// Thiết bị cửa hàng → "Đặt trình duyệt này làm máy quầy" (lối nhanh — người đang đăng nhập là chủ cửa hàng / quản lý): đặt CHÍNH trình duyệt này (PC ở quầy, có thể kèm màn hình khách) làm máy quầy của một
 // chi nhánh. Sau đó mở trang là màn chọn nhân viên có ca; ai đăng nhập ở đây cũng chỉ có bán hàng, hoá đơn, hàng hoá,
 // khách hàng, kiểm tiền ca. Người đang đăng nhập được đăng xuất (máy quầy dùng chung).
 // ----------------------------------------------------------------------
 
 type Branch = { id: string; branchName: string };
 
-export default function CounterDeviceTab() {
+export default function CounterBrowserCard({ onProvisioned }: { onProvisioned?: () => void }) {
   const router = useRouter();
   const { logout } = useAuthContext();
   const { enqueueSnackbar } = useSnackbar();
@@ -61,7 +61,7 @@ export default function CounterDeviceTab() {
       return;
     setSaving(true);
     try {
-      const res = await provisionCounterDevice(branchId, name.trim());
+      const res = await provisionCounterDevice(branchId, name.trim(), 'web');
       saveCounterDevice({
         deviceId: res.deviceId,
         deviceName: res.deviceName,
@@ -87,18 +87,19 @@ export default function CounterDeviceTab() {
     }
     clearCounterDevice();
     enqueueSnackbar('Trình duyệt này không còn là máy quầy', { variant: 'success' });
+    onProvisioned?.();
   }
 
   return (
     <Card sx={{ p: 3 }}>
       <Stack spacing={2.5}>
         <Box>
-          <Typography variant="h6">Máy quầy</Typography>
+          <Typography variant="subtitle1">Đặt trình duyệt này làm máy quầy</Typography>
           <Typography variant="body2" color="text.secondary">
             Dùng cho máy tính đặt cố định ở quầy. Mở trang là danh sách nhân viên có ca hôm nay; bấm tên → mã 6 số gửi về
             app điện thoại (người chưa có app dùng mật khẩu, hoặc quét QR). Ai đăng nhập ở máy quầy — kể cả chủ cửa hàng —
             cũng chỉ có bán hàng, hoá đơn / trả hàng, hàng hoá, khách hàng và kiểm tiền ca; tự đăng xuất khi hết ca (thêm
-            30 phút). Máy POS / tablet: đặt trong app ở Hồ sơ → Đặt máy này làm máy quầy.
+            30 phút). Máy chưa có ai đăng nhập: mở trang /counter trên máy đó, nhập mã hiện ra vào ô Ghép nối ở trên.
           </Typography>
         </Box>
 

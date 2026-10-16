@@ -43,8 +43,9 @@ export default function KioskPairingSetup({ onSubmit }: Props) {
       const res = await requestKioskPairing();
       setPairing(res);
       setStatus('waiting');
-      // QR mã hoá JSON để app đọc trực tiếp — vẫn hiện mã số bên dưới cho người nhập tay/nhìn đọc.
-      const payload = JSON.stringify({ type: 'corecms-kiosk-pair', pairingId: res.pairingId, code: res.code });
+      // QR mã hoá JSON để app đọc trực tiếp — vẫn hiện mã số bên dưới cho người nhập tay/nhìn đọc. KHÔNG đưa pairingId
+      // vào QR: đó là bí mật để hỏi trạng thái (lấy key), ai chụp được QR cũng không được lấy key.
+      const payload = JSON.stringify({ type: 'corecms-kiosk-pair', code: res.code });
       const dataUrl = await QRCode.toDataURL(payload, { margin: 1, width: 240 });
       setQrDataUrl(dataUrl);
     } catch {

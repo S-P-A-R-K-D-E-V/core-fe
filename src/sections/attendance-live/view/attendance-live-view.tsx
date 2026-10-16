@@ -834,7 +834,7 @@ export function AttendanceLiveView() {
         <Alert severity="info">
           Chưa có chi nhánh nào có camera chấm công. Cài <strong>Spark Camera Agent</strong> trên máy tính ở quầy (cùng
           mạng Wi-Fi với camera quầy), chạy <code>python -m agent pair</code> rồi nhập mã 6 số agent hiện ra ở trang{' '}
-          <Link component={RouterLink} href={paths.dashboard.attendance.kioskDevices}>
+          <Link component={RouterLink} href={paths.dashboard.storeSettings.devices}>
             Thiết bị cửa hàng
           </Link>
           . Khi agent chạy, chi nhánh sẽ hiện ở đây.

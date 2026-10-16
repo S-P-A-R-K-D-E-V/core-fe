@@ -75,13 +75,20 @@ export type KioskPairingStatus = 'pending' | 'expired' | 'claimed';
 
 export interface IKioskPairingStatusResponse {
   status: KioskPairingStatus;
+  /** Chỉ có ở lần hỏi đầu tiên sau khi được duyệt — lưu ngay. */
   kioskKey?: string | null;
   deviceName?: string | null;
+  deviceId?: string | null;
+  /** "counter" = máy quầy; null = kiosk chấm công. */
+  deviceType?: string | null;
+  branchId?: string | null;
+  branchName?: string | null;
 }
 
 export interface IKioskClaimResponse {
   deviceId: string;
   deviceName: string;
+  deviceType?: string | null;
 }
 
 /** Vai trò camera do agent khai báo: quầy chấm công (nhận diện nhân viên) hoặc cửa (đếm khách). */
@@ -116,4 +123,9 @@ export interface IKioskDeviceItem {
   /** null với kiosk web (không gửi heartbeat). */
   online: boolean | null;
   cameras: IKioskAgentCamera[];
+  /** Máy quầy: android / ios / web. */
+  platform?: string | null;
+  /** Máy quầy: người đang đăng nhập + giờ phiên tự hết. */
+  currentUserName?: string | null;
+  sessionEndsAt?: string | null;
 }

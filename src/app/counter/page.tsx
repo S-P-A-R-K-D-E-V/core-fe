@@ -2,10 +2,6 @@
 
 import { useEffect } from 'react';
 
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
-
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
@@ -13,11 +9,12 @@ import { useAuthContext } from 'src/auth/hooks';
 import { SplashScreen } from 'src/components/loading-screen';
 
 import CounterLockView from 'src/sections/counter/counter-lock-view';
+import CounterPairPanel from 'src/sections/counter/counter-pair-panel';
 import { useCounterDevice } from 'src/sections/counter/counter-device';
 import { counterHome, useCounterSession } from 'src/sections/counter/counter-scope';
 
 // ----------------------------------------------------------------------
-// Máy quầy trên web: màn chọn nhân viên có ca. Trình duyệt chưa đặt làm máy quầy → hướng dẫn; đã có người đăng nhập ở
+// Máy quầy trên web: màn chọn nhân viên có ca. Trình duyệt chưa đặt làm máy quầy → hiện mã ghép nối; đã có người đăng nhập ở
 // máy quầy → vào thẳng trang bán hàng.
 // ----------------------------------------------------------------------
 
@@ -38,23 +35,10 @@ export default function CounterPage() {
 
   if (loading || (device && authenticated)) return <SplashScreen />;
 
+  // Chưa là máy quầy: hiện mã để chủ cửa hàng / quản lý duyệt từ web hoặc app; đang ở máy thì đăng nhập đặt nhanh.
   if (!device) {
-    return (
-      <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 3, textAlign: 'center' }}>
-        <Box sx={{ maxWidth: 480 }}>
-          <Typography variant="h5" sx={{ mb: 1 }}>
-            Trình duyệt này chưa là máy quầy
-          </Typography>
-          <Typography color="text.secondary" sx={{ mb: 3 }}>
-            Chủ cửa hàng / quản lý đăng nhập trên chính máy này, vào Cài đặt cửa hàng → Máy quầy → “Đặt trình duyệt này làm
-            máy quầy”.
-          </Typography>
-          <Button variant="contained" onClick={() => router.replace(paths.auth.jwt.login)}>
-            Đăng nhập
-          </Button>
-        </Box>
-      </Box>
-    );
+    const loginThenSetUp = `${paths.auth.jwt.login}?returnTo=${encodeURIComponent(paths.dashboard.storeSettings.devices)}`;
+    return <CounterPairPanel onLogin={() => router.replace(loginThenSetUp)} />;
   }
 
   return <CounterLockView device={device} onSignedIn={() => router.replace(home)} />;

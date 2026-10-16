@@ -52,8 +52,12 @@ export type CounterLoginRequested = { requestId: string; expiresInSeconds: numbe
 
 export type CounterError = { code: string; message: string; status?: number };
 
-export async function provisionCounterDevice(branchId: string, deviceName: string): Promise<CounterProvisionResult> {
-  const res = await axiosInstance.post<CounterProvisionResult>('/counter-devices', { branchId, deviceName });
+export async function provisionCounterDevice(
+  branchId: string,
+  deviceName: string,
+  platform: 'web' | 'android' | 'ios' = 'web'
+): Promise<CounterProvisionResult> {
+  const res = await axiosInstance.post<CounterProvisionResult>('/counter-devices', { branchId, deviceName, platform });
   return res.data;
 }
 

@@ -7,6 +7,7 @@ import Tabs from '@mui/material/Tabs';
 import Container from '@mui/material/Container';
 
 import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
 
 import Iconify from 'src/components/iconify';
 import { useSettingsContext } from 'src/components/settings';
@@ -18,7 +19,6 @@ import StoreBrandingTab from './store-branding-tab';
 import PaymentConnectionsTab from './payment-connections-tab';
 import KiotVietConnectionTab from './kiotviet-connection-tab';
 import CustomerDisplayTab from './customer-display-tab';
-import CounterDeviceTab from './counter-device-tab';
 
 // ----------------------------------------------------------------------
 
@@ -28,7 +28,8 @@ const TABS = [
   { value: 'bank-accounts', label: 'Tài khoản ngân hàng', icon: 'solar:wallet-money-bold' },
   { value: 'payment', label: 'Thanh toán', icon: 'solar:card-transfer-bold' },
   { value: 'customer-display', label: 'Màn hình khách', icon: 'solar:monitor-bold' },
-  { value: 'counter', label: 'Máy quầy', icon: 'solar:cart-large-4-bold' },
+  // Mở trang riêng Thiết bị cửa hàng (máy quầy, kiosk, camera — quản lý cũng vào được).
+  { value: 'devices', label: 'Thiết bị cửa hàng', icon: 'solar:monitor-smartphone-bold' },
   { value: 'agent-keys', label: 'Kết nối MCP & khoá API', icon: 'solar:key-bold' },
 ] as const;
 
@@ -37,6 +38,7 @@ type TabValue = (typeof TABS)[number]['value'];
 export default function StoreSettingsView() {
   const settings = useSettingsContext();
   const [tab, setTab] = useState<TabValue>('branding');
+  const router = useRouter();
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'lg'}>
@@ -48,7 +50,7 @@ export default function StoreSettingsView() {
 
       <Tabs
         value={tab}
-        onChange={(_, v) => setTab(v)}
+        onChange={(_, v) => (v === 'devices' ? router.push(paths.dashboard.storeSettings.devices) : setTab(v))}
         variant="scrollable"
         allowScrollButtonsMobile
         sx={{ mb: { xs: 3, md: 5 } }}
@@ -63,7 +65,6 @@ export default function StoreSettingsView() {
       {tab === 'bank-accounts' && <BankAccountsTab />}
       {tab === 'payment' && <PaymentConnectionsTab />}
       {tab === 'customer-display' && <CustomerDisplayTab />}
-      {tab === 'counter' && <CounterDeviceTab />}
       {tab === 'agent-keys' && <AgentKeysTab />}
     </Container>
   );
