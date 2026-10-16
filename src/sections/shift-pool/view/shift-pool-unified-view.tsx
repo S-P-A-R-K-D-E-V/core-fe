@@ -30,6 +30,7 @@ import Typography from '@mui/material/Typography';
 import { paths } from 'src/routes/paths';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { hasAnyRole, getUserRoles, MANAGER_ROLES } from 'src/auth/roles';
 
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
@@ -247,7 +248,8 @@ export default function ShiftPoolUnifiedView() {
   const { enqueueSnackbar } = useSnackbar();
   const { user } = useAuthContext();
 
-  const isManager = user?.role === 'Admin' || user?.role === 'Manager';
+  // Gộp role + roles: Staff kiêm Quản lý vẫn duyệt được (API xét đủ danh sách vai trò).
+  const isManager = hasAnyRole(getUserRoles(user), MANAGER_ROLES);
 
   const [tab, setTab] = useState<TabKey>('browse');
   const [viewMode, setViewMode] = useState<'calendar' | 'grid'>('calendar');

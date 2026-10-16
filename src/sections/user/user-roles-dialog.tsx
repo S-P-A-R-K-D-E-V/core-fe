@@ -14,6 +14,10 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Alert from '@mui/material/Alert';
 
+import { apiErrorMessage } from 'src/utils/api-error';
+
+import { useAuthContext } from 'src/auth/hooks';
+
 import { useSnackbar } from 'src/components/snackbar';
 
 import { IRole } from 'src/types/corecms-api';
@@ -31,6 +35,11 @@ type Props = {
 
 export default function UserRolesDialog({ open, onClose, userId, userName }: Props) {
   const { enqueueSnackbar } = useSnackbar();
+
+  const { user } = useAuthContext();
+
+  // Core-be chặn Admin tự gỡ Admin của chính mình (có thể là Admin cuối cùng) — khoá luôn ô đó trên giao diện.
+  const isSelf = !!user?.id && user.id === userId;
 
   const [allRoles, setAllRoles] = useState<IRole[]>([]);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
@@ -80,7 +89,7 @@ export default function UserRolesDialog({ open, onClose, userId, userName }: Pro
       onClose();
     } catch (error) {
       console.error('Failed to assign roles:', error);
-      enqueueSnackbar('Failed to assign roles', { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(error, 'Không gán được vai trò'), { variant: 'error' });
     } finally {
       setSaving(false);
     }
@@ -118,6 +127,7 @@ export default function UserRolesDialog({ open, onClose, userId, userName }: Pro
                   <Checkbox
                     checked={selectedRoleIds.includes(role.id)}
                     onChange={() => handleToggleRole(role.id)}
+                    disabled={isSelf && role.name === 'Admin' && selectedRoleIds.includes(role.id)}
                   />
                 }
               />

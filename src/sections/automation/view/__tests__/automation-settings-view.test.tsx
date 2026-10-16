@@ -700,7 +700,7 @@ describe('AutomationSettingsView — phân quyền', () => {
 
       renderView();
 
-      expect(screen.getByText('Permission Denied')).toBeInTheDocument();
+      expect(screen.getByText('Không có quyền truy cập')).toBeInTheDocument();
       // Cho effect (nếu có) cơ hội chạy rồi mới khẳng định không gọi API
       await new Promise((r) => setTimeout(r, 0));
       expect(getAutomationRules).not.toHaveBeenCalled();

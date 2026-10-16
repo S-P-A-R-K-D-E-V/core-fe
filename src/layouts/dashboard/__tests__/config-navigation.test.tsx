@@ -22,7 +22,7 @@ import { useNavData } from 'src/layouts/dashboard/config-navigation';
 
 import { useWorkingBranch } from 'src/store/working-branch-store';
 
-function navPaths(userRole?: string, enabledFeatures: string[] = []) {
+function navPaths(userRole?: string | string[], enabledFeatures: string[] = []) {
   const { result } = renderHook(() => useNavData(userRole, enabledFeatures));
   const out: string[] = [];
   result.current.forEach((group: any) =>
@@ -166,5 +166,21 @@ describe('useNavData — camera, giám sát, báo cáo chỉ Admin', () => {
     ownerOnly.forEach((p) => expect(visible).not.toContain(p));
     // Quản lý vẫn quản lý chấm công như cũ.
     if (role === 'Manager') expect(visible).toContain(paths.dashboard.attendance.report);
+  });
+});
+
+// Người kiêm nhiều vai trò (vd Staff kiêm Admin, vai trò chính "Staff") thấy menu của MỌI vai trò — như guard và API.
+// Trước đây menu chỉ xét vai trò chính nên ẩn hết mục Admin dù trang/API vẫn cho vào.
+describe('useNavData — nhiều vai trò', () => {
+  it('Staff kiêm Admin thấy mục chỉ dành cho Admin', () => {
+    expect(navPaths('Staff')).not.toContain(paths.dashboard.automation.root);
+    expect(navPaths(['Staff', 'Admin'])).toContain(paths.dashboard.automation.root);
+    expect(navPaths(['Staff', 'Admin'])).toContain(paths.dashboard.storeSettings.root);
+  });
+
+  it('Staff kiêm Quản lý thấy mục của Quản lý nhưng không thấy mục chỉ Admin', () => {
+    const paths2 = navPaths(['Staff', 'Manager']);
+    expect(paths2).toContain(paths.dashboard.user.root);
+    expect(paths2).not.toContain(paths.dashboard.storeSettings.root);
   });
 });

@@ -1,5 +1,7 @@
 import type { IBranchLocation, IShiftAssignment } from 'src/types/corecms-api';
 
+import { getUserRoles } from 'src/auth/roles';
+
 import { apiErrorMessage } from './api-error';
 
 // ----------------------------------------------------------------------
@@ -36,17 +38,13 @@ export type ShiftCashGeo = {
   accuracy?: number | null;
 };
 
-function userRoles(user: Record<string, any> | null | undefined): string[] {
-  return [...(user?.roles ?? []), user?.role].filter(Boolean);
-}
-
 export function isShiftCashBypass(user: Record<string, any> | null | undefined): boolean {
-  const roles = userRoles(user);
+  const roles = getUserRoles(user);
   return SHIFT_CASH_BYPASS_ROLES.some((r) => roles.includes(r));
 }
 
 export function canUseShiftCash(user: Record<string, any> | null | undefined): boolean {
-  const roles = userRoles(user);
+  const roles = getUserRoles(user);
   return SHIFT_CASH_ROLES.some((r) => roles.includes(r));
 }
 

@@ -18,6 +18,7 @@ import { useResponsive } from 'src/hooks/use-responsive';
 import { useEventListener } from 'src/hooks/use-event-listener';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { getUserRoles } from 'src/auth/roles';
 
 import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
@@ -44,7 +45,7 @@ function Searchbar() {
   const { user } = useAuthContext();
 
   // Cùng bộ lọc vai trò + tính năng với thanh menu — không truyền thì ô tìm kiếm liệt kê mọi mục.
-  const navData = useNavData(user?.role, user?.enabledFeatures);
+  const navData = useNavData(getUserRoles(user), user?.enabledFeatures);
 
   const handleClose = useCallback(() => {
     search.onFalse();

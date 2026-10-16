@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import Card from '@mui/material/Card';
+import Alert from '@mui/material/Alert';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
@@ -14,6 +15,8 @@ import { useRouter } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+
+import { apiErrorMessage } from 'src/utils/api-error';
 
 import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
@@ -30,9 +33,9 @@ import {
   TablePaginationCustom,
 } from 'src/components/table';
 
-import { IRole } from 'src/types/corecms-api';
+import { IRole, IRoleCatalogStatus } from 'src/types/corecms-api';
 
-import { getAllRoles, deleteRole } from 'src/api/roles';
+import { getAllRoles, deleteRole, getRoleCatalogStatus } from 'src/api/roles';
 import RoleTableToolbar from '../role-table-toolbar';
 import RoleTableRow from '../role-table-row';
 
@@ -62,6 +65,15 @@ export default function RoleListView() {
 
   const [filterName, setFilterName] = useState('');
 
+  const [catalog, setCatalog] = useState<IRoleCatalogStatus | null>(null);
+
+  // Chưa biết (đang hỏi) → ẩn nút sửa cho tới khi chắc, tránh nháy hiện rồi ẩn.
+  const editable = catalog?.editable === true;
+
+  useEffect(() => {
+    getRoleCatalogStatus().then(setCatalog);
+  }, []);
+
   const fetchRoles = useCallback(async () => {
     try {
       const data = await getAllRoles();
@@ -88,6 +100,9 @@ export default function RoleListView() {
 
   const notFound = !dataFiltered.length && !!filterName;
 
+  // Vai trò hệ thống không xoá được (Core-be SystemRoles) → không cho chọn để xoá hàng loạt.
+  const deletableIds = editable ? dataFiltered.filter((row) => !row.isSystem).map((row) => row.id) : [];
+
   const handleFilterName = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       table.onResetPage();
@@ -105,7 +120,7 @@ export default function RoleListView() {
         table.onUpdatePageDeleteRow(dataInPage.length);
       } catch (error) {
         console.error('Failed to delete role:', error);
-        enqueueSnackbar('Failed to delete role', { variant: 'error' });
+        enqueueSnackbar(apiErrorMessage(error, 'Không xoá được vai trò'), { variant: 'error' });
       }
     },
     [dataInPage.length, enqueueSnackbar, fetchRoles, table]
@@ -122,7 +137,7 @@ export default function RoleListView() {
       });
     } catch (error) {
       console.error('Failed to delete roles:', error);
-      enqueueSnackbar('Failed to delete roles', { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(error, 'Không xoá được vai trò'), { variant: 'error' });
     }
   }, [dataFiltered.length, dataInPage.length, enqueueSnackbar, fetchRoles, table]);
 
@@ -144,17 +159,26 @@ export default function RoleListView() {
             { name: 'List' },
           ]}
           action={
-            <Button
-              component={RouterLink}
-              href={paths.dashboard.role.new}
-              variant="contained"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-            >
-              New Role
-            </Button>
+            editable && (
+              <Button
+                component={RouterLink}
+                href={paths.dashboard.role.new}
+                variant="contained"
+                startIcon={<Iconify icon="mingcute:add-line" />}
+              >
+                New Role
+              </Button>
+            )
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
+
+        {catalog && !catalog.editable && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            {catalog.reason || 'Danh mục vai trò của cửa hàng này không sửa được.'} Bạn vẫn gán vai trò cho nhân viên
+            trong mục Người dùng.
+          </Alert>
+        )}
 
         <Card>
           <RoleTableToolbar filterName={filterName} onFilterName={handleFilterName} />
@@ -163,11 +187,11 @@ export default function RoleListView() {
             <TableSelectedAction
               dense={table.dense}
               numSelected={table.selected.length}
-              rowCount={dataFiltered.length}
+              rowCount={deletableIds.length}
               onSelectAllRows={(checked) =>
                 table.onSelectAllRows(
                   checked,
-                  dataFiltered.map((row) => row.id)
+                  deletableIds
                 )
               }
               action={
@@ -183,13 +207,13 @@ export default function RoleListView() {
                   order={table.order}
                   orderBy={table.orderBy}
                   headLabel={TABLE_HEAD}
-                  rowCount={dataFiltered.length}
+                  rowCount={deletableIds.length}
                   numSelected={table.selected.length}
                   onSort={table.onSort}
                   onSelectAllRows={(checked) =>
                     table.onSelectAllRows(
                       checked,
-                      dataFiltered.map((row) => row.id)
+                      deletableIds
                     )
                   }
                 />
@@ -205,6 +229,8 @@ export default function RoleListView() {
                         key={row.id}
                         row={row}
                         selected={table.selected.includes(row.id)}
+                        canEdit={editable}
+                        canDelete={editable && !row.isSystem}
                         onSelectRow={() => table.onSelectRow(row.id)}
                         onDeleteRow={() => handleDeleteRow(row.id)}
                         onEditRow={() => handleEditRow(row.id)}

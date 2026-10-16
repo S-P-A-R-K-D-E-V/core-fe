@@ -2,6 +2,8 @@ import { create } from 'zustand';
 
 import type { IBranchScope, IBranchLocation } from 'src/types/corecms-api';
 
+import { normalizeRoles } from 'src/auth/roles';
+
 // ----------------------------------------------------------------------
 // Chi nhánh đang làm việc của TRÌNH DUYỆT này (cùng mô hình với app — features/branch/working-branch.ts):
 //   - lựa chọn = chi nhánh đang hoạt động (GET /branches) trong phạm vi được phân công (GET /users/me → branchScope;
@@ -78,13 +80,15 @@ export const canSwitchBranch = (options: readonly WorkingBranch[] | null | undef
  *   - Còn lại (nhân viên): đúng loại của chi nhánh đang làm việc.
  */
 export function menuBranchTypes(
-  role: string | undefined,
+  roles: string | readonly string[] | undefined,
   branch: WorkingBranch | null,
   options: readonly WorkingBranch[] | null
 ): BranchType[] | null {
-  if (role === 'Admin') return null;
+  // Người kiêm nhiều vai trò theo vai trò rộng nhất (vd Staff kiêm Admin = chủ cửa hàng).
+  const userRoles = normalizeRoles(roles);
+  if (userRoles.includes('Admin')) return null;
   const own = branch ? [branch.type] : [];
-  if (role === 'Manager' && options) return Array.from(new Set(options.map((b) => b.type)));
+  if (userRoles.includes('Manager') && options) return Array.from(new Set(options.map((b) => b.type)));
   return own;
 }
 

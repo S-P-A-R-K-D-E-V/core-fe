@@ -23,6 +23,10 @@ import { IRole } from 'src/types/corecms-api';
 type Props = {
   selected: boolean;
   row: IRole;
+  /** Danh mục vai trò sửa được ở cửa hàng này (GET /roles/catalog-status). */
+  canEdit: boolean;
+  /** Sửa được và không phải vai trò hệ thống. */
+  canDelete: boolean;
   onSelectRow: VoidFunction;
   onDeleteRow: VoidFunction;
   onEditRow: VoidFunction;
@@ -31,6 +35,8 @@ type Props = {
 export default function RoleTableRow({
   row,
   selected,
+  canEdit,
+  canDelete,
   onSelectRow,
   onDeleteRow,
   onEditRow,
@@ -45,10 +51,17 @@ export default function RoleTableRow({
     <>
       <TableRow hover selected={selected}>
         <TableCell padding="checkbox">
-          <Checkbox checked={selected} onClick={onSelectRow} />
+          <Checkbox checked={selected} onClick={onSelectRow} disabled={!canDelete} />
         </TableCell>
 
-        <TableCell sx={{ fontWeight: 'bold' }}>{name}</TableCell>
+        <TableCell sx={{ fontWeight: 'bold' }}>
+          {name}
+          {row.isSystem && (
+            <Label variant="soft" color="default" sx={{ ml: 1 }}>
+              Hệ thống
+            </Label>
+          )}
+        </TableCell>
 
         <TableCell sx={{ color: 'text.secondary' }}>
           {description || '—'}
@@ -71,9 +84,11 @@ export default function RoleTableRow({
         </TableCell>
 
         <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }}>
-          <IconButton color={popover.open ? 'inherit' : 'default'} onClick={popover.onOpen}>
-            <Iconify icon="eva:more-vertical-fill" />
-          </IconButton>
+          {canEdit && (
+            <IconButton color={popover.open ? 'inherit' : 'default'} onClick={popover.onOpen}>
+              <Iconify icon="eva:more-vertical-fill" />
+            </IconButton>
+          )}
         </TableCell>
       </TableRow>
 
@@ -93,16 +108,18 @@ export default function RoleTableRow({
           Edit
         </MenuItem>
 
-        <MenuItem
-          onClick={() => {
-            confirm.onTrue();
-            popover.onClose();
-          }}
-          sx={{ color: 'error.main' }}
-        >
-          <Iconify icon="solar:trash-bin-trash-bold" />
-          Delete
-        </MenuItem>
+        {canDelete && (
+          <MenuItem
+            onClick={() => {
+              confirm.onTrue();
+              popover.onClose();
+            }}
+            sx={{ color: 'error.main' }}
+          >
+            <Iconify icon="solar:trash-bin-trash-bold" />
+            Delete
+          </MenuItem>
+        )}
       </CustomPopover>
 
       <ConfirmDialog

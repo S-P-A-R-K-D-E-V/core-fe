@@ -173,6 +173,14 @@ export interface IRole {
   createdAt: string;
   userCount: number;
   permissions: IPermission[];
+  /** Vai trò hệ thống (Admin/Manager/Staff/User): không đổi tên/xoá được — Core-be SystemRoles. */
+  isSystem?: boolean;
+}
+
+/** GET /roles/catalog-status — danh mục vai trò có tạo/sửa/xoá được từ cửa hàng hiện tại không. */
+export interface IRoleCatalogStatus {
+  editable: boolean;
+  reason?: string | null;
 }
 
 export interface IPermission {

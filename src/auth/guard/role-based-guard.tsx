@@ -13,26 +13,28 @@ import { ForbiddenIllustration } from 'src/assets/illustrations';
 import { varBounce, MotionContainer } from 'src/components/animate';
 
 import { useAuthContext } from '../hooks';
+import { hasAnyRole, getUserRoles } from '../roles';
 
 // ----------------------------------------------------------------------
 
 type RoleBasedGuardProp = {
   hasContent?: boolean;
-  roles?: string[];
+  roles?: readonly string[];
   permissions?: string[];
   children: React.ReactNode;
   sx?: SxProps<Theme>;
 };
 
+export const FORBIDDEN_TITLE = 'Không có quyền truy cập';
+
 export default function RoleBasedGuard({ hasContent, roles, permissions, children, sx }: RoleBasedGuardProp) {
   const { user } = useAuthContext();
 
-  const currentRole = user?.role;
-  const userRoles: string[] = user?.roles || [currentRole].filter(Boolean);
+  // Gộp role + roles: người kiêm nhiều vai trò (vd Staff kiêm Admin) có quyền của MỌI vai trò, như API.
+  const userRoles = getUserRoles(user);
   const userPermissions: string[] = user?.permissions || [];
 
-  // Check role-based access
-  const hasRoleAccess = typeof roles === 'undefined' || roles.some((role) => userRoles.includes(role));
+  const hasRoleAccess = hasAnyRole(userRoles, roles);
 
   // Check permission-based access
   const hasPermissionAccess = typeof permissions === 'undefined' || permissions.some((perm) => userPermissions.includes(perm));
@@ -42,13 +44,13 @@ export default function RoleBasedGuard({ hasContent, roles, permissions, childre
       <Container component={MotionContainer} sx={{ textAlign: 'center', ...sx }}>
         <m.div variants={varBounce().in}>
           <Typography variant="h3" sx={{ mb: 2 }}>
-            Permission Denied
+            {FORBIDDEN_TITLE}
           </Typography>
         </m.div>
 
         <m.div variants={varBounce().in}>
           <Typography sx={{ color: 'text.secondary' }}>
-            You do not have permission to access this page
+            Tài khoản của bạn không có quyền mở trang này. Liên hệ chủ cửa hàng nếu bạn cần dùng.
           </Typography>
         </m.div>
 

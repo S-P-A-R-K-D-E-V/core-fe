@@ -9,7 +9,8 @@ export type SlotProps = {
   rootItem?: SxProps<Theme>;
   subItem?: SxProps<Theme>;
   subheader?: SxProps<Theme>;
-  currentRole?: string;
+  /** Vai trò của người dùng — một chuỗi hoặc đủ danh sách (người kiêm nhiều vai trò). */
+  currentRole?: string | readonly string[];
 };
 
 export type NavItemStateProps = {
@@ -17,7 +18,7 @@ export type NavItemStateProps = {
   open?: boolean;
   active?: boolean;
   hasChild?: boolean;
-  currentRole?: string;
+  currentRole?: string | readonly string[];
   externalLink?: boolean;
 };
 

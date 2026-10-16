@@ -6,6 +6,7 @@ import {
   IUpdateRoleRequest,
   IAssignRoleRequest,
   IUserPermissions,
+  IRoleCatalogStatus,
 } from 'src/types/corecms-api';
 
 // -------------------------------------------------------
@@ -37,6 +38,19 @@ export async function deleteRole(id: string): Promise<void> {
 
 export async function assignRoles(data: IAssignRoleRequest): Promise<void> {
   await axios.post(endpoints.roles.assign, data);
+}
+
+/**
+ * Cửa hàng dùng danh mục vai trò chung (tenant SaaS) thì không tạo/sửa/xoá vai trò được — Core-be trả 403. Không hỏi
+ * được (API cũ chưa có endpoint, lỗi mạng) → coi như sửa được, giữ hành vi trước: API vẫn tự chặn khi lưu.
+ */
+export async function getRoleCatalogStatus(): Promise<IRoleCatalogStatus> {
+  try {
+    const response = await axios.get<IRoleCatalogStatus>(endpoints.roles.catalogStatus);
+    return response.data;
+  } catch {
+    return { editable: true, reason: null };
+  }
 }
 
 // -------------------------------------------------------
