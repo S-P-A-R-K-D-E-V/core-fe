@@ -203,12 +203,16 @@ export default function HubLoginView() {
 
       {mode === 'qr' ? (
         <JwtQrLogin
+          api={{
+            start: `${window.location.origin}${endpoints.auth.appHubQrStart}`,
+            status: `${window.location.origin}${endpoints.auth.appHubQrStatus}`,
+          }}
           hint="Mở app Spark Store trên điện thoại (đang đăng nhập cửa hàng của bạn), vào Hồ sơ → Quét mã đăng nhập web rồi quét mã này."
           onBack={() => setMode('choose')}
           onSuccess={() => {}}
           onApproved={async (code, verifier) => {
             const state = randomToken(24);
-            const res = await axios.post<{ redirectUrl: string }>(endpoints.auth.qrHubExchange, {
+            const res = await axios.post<{ redirectUrl: string }>(`${window.location.origin}${endpoints.auth.appHubQrExchange}`, {
               code,
               codeVerifier: verifier,
               state,

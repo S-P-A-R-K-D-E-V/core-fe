@@ -66,7 +66,6 @@ export const endpoints = {
     qrStart: '/auth/qr/start',
     qrStatus: '/auth/qr/status',
     qrExchange: '/auth/qr/exchange',
-    qrHubExchange: '/auth/qr/hub-exchange',
     // Thiết bị đang đăng nhập: xem các phiên còn mở của mình, đăng xuất từng thiết bị / mọi thiết bị khác từ xa.
     sessions: '/auth/sessions',
     sessionRevoke: (sessionId: string) => `/auth/sessions/${sessionId}`,
@@ -76,6 +75,10 @@ export const endpoints = {
     // tần suất app-hub tính theo IP client, đi qua core-fe thì mọi người dùng chung IP của ingress.
     appWebHandoff: '/api/app-hub/web-handoff',
     appHubLink: '/api/app-hub/link',
+    // QR trên trang đăng nhập chung (gọi thẳng ingress /api/app-hub — tên miền auth không thuộc cửa hàng nào).
+    appHubQrStart: '/api/app-hub/qr/start',
+    appHubQrStatus: '/api/app-hub/qr/status',
+    appHubQrExchange: '/api/app-hub/qr/exchange',
     deleteAccount: '/auth/account',
   },
   users: {

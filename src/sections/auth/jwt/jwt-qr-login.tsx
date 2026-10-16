@@ -49,9 +49,13 @@ type Props = {
   onApproved?: (code: string, verifier: string) => Promise<void>;
   /** Chữ hướng dẫn dưới mã (mặc định: quét bằng app của cửa hàng). */
   hint?: string;
+  /** Đường xin mã / hỏi trạng thái (mặc định /auth/qr/* của cửa hàng; trang chung dùng /api/app-hub/qr/*). */
+  api?: { start: string; status: string };
 };
 
-export default function JwtQrLogin({ onSuccess, onBack, onApproved, hint }: Props) {
+export default function JwtQrLogin({ onSuccess, onBack, onApproved, hint, api }: Props) {
+  const startUrl = api?.start ?? endpoints.auth.qrStart;
+  const statusUrl = api?.status ?? endpoints.auth.qrStatus;
   const { loginWithQr } = useAuthContext();
 
   const [phase, setPhase] = useState<Phase>('loading');
@@ -82,7 +86,7 @@ export default function JwtQrLogin({ onSuccess, onBack, onApproved, hint }: Prop
 
     try {
       const verifier = randomToken(32);
-      const res = await axios.post<IQrLoginStartResponse>(endpoints.auth.qrStart, {
+      const res = await axios.post<IQrLoginStartResponse>(startUrl, {
         codeChallenge: await sha256Hex(verifier),
       });
       const { code, expiresInSeconds, pollIntervalSeconds } = res.data;
@@ -110,7 +114,7 @@ export default function JwtQrLogin({ onSuccess, onBack, onApproved, hint }: Prop
       );
       setPhase('error');
     }
-  }, []);
+  }, [startUrl]);
 
   useEffect(() => {
     begin(false);
@@ -135,7 +139,7 @@ export default function JwtQrLogin({ onSuccess, onBack, onApproved, hint }: Prop
       if (busy) return;
       busy = true;
       try {
-        const res = await axios.post<IQrLoginStatusResponse>(endpoints.auth.qrStatus, { code: ticket.code });
+        const res = await axios.post<IQrLoginStatusResponse>(statusUrl, { code: ticket.code });
         if (current !== generation.current) return;
 
         const { status } = res.data;
@@ -172,7 +176,7 @@ export default function JwtQrLogin({ onSuccess, onBack, onApproved, hint }: Prop
     }, ticket.pollMs);
 
     return () => clearInterval(timer);
-  }, [ticket, phase, begin, loginWithQr]);
+  }, [ticket, phase, begin, loginWithQr, statusUrl]);
 
   const renderQr = qrDataUrl && (phase === 'waiting' || phase === 'scanned' || phase === 'signing-in') && (
     <Box sx={{ position: 'relative', width: 220, height: 220 }}>
