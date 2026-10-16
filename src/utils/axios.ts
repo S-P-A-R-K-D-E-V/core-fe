@@ -648,6 +648,12 @@ export const endpoints = {
     customerContext: '/chatbot/context/customer',
     callbackOrder: '/chatbot/callback-order',
   },
+  customerDisplay: {
+    config: '/pos-display/config',
+    settings: '/pos-display/settings',
+    branchSettings: (branchId: string) => `/pos-display/settings/${branchId}`,
+    presign: '/pos-display/media/presign',
+  },
   kiosk: {
     confirmCheckIn: '/kiosk/confirm-checkin',
     confirmCheckOut: '/kiosk/confirm-checkout',
