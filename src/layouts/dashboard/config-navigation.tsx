@@ -63,6 +63,8 @@ const ICONS = {
  * Item có branchType chỉ hiện khi loại đó nằm trong branchTypes (xem menuBranchTypes: nhân viên = loại của chi nhánh
  * đang làm việc, quản lý = các loại trong chi nhánh được phân công); branchTypes null = không thu hẹp (chủ cửa hàng). */
 const PAYROLL = PERMISSIONS.payroll;
+const SHIFT = PERMISSIONS.shift;
+const ATTENDANCE = PERMISSIONS.attendance;
 
 type NavAccess = { roles: readonly string[]; permissions: readonly string[] | undefined };
 
@@ -324,26 +326,28 @@ export function useNavData(
             ],
           },
 
-          // SHIFT MANAGEMENT
+          // SHIFT MANAGEMENT — theo quyền shift.* (Core-be; mặc định Admin, Manager; nhắc ca chỉ Admin).
           {
             title: t('shift'),
             path: paths.dashboard.shift.root,
             icon: ICONS.calendar,
-            roles: ['Admin', 'Manager'],
+            permissions: [SHIFT.templateManage, SHIFT.scheduleManage, SHIFT.reminderManage],
             featureKey: 'workforce.shift-scheduling',
             children: [
               {
                 title: t('shiftTemplates'),
                 path: paths.dashboard.shift.templates.list,
+                allPermissions: [SHIFT.templateManage],
               },
               {
                 title: t('shiftSchedules'),
                 path: paths.dashboard.shift.schedules.list,
+                allPermissions: [SHIFT.scheduleManage],
               },
               {
                 title: t('shiftReminderRules'),
                 path: paths.dashboard.shift.reminderRules.list,
-                roles: ['Admin'],
+                allPermissions: [SHIFT.reminderManage],
               },
             ],
           },
@@ -373,20 +377,27 @@ export function useNavData(
             roles: ['Admin'],
           },
 
-          // ATTENDANCE MANAGEMENT (Admin/Manager)
+          // ATTENDANCE MANAGEMENT — theo quyền attendance.* / shift.assignment.read (mặc định Admin, Manager).
           {
             title: t('attendance'),
             path: paths.dashboard.attendance.root,
             icon: ICONS.booking,
-            roles: ['Admin', 'Manager'],
+            permissions: [SHIFT.assignmentRead, ATTENDANCE.read, ATTENDANCE.requestProcess, ATTENDANCE.adjust],
             featureKey: 'workforce.attendance',
             children: [
-              { title: t('assignmentsAttendance'), path: paths.dashboard.attendance.assignments },
-              { title: t('logsAttendance'), path: paths.dashboard.attendance.logs },
-              { title: t('requestsAttendance'), path: paths.dashboard.attendance.requests },
-              { title: t('reportsAttendance'), path: paths.dashboard.attendance.report },
-              { title: t('adjustAttendance'), path: paths.dashboard.attendance.adjust },
-
+              {
+                title: t('assignmentsAttendance'),
+                path: paths.dashboard.attendance.assignments,
+                allPermissions: [SHIFT.assignmentRead],
+              },
+              { title: t('logsAttendance'), path: paths.dashboard.attendance.logs, allPermissions: [ATTENDANCE.read] },
+              {
+                title: t('requestsAttendance'),
+                path: paths.dashboard.attendance.requests,
+                allPermissions: [ATTENDANCE.requestProcess],
+              },
+              { title: t('reportsAttendance'), path: paths.dashboard.attendance.report, allPermissions: [ATTENDANCE.read] },
+              { title: t('adjustAttendance'), path: paths.dashboard.attendance.adjust, allPermissions: [ATTENDANCE.adjust] },
             ],
           },
           
@@ -447,12 +458,12 @@ export function useNavData(
             featureKey: 'workforce.shift-scheduling',
           },
 
-          // SHIFT AUDIT LOG (Admin, Manager)
+          // SHIFT AUDIT LOG — shift.audit.read (mặc định Admin, Manager)
           {
             title: 'Audit Log ca làm',
             path: paths.dashboard.shiftAudit.root,
             icon: ICONS.file,
-            roles: ['Admin', 'Manager'],
+            permissions: [SHIFT.auditRead],
             featureKey: 'workforce.shift-scheduling',
           },
 

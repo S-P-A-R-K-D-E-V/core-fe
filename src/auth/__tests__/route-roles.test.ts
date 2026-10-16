@@ -16,10 +16,6 @@ describe('requiredRolesFor', () => {
     [paths.dashboard.role.edit('r1'), ADMIN_ROLES],
     [paths.dashboard.storeSettings.root, ADMIN_ROLES],
     [paths.dashboard.notificationConfig.root, ADMIN_ROLES],
-    [paths.dashboard.shift.templates.list, MANAGER_ROLES],
-    [paths.dashboard.shift.schedules.edit('s1'), MANAGER_ROLES],
-    [paths.dashboard.shift.reminderRules.new, ADMIN_ROLES],
-    [paths.dashboard.shiftAudit.root, MANAGER_ROLES],
     [paths.dashboard.user.list, MANAGER_ROLES],
     [paths.dashboard.user.edit('u1'), MANAGER_ROLES],
   ])('%s → chỉ %j', (path, roles) => {
@@ -60,6 +56,34 @@ describe('requiredPermissionsFor', () => {
   ])('%s → cần %j, không còn giới hạn theo vai trò', (path, permissions) => {
     expect(requiredPermissionsFor(path)).toEqual(permissions);
     expect(requiredRolesFor(path)).toBeNull();
+  });
+
+  const S = PERMISSIONS.shift;
+  const A = PERMISSIONS.attendance;
+
+  it.each([
+    [paths.dashboard.shift.templates.list, [S.templateManage]],
+    [paths.dashboard.shift.schedules.edit('s1'), [S.scheduleManage]],
+    [paths.dashboard.shift.reminderRules.new, [S.reminderManage]],
+    [paths.dashboard.shift.list, [S.templateManage, S.scheduleManage]],
+    [paths.dashboard.shiftAudit.root, [S.auditRead]],
+    [paths.dashboard.shiftPool.pending, [S.requestReview]],
+    [paths.dashboard.shiftSwap.pending, [S.requestReview]],
+    [paths.dashboard.attendance.assignments, [S.assignmentRead]],
+    [paths.dashboard.attendance.logs, [A.read]],
+    [paths.dashboard.attendance.report, [A.read]],
+    [paths.dashboard.attendance.adjust, [A.adjust]],
+  ])('ca làm / chấm công: %s → cần %j', (path, permissions) => {
+    expect(requiredPermissionsFor(path)).toEqual(permissions);
+    expect(requiredRolesFor(path)).toBeNull();
+  });
+
+  it('việc của chính mình ở ca làm / chấm công không xét quyền', () => {
+    expect(requiredPermissionsFor(paths.dashboard.attendance.checkin)).toBeNull();
+    expect(requiredPermissionsFor(paths.dashboard.attendance.mySchedule)).toBeNull();
+    expect(requiredPermissionsFor(paths.dashboard.attendance.shiftRegistration)).toBeNull();
+    expect(requiredPermissionsFor(paths.dashboard.shiftPool.browse)).toBeNull();
+    expect(requiredPermissionsFor(paths.dashboard.shiftSwap.myRequests)).toBeNull();
   });
 
   it('lương của chính mình và trang chưa chuyển không xét quyền', () => {

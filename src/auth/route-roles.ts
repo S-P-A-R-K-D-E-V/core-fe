@@ -11,8 +11,8 @@ import { ADMIN_ROLES, MANAGER_ROLES } from './roles';
 //   - role               : RolesController (sửa danh mục/gán vai trò chỉ Admin)
 //   - store-settings     : StoreSettingsController — Admin
 //   - notification-config: NotificationConfigController — Admin
-//   - shift              : ShiftTemplate/ShiftSchedule — sửa cho Admin, Manager; reminder-rules chỉ Admin
-//   - shift-audit        : ShiftAuditController — Admin, Manager
+//   - shift, shift-audit, shift-pool/pending, shift-swap/pending, attendance/*: theo quyền shift.* / attendance.*
+//     (Core-be; mặc định Admin, Manager — nhắc ca chỉ Admin)
 //   - salary, holiday-policy, penalty-policy, payroll/cycles, payroll/batch: theo quyền payroll.* (Core-be Payroll*,
 //     mặc định Admin, Manager; vai trò tuỳ chỉnh được cấp thêm) — `permissions`: cần MỘT trong các quyền
 //   - user               : UsersController quản trị người khác — Admin, Manager (trừ trang tài khoản của chính mình)
@@ -28,15 +28,25 @@ export type RouteRoleRule = {
 };
 
 const PAYROLL = PERMISSIONS.payroll;
+const SHIFT = PERMISSIONS.shift;
+const ATTENDANCE = PERMISSIONS.attendance;
 
 export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   { prefix: paths.dashboard.role.root, roles: ADMIN_ROLES },
   { prefix: paths.dashboard.storeSettings.root, roles: ADMIN_ROLES },
   { prefix: paths.dashboard.notificationConfig.root, roles: ADMIN_ROLES },
 
-  { prefix: paths.dashboard.shift.root, roles: MANAGER_ROLES },
-  { prefix: paths.dashboard.shift.reminderRules.root, roles: ADMIN_ROLES },
-  { prefix: paths.dashboard.shiftAudit.root, roles: MANAGER_ROLES },
+  { prefix: paths.dashboard.shift.root, roles: null, permissions: [SHIFT.templateManage, SHIFT.scheduleManage] },
+  { prefix: paths.dashboard.shift.templates.root, roles: null, permissions: [SHIFT.templateManage] },
+  { prefix: paths.dashboard.shift.schedules.root, roles: null, permissions: [SHIFT.scheduleManage] },
+  { prefix: paths.dashboard.shift.reminderRules.root, roles: null, permissions: [SHIFT.reminderManage] },
+  { prefix: paths.dashboard.shiftAudit.root, roles: null, permissions: [SHIFT.auditRead] },
+  { prefix: paths.dashboard.shiftPool.pending, roles: null, permissions: [SHIFT.requestReview] },
+  { prefix: paths.dashboard.shiftSwap.pending, roles: null, permissions: [SHIFT.requestReview] },
+  { prefix: paths.dashboard.attendance.assignments, roles: null, permissions: [SHIFT.assignmentRead] },
+  { prefix: paths.dashboard.attendance.logs, roles: null, permissions: [ATTENDANCE.read] },
+  { prefix: paths.dashboard.attendance.report, roles: null, permissions: [ATTENDANCE.read] },
+  { prefix: paths.dashboard.attendance.adjust, roles: null, permissions: [ATTENDANCE.adjust] },
 
   { prefix: paths.dashboard.salary.root, roles: null, permissions: [PAYROLL.salaryConfigRead] },
   { prefix: paths.dashboard.holidayPolicy.root, roles: null, permissions: [PAYROLL.policyManage] },
