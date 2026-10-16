@@ -33,6 +33,7 @@ import {
   IQrPaymentResponse,
   IQrPaymentStatusResponse,
 } from 'src/types/corecms-api';
+import { customerDisplay } from 'src/sections/customer-display/customer-display-bus';
 
 // ----------------------------------------------------------------------
 
@@ -320,6 +321,27 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
   );
   const amountReceived = statusData?.amountReceived ?? 0;
   const expectedAmount = statusData?.amount ?? qrOrder?.amount ?? amount;
+
+  // Màn hình khách: QR lớn cho khách quét trên màn phụ; nhận đủ tiền → "Cảm ơn quý khách".
+  const qrShowing = (qrState === 'active' || qrState === 'polling') && !!qrImageSrc;
+  const qrExpiresAt = statusData?.expiresAt ?? qrOrder?.expiresAt ?? null;
+  useEffect(() => {
+    if (qrShowing && qrImageSrc) {
+      customerDisplay.setQr({
+        amount: expectedAmount,
+        imageSrc: qrImageSrc,
+        bankName: qrOrder?.bankName ?? null,
+        accountNumber: qrOrder?.accountNumber ?? null,
+        paymentCode: paymentCode ?? null,
+        expiresAt: qrExpiresAt,
+      });
+    } else if (qrState === 'completed') {
+      customerDisplay.paid(amountReceived || expectedAmount);
+    } else {
+      customerDisplay.setQr(null);
+    }
+  }, [qrShowing, qrImageSrc, qrState, expectedAmount, qrOrder?.bankName, qrOrder?.accountNumber, paymentCode, qrExpiresAt, amountReceived]);
+  useEffect(() => () => customerDisplay.setQr(null), []);
 
   const currentStatus = statusData?.status || qrOrder?.status || '';
   const statusInfo = STATUS_LABELS[currentStatus] || { label: currentStatus, color: 'default' as const };
