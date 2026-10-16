@@ -32,6 +32,30 @@ export const PERMISSIONS = {
     categoryManage: 'expense.category.manage',
     recurringManage: 'expense.recurring.manage',
   },
+  /**
+   * Giám sát Kiểm quầy (trước đây cứng "chỉ Admin"). Xem: vào không cần ca / vị trí, xem ngày cũ, nhật ký, điều tra chênh
+   * lệch. Sửa (cần kèm xem): ghi ngày cũ, sửa / xoá khoản của người khác, ghi khi không có ca.
+   */
+  shiftCash: {
+    oversightRead: 'shift-cash.oversight.read',
+    oversightManage: 'shift-cash.oversight.manage',
+  },
+  /** Lương — lương của chính mình (my-payroll) không cần quyền. Quyền ghi cần kèm quyền xem tương ứng. */
+  payroll: {
+    recordsRead: 'payroll.records.read',
+    calculate: 'payroll.calculate',
+    recalculate: 'payroll.recalculate',
+    finalize: 'payroll.finalize',
+    paymentPrepare: 'payroll.payment.prepare',
+    markPaid: 'payroll.mark-paid',
+    cycleManage: 'payroll.cycle.manage',
+    cyclePublish: 'payroll.cycle.publish',
+    cycleDelete: 'payroll.cycle.delete',
+    penaltyManage: 'payroll.penalty.manage',
+    policyManage: 'payroll.policy.manage',
+    salaryConfigRead: 'payroll.salary-config.read',
+    salaryConfigManage: 'payroll.salary-config.manage',
+  },
 } as const;
 
 type PermissionSource = { role?: unknown; roles?: unknown; permissions?: unknown } | null | undefined;

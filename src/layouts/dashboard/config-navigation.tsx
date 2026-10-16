@@ -62,6 +62,8 @@ const ICONS = {
  * hiện khi bật MỘT TRONG các khoá (vd hàng hoá dùng chung cho bán lẻ và F&B).
  * Item có branchType chỉ hiện khi loại đó nằm trong branchTypes (xem menuBranchTypes: nhân viên = loại của chi nhánh
  * đang làm việc, quản lý = các loại trong chi nhánh được phân công); branchTypes null = không thu hẹp (chủ cửa hàng). */
+const PAYROLL = PERMISSIONS.payroll;
+
 type NavAccess = { roles: readonly string[]; permissions: readonly string[] | undefined };
 
 function filterNavItems<
@@ -389,19 +391,49 @@ export function useNavData(
           },
           
 
-          // SALARY MANAGEMENT (Admin/Manager)
+          // SALARY MANAGEMENT — theo quyền payroll.* (Core-be; mặc định Admin, Manager như trước).
           {
             title: t('salaryManagement'),
             path: paths.dashboard.salary.root,
             icon: ICONS.banking,
-            roles: ['Admin', 'Manager'],
+            permissions: [PAYROLL.salaryConfigRead, PAYROLL.policyManage, PAYROLL.recordsRead],
             children: [
-              { title: t('salaryConfiguration'), path: paths.dashboard.salary.configuration, featureKey: 'payroll.core' },
-              { title: t('salaryHistory'), path: paths.dashboard.salary.history, featureKey: 'payroll.core' },
-              { title: t('holidayPolicy'), path: paths.dashboard.holidayPolicy.list, featureKey: 'payroll.core' },
-              { title: t('penaltyPolicy'), path: paths.dashboard.penaltyPolicy.list, featureKey: 'payroll.penalty' },
-              { title: t('payrollCycle'), path: paths.dashboard.payroll.cycles, featureKey: 'payroll.core' },
-              { title: t('payrollBatch'), path: paths.dashboard.payroll.batch, featureKey: 'payroll.core' },
+              {
+                title: t('salaryConfiguration'),
+                path: paths.dashboard.salary.configuration,
+                featureKey: 'payroll.core',
+                allPermissions: [PAYROLL.salaryConfigRead],
+              },
+              {
+                title: t('salaryHistory'),
+                path: paths.dashboard.salary.history,
+                featureKey: 'payroll.core',
+                allPermissions: [PAYROLL.salaryConfigRead],
+              },
+              {
+                title: t('holidayPolicy'),
+                path: paths.dashboard.holidayPolicy.list,
+                featureKey: 'payroll.core',
+                allPermissions: [PAYROLL.policyManage],
+              },
+              {
+                title: t('penaltyPolicy'),
+                path: paths.dashboard.penaltyPolicy.list,
+                featureKey: 'payroll.penalty',
+                allPermissions: [PAYROLL.policyManage],
+              },
+              {
+                title: t('payrollCycle'),
+                path: paths.dashboard.payroll.cycles,
+                featureKey: 'payroll.core',
+                allPermissions: [PAYROLL.recordsRead],
+              },
+              {
+                title: t('payrollBatch'),
+                path: paths.dashboard.payroll.batch,
+                featureKey: 'payroll.core',
+                allPermissions: [PAYROLL.recordsRead],
+              },
             ],
           },
           

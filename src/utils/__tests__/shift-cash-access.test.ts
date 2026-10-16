@@ -7,7 +7,8 @@ import {
   hasShiftOn,
   canUseShiftCash,
   shiftCashDenial,
-  isShiftCashBypass,
+  canOverseeShiftCash,
+  canManageShiftCashOversight,
   shiftCashGeoHeaders,
   checkShiftCashGeofence,
   ShiftCashGeoError,
@@ -25,13 +26,23 @@ const STORE: IBranchLocation = {
   isActive: true,
 };
 
-describe('isShiftCashBypass', () => {
-  it('chỉ Admin được bỏ qua — Manager theo luật của Staff', () => {
-    expect(isShiftCashBypass({ roles: ['Admin'] })).toBe(true);
-    expect(isShiftCashBypass({ role: 'Admin' })).toBe(true);
-    expect(isShiftCashBypass({ roles: ['Manager'] })).toBe(false);
-    expect(isShiftCashBypass({ roles: ['Staff'], role: 'Staff' })).toBe(false);
-    expect(isShiftCashBypass(null)).toBe(false);
+describe('canOverseeShiftCash / canManageShiftCashOversight', () => {
+  it('mặc định chỉ Admin — Manager theo luật của Staff', () => {
+    expect(canOverseeShiftCash({ roles: ['Admin'] })).toBe(true);
+    expect(canOverseeShiftCash({ role: 'Admin' })).toBe(true);
+    expect(canManageShiftCashOversight({ role: 'Admin' })).toBe(true);
+    expect(canOverseeShiftCash({ roles: ['Manager'], permissions: [] })).toBe(false);
+    expect(canOverseeShiftCash({ roles: ['Staff'], role: 'Staff' })).toBe(false);
+    expect(canOverseeShiftCash(null)).toBe(false);
+  });
+
+  it('vai trò tuỳ chỉnh được cấp quyền giám sát', () => {
+    const viewer = { roles: ['Staff'], permissions: ['shift-cash.oversight.read'] };
+    expect(canOverseeShiftCash(viewer)).toBe(true);
+    expect(canManageShiftCashOversight(viewer)).toBe(false);
+
+    const manager = { roles: ['Staff'], permissions: ['shift-cash.oversight.read', 'shift-cash.oversight.manage'] };
+    expect(canManageShiftCashOversight(manager)).toBe(true);
   });
 });
 

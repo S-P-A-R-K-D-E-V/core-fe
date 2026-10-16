@@ -231,3 +231,32 @@ describe('useNavData — chi phí theo quyền', () => {
     expect(navPaths('Staff', [], ['expense.read', 'expense.create'])).toContain(expense.new);
   });
 });
+
+// Quản lý lương theo quyền payroll.* (Core-be): Admin / Manager như trước; vai trò tuỳ chỉnh thấy đúng mục được cấp.
+describe('useNavData — lương theo quyền', () => {
+  const features = ['payroll.core', 'payroll.penalty'];
+  const MANAGER_DEFAULTS = [
+    'payroll.records.read',
+    'payroll.salary-config.read',
+    'payroll.policy.manage',
+  ];
+
+  it('Admin và Manager (quyền mặc định) thấy đủ mục lương', () => {
+    [navPaths('Admin', features), navPaths('Manager', features, MANAGER_DEFAULTS)].forEach((nav) => {
+      expect(nav).toContain(paths.dashboard.salary.root);
+      expect(nav).toContain(paths.dashboard.payroll.batch);
+      expect(nav).toContain(paths.dashboard.penaltyPolicy.list);
+    });
+  });
+
+  it('nhân viên thường không thấy; "Kế toán lương" chỉ xem bảng lương thấy đúng kỳ + bảng lương', () => {
+    expect(navPaths('Staff', features, [])).not.toContain(paths.dashboard.salary.root);
+
+    const accountant = navPaths('Staff', features, ['payroll.records.read']);
+    expect(accountant).toContain(paths.dashboard.salary.root);
+    expect(accountant).toContain(paths.dashboard.payroll.batch);
+    expect(accountant).toContain(paths.dashboard.payroll.cycles);
+    expect(accountant).not.toContain(paths.dashboard.salary.configuration);
+    expect(accountant).not.toContain(paths.dashboard.holidayPolicy.list);
+  });
+});

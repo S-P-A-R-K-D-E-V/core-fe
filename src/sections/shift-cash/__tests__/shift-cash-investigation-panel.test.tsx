@@ -18,7 +18,7 @@ import type {
 // thứ tự BE trả về, và phân biệt các trạng thái: chưa chốt / BE chưa có endpoint / 403 / lỗi khác.
 // ----------------------------------------------------------------------
 
-let mockUser: { role: string; roles: string[] } = { role: 'Admin', roles: ['Admin'] };
+let mockUser: { role: string; roles: string[]; permissions?: string[] } = { role: 'Admin', roles: ['Admin'] };
 vi.mock('src/auth/hooks', () => ({
   useAuthContext: () => ({ user: mockUser }),
 }));
@@ -517,9 +517,9 @@ describe('ShiftCashInvestigationPanel', () => {
   });
 
   it.each(['Manager', 'Staff'])(
-    '%s (không phải Admin) → không hiện gì, không gọi API kể cả khi có ?investigate=1',
+    '%s không có quyền giám sát → không hiện gì, không gọi API kể cả khi có ?investigate=1',
     (role) => {
-      mockUser = { role, roles: [role] };
+      mockUser = { role, roles: [role], permissions: [] };
       query = 'investigate=1';
 
       const { container } = renderPanel();
@@ -528,6 +528,14 @@ describe('ShiftCashInvestigationPanel', () => {
       expect(getShiftCashInvestigation).not.toHaveBeenCalled();
     }
   );
+
+  it('vai trò được cấp quyền giám sát Kiểm quầy thấy panel như Admin', () => {
+    mockUser = { role: 'Staff', roles: ['Staff'], permissions: ['shift-cash.oversight.read'] };
+
+    renderPanel();
+
+    expect(screen.getByRole('button', { name: 'Kiểm tra' })).toBeInTheDocument();
+  });
 
   it('?investigate=1 → tự kiểm tra đúng 1 lần cho ngày đang chọn; đổi ngày sau đó không tự chạy lại', async () => {
     query = 'investigate=1';
