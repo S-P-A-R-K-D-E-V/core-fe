@@ -34,6 +34,8 @@ import { useSnackbar } from 'src/components/snackbar';
 
 import type { IUser } from 'src/types/corecms-api';
 
+import PlatformAccessLogCard from './platform-access-log-card';
+
 // ----------------------------------------------------------------------
 // Cài đặt cửa hàng → Tính năng web / app: giới hạn ai được dùng một tính năng trên từng nền tảng, vd tắt tự chấm công
 // trên web với nhân viên để buộc chấm công bằng app. Không giới hạn = mọi người dùng được (mặc định).
@@ -260,6 +262,8 @@ export default function PlatformFeaturesTab() {
           </Stack>
         </Card>
       ))}
+
+      <PlatformAccessLogCard />
     </Stack>
   );
 }

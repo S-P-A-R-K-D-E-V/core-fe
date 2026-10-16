@@ -1,8 +1,9 @@
 // ----------------------------------------------------------------------
 // Bật / tắt tính năng theo nền tảng — trùng Core-be (CoreCms.Domain/Common/PlatformFeatures.cs). Chủ cửa hàng giới hạn ai
-// được dùng một tính năng trên web / app (vd tắt tự chấm công trên web với nhân viên, buộc dùng app). Web khai nền tảng
-// qua header X-Client-Platform (src/utils/axios.ts); GET /users/me trả blockedFeatures cho nền tảng đó. API vẫn tự chặn
-// (403 platform_feature_disabled) — web chỉ ẩn cho khớp.
+// được dùng một tính năng trên web / app (vd tắt tự chấm công trên web với nhân viên, buộc dùng app). Server tự nhận ra
+// trình duyệt (luôn là web) và gắn nền tảng vào phiên đăng nhập; header X-Client-Platform (src/utils/axios.ts) chỉ còn là
+// tín hiệu phụ. GET /users/me trả blockedFeatures cho nền tảng đó. API vẫn tự chặn (403 platform_feature_disabled) — web
+// chỉ ẩn cho khớp.
 // ----------------------------------------------------------------------
 
 export const PLATFORM_FEATURES = {

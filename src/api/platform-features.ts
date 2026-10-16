@@ -47,3 +47,39 @@ export async function setPlatformFeaturePolicy(
   const response = await axios.put<PlatformFeaturePolicy | ''>(endpoints.platformFeatures.policy(featureKey, platform), data);
   return response.status === 204 || !response.data ? null : response.data;
 }
+
+/** Một lần gọi tính năng theo nền tảng (GET /platform-features/access-logs). */
+export type PlatformAccessLog = {
+  id: string;
+  createdAt: string;
+  userId: string;
+  userName?: string | null;
+  featureKey: string;
+  /** Action được gọi (vd "SmartCheckIn"). */
+  action: string;
+  /** Nền tảng server dùng để quyết định ("web" / "app"; null = không rõ). */
+  platform?: string | null;
+  /** Header X-Client-Platform client gửi (đã chuẩn hoá). */
+  declaredPlatform?: string | null;
+  /** Nền tảng ghi trong phiên đăng nhập. */
+  sessionPlatform?: string | null;
+  isBrowser: boolean;
+  /** Các tín hiệu mâu thuẫn — dấu hiệu sửa nền tảng. */
+  suspicious: boolean;
+  blocked: boolean;
+  statusCode: number;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+};
+
+export type PlatformAccessLogPage = { total: number; page: number; pageSize: number; data: PlatformAccessLog[] };
+
+export async function getPlatformAccessLogs(params: {
+  suspiciousOnly?: boolean;
+  blockedOnly?: boolean;
+  page?: number;
+  pageSize?: number;
+}): Promise<PlatformAccessLogPage> {
+  const response = await axios.get<PlatformAccessLogPage>(endpoints.platformFeatures.accessLogs, { params });
+  return response.data;
+}
