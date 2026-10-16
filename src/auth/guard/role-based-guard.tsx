@@ -14,30 +14,41 @@ import { varBounce, MotionContainer } from 'src/components/animate';
 
 import { useAuthContext } from '../hooks';
 import { hasAnyRole, getUserRoles } from '../roles';
+import { permissionsKnown, hasAnyPermission, hasAllPermissions } from '../permissions';
 
 // ----------------------------------------------------------------------
 
 type RoleBasedGuardProp = {
   hasContent?: boolean;
   roles?: readonly string[];
-  permissions?: string[];
+  /** Có MỘT trong các quyền (mã Core-be, xem src/auth/permissions.ts). */
+  permissions?: readonly string[];
+  /** Có ĐỦ các quyền — trang gọi nhiều API, mỗi API một quyền. */
+  allPermissions?: readonly string[];
   children: React.ReactNode;
   sx?: SxProps<Theme>;
 };
 
 export const FORBIDDEN_TITLE = 'Không có quyền truy cập';
 
-export default function RoleBasedGuard({ hasContent, roles, permissions, children, sx }: RoleBasedGuardProp) {
+export default function RoleBasedGuard({
+  hasContent,
+  roles,
+  permissions,
+  allPermissions,
+  children,
+  sx,
+}: RoleBasedGuardProp) {
   const { user } = useAuthContext();
 
   // Gộp role + roles: người kiêm nhiều vai trò (vd Staff kiêm Admin) có quyền của MỌI vai trò, như API.
-  const userRoles = getUserRoles(user);
-  const userPermissions: string[] = user?.permissions || [];
+  const hasRoleAccess = hasAnyRole(getUserRoles(user), roles);
 
-  const hasRoleAccess = hasAnyRole(userRoles, roles);
+  const needsPermission = !!permissions?.length || !!allPermissions?.length;
+  // Token không mang quyền: chờ /users/me nạp xong thay vì báo "không có quyền" rồi lại mở.
+  if (hasRoleAccess && needsPermission && !permissionsKnown(user)) return null;
 
-  // Check permission-based access
-  const hasPermissionAccess = typeof permissions === 'undefined' || permissions.some((perm) => userPermissions.includes(perm));
+  const hasPermissionAccess = hasAnyPermission(user, permissions) && hasAllPermissions(user, allPermissions);
 
   if (!hasRoleAccess || !hasPermissionAccess) {
     return hasContent ? (

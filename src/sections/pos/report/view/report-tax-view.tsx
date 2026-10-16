@@ -13,6 +13,8 @@ import { getBankAccounts } from 'src/api/bank-accounts';
 
 import TaxReportFilter from '../tax-report-filter';
 import TaxReportTable from '../tax-report-table';
+import { useAuthContext } from 'src/auth/hooks';
+import { canExportReports } from '../report-access';
 
 // ----------------------------------------------------------------------
 
@@ -24,6 +26,7 @@ function getDefaultQuery(): TaxReportQuery {
 // ----------------------------------------------------------------------
 
 export default function ReportTaxView() {
+  const { user } = useAuthContext();
   const { enqueueSnackbar } = useSnackbar();
 
   const [query, setQuery] = useState<TaxReportQuery>(getDefaultQuery);
@@ -79,7 +82,7 @@ export default function ReportTaxView() {
         query={query}
         onChange={setQuery}
         onView={handleView}
-        onExport={handleExport}
+        onExport={canExportReports(user) ? handleExport : undefined}
         bankAccounts={bankAccounts}
         loadingView={loadingView}
         loadingExport={loadingExport}

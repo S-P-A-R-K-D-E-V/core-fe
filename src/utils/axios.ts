@@ -127,10 +127,17 @@ export const endpoints = {
     update: (id: string) => `/roles/${id}`,
     delete: (id: string) => `/roles/${id}`,
     assign: '/roles/assign',
-    catalogStatus: '/roles/catalog-status',
+  },
+  customRoles: {
+    list: '/custom-roles',
+    create: '/custom-roles',
+    update: (id: string) => `/custom-roles/${id}`,
+    delete: (id: string) => `/custom-roles/${id}`,
+    userAssignment: (userId: string) => `/custom-roles/users/${userId}`,
   },
   permissions: {
     list: '/permissions',
+    catalog: '/permissions/catalog',
     userPermissions: (userId: string) => `/permissions/user/${userId}`,
     myPermissions: '/permissions/me',
   },

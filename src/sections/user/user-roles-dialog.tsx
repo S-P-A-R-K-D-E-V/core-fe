@@ -3,16 +3,17 @@
 import { useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
+import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
+import Divider from '@mui/material/Divider';
 import Checkbox from '@mui/material/Checkbox';
 import Typography from '@mui/material/Typography';
+import LoadingButton from '@mui/lab/LoadingButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
-import LoadingButton from '@mui/lab/LoadingButton';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import Alert from '@mui/material/Alert';
 
 import { apiErrorMessage } from 'src/utils/api-error';
 
@@ -20,10 +21,20 @@ import { useAuthContext } from 'src/auth/hooks';
 
 import { useSnackbar } from 'src/components/snackbar';
 
-import { IRole } from 'src/types/corecms-api';
+import type { IRole, ICustomRole } from 'src/types/corecms-api';
 
-import { getAllRoles, assignRoles, getUserPermissions } from 'src/api/roles';
+import { getAllRoles, assignRoles } from 'src/api/roles';
+import {
+  getCustomRoles,
+  SYSTEM_ROLE_LABELS,
+  setUserCustomRoles,
+  getUserRoleAssignment,
+} from 'src/api/custom-roles';
 
+// ----------------------------------------------------------------------
+// Gán vai trò cho một người ở cửa hàng hiện tại: vai trò hệ thống (/roles/assign) + vai trò tuỳ chỉnh
+// (/custom-roles/users/{id}). Đọc vai trò ĐƯỢC GÁN từ /custom-roles/users/{id} — danh sách vai trò trong token / GET /users
+// có cả vai trò gốc của vai trò tuỳ chỉnh, đọc từ đó là lưu nhầm vai trò gốc thành vai trò hệ thống.
 // ----------------------------------------------------------------------
 
 type Props = {
@@ -33,6 +44,8 @@ type Props = {
   userName: string;
 };
 
+const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+
 export default function UserRolesDialog({ open, onClose, userId, userName }: Props) {
   const { enqueueSnackbar } = useSnackbar();
 
@@ -41,8 +54,12 @@ export default function UserRolesDialog({ open, onClose, userId, userName }: Pro
   // Core-be chặn Admin tự gỡ Admin của chính mình (có thể là Admin cuối cùng) — khoá luôn ô đó trên giao diện.
   const isSelf = !!user?.id && user.id === userId;
 
-  const [allRoles, setAllRoles] = useState<IRole[]>([]);
-  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
+  const [systemRoles, setSystemRoles] = useState<IRole[]>([]);
+  const [customRoles, setCustomRoles] = useState<ICustomRole[]>([]);
+  const [initialSystem, setInitialSystem] = useState<string[]>([]);
+  const [initialCustom, setInitialCustom] = useState<string[]>([]);
+  const [selectedSystem, setSelectedSystem] = useState<string[]>([]);
+  const [selectedCustom, setSelectedCustom] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -52,21 +69,21 @@ export default function UserRolesDialog({ open, onClose, userId, userName }: Pro
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [roles, userPerms] = await Promise.all([
+        const [roles, custom, assignment] = await Promise.all([
           getAllRoles(),
-          getUserPermissions(userId),
+          getCustomRoles(),
+          getUserRoleAssignment(userId),
         ]);
-        setAllRoles(roles);
+        setSystemRoles(roles);
+        setCustomRoles(custom);
 
-        // Find role IDs from role names
-        const userRoleNames = userPerms.roles || [];
-        const userRoleIds = roles
-          .filter((r) => userRoleNames.includes(r.name))
-          .map((r) => r.id);
-        setSelectedRoleIds(userRoleIds);
+        const systemIds = roles.filter((r) => assignment.systemRoles.includes(r.name)).map((r) => r.id);
+        setInitialSystem(systemIds);
+        setSelectedSystem(systemIds);
+        setInitialCustom(assignment.customRoleIds);
+        setSelectedCustom(assignment.customRoleIds);
       } catch (error) {
-        console.error('Failed to fetch data:', error);
-        enqueueSnackbar('Failed to load roles', { variant: 'error' });
+        enqueueSnackbar(apiErrorMessage(error, 'Không tải được vai trò'), { variant: 'error' });
       } finally {
         setLoading(false);
       }
@@ -75,47 +92,45 @@ export default function UserRolesDialog({ open, onClose, userId, userName }: Pro
     fetchData();
   }, [open, userId, enqueueSnackbar]);
 
-  const handleToggleRole = (roleId: string) => {
-    setSelectedRoleIds((prev) =>
-      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]
-    );
-  };
+  const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await assignRoles({ userId, roleIds: selectedRoleIds });
-      enqueueSnackbar('Roles assigned successfully!');
+      // Hai lệnh riêng: lệnh nào không đổi thì không gửi (mỗi lệnh có thể buộc người đó đăng nhập lại).
+      if (!sameSet(selectedSystem, initialSystem)) await assignRoles({ userId, roleIds: selectedSystem });
+      if (!sameSet(selectedCustom, initialCustom)) await setUserCustomRoles(userId, selectedCustom);
+      enqueueSnackbar('Đã cập nhật vai trò');
       onClose();
     } catch (error) {
-      console.error('Failed to assign roles:', error);
       enqueueSnackbar(apiErrorMessage(error, 'Không gán được vai trò'), { variant: 'error' });
     } finally {
       setSaving(false);
     }
   };
 
+  const roleLabel = (role: IRole) => SYSTEM_ROLE_LABELS[role.name] ?? role.name;
+
   return (
     <Dialog fullWidth maxWidth="xs" open={open} onClose={onClose}>
-      <DialogTitle>Manage Roles</DialogTitle>
+      <DialogTitle>Vai trò của {userName}</DialogTitle>
 
       <DialogContent dividers>
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Assign roles to <strong>{userName}</strong>
-        </Alert>
-
         {loading ? (
           <Typography variant="body2" sx={{ py: 3, textAlign: 'center', color: 'text.secondary' }}>
-            Loading...
+            Đang tải…
           </Typography>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {allRoles.map((role) => (
+            <Typography variant="overline" sx={{ color: 'text.secondary' }}>
+              Vai trò hệ thống
+            </Typography>
+            {systemRoles.map((role) => (
               <FormControlLabel
                 key={role.id}
                 label={
                   <Box>
-                    <Typography variant="subtitle2">{role.name}</Typography>
+                    <Typography variant="subtitle2">{roleLabel(role)}</Typography>
                     {role.description && (
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                         {role.description}
@@ -125,18 +140,40 @@ export default function UserRolesDialog({ open, onClose, userId, userName }: Pro
                 }
                 control={
                   <Checkbox
-                    checked={selectedRoleIds.includes(role.id)}
-                    onChange={() => handleToggleRole(role.id)}
-                    disabled={isSelf && role.name === 'Admin' && selectedRoleIds.includes(role.id)}
+                    checked={selectedSystem.includes(role.id)}
+                    onChange={() => setSelectedSystem((prev) => toggle(prev, role.id))}
+                    disabled={isSelf && role.name === 'Admin' && selectedSystem.includes(role.id)}
                   />
                 }
               />
             ))}
 
-            {allRoles.length === 0 && (
-              <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 2 }}>
-                No roles available
-              </Typography>
+            <Divider sx={{ my: 1 }} />
+
+            <Typography variant="overline" sx={{ color: 'text.secondary' }}>
+              Vai trò tuỳ chỉnh
+            </Typography>
+            {customRoles.map((role) => (
+              <FormControlLabel
+                key={role.id}
+                label={
+                  <Box>
+                    <Typography variant="subtitle2">{role.name}</Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Gốc: {SYSTEM_ROLE_LABELS[role.baseRole] ?? role.baseRole} · {role.permissions.length} quyền
+                    </Typography>
+                  </Box>
+                }
+                control={
+                  <Checkbox
+                    checked={selectedCustom.includes(role.id)}
+                    onChange={() => setSelectedCustom((prev) => toggle(prev, role.id))}
+                  />
+                }
+              />
+            ))}
+            {customRoles.length === 0 && (
+              <Alert severity="info">Cửa hàng chưa có vai trò tuỳ chỉnh — tạo trong mục Vai trò.</Alert>
             )}
           </Box>
         )}
@@ -144,11 +181,11 @@ export default function UserRolesDialog({ open, onClose, userId, userName }: Pro
 
       <DialogActions>
         <Button variant="outlined" color="inherit" onClick={onClose}>
-          Cancel
+          Huỷ
         </Button>
 
-        <LoadingButton variant="contained" loading={saving} onClick={handleSave}>
-          Save
+        <LoadingButton variant="contained" loading={saving} disabled={loading} onClick={handleSave}>
+          Lưu
         </LoadingButton>
       </DialogActions>
     </Dialog>

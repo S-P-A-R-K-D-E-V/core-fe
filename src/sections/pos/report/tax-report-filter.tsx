@@ -30,7 +30,8 @@ interface Props {
   query: TaxReportQuery;
   onChange: (q: TaxReportQuery) => void;
   onView: () => void;
-  onExport: () => void;
+  /** Không truyền = không có quyền xuất (analytics.export) → ẩn nút. */
+  onExport?: () => void;
   bankAccounts: IKiotVietBankAccount[];
   loadingView: boolean;
   loadingExport: boolean;
@@ -141,15 +142,17 @@ export default function TaxReportFilter({
             >
               Xem báo cáo
             </Button>
-            <Button
-              variant="outlined"
-              color="success"
-              onClick={onExport}
-              disabled={loadingExport}
-              startIcon={<Iconify icon="vscode-icons:file-type-excel" />}
-            >
-              Xuất Excel
-            </Button>
+            {onExport && (
+              <Button
+                variant="outlined"
+                color="success"
+                onClick={onExport}
+                disabled={loadingExport}
+                startIcon={<Iconify icon="vscode-icons:file-type-excel" />}
+              >
+                Xuất Excel
+              </Button>
+            )}
           </Stack>
         </Stack>
       </CardContent>
