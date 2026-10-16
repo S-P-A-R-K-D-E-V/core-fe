@@ -430,6 +430,7 @@ export function useNavData(
             path: paths.dashboard.salary.root,
             icon: ICONS.banking,
             permissions: [PAYROLL.salaryConfigRead, PAYROLL.policyManage, PAYROLL.recordsRead],
+            platformFeature: PLATFORM_FEATURES.payroll,
             children: [
               {
                 title: t('salaryConfiguration'),
