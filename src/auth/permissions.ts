@@ -119,6 +119,29 @@ export const PERMISSIONS = {
   },
   /** Nhà cung cấp và nhóm nhà cung cấp. */
   supplier: { read: 'supplier.read', manage: 'supplier.manage' },
+  /**
+   * Hoá đơn bán — bán theo giá niêm yết, xem hoá đơn mình bán hôm nay không cần quyền. priceOverride: bán khác giá,
+   * chọn người bán. Phiên máy quầy xem mọi hoá đơn như trước.
+   */
+  sales: {
+    orderRead: 'sales.order.read',
+    orderExport: 'sales.order.export',
+    orderUpdate: 'sales.order.update',
+    orderCancel: 'sales.order.cancel',
+    paymentAdd: 'sales.order.payment.add',
+    priceOverride: 'sales.price.override',
+  },
+  salesReturn: {
+    read: 'sales-return.read',
+    create: 'sales-return.create',
+    complete: 'sales-return.complete',
+    cancel: 'sales-return.cancel',
+  },
+  customer: { read: 'customer.read', manage: 'customer.manage', delete: 'customer.delete' },
+  coupon: { read: 'coupon.read', manage: 'coupon.manage' },
+  promotionCampaign: { read: 'promotion-campaign.read', manage: 'promotion-campaign.manage' },
+  posCart: { read: 'pos-cart.read', manage: 'pos-cart.manage', convert: 'pos-cart.convert' },
+  orders: { read: 'orders.read', create: 'orders.create', update: 'orders.update', delete: 'orders.delete' },
 } as const;
 
 type PermissionSource = { role?: unknown; roles?: unknown; permissions?: unknown } | null | undefined;

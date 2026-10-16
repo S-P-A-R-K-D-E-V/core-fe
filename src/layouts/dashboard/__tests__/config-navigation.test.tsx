@@ -362,3 +362,24 @@ describe('useNavData — nhập hàng và nhà cung cấp theo quyền', () => {
     expect(viewer).not.toContain(paths.dashboard.pos.supplier.new);
   });
 });
+
+// Đơn bán, khách hàng theo quyền sales.* / customer.* (Core-be): trước đây chỉ Admin dù API cho cả Manager.
+describe('useNavData — đơn bán và khách hàng theo quyền', () => {
+  const features = ['commerce.retail.pos'];
+
+  it('Manager (quyền mặc định) thấy; nhân viên thường không', () => {
+    const manager = navPaths('Manager', features, ['sales.order.read', 'customer.read', 'customer.manage']);
+    expect(manager).toContain(paths.dashboard.pos.salesOrder.list);
+    expect(manager).toContain(paths.dashboard.pos.customer.new);
+
+    const staff = navPaths('Staff', features, []);
+    expect(staff).not.toContain(paths.dashboard.pos.salesOrder.root);
+    expect(staff).not.toContain(paths.dashboard.pos.customer.root);
+  });
+
+  it('"CSKH" chỉ xem khách: thấy danh sách, không thấy "Thêm mới"', () => {
+    const cs = navPaths('Staff', features, ['customer.read']);
+    expect(cs).toContain(paths.dashboard.pos.customer.list);
+    expect(cs).not.toContain(paths.dashboard.pos.customer.new);
+  });
+});

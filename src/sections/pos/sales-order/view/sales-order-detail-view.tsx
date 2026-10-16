@@ -30,10 +30,9 @@ import { ISalesOrder } from 'src/types/corecms-api';
 import { getSalesOrderById, cancelSalesOrder } from 'src/api/sales-orders';
 
 import ReceiptPrintDialog from 'src/sections/pos/receipt-print/receipt-print-dialog';
-import { useAuthContext } from 'src/auth/hooks';
-import { useCounterSession } from 'src/sections/counter/counter-scope';
 
 import SalesReturnDialog from '../sales-return-dialog';
+import { useSalesAccess } from '../sales-access';
 
 import KiotVietSyncLabel from '../kiotviet-sync-label';
 
@@ -86,10 +85,8 @@ export default function SalesOrderDetailView({ id }: Props) {
   const [actionLoading, setActionLoading] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
-  const { user } = useAuthContext();
-  // Máy quầy: in lại, trả hàng — không sửa / huỷ hoá đơn (server cũng chặn).
-  const counterSession = useCounterSession();
-  const isManager = !!user?.roles?.some((r: string) => r === 'Admin' || r === 'Manager');
+  // Theo quyền sales.* / sales-return.* — máy quầy: in lại, trả hàng; không sửa / huỷ hoá đơn (server cũng chặn).
+  const access = useSalesAccess();
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -144,7 +141,7 @@ export default function SalesOrderDetailView({ id }: Props) {
             >
               In hoá đơn
             </Button>
-            {order.status !== 'Cancelled' && (counterSession || isManager) && (
+            {order.status !== 'Cancelled' && access.canReturn && (
               <Button
                 variant="outlined"
                 onClick={() => setReturnOpen(true)}
@@ -153,19 +150,23 @@ export default function SalesOrderDetailView({ id }: Props) {
                 Trả hàng
               </Button>
             )}
-            {!counterSession && canCancel && order.status !== 'Cancelled' && (
+            {canCancel && order.status !== 'Cancelled' && (
               <>
-                <Button
-                  variant="outlined"
-                  onClick={() => router.push(paths.dashboard.pos.salesOrder.edit(id))}
-                  startIcon={<Iconify icon="solar:pen-bold" />}
-                >
-                  Chỉnh sửa
-                </Button>
-                <LoadingButton variant="outlined" color="error" loading={actionLoading} onClick={handleCancel}
-                  startIcon={<Iconify icon="solar:close-circle-bold" />}>
-                  Hủy đơn
-                </LoadingButton>
+                {access.canUpdate && (
+                  <Button
+                    variant="outlined"
+                    onClick={() => router.push(paths.dashboard.pos.salesOrder.edit(id))}
+                    startIcon={<Iconify icon="solar:pen-bold" />}
+                  >
+                    Chỉnh sửa
+                  </Button>
+                )}
+                {access.canCancel && (
+                  <LoadingButton variant="outlined" color="error" loading={actionLoading} onClick={handleCancel}
+                    startIcon={<Iconify icon="solar:close-circle-bold" />}>
+                    Hủy đơn
+                  </LoadingButton>
+                )}
               </>
             )}
           </Stack>

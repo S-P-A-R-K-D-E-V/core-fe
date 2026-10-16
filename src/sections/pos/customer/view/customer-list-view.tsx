@@ -41,7 +41,7 @@ import {
 import { ICustomer } from 'src/types/corecms-api';
 import { getAllCustomers, deleteCustomer } from 'src/api/customers';
 
-import { useCounterSession } from 'src/sections/counter/counter-scope';
+import { useSalesAccess } from 'src/sections/pos/sales-order/sales-access';
 import { fCurrency } from 'src/utils/format-number';
 
 // ----------------------------------------------------------------------
@@ -60,7 +60,8 @@ const TABLE_HEAD = [
 // ----------------------------------------------------------------------
 
 export default function CustomerListView() {
-  const counterSession = useCounterSession();
+  // Thêm / sửa theo customer.manage, xoá theo customer.delete (không ở máy quầy).
+  const { canManageCustomers, canDeleteCustomers } = useSalesAccess();
   const { enqueueSnackbar } = useSnackbar();
   const table = useTable();
   const router = useRouter();
@@ -127,9 +128,11 @@ export default function CustomerListView() {
             { name: 'Khách hàng' },
           ]}
           action={
-            <Button component={RouterLink} href={paths.dashboard.pos.customer.new} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
-              Thêm KH
-            </Button>
+            canManageCustomers && (
+              <Button component={RouterLink} href={paths.dashboard.pos.customer.new} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+                Thêm KH
+              </Button>
+            )
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
@@ -157,7 +160,7 @@ export default function CustomerListView() {
               numSelected={table.selected.length}
               rowCount={dataFiltered.length}
               onSelectAllRows={(checked) => table.onSelectAllRows(checked, dataFiltered.map((row) => row.id))}
-              action={counterSession ? undefined : <Button color="error" onClick={confirm.onTrue}>Xóa</Button>}
+              action={canDeleteCustomers ? <Button color="error" onClick={confirm.onTrue}>Xóa</Button> : undefined}
             />
             <Scrollbar>
               <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 960 }}>
@@ -188,12 +191,14 @@ export default function CustomerListView() {
                         </Label>
                       </TableCell>
                       <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }}>
-                        <Tooltip title="Sửa">
-                          <IconButton onClick={() => handleEditRow(row.id)}>
-                            <Iconify icon="solar:pen-bold" />
-                          </IconButton>
-                        </Tooltip>
-                        {!counterSession && (
+                        {canManageCustomers && (
+                          <Tooltip title="Sửa">
+                            <IconButton onClick={() => handleEditRow(row.id)}>
+                              <Iconify icon="solar:pen-bold" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {canDeleteCustomers && (
                           <Tooltip title="Xóa">
                             <IconButton color="error" onClick={() => handleDeleteRow(row.id)}>
                               <Iconify icon="solar:trash-bin-trash-bold" />
