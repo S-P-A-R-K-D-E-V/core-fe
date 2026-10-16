@@ -19,7 +19,8 @@ import { ADMIN_ROLES, MANAGER_ROLES } from './roles';
 //     mặc định Admin, Manager). Danh sách hàng (pos/product/list) mở cho mọi nhân viên; trang sửa hàng tự chặn.
 //   - pos/purchase-order, pos/supplier: theo quyền purchase.* / supplier.* (mặc định Admin, Manager); trang sửa đơn nhập,
 //     sửa nhà cung cấp tự chặn.
-//   - user               : UsersController quản trị người khác — Admin, Manager (trừ trang tài khoản của chính mình)
+//   - user               : UsersController quản trị người khác — quyền user.* (mặc định Admin, Manager), trừ trang tài
+//     khoản của chính mình; trang sửa nhân viên tự chặn
 // Trang không có trong danh sách: chỉ cần là nhân viên cửa hàng (guard của app/dashboard/layout.tsx), trang tự chặn
 // thêm nếu cần. `roles: null` = mở lại cho mọi nhân viên bên trong một tiền tố đã bị chặn.
 // ----------------------------------------------------------------------
@@ -70,7 +71,8 @@ export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   { prefix: paths.dashboard.pos.supplier.root, roles: null, permissions: [PERMISSIONS.supplier.read] },
   { prefix: paths.dashboard.pos.supplier.new, roles: null, permissions: [PERMISSIONS.supplier.manage] },
 
-  { prefix: paths.dashboard.user.root, roles: MANAGER_ROLES },
+  { prefix: paths.dashboard.user.root, roles: null, permissions: [PERMISSIONS.user.read] },
+  { prefix: paths.dashboard.user.new, roles: null, permissions: [PERMISSIONS.user.create] },
   { prefix: paths.dashboard.user.account, roles: null },
   { prefix: paths.dashboard.user.profile, roles: null },
 ];

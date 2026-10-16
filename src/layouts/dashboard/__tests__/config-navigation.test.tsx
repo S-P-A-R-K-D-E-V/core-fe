@@ -186,7 +186,8 @@ describe('useNavData — nhiều vai trò', () => {
   });
 
   it('Staff kiêm Quản lý thấy mục của Quản lý nhưng không thấy mục chỉ Admin', () => {
-    const paths2 = navPaths(['Staff', 'Manager']);
+    // Quyền mặc định của Manager (GET /users/me) gồm user.read.
+    const paths2 = navPaths(['Staff', 'Manager'], [], ['user.read']);
     expect(paths2).toContain(paths.dashboard.user.root);
     expect(paths2).not.toContain(paths.dashboard.storeSettings.root);
   });
@@ -381,5 +382,14 @@ describe('useNavData — đơn bán và khách hàng theo quyền', () => {
     const cs = navPaths('Staff', features, ['customer.read']);
     expect(cs).toContain(paths.dashboard.pos.customer.list);
     expect(cs).not.toContain(paths.dashboard.pos.customer.new);
+  });
+});
+
+// Nhân viên theo quyền user.read (Core-be): Admin / Manager như trước; vai trò tuỳ chỉnh "Nhân sự" được cấp thì thấy.
+describe('useNavData — nhân viên theo quyền', () => {
+  it('Manager (quyền mặc định) và "Nhân sự" thấy; nhân viên thường không', () => {
+    expect(navPaths('Manager', [], ['user.read'])).toContain(paths.dashboard.user.list);
+    expect(navPaths('Staff', [], ['user.read', 'user.update'])).toContain(paths.dashboard.user.list);
+    expect(navPaths('Staff', [], [])).not.toContain(paths.dashboard.user.root);
   });
 });

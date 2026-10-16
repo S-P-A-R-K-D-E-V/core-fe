@@ -46,6 +46,7 @@ import UserTableRow from '../user-table-row';
 import UserAddStaffDialog from '../user-add-staff-dialog';
 import UserTableToolbar from '../user-table-toolbar';
 import UserTableFiltersResult from '../user-table-filters-result';
+import { useUserAccess } from '../user-access';
 
 // ----------------------------------------------------------------------
 
@@ -86,6 +87,7 @@ export default function UserListView() {
 
   const confirm = useBoolean();
   const addStaffDialog = useBoolean();
+  const access = useUserAccess();
 
   const [tableData, setTableData] = useState<IUser[]>([]);
 
@@ -197,13 +199,15 @@ export default function UserListView() {
             { name: 'List' },
           ]}
           action={
-            <Button
-              variant="contained"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-              onClick={addStaffDialog.onTrue}
-            >
-              Thêm nhân viên
-            </Button>
+            access.canCreate && (
+              <Button
+                variant="contained"
+                startIcon={<Iconify icon="mingcute:add-line" />}
+                onClick={addStaffDialog.onTrue}
+              >
+                Thêm nhân viên
+              </Button>
+            )
           }
           sx={{
             mb: { xs: 3, md: 5 },
@@ -276,11 +280,13 @@ export default function UserListView() {
                 )
               }
               action={
-                <Tooltip title="Delete">
-                  <IconButton color="primary" onClick={confirm.onTrue}>
-                    <Iconify icon="solar:trash-bin-trash-bold" />
-                  </IconButton>
-                </Tooltip>
+                access.canDelete ? (
+                  <Tooltip title="Delete">
+                    <IconButton color="primary" onClick={confirm.onTrue}>
+                      <Iconify icon="solar:trash-bin-trash-bold" />
+                    </IconButton>
+                  </Tooltip>
+                ) : undefined
               }
             />
 
