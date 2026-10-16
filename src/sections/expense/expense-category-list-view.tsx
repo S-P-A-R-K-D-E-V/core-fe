@@ -25,7 +25,6 @@ import LoadingButton from '@mui/lab/LoadingButton';
 
 import Label from 'src/components/label';
 import { paths } from 'src/routes/paths';
-import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
@@ -38,6 +37,9 @@ import FormProvider, { RHFTextField, RHFSelect, RHFSwitch } from 'src/components
 import { TableHeadCustom, TableNoData } from 'src/components/table';
 
 import { ExpenseType, IExpenseCategory } from 'src/types/corecms-api';
+import { apiErrorMessage } from 'src/utils/api-error';
+
+import { useExpenseAccess } from './expense-access';
 import {
   getExpenseCategories,
   createExpenseCategory,
@@ -80,6 +82,7 @@ export default function ExpenseCategoryListView() {
   const { enqueueSnackbar } = useSnackbar();
   const dialog = useBoolean();
   const confirm = useBoolean();
+  const canManage = useExpenseAccess().canManageCategories;
 
   const [categories, setCategories] = useState<IExpenseCategory[]>([]);
   const [editing, setEditing] = useState<IExpenseCategory | null>(null);
@@ -145,7 +148,7 @@ export default function ExpenseCategoryListView() {
       dialog.onFalse();
       fetchData();
     } catch (error) {
-      enqueueSnackbar('Có lỗi xảy ra', { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(error, 'Có lỗi xảy ra'), { variant: 'error' });
     }
   });
 
@@ -156,7 +159,7 @@ export default function ExpenseCategoryListView() {
       enqueueSnackbar('Xóa thành công!');
       fetchData();
     } catch (error) {
-      enqueueSnackbar('Không thể xóa danh mục đang có chi phí', { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(error, 'Không thể xóa danh mục đang có chi phí'), { variant: 'error' });
     } finally {
       setDeleteId(null);
       confirm.onFalse();
@@ -164,7 +167,7 @@ export default function ExpenseCategoryListView() {
   }, [deleteId, enqueueSnackbar, fetchData, confirm]);
 
   return (
-    <RoleBasedGuard hasContent roles={['Admin']}>
+    <>
       <Container maxWidth="md">
         <CustomBreadcrumbs
           heading="Danh mục chi phí"
@@ -174,9 +177,11 @@ export default function ExpenseCategoryListView() {
             { name: 'Danh mục' },
           ]}
           action={
-            <Button variant="contained" startIcon={<Iconify icon="mingcute:add-line" />} onClick={handleOpenCreate}>
-              Thêm danh mục
-            </Button>
+            canManage && (
+              <Button variant="contained" startIcon={<Iconify icon="mingcute:add-line" />} onClick={handleOpenCreate}>
+                Thêm danh mục
+              </Button>
+            )
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
@@ -201,22 +206,26 @@ export default function ExpenseCategoryListView() {
                         </Label>
                       </TableCell>
                       <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }}>
-                        <Tooltip title="Sửa">
-                          <IconButton onClick={() => handleOpenEdit(row)}>
-                            <Iconify icon="solar:pen-bold" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Xóa">
-                          <IconButton
-                            color="error"
-                            onClick={() => {
-                              setDeleteId(row.id);
-                              confirm.onTrue();
-                            }}
-                          >
-                            <Iconify icon="solar:trash-bin-trash-bold" />
-                          </IconButton>
-                        </Tooltip>
+                        {canManage && (
+                          <>
+                            <Tooltip title="Sửa">
+                              <IconButton onClick={() => handleOpenEdit(row)}>
+                                <Iconify icon="solar:pen-bold" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Xóa">
+                              <IconButton
+                                color="error"
+                                onClick={() => {
+                                  setDeleteId(row.id);
+                                  confirm.onTrue();
+                                }}
+                              >
+                                <Iconify icon="solar:trash-bin-trash-bold" />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -266,6 +275,6 @@ export default function ExpenseCategoryListView() {
           </Button>
         }
       />
-    </RoleBasedGuard>
+    </>
   );
 }

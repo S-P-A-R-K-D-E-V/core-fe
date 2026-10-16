@@ -22,6 +22,9 @@ import { IExpense, IExpenseCategory, IShareholder } from 'src/types/corecms-api'
 import { createExpense, updateExpense, getExpenseCategories } from 'src/api/expenses';
 import { getShareholders } from 'src/api/shareholders';
 import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
+import { apiErrorMessage } from 'src/utils/api-error';
+
+import { useExpenseAccess } from './expense-access';
 
 // ----------------------------------------------------------------------
 
@@ -34,7 +37,11 @@ export default function ExpenseNewEditForm({ currentExpense }: Props) {
   const { enqueueSnackbar } = useSnackbar();
   const [categories, setCategories] = useState<IExpenseCategory[]>([]);
   const [shareholders, setShareholders] = useState<IShareholder[]>([]);
-  const shareholdersOn = useFeatureEnabled(FEATURE.shareholders);
+  // "Ai chi hộ" sinh giao dịch vốn của cổ đông — chỉ chủ cửa hàng chọn (API chặn người khác; danh sách cổ đông cũng chỉ
+  // chủ đọc được). Khoản đang do cổ đông chi hộ thì người khác không mở được form sửa (expense-edit-view).
+  const shareholdersFeature = useFeatureEnabled(FEATURE.shareholders);
+  const { canManageShareholderFunds } = useExpenseAccess();
+  const shareholdersOn = shareholdersFeature && canManageShareholderFunds;
 
   useEffect(() => {
     getExpenseCategories(true).then(setCategories);
@@ -101,7 +108,7 @@ export default function ExpenseNewEditForm({ currentExpense }: Props) {
       router.push(paths.dashboard.pos.expense.list);
     } catch (error) {
       console.error(error);
-      enqueueSnackbar('Có lỗi xảy ra', { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(error, 'Có lỗi xảy ra'), { variant: 'error' });
     }
   });
 

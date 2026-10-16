@@ -205,3 +205,29 @@ describe('useNavData — báo cáo theo quyền', () => {
     expect(accountant).not.toContain(paths.dashboard.pos.report.tax);
   });
 });
+
+// Chi phí theo quyền expense.* (Core-be /expenses/*): chủ cửa hàng thấy hết; vai trò tuỳ chỉnh thấy theo quyền được cấp.
+describe('useNavData — chi phí theo quyền', () => {
+  const expense = paths.dashboard.pos.expense;
+
+  it('Admin thấy mục Chi phí và mọi trang con', () => {
+    const nav = navPaths('Admin');
+    [expense.root, expense.list, expense.new, expense.categories, expense.recurringTemplates].forEach((p) =>
+      expect(nav).toContain(p)
+    );
+  });
+
+  it('Quản lý / nhân viên thường không thấy (như trước)', () => {
+    expect(navPaths('Manager', [], [])).not.toContain(expense.root);
+    expect(navPaths('Staff', [], [])).not.toContain(expense.root);
+  });
+
+  it('chỉ có quyền xem: thấy danh sách, không thấy "Thêm chi phí"; có quyền thêm thì thấy', () => {
+    const viewer = navPaths('Staff', [], ['expense.read']);
+    expect(viewer).toContain(expense.root);
+    expect(viewer).toContain(expense.list);
+    expect(viewer).not.toContain(expense.new);
+
+    expect(navPaths('Staff', [], ['expense.read', 'expense.create'])).toContain(expense.new);
+  });
+});

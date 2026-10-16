@@ -10,7 +10,7 @@ import SvgColor from 'src/components/svg-color';
 import { useStoreBrand } from 'src/components/branding';
 
 import { hasAnyRole, normalizeRoles } from 'src/auth/roles';
-import { hasAnyPermission, hasAllPermissions } from 'src/auth/permissions';
+import { PERMISSIONS, hasAnyPermission, hasAllPermissions } from 'src/auth/permissions';
 
 import { REPORT_PAGES, REPORT_VIEW_PERMISSIONS } from 'src/sections/pos/report/report-access';
 
@@ -579,10 +579,15 @@ export function useNavData(
             title: 'Chi phí & Công nợ',
             path: paths.dashboard.pos.expense.root,
             icon: ICONS.invoice,
-            roles: ['Admin'],
+            // Theo quyền expense.* (Core-be /expenses/*): chủ cửa hàng có đủ; vai trò tuỳ chỉnh được cấp từng phần.
+            permissions: [PERMISSIONS.expense.read],
             children: [
               { title: 'Danh sách chi phí', path: paths.dashboard.pos.expense.list },
-              { title: 'Thêm chi phí', path: paths.dashboard.pos.expense.new },
+              {
+                title: 'Thêm chi phí',
+                path: paths.dashboard.pos.expense.new,
+                allPermissions: [PERMISSIONS.expense.create],
+              },
               { title: 'Danh mục chi phí', path: paths.dashboard.pos.expense.categories },
               { title: 'Chi phí định kỳ', path: paths.dashboard.pos.expense.recurringTemplates },
             ],

@@ -25,7 +25,6 @@ import LoadingButton from '@mui/lab/LoadingButton';
 
 import Label from 'src/components/label';
 import { paths } from 'src/routes/paths';
-import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
@@ -49,6 +48,9 @@ import {
 } from 'src/api/expenses';
 import { getShareholders } from 'src/api/shareholders';
 import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
+import { apiErrorMessage } from 'src/utils/api-error';
+
+import { useExpenseAccess, lockedByShareholderFunds, SHAREHOLDER_FUNDS_LOCKED_TEXT } from './expense-access';
 
 // ----------------------------------------------------------------------
 
@@ -83,7 +85,10 @@ export default function RecurringTemplateListView() {
   const [templates, setTemplates] = useState<IRecurringExpenseTemplate[]>([]);
   const [categories, setCategories] = useState<IExpenseCategory[]>([]);
   const [shareholders, setShareholders] = useState<IShareholder[]>([]);
-  const shareholdersOn = useFeatureEnabled(FEATURE.shareholders);
+  const access = useExpenseAccess();
+  // "Ai chi hộ" (giao dịch vốn cổ đông mỗi kỳ) chỉ chủ cửa hàng chọn; danh sách cổ đông cũng chỉ chủ đọc được.
+  const shareholdersFeature = useFeatureEnabled(FEATURE.shareholders);
+  const shareholdersOn = shareholdersFeature && access.canManageShareholderFunds;
   const [editing, setEditing] = useState<IRecurringExpenseTemplate | null>(null);
   const [deactivateId, setDeactivateId] = useState<string | null>(null);
 
@@ -162,7 +167,7 @@ export default function RecurringTemplateListView() {
       dialog.onFalse();
       fetchData();
     } catch (error) {
-      enqueueSnackbar('Có lỗi xảy ra', { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(error, 'Có lỗi xảy ra'), { variant: 'error' });
     }
   });
 
@@ -173,7 +178,7 @@ export default function RecurringTemplateListView() {
       enqueueSnackbar('Đã ngưng chi phí định kỳ!');
       fetchData();
     } catch (error) {
-      enqueueSnackbar('Có lỗi xảy ra', { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(error, 'Có lỗi xảy ra'), { variant: 'error' });
     } finally {
       setDeactivateId(null);
       confirm.onFalse();
@@ -181,7 +186,7 @@ export default function RecurringTemplateListView() {
   }, [deactivateId, enqueueSnackbar, fetchData, confirm]);
 
   return (
-    <RoleBasedGuard hasContent roles={['Admin']}>
+    <>
       <Container maxWidth="lg">
         <CustomBreadcrumbs
           heading="Chi phí định kỳ"
@@ -191,9 +196,11 @@ export default function RecurringTemplateListView() {
             { name: 'Định kỳ' },
           ]}
           action={
-            <Button variant="contained" startIcon={<Iconify icon="mingcute:add-line" />} onClick={handleOpenCreate}>
-              Thêm chi phí định kỳ
-            </Button>
+            access.canManageRecurring && (
+              <Button variant="contained" startIcon={<Iconify icon="mingcute:add-line" />} onClick={handleOpenCreate}>
+                Thêm chi phí định kỳ
+              </Button>
+            )
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
@@ -204,41 +211,51 @@ export default function RecurringTemplateListView() {
               <Table sx={{ minWidth: 900 }}>
                 <TableHeadCustom headLabel={TABLE_HEAD} rowCount={templates.length} />
                 <TableBody>
-                  {templates.map((row) => (
-                    <TableRow key={row.id} hover>
-                      <TableCell>{row.name}</TableCell>
-                      <TableCell>{row.categoryName}</TableCell>
-                      <TableCell align="right">{fCurrency(row.amount)}</TableCell>
-                      <TableCell>{row.recurrenceType === 'Monthly' ? 'Hàng tháng' : 'Hàng năm'}</TableCell>
-                      <TableCell>{new Date(row.validFrom).toLocaleDateString('vi-VN')}</TableCell>
-                      <TableCell>{row.validTo ? new Date(row.validTo).toLocaleDateString('vi-VN') : '—'}</TableCell>
-                      <TableCell>
-                        <Label variant="soft" color={row.isActive ? 'success' : 'error'}>
-                          {row.isActive ? 'Hoạt động' : 'Đã ngưng'}
-                        </Label>
-                      </TableCell>
-                      <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }}>
-                        <Tooltip title="Sửa">
-                          <IconButton onClick={() => handleOpenEdit(row)}>
-                            <Iconify icon="solar:pen-bold" />
-                          </IconButton>
-                        </Tooltip>
-                        {row.isActive && (
-                          <Tooltip title="Ngưng">
-                            <IconButton
-                              color="error"
-                              onClick={() => {
-                                setDeactivateId(row.id);
-                                confirm.onTrue();
-                              }}
-                            >
-                              <Iconify icon="solar:pause-circle-bold" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {templates.map((row) => {
+                    const locked = lockedByShareholderFunds(access, row);
+                    return (
+                      <TableRow key={row.id} hover>
+                        <TableCell>{row.name}</TableCell>
+                        <TableCell>{row.categoryName}</TableCell>
+                        <TableCell align="right">{fCurrency(row.amount)}</TableCell>
+                        <TableCell>{row.recurrenceType === 'Monthly' ? 'Hàng tháng' : 'Hàng năm'}</TableCell>
+                        <TableCell>{new Date(row.validFrom).toLocaleDateString('vi-VN')}</TableCell>
+                        <TableCell>{row.validTo ? new Date(row.validTo).toLocaleDateString('vi-VN') : '—'}</TableCell>
+                        <TableCell>
+                          <Label variant="soft" color={row.isActive ? 'success' : 'error'}>
+                            {row.isActive ? 'Hoạt động' : 'Đã ngưng'}
+                          </Label>
+                        </TableCell>
+                        <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }}>
+                          {access.canManageRecurring && (
+                            <Tooltip title={locked ? SHAREHOLDER_FUNDS_LOCKED_TEXT : 'Sửa'}>
+                              <span>
+                                <IconButton disabled={locked} onClick={() => handleOpenEdit(row)}>
+                                  <Iconify icon="solar:pen-bold" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
+                          {access.canManageRecurring && row.isActive && (
+                            <Tooltip title={locked ? SHAREHOLDER_FUNDS_LOCKED_TEXT : 'Ngưng'}>
+                              <span>
+                                <IconButton
+                                  color="error"
+                                  disabled={locked}
+                                  onClick={() => {
+                                    setDeactivateId(row.id);
+                                    confirm.onTrue();
+                                  }}
+                                >
+                                  <Iconify icon="solar:pause-circle-bold" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                   <TableNoData notFound={!templates.length} />
                 </TableBody>
               </Table>
@@ -308,6 +325,6 @@ export default function RecurringTemplateListView() {
           </Button>
         }
       />
-    </RoleBasedGuard>
+    </>
   );
 }
