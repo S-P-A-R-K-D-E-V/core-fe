@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -56,27 +56,22 @@ describe('CustomerDisplayScreen', () => {
       </ThemeProvider>
     );
 
-  const flush = () => act(() => new Promise((r) => setTimeout(r, 30)));
-
+  // BroadcastChannel giao tin bất đồng bộ — chờ tới khi chữ hiện (máy bận / chạy nhiều suite cùng lúc thì >30ms).
   it('shows the cart, then the QR, then thanks after payment', async () => {
     renderScreen();
     customerDisplay.setAds({ intervalSeconds: 8, slides: [] }, 'Cửa hàng A');
-    await flush();
-    expect(screen.getByText('Cửa hàng A')).toBeTruthy();
+    expect(await screen.findByText('Cửa hàng A')).toBeTruthy();
 
     customerDisplay.setCart(cart);
-    await flush();
-    expect(screen.getByText('Áo thun')).toBeTruthy();
+    expect(await screen.findByText('Áo thun')).toBeTruthy();
     expect(screen.getByText(/Chị Lan/)).toBeTruthy();
 
     customerDisplay.setQr(qr);
-    await flush();
-    expect(screen.getByText('Quét mã để thanh toán')).toBeTruthy();
+    expect(await screen.findByText('Quét mã để thanh toán')).toBeTruthy();
     expect(screen.getByText('SP123')).toBeTruthy();
 
     customerDisplay.paid(200000);
-    await flush();
-    expect(screen.getByText('Cảm ơn quý khách!')).toBeTruthy();
+    expect(await screen.findByText('Cảm ơn quý khách!')).toBeTruthy();
     expect(PAID_SCREEN_MS).toBeGreaterThan(1000);
   });
 });

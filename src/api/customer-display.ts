@@ -4,7 +4,8 @@ import axios, { endpoints } from 'src/utils/axios';
 // Màn hình khách ở quầy — slide quảng cáo (core-be CustomerDisplayController). Ảnh / video PUT thẳng lên kho file bằng
 // URL ký sẵn (không đi qua API), slide lưu object key; hiển thị qua /media/<key> (getStorageUrl).
 
-export type CustomerDisplaySlideDto = { key: string; kind: 'image' | 'video'; title?: string | null };
+/** url: chỉ có trong phản hồi — link tải có chữ ký (24 giờ), không gửi lên khi lưu. */
+export type CustomerDisplaySlideDto = { key: string; kind: 'image' | 'video'; title?: string | null; url?: string | null };
 
 export type CustomerDisplayConfigDto = {
   branchId: string | null;

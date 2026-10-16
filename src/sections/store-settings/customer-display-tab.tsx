@@ -119,7 +119,11 @@ export default function CustomerDisplayTab() {
   async function handleSave() {
     setSaving(true);
     try {
-      await saveCustomerDisplaySettings({ branchId, intervalSeconds: interval, slides });
+      await saveCustomerDisplaySettings({
+        branchId,
+        intervalSeconds: interval,
+        slides: slides.map(({ url: _url, ...rest }) => rest),
+      });
       enqueueSnackbar('Đã lưu màn hình khách', { variant: 'success' });
       setDirty(false);
       await load();
@@ -214,9 +218,9 @@ export default function CustomerDisplayTab() {
             <Card key={`${slide.key}-${i}`} variant="outlined" sx={{ overflow: 'hidden' }}>
               <Box sx={{ position: 'relative', aspectRatio: '16 / 9', bgcolor: 'grey.900' }}>
                 {slide.kind === 'video' ? (
-                  <Box component="video" src={getStorageUrl(slide.key)} muted playsInline sx={{ width: 1, height: 1, objectFit: 'contain' }} />
+                  <Box component="video" src={slide.url || getStorageUrl(slide.key)} muted playsInline sx={{ width: 1, height: 1, objectFit: 'contain' }} />
                 ) : (
-                  <Box component="img" src={getStorageUrl(slide.key)} alt="" sx={{ width: 1, height: 1, objectFit: 'contain' }} />
+                  <Box component="img" src={slide.url || getStorageUrl(slide.key)} alt="" sx={{ width: 1, height: 1, objectFit: 'contain' }} />
                 )}
                 <Typography variant="caption" sx={{ position: 'absolute', top: 6, left: 8, color: '#fff', bgcolor: 'rgba(0,0,0,.5)', px: 0.75, borderRadius: 0.5 }}>
                   {i + 1} · {slide.kind === 'video' ? 'Video' : 'Ảnh'}
