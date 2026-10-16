@@ -38,9 +38,12 @@ export default function SsoCallbackView() {
 
     const code = searchParams.get('code');
     const state = searchParams.get('state');
+    // Đăng nhập bắt đầu ở trang chung auth.devbyspark.com (đăng nhập rồi chọn cửa hàng / quét QR): trang này chưa tạo
+    // state nào — vé chỉ đổi được với đúng state trang chung đã gắn khi xin vé, vé sống 60 giây và dùng một lần.
+    const fromHub = searchParams.get('from') === 'hub';
     const returnTo = safeReturnPath(searchParams.get('returnTo'), PATH_AFTER_LOGIN);
-    const expectedState = takeCentralLoginState();
-    const mobileRedirectUri = takeCentralLoginMobileRedirect();
+    const expectedState = fromHub ? state : takeCentralLoginState();
+    const mobileRedirectUri = fromHub ? null : takeCentralLoginMobileRedirect();
 
     // Bỏ mã khỏi thanh địa chỉ/lịch sử ngay, dù đổi được hay không.
     window.history.replaceState(null, '', window.location.pathname);

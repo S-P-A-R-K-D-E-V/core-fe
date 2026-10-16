@@ -42,9 +42,16 @@ type Props = {
   onSuccess: () => void;
   /** Quay lại đăng nhập bằng mật khẩu. */
   onBack: () => void;
+  /**
+   * Mã đã được duyệt: tự xử lý thay cho đăng nhập vào trang hiện tại (trang đăng nhập chung auth.devbyspark.com đổi mã
+   * lấy vé của cửa hàng người duyệt rồi chuyển sang cửa hàng đó). Không truyền = đăng nhập ngay trên trang này.
+   */
+  onApproved?: (code: string, verifier: string) => Promise<void>;
+  /** Chữ hướng dẫn dưới mã (mặc định: quét bằng app của cửa hàng). */
+  hint?: string;
 };
 
-export default function JwtQrLogin({ onSuccess, onBack }: Props) {
+export default function JwtQrLogin({ onSuccess, onBack, onApproved, hint }: Props) {
   const { loginWithQr } = useAuthContext();
 
   const [phase, setPhase] = useState<Phase>('loading');
@@ -58,9 +65,11 @@ export default function JwtQrLogin({ onSuccess, onBack }: Props) {
 
   // Trang cha truyền hàm mới mỗi lần render — giữ qua ref để không dựng lại vòng hỏi trạng thái.
   const onSuccessRef = useRef(onSuccess);
+  const onApprovedRef = useRef(onApproved);
   useEffect(() => {
     onSuccessRef.current = onSuccess;
-  }, [onSuccess]);
+    onApprovedRef.current = onApproved;
+  }, [onSuccess, onApproved]);
 
   const begin = useCallback(async (auto: boolean) => {
     generation.current += 1;
@@ -134,7 +143,8 @@ export default function JwtQrLogin({ onSuccess, onBack }: Props) {
           clearInterval(timer);
           setPhase('signing-in');
           try {
-            await loginWithQr?.(ticket.code, ticket.verifier);
+            if (onApprovedRef.current) await onApprovedRef.current(ticket.code, ticket.verifier);
+            else await loginWithQr?.(ticket.code, ticket.verifier);
             if (current === generation.current) onSuccessRef.current();
           } catch (error) {
             if (current !== generation.current) return;
@@ -204,8 +214,12 @@ export default function JwtQrLogin({ onSuccess, onBack }: Props) {
   return (
     <Stack spacing={2.5} alignItems="center">
       <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>
-        Mở app trên điện thoại đã đăng nhập, vào <strong>Hồ sơ → Quét mã đăng nhập web</strong> rồi quét mã
-        này.
+        {hint ?? (
+          <>
+            Mở app trên điện thoại đã đăng nhập, vào <strong>Hồ sơ → Quét mã đăng nhập web</strong> rồi quét mã
+            này.
+          </>
+        )}
       </Typography>
 
       {phase === 'loading' && (

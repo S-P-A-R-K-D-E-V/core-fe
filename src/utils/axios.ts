@@ -66,6 +66,7 @@ export const endpoints = {
     qrStart: '/auth/qr/start',
     qrStatus: '/auth/qr/status',
     qrExchange: '/auth/qr/exchange',
+    qrHubExchange: '/auth/qr/hub-exchange',
     // Thiết bị đang đăng nhập: xem các phiên còn mở của mình, đăng xuất từng thiết bị / mọi thiết bị khác từ xa.
     sessions: '/auth/sessions',
     sessionRevoke: (sessionId: string) => `/auth/sessions/${sessionId}`,
