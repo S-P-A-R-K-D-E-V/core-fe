@@ -19,6 +19,8 @@ import { ADMIN_ROLES, MANAGER_ROLES } from './roles';
 //     mặc định Admin, Manager). Danh sách hàng (pos/product/list) mở cho mọi nhân viên; trang sửa hàng tự chặn.
 //   - pos/purchase-order, pos/supplier: theo quyền purchase.* / supplier.* (mặc định Admin, Manager); trang sửa đơn nhập,
 //     sửa nhà cung cấp tự chặn.
+//   - cleaning/tasks, templates, week-builder, review, week-overview: theo quyền cleaning.* (mặc định Admin, Manager);
+//     checklist của mình mở cho mọi nhân viên
 //   - user               : UsersController quản trị người khác — quyền user.* (mặc định Admin, Manager), trừ trang tài
 //     khoản của chính mình; trang sửa nhân viên tự chặn
 // Trang không có trong danh sách: chỉ cần là nhân viên cửa hàng (guard của app/dashboard/layout.tsx), trang tự chặn
@@ -36,6 +38,7 @@ const PAYROLL = PERMISSIONS.payroll;
 const SHIFT = PERMISSIONS.shift;
 const ATTENDANCE = PERMISSIONS.attendance;
 const PRODUCTS = PERMISSIONS.products;
+const CLEANING = PERMISSIONS.cleaning;
 
 export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   { prefix: paths.dashboard.role.root, roles: ADMIN_ROLES },
@@ -70,6 +73,12 @@ export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   { prefix: paths.dashboard.pos.purchaseOrder.new, roles: null, permissions: [PERMISSIONS.purchase.create] },
   { prefix: paths.dashboard.pos.supplier.root, roles: null, permissions: [PERMISSIONS.supplier.read] },
   { prefix: paths.dashboard.pos.supplier.new, roles: null, permissions: [PERMISSIONS.supplier.manage] },
+
+  { prefix: paths.dashboard.cleaning.taskLibrary, roles: null, permissions: [CLEANING.templateManage] },
+  { prefix: paths.dashboard.cleaning.templates, roles: null, permissions: [CLEANING.templateManage] },
+  { prefix: paths.dashboard.cleaning.weekBuilder, roles: null, permissions: [CLEANING.templateManage] },
+  { prefix: paths.dashboard.cleaning.review, roles: null, permissions: [CLEANING.read] },
+  { prefix: paths.dashboard.cleaning.weekOverview, roles: null, permissions: [CLEANING.read] },
 
   { prefix: paths.dashboard.user.root, roles: null, permissions: [PERMISSIONS.user.read] },
   { prefix: paths.dashboard.user.new, roles: null, permissions: [PERMISSIONS.user.create] },
