@@ -33,6 +33,7 @@ import { getBankAccounts } from 'src/api/bank-accounts';
 import { cancelQrPayment, createQrPayment, getQrPaymentStatus } from 'src/api/payment-qr';
 
 import PaymentQrInfo, { useQrImageSrc, useExpirySeconds } from 'src/components/payment-qr-info';
+import { customerDisplay } from 'src/sections/customer-display/customer-display-bus';
 import PaymentConnectionSelect, {
   usePosPaymentConnections,
 } from 'src/components/payment-connection-select';
@@ -165,6 +166,23 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
         }`
       : '';
   const secondsLeft = useExpirySeconds(qr?.expiresAt);
+
+  // Màn hình khách: mã QR to cho khách quét trên màn phụ; đóng hộp / bỏ mã thì ẩn.
+  useEffect(() => {
+    customerDisplay.setQr(
+      open && qr && qrImageSrc
+        ? {
+            amount: qr.amount ?? total,
+            imageSrc: qrImageSrc,
+            bankName: qr.bankName ?? null,
+            accountNumber: qr.accountNumber ?? null,
+            paymentCode: qr.paymentCode ?? null,
+            expiresAt: qr.expiresAt ?? null,
+          }
+        : null
+    );
+  }, [open, qr, qrImageSrc, total]);
+  useEffect(() => () => customerDisplay.setQr(null), []);
 
   const showQr = async () => {
     if ((!accountId && !connectionId) || total <= 0) return;

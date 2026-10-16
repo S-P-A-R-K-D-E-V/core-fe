@@ -17,6 +17,8 @@ const api = vi.hoisted(() => ({
   getBankAccounts: vi.fn(),
 }));
 
+// Màn hình khách: không gọi API quảng cáo trong test.
+vi.mock('src/sections/customer-display/use-customer-display-sync', () => ({ useCustomerDisplaySync: () => {} }));
 vi.mock('src/api/payment-qr', () => ({
   createQrPayment: api.createQrPayment,
   getQrPaymentStatus: api.getQrPaymentStatus,

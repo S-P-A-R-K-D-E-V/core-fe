@@ -37,6 +37,8 @@ import { newId, currentDeviceId } from './lib/ids';
 import { readProblem } from './lib/errors';
 import { checkoutPlan } from './lib/checkout';
 import FnbCheckoutDialog from './fnb-checkout-dialog';
+import { useCustomerDisplaySync } from 'src/sections/customer-display/use-customer-display-sync';
+import { customerDisplay, type CustomerDisplayCart } from 'src/sections/customer-display/customer-display-bus';
 import { billHtml, kitchenTicketHtml } from './lib/print';
 import { FnbDishDialog, FnbOpenItemDialog } from './fnb-dish-dialog';
 import { addDraft, itemDraft, draftTotal, draftAmount, setDraftQty, toLineInput } from './lib/draft';
@@ -254,6 +256,7 @@ export default function FnbOrderScreen({ branchId, storeName, menu, floor, targe
       );
       if (!result) return;
       setDialog(null);
+      customerDisplay.paid(total);
       await printTicket(result.ticket);
       enqueueSnackbar(`Đã thanh toán đơn ${result.order.displayNo}`);
       if (result.order.payment?.salesOrderId) setReceiptOrderId(result.order.payment.salesOrderId);
@@ -343,6 +346,47 @@ export default function FnbOrderScreen({ branchId, storeName, menu, floor, targe
   const place = target.tableName ? `${target.areaName ? `${target.areaName} · ` : ''}${target.tableName}` : 'Mang về';
   const canSend = isOpen && (drafts.length > 0 || pending.length > 0);
   const hasActive = (order?.totals.itemCount ?? 0) > 0 || drafts.length > 0;
+
+  // Màn hình khách: món của đơn (đã gửi + đang chọn) và tổng; đơn đóng / rời màn → quảng cáo.
+  const displayCart = useMemo<CustomerDisplayCart | null>(() => {
+    if (!isOpen) return null;
+    const detailOf = (variantName: string | null, toppings: { name: string }[]) =>
+      [variantName, ...toppings.map((tp) => tp.name)].filter(Boolean).join(', ') || null;
+    const lines = [
+      ...(order?.lines ?? [])
+        .filter((l) => l.quantity > 0)
+        .map((l) => ({
+          key: l.id,
+          name: l.name,
+          detail: detailOf(l.variantName, l.toppings),
+          quantity: l.quantity,
+          unitPrice: l.quantity ? l.amount / l.quantity : l.unitPrice,
+          discount: 0,
+          amount: l.amount,
+        })),
+      ...drafts.map((d) => ({
+        key: d.id,
+        name: d.name,
+        detail: detailOf(d.variantName, d.toppings),
+        quantity: d.quantity,
+        unitPrice: d.quantity ? draftAmount(d) / d.quantity : d.unitPrice,
+        discount: 0,
+        amount: draftAmount(d),
+      })),
+    ];
+    if (!lines.length) return null;
+    const subtotal = lines.reduce((s, l) => s + l.amount, 0);
+    return {
+      lines,
+      itemCount: lines.reduce((s, l) => s + l.quantity, 0),
+      subtotal,
+      vat: 0,
+      orderDiscount: order?.totals.discountAmount ?? 0,
+      total,
+      customerName: place,
+    };
+  }, [isOpen, order, drafts, total, place]);
+  useCustomerDisplaySync(displayCart, branchId);
 
   return (
     <Grid container spacing={2}>
