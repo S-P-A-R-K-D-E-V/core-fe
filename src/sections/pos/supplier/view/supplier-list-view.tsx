@@ -41,6 +41,8 @@ import {
 import { ISupplier } from 'src/types/corecms-api';
 import { getAllSuppliers, deleteSupplier } from 'src/api/suppliers';
 
+import { usePurchaseAccess } from 'src/sections/pos/purchase-order/purchase-access';
+
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
@@ -60,6 +62,8 @@ export default function SupplierListView() {
   const { enqueueSnackbar } = useSnackbar();
   const table = useTable();
   const router = useRouter();
+  // Thêm / sửa / xoá theo quyền supplier.manage — chỉ xem (supplier.read) thì ẩn.
+  const { canManageSuppliers } = usePurchaseAccess();
   const confirm = useBoolean();
 
   const [tableData, setTableData] = useState<ISupplier[]>([]);
@@ -123,9 +127,11 @@ export default function SupplierListView() {
             { name: 'Nhà cung cấp' },
           ]}
           action={
-            <Button component={RouterLink} href={paths.dashboard.pos.supplier.new} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
-              Thêm NCC
-            </Button>
+            canManageSuppliers && (
+              <Button component={RouterLink} href={paths.dashboard.pos.supplier.new} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+                Thêm NCC
+              </Button>
+            )
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
@@ -153,7 +159,7 @@ export default function SupplierListView() {
               numSelected={table.selected.length}
               rowCount={dataFiltered.length}
               onSelectAllRows={(checked) => table.onSelectAllRows(checked, dataFiltered.map((row) => row.id))}
-              action={<Button color="error" onClick={confirm.onTrue}>Xóa</Button>}
+              action={canManageSuppliers ? <Button color="error" onClick={confirm.onTrue}>Xóa</Button> : undefined}
             />
             <Scrollbar>
               <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 960 }}>
@@ -184,16 +190,20 @@ export default function SupplierListView() {
                         </Label>
                       </TableCell>
                       <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }}>
-                        <Tooltip title="Sửa">
-                          <IconButton onClick={() => handleEditRow(row.id)}>
-                            <Iconify icon="solar:pen-bold" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Xóa">
-                          <IconButton color="error" onClick={() => handleDeleteRow(row.id)}>
-                            <Iconify icon="solar:trash-bin-trash-bold" />
-                          </IconButton>
-                        </Tooltip>
+                        {canManageSuppliers && (
+                          <>
+                            <Tooltip title="Sửa">
+                              <IconButton onClick={() => handleEditRow(row.id)}>
+                                <Iconify icon="solar:pen-bold" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Xóa">
+                              <IconButton color="error" onClick={() => handleDeleteRow(row.id)}>
+                                <Iconify icon="solar:trash-bin-trash-bold" />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

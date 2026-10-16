@@ -44,6 +44,8 @@ import { getAllSuppliers } from 'src/api/suppliers';
 import { getShareholders } from 'src/api/shareholders';
 import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 
+import { lockedByPaidBy, usePurchaseAccess } from '../purchase-access';
+
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
@@ -98,6 +100,7 @@ export default function PurchaseOrderListView() {
   const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
   const [shareholders, setShareholders] = useState<IShareholder[]>([]);
   const shareholdersOn = useFeatureEnabled(FEATURE.shareholders);
+  const access = usePurchaseAccess();
   const tableHead = useMemo(
     () => (shareholdersOn ? TABLE_HEAD : TABLE_HEAD.filter((h) => h.id !== 'paidByShareholder')),
     [shareholdersOn]
@@ -119,7 +122,10 @@ export default function PurchaseOrderListView() {
           pageSize,
         }),
         getAllSuppliers(),
-        shareholdersOn ? getShareholders(true) : Promise.resolve([] as IShareholder[]),
+        // Danh sách cổ đông chỉ chủ cửa hàng đọc được — người khác vẫn xem được đơn, chỉ không chọn "ai chi hộ".
+        shareholdersOn && access.canSetPaidBy
+          ? getShareholders(true).catch(() => [] as IShareholder[])
+          : Promise.resolve([] as IShareholder[]),
       ]);
       setTableData(pagedResult.items);
       setTotalCount(pagedResult.totalCount);
@@ -129,7 +135,7 @@ export default function PurchaseOrderListView() {
       console.error(error);
       enqueueSnackbar('Không thể tải đơn nhập hàng', { variant: 'error' });
     }
-  }, [enqueueSnackbar, filterSupplier, filterStatus, pageNumber, pageSize, shareholdersOn]);
+  }, [enqueueSnackbar, filterSupplier, filterStatus, pageNumber, pageSize, shareholdersOn, access.canSetPaidBy]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -198,9 +204,11 @@ export default function PurchaseOrderListView() {
             { name: 'Đơn nhập hàng' },
           ]}
           action={
-            <Button component={RouterLink} href={paths.dashboard.pos.purchaseOrder.new} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
-              Tạo đơn nhập
-            </Button>
+            access.canCreate && (
+              <Button component={RouterLink} href={paths.dashboard.pos.purchaseOrder.new} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+                Tạo đơn nhập
+              </Button>
+            )
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
@@ -250,7 +258,7 @@ export default function PurchaseOrderListView() {
                       <TableCell align="right">{fCurrency(row.totalAmount)}</TableCell>
                       {shareholdersOn && (
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        {row.status === 'Returned' ? (
+                        {row.status === 'Returned' && access.canSetPaidBy && shareholders.length > 0 ? (
                           <TextField
                             select
                             size="small"
@@ -285,24 +293,30 @@ export default function PurchaseOrderListView() {
                       <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
                         {row.status === 'Draft' && (
                           <>
-                            <Tooltip title="Sửa đơn">
-                              <IconButton color="primary" onClick={() => handleEditRow(row.id)}>
-                                <Iconify icon="solar:pen-bold" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Duyệt">
-                              <IconButton color="info" onClick={() => handleConfirmOrder(row.id)}>
-                                <Iconify icon="solar:check-circle-bold" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Hủy">
-                              <IconButton color="error" onClick={() => handleCancelOrder(row.id)}>
-                                <Iconify icon="solar:close-circle-bold" />
-                              </IconButton>
-                            </Tooltip>
+                            {access.canUpdate && !lockedByPaidBy(access, row) && (
+                              <Tooltip title="Sửa đơn">
+                                <IconButton color="primary" onClick={() => handleEditRow(row.id)}>
+                                  <Iconify icon="solar:pen-bold" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                            {access.canConfirm && (
+                              <Tooltip title="Duyệt">
+                                <IconButton color="info" onClick={() => handleConfirmOrder(row.id)}>
+                                  <Iconify icon="solar:check-circle-bold" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                            {access.canCancel && !lockedByPaidBy(access, row) && (
+                              <Tooltip title="Hủy">
+                                <IconButton color="error" onClick={() => handleCancelOrder(row.id)}>
+                                  <Iconify icon="solar:close-circle-bold" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           </>
                         )}
-                        {(row.status === 'Confirmed' || row.status === 'PartiallyReceived') && (
+                        {(row.status === 'Confirmed' || row.status === 'PartiallyReceived') && access.canReceive && (
                           <Tooltip title="Nhận hàng">
                             <IconButton color="success" onClick={() => handleViewRow(row.id)}>
                               <Iconify icon="solar:box-bold" />
