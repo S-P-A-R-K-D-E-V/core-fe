@@ -296,3 +296,40 @@ describe('useNavData — ca làm và chấm công theo quyền', () => {
     expect(lead).not.toContain(paths.dashboard.shift.templates.list);
   });
 });
+
+// Hàng hoá / kho theo quyền products.* / inventory.* (Core-be): menu quản lý trước đây chỉ Admin dù API cho cả Manager.
+describe('useNavData — hàng hoá và kho theo quyền', () => {
+  const features = ['commerce.retail.inventory'];
+  const MANAGER_DEFAULTS = [
+    'products.cost.read',
+    'products.create',
+    'products.update',
+    'products.delete',
+    'products.catalog.manage',
+    'inventory.warehouse.manage',
+  ];
+
+  it('Admin và Manager (quyền mặc định) thấy quản lý sản phẩm, danh mục, kho, đơn vị tính', () => {
+    [navPaths('Admin', features), navPaths('Manager', features, MANAGER_DEFAULTS)].forEach((nav) => {
+      expect(nav).toContain(paths.dashboard.pos.product.new);
+      expect(nav).toContain(paths.dashboard.pos.category.list);
+      expect(nav).toContain(paths.dashboard.pos.warehouse.list);
+      expect(nav).toContain(paths.dashboard.pos.unitOfMeasure.list);
+    });
+    // Chưa có API phía Core-be — giữ chỉ Admin.
+    expect(navPaths('Manager', features, MANAGER_DEFAULTS)).not.toContain(paths.dashboard.pos.variantAttribute.list);
+  });
+
+  it('nhân viên thường không thấy menu quản lý; "Thủ kho" chỉ sửa hàng không thấy "Thêm mới"', () => {
+    const staff = navPaths('Staff', features, []);
+    expect(staff).not.toContain(paths.dashboard.pos.product.root);
+    expect(staff).not.toContain(paths.dashboard.pos.product.new);
+    expect(staff).not.toContain(paths.dashboard.pos.category.list);
+    expect(staff).not.toContain(paths.dashboard.pos.warehouse.list);
+
+    const keeper = navPaths('Staff', features, ['products.update', 'products.cost.read']);
+    expect(keeper).toContain(paths.dashboard.pos.product.root);
+    expect(keeper).not.toContain(paths.dashboard.pos.product.new);
+    expect(keeper).not.toContain(paths.dashboard.pos.category.list);
+  });
+});

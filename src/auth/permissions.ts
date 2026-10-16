@@ -75,6 +75,29 @@ export const PERMISSIONS = {
     auditRead: 'shift.audit.read',
     reminderManage: 'shift.reminder.manage',
   },
+  /** Hàng hoá — xem hàng, nhóm hàng, thương hiệu, đơn vị không cần quyền (màn bán hàng). Thêm / sửa cần kèm xem giá vốn. */
+  products: {
+    costRead: 'products.cost.read',
+    create: 'products.create',
+    update: 'products.update',
+    delete: 'products.delete',
+    /** Nhóm hàng, thương hiệu, đơn vị tính. */
+    catalogManage: 'products.catalog.manage',
+  },
+  /** Tồn kho — xem danh sách kho không cần quyền. Chỉnh tồn trực tiếp mặc định chỉ Admin. */
+  inventory: {
+    warehouseManage: 'inventory.warehouse.manage',
+    adjustmentRead: 'inventory.adjustment.read',
+    adjust: 'inventory.adjust',
+  },
+  /** Phiếu kiểm kho / xuất huỷ / xuất dùng nội bộ: lập (gồm huỷ phiếu nháp) và hoàn thành đều cần kèm quyền xem. */
+  stockTake: { read: 'stocktake.read', create: 'stocktake.create', complete: 'stocktake.complete' },
+  damageNote: { read: 'damage-note.read', create: 'damage-note.create', complete: 'damage-note.complete' },
+  internalUseNote: {
+    read: 'internal-use-note.read',
+    create: 'internal-use-note.create',
+    complete: 'internal-use-note.complete',
+  },
 } as const;
 
 type PermissionSource = { role?: unknown; roles?: unknown; permissions?: unknown } | null | undefined;

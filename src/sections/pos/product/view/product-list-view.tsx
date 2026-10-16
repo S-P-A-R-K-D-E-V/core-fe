@@ -43,6 +43,7 @@ import ProductTableToolbar from '../product-table-toolbar';
 import ProductTableRow from '../product-table-row';
 import { useCounterSession } from 'src/sections/counter/counter-scope';
 import ProductEditDialog from '../product-edit-dialog';
+import { useProductAccess } from '../product-access';
 
 // ----------------------------------------------------------------------
 
@@ -109,6 +110,7 @@ function getInitialVisibleColumns(): ColumnKey[] {
 
 export default function ProductListView() {
   const counterSession = useCounterSession();
+  const access = useProductAccess();
   const { enqueueSnackbar } = useSnackbar();
   const table = useTable({ defaultRowsPerPage: 25 });
   const router = useRouter();
@@ -278,9 +280,11 @@ export default function ProductListView() {
               >
                 {syncing ? 'Đang đồng bộ...' : 'Đồng bộ KiotViet'}
               </Button>
-              <Button variant="contained" startIcon={<Iconify icon="mingcute:add-line" />} onClick={handleCreateProduct}>
-                Thêm sản phẩm
-              </Button>
+              {access.canCreate && (
+                <Button variant="contained" startIcon={<Iconify icon="mingcute:add-line" />} onClick={handleCreateProduct}>
+                  Thêm sản phẩm
+                </Button>
+              )}
             </Stack>
             )
           }
@@ -308,7 +312,7 @@ export default function ProductListView() {
                   <Button color="primary" startIcon={<Iconify icon="solar:printer-bold" width={18} />} onClick={handlePrintSelectedLabels}>
                     In tem mã
                   </Button>
-                  {!counterSession && <Button color="error" onClick={confirm.onTrue}>Xóa</Button>}
+                  {access.canDelete && <Button color="error" onClick={confirm.onTrue}>Xóa</Button>}
                 </Stack>
               }
             />
