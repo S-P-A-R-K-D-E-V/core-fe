@@ -38,7 +38,8 @@ import PlatformAccessLogCard from './platform-access-log-card';
 
 // ----------------------------------------------------------------------
 // Cài đặt cửa hàng → Tính năng web / app: giới hạn ai được dùng một tính năng trên từng nền tảng, vd tắt tự chấm công
-// trên web với nhân viên để buộc chấm công bằng app. Không giới hạn = mọi người dùng được (mặc định).
+// trên web với nhân viên để buộc chấm công bằng app, không cho xem báo cáo trên điện thoại. Không giới hạn = mọi người dùng
+// được (mặc định). Máy quầy của cửa hàng không bị giới hạn.
 
 const SYSTEM_ROLES = ['Admin', 'Manager', 'Staff'] as const;
 
@@ -150,6 +151,7 @@ export default function PlatformFeaturesTab() {
   };
 
   const usersById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
+  const featureLabels = useMemo(() => Object.fromEntries(features.map((f) => [f.key, f.label])), [features]);
 
   if (loading) {
     return (
@@ -165,8 +167,8 @@ export default function PlatformFeaturesTab() {
     <Stack spacing={3}>
       <Alert severity="info">
         Giới hạn ai được dùng một tính năng trên web hoặc trên app. Ví dụ: tắt chấm công trên web với nhân viên để buộc
-        chấm công bằng app (GPS + khuôn mặt), chủ cửa hàng và quản lý vẫn dùng web. Không bật giới hạn thì mọi người dùng
-        được như bình thường.
+        chấm công bằng app (GPS + khuôn mặt); không cho nhân viên bán hàng bằng điện thoại cá nhân; không cho xem báo cáo
+        trên app. Không bật giới hạn thì mọi người dùng được như bình thường. Máy quầy của cửa hàng không bị giới hạn.
       </Alert>
 
       {features.map((feature) => (
@@ -263,7 +265,7 @@ export default function PlatformFeaturesTab() {
         </Card>
       ))}
 
-      <PlatformAccessLogCard />
+      <PlatformAccessLogCard featureLabels={featureLabels} />
     </Stack>
   );
 }

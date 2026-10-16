@@ -1,3 +1,6 @@
+import PlatformFeatureGuard from 'src/auth/guard/platform-feature-guard';
+import { PLATFORM_FEATURES } from 'src/auth/platform-features';
+
 import { ShiftCashDashboardView } from 'src/sections/shift-cash/view';
 
 // ----------------------------------------------------------------------
@@ -7,5 +10,9 @@ export const metadata = {
 };
 
 export default function ShiftCashPage() {
-  return <ShiftCashDashboardView />;
+  return (
+    <PlatformFeatureGuard feature={PLATFORM_FEATURES.shiftCash} label="Kiểm quầy">
+      <ShiftCashDashboardView />
+    </PlatformFeatureGuard>
+  );
 }

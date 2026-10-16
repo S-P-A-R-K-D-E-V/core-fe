@@ -205,7 +205,11 @@ export interface IPermissionCatalog {
     /** requires: quyền phải có kèm (vd sửa chi phí cần xem chi phí) — API kiểm cả hai, lưu vai trò tự thêm. */
     permissions: { code: string; label: string; requires?: string[] }[];
   }[];
-  systemRoles: { name: string; permissions: string[] }[];
+  /**
+   * summary: vai trò dành cho ai; baseline: việc làm được sẵn theo vai trò, không nằm trong danh mục quyền chi tiết (vd Nhân
+   * viên bán hàng, tự chấm công; Người dùng không vào được chức năng cửa hàng). Core-be cũ chưa trả thì không có.
+   */
+  systemRoles: { name: string; permissions: string[]; summary?: string; baseline?: string[] }[];
   baseRoles: string[];
 }
 

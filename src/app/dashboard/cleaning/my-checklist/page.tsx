@@ -1,3 +1,6 @@
+import PlatformFeatureGuard from 'src/auth/guard/platform-feature-guard';
+import { PLATFORM_FEATURES } from 'src/auth/platform-features';
+
 import { CleaningMyChecklistView } from 'src/sections/cleaning/view';
 
 // ----------------------------------------------------------------------
@@ -7,5 +10,9 @@ export const metadata = {
 };
 
 export default function CleaningMyChecklistPage() {
-  return <CleaningMyChecklistView />;
+  return (
+    <PlatformFeatureGuard feature={PLATFORM_FEATURES.cleaningTasks} label="Làm việc vệ sinh">
+      <CleaningMyChecklistView />
+    </PlatformFeatureGuard>
+  );
 }

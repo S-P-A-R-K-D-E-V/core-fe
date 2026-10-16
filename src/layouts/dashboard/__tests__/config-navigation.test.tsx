@@ -414,4 +414,33 @@ describe('useNavData — tính năng tắt theo nền tảng', () => {
     expect(navPaths('Staff', ATTENDANCE_FEATURES, [])).toContain(paths.dashboard.attendance.checkin);
     expect(navPaths('Staff', ATTENDANCE_FEATURES, [], [])).toContain(paths.dashboard.attendance.checkin);
   });
+
+  it('kiểm quầy, checklist vệ sinh, bán hàng, báo cáo ẩn theo đúng tính năng bị tắt', () => {
+    const FEATURES = ['commerce.retail.pos', 'workforce.cleaning'];
+    const all = navPaths('Admin', FEATURES, []);
+    expect(all).toEqual(
+      expect.arrayContaining([
+        paths.dashboard.shiftCash.root,
+        paths.dashboard.cleaning.myChecklist,
+        paths.dashboard.pos.sale.root,
+        paths.dashboard.pos.salesOrder.new,
+        paths.dashboard.pos.report.root,
+      ])
+    );
+
+    const blocked = navPaths('Admin', FEATURES, [], [
+      'shift-cash.counter',
+      'cleaning.tasks',
+      'sales.pos',
+      'analytics.reports',
+    ]);
+    expect(blocked).not.toContain(paths.dashboard.shiftCash.root);
+    expect(blocked).not.toContain(paths.dashboard.cleaning.myChecklist);
+    expect(blocked).not.toContain(paths.dashboard.pos.sale.root);
+    expect(blocked).not.toContain(paths.dashboard.pos.salesOrder.new);
+    expect(blocked).not.toContain(paths.dashboard.pos.report.root);
+    // Quản lý vệ sinh và danh sách hoá đơn không thuộc tính năng nào.
+    expect(blocked).toContain(paths.dashboard.cleaning.review);
+    expect(blocked).toContain(paths.dashboard.pos.salesOrder.list);
+  });
 });

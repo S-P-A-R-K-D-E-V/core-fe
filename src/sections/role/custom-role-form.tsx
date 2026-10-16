@@ -30,6 +30,7 @@ import {
   getPermissionCatalog,
 } from 'src/api/custom-roles';
 
+import SystemRoleBaseline from './system-role-baseline';
 import PermissionChecklist from './permission-checklist';
 
 // ----------------------------------------------------------------------
@@ -116,6 +117,7 @@ export default function CustomRoleForm({ currentRole }: Props) {
   });
 
   const baseRoles = catalog?.baseRoles ?? ['Manager', 'Staff'];
+  const baseBaseline = catalog?.systemRoles.find((r) => r.name === baseRole)?.baseline;
 
   return (
     <FormProvider methods={methods} onSubmit={onSubmit}>
@@ -133,8 +135,13 @@ export default function CustomRoleForm({ currentRole }: Props) {
                   label="Vai trò gốc"
                   options={baseRoles.map((r) => ({ value: r, label: SYSTEM_ROLE_LABELS[r] ?? r }))}
                 />
+                {baseBaseline?.length ? (
+                  <Box sx={{ mt: 1 }}>
+                    <SystemRoleBaseline baseline={baseBaseline} title="Vai trò gốc làm được sẵn" />
+                  </Box>
+                ) : null}
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {BASE_ROLE_HELP[baseRole] ?? ''}
+                  {baseBaseline?.length ? '' : BASE_ROLE_HELP[baseRole] ?? ''}
                   {currentRole && currentRole.userCount > 0 && baseRole !== currentRole.baseRole
                     ? ' Đổi vai trò gốc sẽ đăng xuất những người đang mang vai trò này.'
                     : ''}

@@ -1,3 +1,6 @@
+import PlatformFeatureGuard from 'src/auth/guard/platform-feature-guard';
+import { PLATFORM_FEATURES } from 'src/auth/platform-features';
+
 import { PosSaleView } from 'src/sections/pos/sale/view';
 
 // ----------------------------------------------------------------------
@@ -7,5 +10,9 @@ export const metadata = {
 };
 
 export default function PosSalePage() {
-  return <PosSaleView />;
+  return (
+    <PlatformFeatureGuard feature={PLATFORM_FEATURES.posSale} label="Bán hàng">
+      <PosSaleView />
+    </PlatformFeatureGuard>
+  );
 }
