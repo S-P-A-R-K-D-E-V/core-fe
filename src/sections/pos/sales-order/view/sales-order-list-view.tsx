@@ -314,7 +314,8 @@ export default function SalesOrderListView() {
                     </TableCell>
                     <TableCell>
                       <KiotVietSyncLabel order={row} />
-                      {canRetryKiotVietPush(row.kiotVietSyncStatus) && !pushDisabled && (
+                      {/* Đẩy lại lên KiotViet: Core-be cần sales.order.update (như sửa hoá đơn). */}
+                      {access.canUpdate && canRetryKiotVietPush(row.kiotVietSyncStatus) && !pushDisabled && (
                         <Tooltip title="Đẩy lại lên KiotViet">
                           <IconButton
                             size="small"
