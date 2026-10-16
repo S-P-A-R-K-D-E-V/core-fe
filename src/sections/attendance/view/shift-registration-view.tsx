@@ -54,6 +54,7 @@ import {
   getRegistrationLock,
 } from 'src/api/shiftRegistration';
 import { useAuthContext } from 'src/auth/hooks';
+import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
 
 import { usePageTours } from 'src/hooks/use-tour';
 import type { TourDefinition } from 'src/hooks/use-tour';
@@ -149,11 +150,8 @@ export default function ShiftRegistrationView() {
   const tourWeeklyDialogRef = useRef(false);
 
   const currentUserId = authUser?.id;
-  const isAdmin =
-    authUser?.role === 'Admin' ||
-    authUser?.role === 'Manager' ||
-    authUser?.roles?.includes('Admin') ||
-    authUser?.roles?.includes('Manager');
+  // Xem đăng ký của mọi người, vượt khoá đăng ký: shift.registration.manage (Admin, Manager mặc định, vai trò được cấp).
+  const isAdmin = hasPermission(authUser, PERMISSIONS.shift.registrationManage);
 
   // Fetch registrations
   const fetchRegistrations = useCallback(async () => {

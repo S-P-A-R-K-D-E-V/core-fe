@@ -42,6 +42,7 @@ import {
 } from 'src/components/table';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
 
 import { IAttendanceRequest } from 'src/types/corecms-api';
 import {
@@ -86,7 +87,9 @@ export default function AttendanceRequestsView() {
   const createDialog = useBoolean();
   const processDialog = useBoolean();
 
-  const isAdmin = user?.roles?.includes('Admin') || user?.roles?.includes('Manager');
+  // Xem / duyệt yêu cầu của mọi người: attendance.request.process (Admin, Manager mặc định, vai trò được cấp) — người khác
+  // chỉ thấy yêu cầu của mình.
+  const isAdmin = hasPermission(user, PERMISSIONS.attendance.requestProcess);
 
   const [tableData, setTableData] = useState<IAttendanceRequest[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');

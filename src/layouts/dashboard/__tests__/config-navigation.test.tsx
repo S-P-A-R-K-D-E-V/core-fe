@@ -162,7 +162,8 @@ describe('useNavData — camera, giám sát, báo cáo chỉ Admin', () => {
   });
 
   it.each(['Manager', 'Staff'])('%s không thấy', (role) => {
-    const visible = navPaths(role, features);
+    // Quyền mặc định của Manager (Core-be) có attendance.read; Staff không có quyền nào.
+    const visible = navPaths(role, features, role === 'Manager' ? ['attendance.read'] : []);
     ownerOnly.forEach((p) => expect(visible).not.toContain(p));
     // Quản lý vẫn quản lý chấm công như cũ.
     if (role === 'Manager') expect(visible).toContain(paths.dashboard.attendance.report);
@@ -258,5 +259,40 @@ describe('useNavData — lương theo quyền', () => {
     expect(accountant).toContain(paths.dashboard.payroll.cycles);
     expect(accountant).not.toContain(paths.dashboard.salary.configuration);
     expect(accountant).not.toContain(paths.dashboard.holidayPolicy.list);
+  });
+});
+
+// Ca làm + chấm công theo quyền shift.* / attendance.* (Core-be): Admin / Manager như trước; vai trò tuỳ chỉnh theo quyền.
+describe('useNavData — ca làm và chấm công theo quyền', () => {
+  const features = ['workforce.shift-scheduling', 'workforce.attendance'];
+  const MANAGER_DEFAULTS = [
+    'shift.template.manage',
+    'shift.schedule.manage',
+    'shift.assignment.read',
+    'shift.audit.read',
+    'attendance.read',
+    'attendance.adjust',
+    'attendance.request.process',
+  ];
+
+  it('Manager (quyền mặc định) thấy quản lý ca + chấm công, không thấy nhắc ca (chỉ Admin)', () => {
+    const nav = navPaths('Manager', features, MANAGER_DEFAULTS);
+    expect(nav).toContain(paths.dashboard.shift.templates.list);
+    expect(nav).toContain(paths.dashboard.attendance.logs);
+    expect(nav).toContain(paths.dashboard.shiftAudit.root);
+    expect(nav).not.toContain(paths.dashboard.shift.reminderRules.list);
+    expect(navPaths('Admin', features)).toContain(paths.dashboard.shift.reminderRules.list);
+  });
+
+  it('nhân viên thường không thấy; "Trưởng ca" chỉ xem lịch thấy đúng mục xếp ca', () => {
+    const staff = navPaths('Staff', features, []);
+    expect(staff).not.toContain(paths.dashboard.shift.root);
+    expect(staff).not.toContain(paths.dashboard.attendance.logs);
+    expect(staff).toContain(paths.dashboard.attendance.checkin);
+
+    const lead = navPaths('Staff', features, ['shift.assignment.read']);
+    expect(lead).toContain(paths.dashboard.attendance.assignments);
+    expect(lead).not.toContain(paths.dashboard.attendance.logs);
+    expect(lead).not.toContain(paths.dashboard.shift.templates.list);
   });
 });

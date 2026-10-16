@@ -56,6 +56,25 @@ export const PERMISSIONS = {
     salaryConfigRead: 'payroll.salary-config.read',
     salaryConfigManage: 'payroll.salary-config.manage',
   },
+  /** Chấm công — tự chấm công, việc của chính mình không cần quyền. */
+  attendance: {
+    read: 'attendance.read',
+    adjust: 'attendance.adjust',
+    requestProcess: 'attendance.request.process',
+  },
+  /** Ca làm — xem mẫu / lịch ca, lịch của mình, đăng ký / nhường / đổi ca của mình không cần quyền. */
+  shift: {
+    templateManage: 'shift.template.manage',
+    scheduleManage: 'shift.schedule.manage',
+    assignmentRead: 'shift.assignment.read',
+    assignmentManage: 'shift.assignment.manage',
+    registrationManage: 'shift.registration.manage',
+    requestReview: 'shift.request.review',
+    /** Sửa ca đã chấm công / đã bắt đầu, duyệt muộn, tạo ca thay đã duyệt — mặc định chỉ Admin. */
+    override: 'shift.override',
+    auditRead: 'shift.audit.read',
+    reminderManage: 'shift.reminder.manage',
+  },
 } as const;
 
 type PermissionSource = { role?: unknown; roles?: unknown; permissions?: unknown } | null | undefined;
