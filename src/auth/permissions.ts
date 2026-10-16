@@ -98,6 +98,27 @@ export const PERMISSIONS = {
     create: 'internal-use-note.create',
     complete: 'internal-use-note.complete',
   },
+  /**
+   * Nhập hàng — thao tác cần kèm quyền xem. Cổ đông chi hộ (giao dịch vốn) cần paidBySet. Trả nhà cung cấp từ quầy không
+   * cần quyền; paymentManage mới trả không qua quầy, huỷ khoản trả bất kỳ.
+   */
+  purchase: {
+    read: 'purchase.read',
+    create: 'purchase.create',
+    update: 'purchase.update',
+    confirm: 'purchase.confirm',
+    receive: 'purchase.receive',
+    cancel: 'purchase.cancel',
+    paidBySet: 'purchase.paid-by.set',
+    paymentManage: 'purchase.payment.manage',
+  },
+  purchaseReturn: {
+    read: 'purchase-return.read',
+    create: 'purchase-return.create',
+    complete: 'purchase-return.complete',
+  },
+  /** Nhà cung cấp và nhóm nhà cung cấp. */
+  supplier: { read: 'supplier.read', manage: 'supplier.manage' },
 } as const;
 
 type PermissionSource = { role?: unknown; roles?: unknown; permissions?: unknown } | null | undefined;

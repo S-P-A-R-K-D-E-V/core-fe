@@ -41,6 +41,8 @@ import {
 import { getShareholders } from 'src/api/shareholders';
 import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 
+import { lockedByPaidBy, usePurchaseAccess } from '../purchase-access';
+
 const fmtQty = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 4 });
 
 // ----------------------------------------------------------------------
@@ -103,7 +105,8 @@ export default function PurchaseOrderDetailView({ id }: Props) {
   useEffect(() => { fetchOrder(); }, [fetchOrder]);
 
   const shareholdersOn = useFeatureEnabled(FEATURE.shareholders);
-  const canEditPaidBy = shareholdersOn && order?.status === 'Returned';
+  const access = usePurchaseAccess();
+  const canEditPaidBy = shareholdersOn && order?.status === 'Returned' && access.canSetPaidBy;
 
   useEffect(() => {
     if (!canEditPaidBy) return;
@@ -189,10 +192,12 @@ export default function PurchaseOrderDetailView({ id }: Props) {
     return <Typography>Đang tải...</Typography>;
   }
 
-  const canConfirm = order.status === 'Draft';
-  const canCancel = order.status === 'Draft';
-  const canEdit = order.status === 'Draft';
-  const canReceive = order.status === 'Confirmed' || order.status === 'PartiallyReceived';
+  // Theo quyền purchase.* — đơn do cổ đông chi hộ: sửa / huỷ cần thêm quyền ghi chi hộ.
+  const paidByLocked = lockedByPaidBy(access, order);
+  const canConfirm = order.status === 'Draft' && access.canConfirm;
+  const canCancel = order.status === 'Draft' && access.canCancel && !paidByLocked;
+  const canEdit = order.status === 'Draft' && access.canUpdate && !paidByLocked;
+  const canReceive = (order.status === 'Confirmed' || order.status === 'PartiallyReceived') && access.canReceive;
 
   return (
     <Grid container spacing={3}>

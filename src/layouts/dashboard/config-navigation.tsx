@@ -578,26 +578,27 @@ export function useNavData(
               { title: 'Thuộc tính biến thể', path: paths.dashboard.pos.variantAttribute.list, roles: ['Admin'] },
             ],
           },
+          // Nhà cung cấp, nhập hàng — theo quyền supplier.* / purchase.* (Core-be; mặc định Admin, Manager).
           {
             title: 'Nhà cung cấp',
             path: paths.dashboard.pos.supplier.root,
             icon: ICONS.user,
-            roles: ['Admin'],
+            permissions: [PERMISSIONS.supplier.read],
             featureKey: 'commerce.retail.inventory',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.supplier.list },
-              { title: 'Thêm mới', path: paths.dashboard.pos.supplier.new },
+              { title: 'Thêm mới', path: paths.dashboard.pos.supplier.new, allPermissions: [PERMISSIONS.supplier.manage] },
             ],
           },
           {
             title: 'Đơn nhập hàng',
             path: paths.dashboard.pos.purchaseOrder.root,
             icon: ICONS.order,
-            roles: ['Admin'],
+            permissions: [PERMISSIONS.purchase.read],
             featureKey: 'commerce.retail.inventory',
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.purchaseOrder.list },
-              { title: 'Tạo đơn', path: paths.dashboard.pos.purchaseOrder.new },
+              { title: 'Tạo đơn', path: paths.dashboard.pos.purchaseOrder.new, allPermissions: [PERMISSIONS.purchase.create] },
             ],
           },
           {

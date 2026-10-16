@@ -99,6 +99,17 @@ describe('requiredPermissionsFor', () => {
     expect(requiredRolesFor(path)).toBeNull();
   });
 
+  it.each([
+    [paths.dashboard.pos.purchaseOrder.list, [PERMISSIONS.purchase.read]],
+    [paths.dashboard.pos.purchaseOrder.details('o1'), [PERMISSIONS.purchase.read]],
+    [paths.dashboard.pos.purchaseOrder.new, [PERMISSIONS.purchase.create]],
+    [paths.dashboard.pos.supplier.list, [PERMISSIONS.supplier.read]],
+    [paths.dashboard.pos.supplier.new, [PERMISSIONS.supplier.manage]],
+  ])('nhập hàng / nhà cung cấp: %s → cần %j', (path, permissions) => {
+    expect(requiredPermissionsFor(path)).toEqual(permissions);
+    expect(requiredRolesFor(path)).toBeNull();
+  });
+
   it('danh sách hàng hoá (chỉ xem) mở cho mọi nhân viên; trang sửa hàng tự chặn', () => {
     expect(requiredPermissionsFor(paths.dashboard.pos.product.list)).toBeNull();
     expect(requiredPermissionsFor(paths.dashboard.pos.product.edit('p1'))).toBeNull();

@@ -333,3 +333,26 @@ describe('useNavData — hàng hoá và kho theo quyền', () => {
     expect(keeper).not.toContain(paths.dashboard.pos.category.list);
   });
 });
+
+// Nhập hàng / nhà cung cấp theo quyền purchase.* / supplier.* (Core-be): trước đây chỉ Admin dù API cho cả Manager.
+describe('useNavData — nhập hàng và nhà cung cấp theo quyền', () => {
+  const features = ['commerce.retail.inventory'];
+
+  it('Manager (quyền mặc định) thấy đơn nhập + nhà cung cấp; nhân viên thường không', () => {
+    const manager = navPaths('Manager', features, ['purchase.read', 'purchase.create', 'supplier.read', 'supplier.manage']);
+    expect(manager).toContain(paths.dashboard.pos.purchaseOrder.new);
+    expect(manager).toContain(paths.dashboard.pos.supplier.new);
+
+    const staff = navPaths('Staff', features, []);
+    expect(staff).not.toContain(paths.dashboard.pos.purchaseOrder.root);
+    expect(staff).not.toContain(paths.dashboard.pos.supplier.root);
+  });
+
+  it('"Kế toán" chỉ xem: thấy danh sách, không thấy "Tạo đơn" / "Thêm mới"', () => {
+    const viewer = navPaths('Staff', features, ['purchase.read', 'supplier.read']);
+    expect(viewer).toContain(paths.dashboard.pos.purchaseOrder.list);
+    expect(viewer).toContain(paths.dashboard.pos.supplier.list);
+    expect(viewer).not.toContain(paths.dashboard.pos.purchaseOrder.new);
+    expect(viewer).not.toContain(paths.dashboard.pos.supplier.new);
+  });
+});

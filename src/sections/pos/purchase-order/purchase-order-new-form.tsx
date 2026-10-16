@@ -41,7 +41,6 @@ import { useBoolean } from 'src/hooks/use-boolean';
 import { fCurrency } from 'src/utils/format-number';
 import { apiErrorMessage } from 'src/utils/api-error';
 
-import { useAuthContext } from 'src/auth/hooks';
 
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
@@ -66,6 +65,7 @@ import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 import { lineNetOf } from './purchase-line';
 import PurchaseOrderQuickCreateProduct from './purchase-order-quick-create-product';
 import PurchaseOrderQuickCreateSupplier from './purchase-order-quick-create-supplier';
+import { usePurchaseAccess } from './purchase-access';
 import PurchaseOrderVariantPicker from './purchase-order-variant-picker';
 
 // ----------------------------------------------------------------------
@@ -371,8 +371,8 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
 
   // ---------- Đơn vị nhập + giá mặc định (M7 bước 1) ----------
   // Lịch sử giá nhập có giá vốn nên chỉ chủ / quản lý xem được (BE 403 với nhân viên).
-  const { user } = useAuthContext();
-  const canSeeCost = ['Admin', 'Manager'].some((r) => user?.role === r || (user?.roles ?? []).includes(r));
+  const access = usePurchaseAccess();
+  const { canSeeCost } = access;
   const [unitsByProduct, setUnitsByProduct] = useState<Record<string, IProductUnits>>({});
   const unitsRequests = useRef<Record<string, Promise<IProductUnits | null>>>({});
 
@@ -817,11 +817,13 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
                   blurOnSelect
                   clearOnBlur
                 />
-                <Tooltip title="Tạo sản phẩm mới">
-                  <IconButton color="primary" onClick={quickCreateProduct.onTrue}>
-                    <Iconify icon="mingcute:add-line" />
-                  </IconButton>
-                </Tooltip>
+                {access.canCreateProducts && (
+                  <Tooltip title="Tạo sản phẩm mới">
+                    <IconButton color="primary" onClick={quickCreateProduct.onTrue}>
+                      <Iconify icon="mingcute:add-line" />
+                    </IconButton>
+                  </Tooltip>
+                )}
               </Stack>
 
               {/* Items table header */}
@@ -1104,11 +1106,13 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
                         </MenuItem>
                       ))}
                   </RHFSelect>
-                  <Tooltip title="Tạo nhanh NCC">
-                    <IconButton color="primary" onClick={quickCreateSupplier.onTrue} sx={{ mt: 1 }}>
-                      <Iconify icon="mingcute:add-line" />
-                    </IconButton>
-                  </Tooltip>
+                  {access.canManageSuppliers && (
+                    <Tooltip title="Tạo nhanh NCC">
+                      <IconButton color="primary" onClick={quickCreateSupplier.onTrue} sx={{ mt: 1 }}>
+                        <Iconify icon="mingcute:add-line" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </Stack>
 
                 <RHFSelect name="warehouseId" label="Kho nhập *" sx={{ mb: 2 }}>
@@ -1124,7 +1128,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
 
                 <RHFDateTimePicker name="expectedDate" label="Ngày nhập hàng" sx={{ mb: 2 }} />
 
-                {shareholdersOn && (
+                {shareholdersOn && access.canSetPaidBy && (
                   <RHFSelect
                     name="paidByShareholderId"
                     label="Ai chi hộ (nếu có)"
