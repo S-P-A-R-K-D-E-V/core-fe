@@ -12,6 +12,7 @@ import { useBoolean } from 'src/hooks/use-boolean';
 import { useResponsive } from 'src/hooks/use-responsive';
 import { useNavFavorites } from 'src/hooks/use-nav-favorites';
 import { useAuthContext } from 'src/auth/hooks';
+import { getUserRoles } from 'src/auth/roles';
 
 import Logo from 'src/components/logo';
 import Iconify from 'src/components/iconify';
@@ -33,12 +34,13 @@ type Props = {
 
 export default function NavVertical({ openNav, onCloseNav }: Props) {
   const { user } = useAuthContext();
+  const userRoles = getUserRoles(user);
 
   const pathname = usePathname();
 
   const lgUp = useResponsive('up', 'lg');
 
-  const navData = useNavData(user?.role, user?.enabledFeatures);
+  const navData = useNavData(userRoles, user?.enabledFeatures, user?.permissions);
 
   const favoritesDialog = useBoolean();
   const { favorites, isFull, toggleFavorite } = useNavFavorites();
@@ -86,7 +88,7 @@ export default function NavVertical({ openNav, onCloseNav }: Props) {
       <NavSectionVertical
         data={navDataWithFavorites}
         slotProps={{
-          currentRole: user?.role,
+          currentRole: userRoles,
         }}
       />
 

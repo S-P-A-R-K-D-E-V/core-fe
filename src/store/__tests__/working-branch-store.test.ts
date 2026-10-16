@@ -198,4 +198,10 @@ describe('loại chi nhánh dùng để lọc menu', () => {
     // Chưa hỏi xong danh sách → tạm theo chi nhánh đã nhớ.
     expect(menuBranchTypes('Manager', fnb, null)).toEqual(['fnb']);
   });
+
+  it('nhiều vai trò: theo vai trò rộng nhất', () => {
+    expect(menuBranchTypes(['Staff', 'Admin'], retail, [retail, fnb])).toBeNull();
+    expect(menuBranchTypes(['Staff', 'Manager'], retail, [retail, fnb])).toEqual(['retail', 'fnb']);
+    expect(menuBranchTypes(undefined, retail, [retail, fnb])).toEqual(['retail']);
+  });
 });

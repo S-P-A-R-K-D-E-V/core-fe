@@ -2,6 +2,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { getUserRoles } from 'src/auth/roles';
 
 import { hideScroll } from 'src/theme/css';
 
@@ -16,8 +17,9 @@ import NavToggleButton from '../common/nav-toggle-button';
 
 export default function NavMini() {
   const { user } = useAuthContext();
+  const userRoles = getUserRoles(user);
 
-  const navData = useNavData(user?.role, user?.enabledFeatures);
+  const navData = useNavData(userRoles, user?.enabledFeatures, user?.permissions);
 
   return (
     <Box
@@ -48,7 +50,7 @@ export default function NavMini() {
         <NavSectionMini
           data={navData}
           slotProps={{
-            currentRole: user?.role,
+            currentRole: userRoles,
           }}
         />
       </Stack>

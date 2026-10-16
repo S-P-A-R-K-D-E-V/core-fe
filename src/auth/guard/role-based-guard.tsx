@@ -13,42 +13,55 @@ import { ForbiddenIllustration } from 'src/assets/illustrations';
 import { varBounce, MotionContainer } from 'src/components/animate';
 
 import { useAuthContext } from '../hooks';
+import { hasAnyRole, getUserRoles } from '../roles';
+import { permissionsKnown, hasAnyPermission, hasAllPermissions } from '../permissions';
 
 // ----------------------------------------------------------------------
 
 type RoleBasedGuardProp = {
   hasContent?: boolean;
-  roles?: string[];
-  permissions?: string[];
+  roles?: readonly string[];
+  /** Có MỘT trong các quyền (mã Core-be, xem src/auth/permissions.ts). */
+  permissions?: readonly string[];
+  /** Có ĐỦ các quyền — trang gọi nhiều API, mỗi API một quyền. */
+  allPermissions?: readonly string[];
   children: React.ReactNode;
   sx?: SxProps<Theme>;
 };
 
-export default function RoleBasedGuard({ hasContent, roles, permissions, children, sx }: RoleBasedGuardProp) {
+export const FORBIDDEN_TITLE = 'Không có quyền truy cập';
+
+export default function RoleBasedGuard({
+  hasContent,
+  roles,
+  permissions,
+  allPermissions,
+  children,
+  sx,
+}: RoleBasedGuardProp) {
   const { user } = useAuthContext();
 
-  const currentRole = user?.role;
-  const userRoles: string[] = user?.roles || [currentRole].filter(Boolean);
-  const userPermissions: string[] = user?.permissions || [];
+  // Gộp role + roles: người kiêm nhiều vai trò (vd Staff kiêm Admin) có quyền của MỌI vai trò, như API.
+  const hasRoleAccess = hasAnyRole(getUserRoles(user), roles);
 
-  // Check role-based access
-  const hasRoleAccess = typeof roles === 'undefined' || roles.some((role) => userRoles.includes(role));
+  const needsPermission = !!permissions?.length || !!allPermissions?.length;
+  // Token không mang quyền: chờ /users/me nạp xong thay vì báo "không có quyền" rồi lại mở.
+  if (hasRoleAccess && needsPermission && !permissionsKnown(user)) return null;
 
-  // Check permission-based access
-  const hasPermissionAccess = typeof permissions === 'undefined' || permissions.some((perm) => userPermissions.includes(perm));
+  const hasPermissionAccess = hasAnyPermission(user, permissions) && hasAllPermissions(user, allPermissions);
 
   if (!hasRoleAccess || !hasPermissionAccess) {
     return hasContent ? (
       <Container component={MotionContainer} sx={{ textAlign: 'center', ...sx }}>
         <m.div variants={varBounce().in}>
           <Typography variant="h3" sx={{ mb: 2 }}>
-            Permission Denied
+            {FORBIDDEN_TITLE}
           </Typography>
         </m.div>
 
         <m.div variants={varBounce().in}>
           <Typography sx={{ color: 'text.secondary' }}>
-            You do not have permission to access this page
+            Tài khoản của bạn không có quyền mở trang này. Liên hệ chủ cửa hàng nếu bạn cần dùng.
           </Typography>
         </m.div>
 

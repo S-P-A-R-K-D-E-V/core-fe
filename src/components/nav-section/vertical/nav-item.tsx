@@ -93,7 +93,8 @@ const NavItem = forwardRef<HTMLDivElement, NavItemProps>(
     );
 
     // Hidden item by role
-    if (roles && !roles.includes(`${currentRole}`)) {
+    const current: readonly string[] = typeof currentRole === 'string' ? [currentRole] : currentRole;
+    if (roles && !roles.some((role) => current.includes(role))) {
       return null;
     }
 

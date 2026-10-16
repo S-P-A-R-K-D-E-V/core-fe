@@ -6,6 +6,28 @@ import { HOST_API } from 'src/config-global';
 
 const axiosInstance = axios.create({ baseURL: HOST_API });
 
+export const FORBIDDEN_MESSAGE = 'Bạn không có quyền thực hiện thao tác này.';
+
+/**
+ * Lỗi mà axiosInstance reject: BODY của response (xem src/utils/api-error.ts), kèm `status` HTTP khi body là object —
+ * trước đây mất hẳn mã HTTP nên màn hình không phân biệt được 403 với lỗi khác. 403 body rỗng (API cũ, proxy) thành
+ * { status, error: 'forbidden', message } thay vì chuỗi tiếng Anh chung chung.
+ */
+export function toApiError(error: any): any {
+  const status: number | undefined = error?.response?.status;
+  const data = error?.response?.data;
+
+  // Chỉ gắn status vào object JSON thường — Blob/ArrayBuffer (tải file) giữ nguyên để nơi gọi tự đọc.
+  if (data && Object.prototype.toString.call(data) === '[object Object]') {
+    return status && data.status === undefined ? { ...data, status } : data;
+  }
+  if (data) return data;
+  if (status === 403) {
+    return { status, error: 'forbidden', title: FORBIDDEN_MESSAGE, message: FORBIDDEN_MESSAGE };
+  }
+  return 'Something went wrong';
+}
+
 axiosInstance.interceptors.response.use(
   (res: any) => res,
   (error: any) => {
@@ -23,7 +45,7 @@ axiosInstance.interceptors.response.use(
       delete axiosInstance.defaults.headers.common.Authorization;
       window.location.href = '/auth/jwt/login';
     }
-    return Promise.reject((error.response && error.response.data) || 'Something went wrong');
+    return Promise.reject(toApiError(error));
   }
 );
 
@@ -106,8 +128,16 @@ export const endpoints = {
     delete: (id: string) => `/roles/${id}`,
     assign: '/roles/assign',
   },
+  customRoles: {
+    list: '/custom-roles',
+    create: '/custom-roles',
+    update: (id: string) => `/custom-roles/${id}`,
+    delete: (id: string) => `/custom-roles/${id}`,
+    userAssignment: (userId: string) => `/custom-roles/users/${userId}`,
+  },
   permissions: {
     list: '/permissions',
+    catalog: '/permissions/catalog',
     userPermissions: (userId: string) => `/permissions/user/${userId}`,
     myPermissions: '/permissions/me',
   },

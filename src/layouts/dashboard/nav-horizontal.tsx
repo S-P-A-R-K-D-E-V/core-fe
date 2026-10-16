@@ -5,6 +5,7 @@ import Toolbar from '@mui/material/Toolbar';
 import { useTheme } from '@mui/material/styles';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { getUserRoles } from 'src/auth/roles';
 
 import { bgBlur } from 'src/theme/css';
 
@@ -21,8 +22,9 @@ function NavHorizontal() {
   const theme = useTheme();
 
   const { user } = useAuthContext();
+  const userRoles = getUserRoles(user);
 
-  const navData = useNavData(user?.role, user?.enabledFeatures);
+  const navData = useNavData(userRoles, user?.enabledFeatures, user?.permissions);
 
   return (
     <AppBar
@@ -48,7 +50,7 @@ function NavHorizontal() {
           <NavSectionHorizontal
             data={navData}
             slotProps={{
-              currentRole: user?.role,
+              currentRole: userRoles,
             }}
             sx={{
               ...theme.mixins.toolbar,

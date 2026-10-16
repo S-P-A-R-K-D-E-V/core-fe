@@ -9,6 +9,11 @@ import Iconify from 'src/components/iconify';
 import SvgColor from 'src/components/svg-color';
 import { useStoreBrand } from 'src/components/branding';
 
+import { hasAnyRole, normalizeRoles } from 'src/auth/roles';
+import { hasAnyPermission, hasAllPermissions } from 'src/auth/permissions';
+
+import { REPORT_PAGES, REPORT_VIEW_PERMISSIONS } from 'src/sections/pos/report/report-access';
+
 import { BranchType, menuBranchTypes, useWorkingBranch } from 'src/store/working-branch-store';
 
 // ----------------------------------------------------------------------
@@ -50,16 +55,29 @@ const ICONS = {
 
 // ----------------------------------------------------------------------
 
-/** Lọc nav item theo role, theo feature key đang bật cho tenant hiện tại VÀ theo loại chi nhánh (đệ quy vào children).
+/** Lọc nav item theo role (người dùng có MỘT trong các vai trò của mục — gộp đủ vai trò, như API), theo feature key đang bật cho tenant hiện tại VÀ theo loại chi nhánh (đệ quy vào children).
  * Item không khai báo featureKey luôn hiện (không phải mọi mục đều gắn với 1 feature có thể tắt). featureKey là mảng =
  * hiện khi bật MỘT TRONG các khoá (vd hàng hoá dùng chung cho bán lẻ và F&B).
  * Item có branchType chỉ hiện khi loại đó nằm trong branchTypes (xem menuBranchTypes: nhân viên = loại của chi nhánh
  * đang làm việc, quản lý = các loại trong chi nhánh được phân công); branchTypes null = không thu hẹp (chủ cửa hàng). */
+type NavAccess = { roles: readonly string[]; permissions: readonly string[] | undefined };
+
 function filterNavItems<
-  T extends { roles?: string[]; featureKey?: string | string[]; branchType?: BranchType; children?: T[] },
->(items: T[], userRole: string, enabledFeatures: string[], branchTypes: BranchType[] | null): T[] {
+  T extends {
+    roles?: string[];
+    /** Có MỘT trong các quyền (mã Core-be). */
+    permissions?: readonly string[];
+    /** Có ĐỦ các quyền. */
+    allPermissions?: readonly string[];
+    featureKey?: string | string[];
+    branchType?: BranchType;
+    children?: T[];
+  },
+>(items: T[], access: NavAccess, enabledFeatures: string[], branchTypes: BranchType[] | null): T[] {
+  const { roles: userRoles } = access;
   return items
-    .filter((item) => !item.roles || item.roles.includes(userRole))
+    .filter((item) => hasAnyRole(userRoles, item.roles))
+    .filter((item) => hasAnyPermission(access, item.permissions) && hasAllPermissions(access, item.allPermissions))
     .filter((item) => !item.branchType || !branchTypes || branchTypes.includes(item.branchType))
     .filter(
       (item) =>
@@ -71,21 +89,33 @@ function filterNavItems<
     .map((item) => ({
       ...item,
       children: item.children
-        ? filterNavItems(item.children, userRole, enabledFeatures, branchTypes)
+        ? filterNavItems(item.children, access, enabledFeatures, branchTypes)
         : undefined,
     }));
 }
 
-export function useNavData(userRole?: string, enabledFeatures?: string[]) {
+/**
+ * `roles`: mọi vai trò của người dùng (getUserRoles) — một chuỗi cũng nhận. Chưa có vai trò → danh sách đầy đủ.
+ * `permissions`: quyền hiệu lực (GET /users/me); Admin luôn đủ quyền.
+ */
+export function useNavData(
+  roles?: string | readonly string[],
+  enabledFeatures?: string[],
+  permissions?: readonly string[]
+) {
   const { t } = useTranslate();
+
+  // Khoá chuỗi cho deps: mảng vai trò tạo mới mỗi lần render.
+  const rolesKey = normalizeRoles(roles).join('|');
+  const userRoles = useMemo(() => (rolesKey ? rolesKey.split('|') : []), [rolesKey]);
 
   const { isCiCi } = useStoreBrand();
 
   const branch = useWorkingBranch((s) => s.branch);
   const branchOptions = useWorkingBranch((s) => s.options);
   const branchTypes = useMemo(
-    () => menuBranchTypes(userRole, branch, branchOptions),
-    [userRole, branch, branchOptions]
+    () => menuBranchTypes(userRoles, branch, branchOptions),
+    [userRoles, branch, branchOptions]
   );
 
   const data = useMemo(
@@ -387,7 +417,6 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
       // ----------------------------------------------------------------------
       {
         subheader: 'Quản lý kho & hàng hóa',
-        roles: ['Admin'],
         items: [
           {
             title: 'Sản phẩm',
@@ -573,23 +602,17 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
             ],
           },
           {
-            // Báo cáo kinh doanh: chỉ chủ cửa hàng (quản lý không thấy).
+            // Báo cáo kinh doanh.
             title: 'Báo cáo',
             path: paths.dashboard.pos.report.root,
             icon: ICONS.analytics,
-            roles: ['Admin'],
-            children: [
-              // Tổng quan tài chính gọi /reports/expenses + /reports/break-even (chỉ Admin) → Manager không thấy mục này.
-              { title: 'Tổng quan', path: paths.dashboard.pos.report.dashboard, roles: ['Admin'] },
-              { title: 'Doanh thu', path: paths.dashboard.pos.report.revenue },
-              { title: 'SP bán chạy', path: paths.dashboard.pos.report.productSales },
-              { title: 'Khách hàng', path: paths.dashboard.pos.report.customers },
-              { title: 'Tồn kho', path: paths.dashboard.pos.report.inventory },
-              { title: 'Báo cáo thuế', path: paths.dashboard.pos.report.tax, roles: ['Admin', 'Manager'] },
-              { title: 'Chi phí', path: paths.dashboard.pos.report.expense, roles: ['Admin'] },
-              { title: 'Công nợ', path: paths.dashboard.pos.report.debt, roles: ['Admin'] },
-              { title: 'Điểm hòa vốn', path: paths.dashboard.pos.report.breakEven, roles: ['Admin'] },
-            ],
+            // Theo quyền analytics.* (Core-be /reports/*): chủ cửa hàng có đủ; vai trò tuỳ chỉnh được cấp từng báo cáo.
+            permissions: REPORT_VIEW_PERMISSIONS,
+            children: REPORT_PAGES.map((page) => ({
+              title: page.title,
+              path: page.path,
+              allPermissions: page.permissions,
+            })),
           },
         ],
       },
@@ -597,7 +620,7 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
       ];
 
       // Nếu user chưa load hoặc chưa có role → trả nguyên (SplashScreen đang hiện)
-      if (!userRole) return fullNav;
+      if (userRoles.length === 0) return fullNav;
 
       // Lọc từng group theo role + feature đang bật cho tenant + loại chi nhánh, bỏ group rỗng.
       // enabledFeatures undefined (chưa fetch xong /users/me) → coi như chưa bật gì, tránh
@@ -605,12 +628,17 @@ export function useNavData(userRole?: string, enabledFeatures?: string[]) {
       return fullNav
         .map((group) => ({
           ...group,
-          items: filterNavItems(group.items as any[], userRole, enabledFeatures ?? [], branchTypes),
+          items: filterNavItems(
+            group.items as any[],
+            { roles: userRoles, permissions },
+            enabledFeatures ?? [],
+            branchTypes
+          ),
         }))
         .filter((group) => group.items.length > 0);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, userRole, enabledFeatures, isCiCi, branchTypes]
+    [t, userRoles, enabledFeatures, permissions, isCiCi, branchTypes]
   );
 
   return data;

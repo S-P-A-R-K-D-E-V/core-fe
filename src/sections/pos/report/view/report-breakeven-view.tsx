@@ -17,7 +17,6 @@ import { useSnackbar } from 'src/components/snackbar';
 import { fCurrency, fPercent } from 'src/utils/format-number';
 import { AppDatePicker } from 'src/components/date-time-picker';
 import Chart, { useChart } from 'src/components/chart';
-import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 
 import { IBreakEvenAnalysis } from 'src/types/corecms-api';
 import { getBreakEvenAnalysis } from 'src/api/reports';
@@ -72,7 +71,7 @@ export default function ReportBreakEvenView() {
   });
 
   return (
-    <RoleBasedGuard hasContent roles={['Admin']}>
+    <>
       <Box>
         <Typography variant="h4" sx={{ mb: 3 }}>
           Điểm hòa vốn
@@ -235,6 +234,6 @@ export default function ReportBreakEvenView() {
           </Grid>
         )}
       </Box>
-    </RoleBasedGuard>
+    </>
   );
 }

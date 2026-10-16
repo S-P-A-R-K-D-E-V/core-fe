@@ -173,6 +173,41 @@ export interface IRole {
   createdAt: string;
   userCount: number;
   permissions: IPermission[];
+  /** Vai trò hệ thống (Admin/Manager/Staff/User): không đổi tên/xoá được — Core-be SystemRoles. */
+  isSystem?: boolean;
+}
+
+/** Vai trò tuỳ chỉnh của cửa hàng (Core-be CustomRole) — GET /custom-roles. */
+export interface ICustomRole {
+  id: string;
+  name: string;
+  description?: string | null;
+  /** Manager | Staff — vai trò hệ thống tương đương cho API chưa kiểm theo quyền. */
+  baseRole: string;
+  permissions: string[];
+  userCount: number;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
+export interface ICustomRoleRequest {
+  name: string;
+  description?: string;
+  baseRole: string;
+  permissions: string[];
+}
+
+/** GET /permissions/catalog — quyền API đang kiểm, quyền cố định của vai trò hệ thống, vai trò gốc được chọn. */
+export interface IPermissionCatalog {
+  groups: { key: string; label: string; permissions: { code: string; label: string }[] }[];
+  systemRoles: { name: string; permissions: string[] }[];
+  baseRoles: string[];
+}
+
+/** GET /custom-roles/users/{userId} — vai trò ĐƯỢC GÁN (không gồm vai trò gốc suy ra từ vai trò tuỳ chỉnh). */
+export interface IUserRoleAssignment {
+  systemRoles: string[];
+  customRoleIds: string[];
 }
 
 export interface IPermission {

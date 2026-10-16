@@ -24,6 +24,8 @@ import Iconify from 'src/components/iconify';
 import { AppDatePicker } from 'src/components/date-time-picker';
 import { IRevenueReport } from 'src/types/corecms-api';
 import { getRevenueReport, downloadExport } from 'src/api/reports';
+import { useAuthContext } from 'src/auth/hooks';
+import { canExportReports } from '../report-access';
 
 // ----------------------------------------------------------------------
 
@@ -64,6 +66,9 @@ export default function ReportRevenueView() {
     fetchData();
   }, [fetchData]);
 
+  const { user } = useAuthContext();
+  const canExport = canExportReports(user);
+
   const handleExport = async () => {
     try {
       await downloadExport('revenue', { fromDate, toDate, groupBy });
@@ -77,14 +82,16 @@ export default function ReportRevenueView() {
     <Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
         <Typography variant="h4">Báo cáo doanh thu</Typography>
-        <Button
-          variant="contained"
-          startIcon={<Iconify icon="vscode-icons:file-type-excel" />}
-          onClick={handleExport}
-          color="success"
-        >
-          Xuất Excel
-        </Button>
+        {canExport && (
+          <Button
+            variant="contained"
+            startIcon={<Iconify icon="vscode-icons:file-type-excel" />}
+            onClick={handleExport}
+            color="success"
+          >
+            Xuất Excel
+          </Button>
+        )}
       </Stack>
 
       {/* Filters */}

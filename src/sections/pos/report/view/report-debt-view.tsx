@@ -19,7 +19,6 @@ import TableRow from '@mui/material/TableRow';
 import Label from 'src/components/label';
 import { useSnackbar } from 'src/components/snackbar';
 import { fCurrency } from 'src/utils/format-number';
-import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 
 import { IDebtSummary } from 'src/types/corecms-api';
 import { getDebtSummary } from 'src/api/reports';
@@ -52,7 +51,7 @@ export default function ReportDebtView() {
   }, [fetchData]);
 
   return (
-    <RoleBasedGuard hasContent roles={['Admin']}>
+    <>
       <Box>
       <Typography variant="h4" sx={{ mb: 3 }}>
         Công nợ phải thu / phải trả
@@ -210,6 +209,6 @@ export default function ReportDebtView() {
         </>
       )}
       </Box>
-    </RoleBasedGuard>
+    </>
   );
 }

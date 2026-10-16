@@ -22,8 +22,8 @@ import { useNavData } from 'src/layouts/dashboard/config-navigation';
 
 import { useWorkingBranch } from 'src/store/working-branch-store';
 
-function navPaths(userRole?: string, enabledFeatures: string[] = []) {
-  const { result } = renderHook(() => useNavData(userRole, enabledFeatures));
+function navPaths(userRole?: string | string[], enabledFeatures: string[] = [], permissions?: string[]) {
+  const { result } = renderHook(() => useNavData(userRole, enabledFeatures, permissions));
   const out: string[] = [];
   result.current.forEach((group: any) =>
     group.items.forEach((item: any) => {
@@ -166,5 +166,42 @@ describe('useNavData — camera, giám sát, báo cáo chỉ Admin', () => {
     ownerOnly.forEach((p) => expect(visible).not.toContain(p));
     // Quản lý vẫn quản lý chấm công như cũ.
     if (role === 'Manager') expect(visible).toContain(paths.dashboard.attendance.report);
+  });
+});
+
+// Người kiêm nhiều vai trò (vd Staff kiêm Admin, vai trò chính "Staff") thấy menu của MỌI vai trò — như guard và API.
+// Trước đây menu chỉ xét vai trò chính nên ẩn hết mục Admin dù trang/API vẫn cho vào.
+describe('useNavData — nhiều vai trò', () => {
+  it('Staff kiêm Admin thấy mục chỉ dành cho Admin', () => {
+    expect(navPaths('Staff')).not.toContain(paths.dashboard.automation.root);
+    expect(navPaths(['Staff', 'Admin'])).toContain(paths.dashboard.automation.root);
+    expect(navPaths(['Staff', 'Admin'])).toContain(paths.dashboard.storeSettings.root);
+  });
+
+  it('Staff kiêm Quản lý thấy mục của Quản lý nhưng không thấy mục chỉ Admin', () => {
+    const paths2 = navPaths(['Staff', 'Manager']);
+    expect(paths2).toContain(paths.dashboard.user.root);
+    expect(paths2).not.toContain(paths.dashboard.storeSettings.root);
+  });
+});
+
+// Báo cáo theo quyền analytics.* (Core-be /reports/*): chủ cửa hàng thấy hết; vai trò tuỳ chỉnh thấy đúng báo cáo được cấp.
+describe('useNavData — báo cáo theo quyền', () => {
+  it('Admin thấy mục Báo cáo và mọi trang con', () => {
+    const nav = navPaths('Admin');
+    expect(nav).toContain(paths.dashboard.pos.report.root);
+    expect(nav).toContain(paths.dashboard.pos.report.tax);
+    expect(nav).toContain(paths.dashboard.pos.report.dashboard);
+  });
+
+  it('nhân viên thường không thấy; "Kế toán" chỉ có doanh thu thấy đúng Doanh thu', () => {
+    expect(navPaths('Staff', [], [])).not.toContain(paths.dashboard.pos.report.root);
+
+    const accountant = navPaths('Staff', [], ['analytics.revenue.read']);
+    expect(accountant).toContain(paths.dashboard.pos.report.root);
+    expect(accountant).toContain(paths.dashboard.pos.report.revenue);
+    // Tổng quan cần thêm chi phí + hoà vốn
+    expect(accountant).not.toContain(paths.dashboard.pos.report.dashboard);
+    expect(accountant).not.toContain(paths.dashboard.pos.report.tax);
   });
 });

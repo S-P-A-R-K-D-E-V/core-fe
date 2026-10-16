@@ -68,7 +68,7 @@ describe('getSalesOrderReceipt qua axios của app', () => {
     await expect(getSalesOrderReceipt(ORDER_ID)).rejects.toThrow(/^Không tìm thấy hoá đơn này\./);
   });
 
-  it('403 tắt tính năng vẫn đi qua interceptor: reject bằng body của core-be', async () => {
+  it('403 tắt tính năng vẫn đi qua interceptor: reject bằng body của core-be, kèm mã HTTP', async () => {
     const body = {
       error: 'feature_disabled',
       message: 'Cửa hàng chưa bật tính năng bán hàng tại quầy.',
@@ -76,7 +76,7 @@ describe('getSalesOrderReceipt qua axios của app', () => {
     };
     respondWith(403, body);
 
-    await expect(getSalesOrderReceipt(ORDER_ID)).rejects.toEqual(body);
+    await expect(getSalesOrderReceipt(ORDER_ID)).rejects.toEqual({ ...body, status: 403 });
   });
 
   it('500 không có body vẫn như các lời gọi khác: reject bằng "Something went wrong"', async () => {

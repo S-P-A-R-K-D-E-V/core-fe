@@ -1,38 +1,13 @@
 import axios, { endpoints } from 'src/utils/axios';
-import {
-  IRole,
-  IPermission,
-  ICreateRoleRequest,
-  IUpdateRoleRequest,
-  IAssignRoleRequest,
-  IUserPermissions,
-} from 'src/types/corecms-api';
+import { IRole, IAssignRoleRequest, IUserPermissions } from 'src/types/corecms-api';
 
 // -------------------------------------------------------
-// Roles API
+// Vai trò hệ thống (danh mục chung: Admin/Manager/Staff/User) — chỉ đọc và gán. Vai trò riêng của cửa hàng: custom-roles.ts.
 // -------------------------------------------------------
 
 export async function getAllRoles(): Promise<IRole[]> {
   const response = await axios.get<IRole[]>(endpoints.roles.list);
   return response.data;
-}
-
-export async function getRoleById(id: string): Promise<IRole> {
-  const response = await axios.get<IRole>(endpoints.roles.details(id));
-  return response.data;
-}
-
-export async function createRole(data: ICreateRoleRequest): Promise<{ id: string }> {
-  const response = await axios.post<{ id: string }>(endpoints.roles.create, data);
-  return response.data;
-}
-
-export async function updateRole(id: string, data: IUpdateRoleRequest): Promise<void> {
-  await axios.put(endpoints.roles.update(id), data);
-}
-
-export async function deleteRole(id: string): Promise<void> {
-  await axios.delete(endpoints.roles.delete(id));
 }
 
 export async function assignRoles(data: IAssignRoleRequest): Promise<void> {
@@ -42,11 +17,6 @@ export async function assignRoles(data: IAssignRoleRequest): Promise<void> {
 // -------------------------------------------------------
 // Permissions API
 // -------------------------------------------------------
-
-export async function getAllPermissions(): Promise<IPermission[]> {
-  const response = await axios.get<IPermission[]>(endpoints.permissions.list);
-  return response.data;
-}
 
 export async function getUserPermissions(userId: string): Promise<IUserPermissions> {
   const response = await axios.get<IUserPermissions>(endpoints.permissions.userPermissions(userId));

@@ -57,7 +57,7 @@ const STATUS_OPTIONS = [
   { value: 'Rejected', label: 'Rejected' },
 ];
 
-const ROLE_OPTIONS = ['Admin', 'Manager', 'User'];
+const ROLE_OPTIONS = ['Admin', 'Manager', 'Staff', 'User'];
 
 const TABLE_HEAD = [
   { id: 'name', label: 'Name' },

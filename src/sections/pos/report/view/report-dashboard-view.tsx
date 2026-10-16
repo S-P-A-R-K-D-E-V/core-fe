@@ -16,8 +16,9 @@ import { useSnackbar } from 'src/components/snackbar';
 import { fCurrency, fPercent, fShortenNumber } from 'src/utils/format-number';
 import { AppDatePicker } from 'src/components/date-time-picker';
 import Chart, { useChart } from 'src/components/chart';
-import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 import { useAuthContext } from 'src/auth/hooks';
+import { hasAllPermissions } from 'src/auth/permissions';
+import { reportPermissionsFor } from '../report-access';
 
 import { IRevenueReport, IExpenseReport, IBreakEvenAnalysis } from 'src/types/corecms-api';
 import { getRevenueReport, getExpenseReport, getBreakEvenAnalysis } from 'src/api/reports';
@@ -46,11 +47,11 @@ export default function ReportDashboardView() {
   const [prevExpense, setPrevExpense] = useState<IExpenseReport | null>(null);
 
   const { user } = useAuthContext();
-  // Trang chỉ Admin (RoleBasedGuard bên dưới): vai trò khác không gọi API — các báo cáo chi phí / hoà vốn trả 403.
-  const isAdmin = (user?.roles || [user?.role]).includes('Admin');
+  // Trang cần đủ quyền doanh thu + chi phí + hoà vốn (ReportPageGuard ở page) — thiếu quyền thì không gọi API (403).
+  const canLoad = hasAllPermissions(user, reportPermissionsFor(paths.dashboard.pos.report.dashboard));
 
   const fetchData = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!canLoad) return;
     try {
       // Kỳ trước = khoảng cùng độ dài ngay trước [fromDate, toDate] (để so sánh MoM)
       const msPerDay = 86_400_000;
@@ -78,7 +79,7 @@ export default function ReportDashboardView() {
       console.error(error);
       enqueueSnackbar('Không thể tải dashboard tài chính', { variant: 'error' });
     }
-  }, [fromDate, toDate, enqueueSnackbar, isAdmin]);
+  }, [fromDate, toDate, enqueueSnackbar, canLoad]);
 
   useEffect(() => {
     fetchData();
@@ -222,7 +223,7 @@ export default function ReportDashboardView() {
   });
 
   return (
-    <RoleBasedGuard hasContent roles={['Admin']}>
+    <>
       <Box>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
           <Typography variant="h4">Dashboard tài chính</Typography>
@@ -483,6 +484,6 @@ export default function ReportDashboardView() {
           </>
         )}
       </Box>
-    </RoleBasedGuard>
+    </>
   );
 }
