@@ -23,6 +23,8 @@ import { fCurrency } from 'src/utils/format-number';
 import Iconify from 'src/components/iconify';
 import { IInventoryReport } from 'src/types/corecms-api';
 import { getInventoryReport, downloadExport } from 'src/api/reports';
+import { useAuthContext } from 'src/auth/hooks';
+import { canExportReports } from '../report-access';
 
 // ----------------------------------------------------------------------
 
@@ -52,6 +54,9 @@ export default function ReportInventoryView() {
     fetchData();
   }, [fetchData]);
 
+  const { user } = useAuthContext();
+  const canExport = canExportReports(user);
+
   const handleExport = async () => {
     try {
       const params: Record<string, string> = {};
@@ -71,14 +76,16 @@ export default function ReportInventoryView() {
     <Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
         <Typography variant="h4">Báo cáo tồn kho</Typography>
-        <Button
-          variant="contained"
-          startIcon={<Iconify icon="vscode-icons:file-type-excel" />}
-          onClick={handleExport}
-          color="success"
-        >
-          Xuất Excel
-        </Button>
+        {canExport && (
+          <Button
+            variant="contained"
+            startIcon={<Iconify icon="vscode-icons:file-type-excel" />}
+            onClick={handleExport}
+            color="success"
+          >
+            Xuất Excel
+          </Button>
+        )}
       </Stack>
 
       {/* Filters */}

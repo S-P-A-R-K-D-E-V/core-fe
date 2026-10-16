@@ -19,7 +19,7 @@ export default function NavMini() {
   const { user } = useAuthContext();
   const userRoles = getUserRoles(user);
 
-  const navData = useNavData(userRoles, user?.enabledFeatures);
+  const navData = useNavData(userRoles, user?.enabledFeatures, user?.permissions);
 
   return (
     <Box

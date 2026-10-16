@@ -125,8 +125,10 @@ function buildUserFromToken(accessToken: string) {
     tokenData.role ||
     'User';
   const roles = Array.isArray(rolesClaim) ? rolesClaim : [rolesClaim];
-  const permissionsClaim = tokenData.permission || [];
-  const permissions = Array.isArray(permissionsClaim) ? permissionsClaim : [permissionsClaim];
+  // Core-be không còn gắn quyền vào token (tính phía server): không có claim → undefined = chưa biết, chờ /users/me.
+  const permissionsClaim = tokenData.permission;
+  const permissions =
+    permissionsClaim === undefined ? undefined : Array.isArray(permissionsClaim) ? permissionsClaim : [permissionsClaim];
 
   const firstName = tokenData.given_name || tokenData.firstName || '';
   const lastName = tokenData.family_name || tokenData.lastName || '';
@@ -236,6 +238,7 @@ export function AuthProvider({ children }: Props) {
       const profileImageUrl: string | undefined = res.data?.profileImageUrl;
       const hasFaceEmbedding: boolean | undefined = res.data?.hasFaceEmbedding;
       const enabledFeatures: string[] | undefined = res.data?.enabledFeatures;
+      const permissions: string[] | undefined = res.data?.permissions;
       dispatch({
         type: Types.LOGIN,
         payload: {
@@ -244,11 +247,13 @@ export function AuthProvider({ children }: Props) {
             ...(profileImageUrl ? { photoURL: getStorageUrl(profileImageUrl) } : null),
             hasFaceEmbedding: !!hasFaceEmbedding,
             enabledFeatures: enabledFeatures ?? [],
+            // Quyền hiệu lực ở cửa hàng này (Core-be tính phía server).
+            permissions: Array.isArray(permissions) ? permissions : baseUser.permissions ?? [],
           },
         },
       });
     } catch {
-      // non-blocking — keep existing photoURL/hasFaceEmbedding
+      // non-blocking — keep existing photoURL/hasFaceEmbedding (refreshUser nạp lại /users/me khi vào dashboard)
     }
   }, []);
 
@@ -459,6 +464,8 @@ export function AuthProvider({ children }: Props) {
     const merged = {
       ...(state.user || {}),
       ...tokenUser,
+      // Token không mang quyền — giữ quyền đã nạp từ /users/me cho tới khi nạp lại bên dưới.
+      permissions: tokenUser.permissions ?? (state.user as any)?.permissions,
       accessToken,
       // Keep refreshToken from sessionStorage in case it was updated
       refreshToken: getRefreshToken() || (state.user as any)?.refreshToken,
@@ -470,6 +477,7 @@ export function AuthProvider({ children }: Props) {
       const profileImageUrl: string | undefined = res.data?.profileImageUrl;
       const hasFaceEmbedding: boolean | undefined = res.data?.hasFaceEmbedding;
       const enabledFeatures: string[] | undefined = res.data?.enabledFeatures;
+      const permissions: string[] | undefined = res.data?.permissions;
       dispatch({
         type: Types.LOGIN,
         payload: {
@@ -478,12 +486,13 @@ export function AuthProvider({ children }: Props) {
             ...(profileImageUrl ? { photoURL: getStorageUrl(profileImageUrl) } : null),
             hasFaceEmbedding: !!hasFaceEmbedding,
             enabledFeatures: enabledFeatures ?? (merged as any).enabledFeatures ?? [],
+            permissions: Array.isArray(permissions) ? permissions : (merged as any).permissions ?? [],
           },
         },
       });
     } catch {
-      // Even if /users/me fails, at least update role/permissions from JWT
-      dispatch({ type: Types.LOGIN, payload: { user: merged } });
+      // /users/me lỗi: cập nhật vai trò từ JWT; quyền chưa từng nạp thì coi như không có (màn chặn thay vì chờ mãi).
+      dispatch({ type: Types.LOGIN, payload: { user: { ...merged, permissions: (merged as any).permissions ?? [] } } });
     }
   }, [state.user]);
 

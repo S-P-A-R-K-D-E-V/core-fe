@@ -21,7 +21,6 @@ import { useSnackbar } from 'src/components/snackbar';
 import { fCurrency, fShortenNumber } from 'src/utils/format-number';
 import { AppDatePicker } from 'src/components/date-time-picker';
 import Chart, { useChart } from 'src/components/chart';
-import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 
 import { IExpenseReport } from 'src/types/corecms-api';
 import { getExpenseReport } from 'src/api/reports';
@@ -86,7 +85,7 @@ export default function ReportExpenseView() {
   });
 
   return (
-    <RoleBasedGuard hasContent roles={['Admin']}>
+    <>
       <Box>
         <Typography variant="h4" sx={{ mb: 3 }}>
           Báo cáo chi phí
@@ -198,6 +197,6 @@ export default function ReportExpenseView() {
         </>
       )}
       </Box>
-    </RoleBasedGuard>
+    </>
   );
 }
