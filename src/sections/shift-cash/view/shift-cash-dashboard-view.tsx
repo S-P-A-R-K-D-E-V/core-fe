@@ -50,13 +50,15 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Label from 'src/components/label';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { getUserRoles } from 'src/auth/roles';
 import { usePageTours } from 'src/hooks/use-tour';
 import type { TourDefinition } from 'src/hooks/use-tour';
 
 import {
   vnToday,
   shiftCashDenial,
-  isShiftCashBypass,
+  canOverseeShiftCash,
+  canManageShiftCashOversight,
   isShiftCashLocationDenial,
 } from 'src/utils/shift-cash-access';
 
@@ -310,8 +312,14 @@ function ShiftCashDashboardContent() {
   const todayDate = vnToday();
 
   const isToday = currentDate === todayDate;
-  // Chỉ Admin: chọn ngày cũ, xem nhật ký / audit, xem theo tháng (Manager theo luật của Staff)
-  const isAdmin = isShiftCashBypass(user);
+  // Người giám sát Kiểm quầy (shift-cash.oversight.read — Admin, hoặc vai trò được cấp): chọn ngày cũ, xem nhật ký /
+  // audit, xem theo tháng (Manager theo luật của Staff). Sửa ngày cũ / khoản của người khác cần thêm quyền sửa giám sát;
+  // người chỉ được xem thì trang chỉ xem (họ vào không qua kiểm ca nên API sẽ chặn ghi).
+  const canOversee = canOverseeShiftCash(user);
+  const canManageOversight = canManageShiftCashOversight(user);
+  const viewOnly = canOversee && !canManageOversight;
+  // Gắn cổ đông: chỉ chủ cửa hàng (danh sách cổ đông chỉ Admin đọc được).
+  const isOwner = getUserRoles(user).includes('Admin');
   const shareholdersOn = useFeatureEnabled(FEATURE.shareholders);
 
   // Link từ thông báo "Kiểm tra chênh lệch quầy": ?date=yyyy-MM-dd mở thẳng ngày đó (chỉ Admin được xem ngày
@@ -320,12 +328,12 @@ function ShiftCashDashboardContent() {
   const urlDate = searchParams.get('date');
   const appliedUrlDateRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!isAdmin || !urlDate || appliedUrlDateRef.current === urlDate) return;
+    if (!canOversee || !urlDate || appliedUrlDateRef.current === urlDate) return;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(urlDate) || urlDate > todayDate) return;
     appliedUrlDateRef.current = urlDate;
     setCurrentDate(urlDate);
-  }, [isAdmin, urlDate, todayDate]);
-  const canEdit = isToday || isAdmin;
+  }, [canOversee, urlDate, todayDate]);
+  const canEdit = canManageOversight || (isToday && !viewOnly);
   const hasOpenedToday = (summary?.denominations ?? []).length > 0;
 
   // ========== Tour hướng dẫn ==========
@@ -360,17 +368,17 @@ function ShiftCashDashboardContent() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Nhật ký chỉnh sửa / audit chỉ Admin xem (BE chặn audit-logs với vai trò khác).
+      // Nhật ký chỉnh sửa / audit chỉ người giám sát xem (BE chặn với người khác).
       // Lỗi nhật ký không được làm hỏng cả trang.
       const [summaryData, logsData, auditLogsData] = await Promise.all([
         getShiftCashSummary(currentDate),
-        isAdmin
+        canOversee
           ? getShiftCashLogs(currentDate).catch((err) => {
               console.error('Shift-cash logs error:', err);
               return [] as IShiftCashLog[];
             })
           : Promise.resolve([] as IShiftCashLog[]),
-        isAdmin
+        canOversee
           ? getShiftCashAuditLogs(currentDate).catch((err) => {
               console.error('Shift-cash audit-logs error:', err);
               return [] as IAuditLogEntry[];
@@ -406,7 +414,7 @@ function ShiftCashDashboardContent() {
     } finally {
       setLoading(false);
     }
-  }, [currentDate, isAdmin, enqueueSnackbar, handleDenied]);
+  }, [currentDate, canOversee, enqueueSnackbar, handleDenied]);
 
   useEffect(() => {
     fetchData();
@@ -421,9 +429,9 @@ function ShiftCashDashboardContent() {
     Promise.allSettled([
       // getVietQRBanks().then((banks) => setVietQRBanks(banks)),
       getKiotVietBankAccounts().then((accounts) => setKiotBankAccounts(accounts)),
-      ...(isAdmin && shareholdersOn ? [getShareholders(true).then((list) => setShareholders(list))] : []),
+      ...(isOwner && shareholdersOn ? [getShareholders(true).then((list) => setShareholders(list))] : []),
     ]);
-  }, [isAdmin, shareholdersOn]);
+  }, [isOwner, shareholdersOn]);
 
   // Lazy-load all invoice details when kiotData is available
   useEffect(() => {
@@ -716,7 +724,7 @@ function ShiftCashDashboardContent() {
           ]}
           action={
             <>
-              {isAdmin && (
+              {canOversee && (
                 <Button
                   component={RouterLink}
                   href={paths.dashboard.shiftCash.monthly}
@@ -774,10 +782,10 @@ function ShiftCashDashboardContent() {
           sx={{ mb: { xs: 3, md: 5 } }}
         />
 
-        {/* Date picker — chỉ Admin chọn được ngày cũ; Staff / Manager cố định ngày hôm nay */}
+        {/* Date picker — chỉ người giám sát chọn được ngày cũ; Staff / Manager cố định ngày hôm nay */}
         <Card id="tour-date-picker" sx={{ mb: 3, p: 2.5 }}>
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
-            {isAdmin ? (
+            {canOversee ? (
               <AppDatePicker
                 label="Ngày"
                 value={currentDate}
@@ -807,12 +815,12 @@ function ShiftCashDashboardContent() {
                 variant="outlined"
                 size="small"
                 // Staff / Manager qua ngày mới khi trang vẫn mở → kiểm lại ca + vị trí cho ngày mới
-                onClick={() => (isAdmin ? setCurrentDate(todayDate) : access.recheck())}
+                onClick={() => (canOversee ? setCurrentDate(todayDate) : access.recheck())}
               >
                 Hôm nay
               </Button>
             )}
-            {!isAdmin && (
+            {!canOversee && (
               <Typography variant="caption" color="text.secondary">
                 Chỉ kiểm quầy được ngày hôm nay khi đang có ca và có mặt tại cửa hàng.
               </Typography>
@@ -820,12 +828,12 @@ function ShiftCashDashboardContent() {
           </Stack>
         </Card>
 
-        {!isToday && !isAdmin && (
+        {!isToday && !canOversee && (
           <Card sx={{ mb: 2, p: 2, bgcolor: alpha(theme.palette.warning.main, 0.08), border: `1px solid ${alpha(theme.palette.warning.main, 0.24)}` }}>
             <Stack direction="row" spacing={1} alignItems="center">
               <Iconify icon="solar:lock-keyhole-bold" width={20} sx={{ color: 'warning.main' }} />
               <Typography variant="body2" color="warning.dark">
-                Đã sang ngày mới. Bấm &quot;Hôm nay&quot; để kiểm quầy ngày {formatDateVN(todayDate)} — dữ liệu ngày cũ chỉ Admin xem / sửa.
+                Đã sang ngày mới. Bấm &quot;Hôm nay&quot; để kiểm quầy ngày {formatDateVN(todayDate)} — dữ liệu ngày cũ chỉ người giám sát Kiểm quầy xem / sửa.
               </Typography>
             </Stack>
           </Card>
@@ -862,7 +870,7 @@ function ShiftCashDashboardContent() {
                   </Stack>
                   <Stack id="tour-finalize-area" direction="row" spacing={1}>
                     {!hasOpenedToday ? (
-                      <Tooltip title={!canEdit ? 'Chỉ Admin mới có quyền chỉnh sửa ngày cũ' : ''}>
+                      <Tooltip title={!canEdit ? 'Chỉ người giám sát Kiểm quầy mới sửa được ngày cũ' : ''}>
                         <span>
                           <Button
                             variant="contained"
@@ -877,7 +885,7 @@ function ShiftCashDashboardContent() {
                         </span>
                       </Tooltip>
                     ) : !denomEditing ? (
-                      <Tooltip title={!canEdit ? 'Chỉ Admin mới có quyền chỉnh sửa ngày cũ' : ''}>
+                      <Tooltip title={!canEdit ? 'Chỉ người giám sát Kiểm quầy mới sửa được ngày cũ' : ''}>
                         <span>
                           <Button
                             variant="contained"
@@ -1214,8 +1222,8 @@ function ShiftCashDashboardContent() {
                     </Stack>
                   }
                 />
-                {/* Nhật ký chỉnh sửa (ai sửa gì, toạ độ GPS) — chỉ Admin */}
-                {isAdmin && (
+                {/* Nhật ký chỉnh sửa (ai sửa gì, toạ độ GPS) — chỉ người giám sát */}
+                {canOversee && (
                   <Tab
                     label={
                       <Stack direction="row" spacing={0.5} alignItems="center">
@@ -1673,8 +1681,8 @@ function ShiftCashDashboardContent() {
                   </>
                 )}
 
-                {/* Tab 2: Nhật ký chỉnh sửa (MongoDB audit logs) — chỉ Admin */}
-                {tab === 2 && isAdmin && (
+                {/* Tab 2: Nhật ký chỉnh sửa (MongoDB audit logs) — chỉ người giám sát */}
+                {tab === 2 && canOversee && (
                   <Scrollbar>
                     <TableContainer>
                       <Table size="small" sx={{ minWidth: 720 }}>
@@ -1951,9 +1959,9 @@ function ShiftCashDashboardContent() {
               multiline
               rows={2}
             />
-            {/* Gắn cổ đông: chỉ Admin (danh sách cổ đông chỉ Admin đọc được). Vai trò khác sửa khoản đã
+            {/* Gắn cổ đông: chỉ chủ cửa hàng (danh sách cổ đông chỉ Admin đọc được). Vai trò khác sửa khoản đã
                 gắn thì giữ nguyên cổ đông cũ — txShareholderId vẫn gửi lại như cũ. */}
-            {isAdmin && shareholdersOn && (
+            {isOwner && shareholdersOn && (
               <TextField
                 select
                 fullWidth

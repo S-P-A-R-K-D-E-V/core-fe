@@ -32,6 +32,14 @@ export const PERMISSIONS = {
     categoryManage: 'expense.category.manage',
     recurringManage: 'expense.recurring.manage',
   },
+  /**
+   * Giám sát Kiểm quầy (trước đây cứng "chỉ Admin"). Xem: vào không cần ca / vị trí, xem ngày cũ, nhật ký, điều tra chênh
+   * lệch. Sửa (cần kèm xem): ghi ngày cũ, sửa / xoá khoản của người khác, ghi khi không có ca.
+   */
+  shiftCash: {
+    oversightRead: 'shift-cash.oversight.read',
+    oversightManage: 'shift-cash.oversight.manage',
+  },
 } as const;
 
 type PermissionSource = { role?: unknown; roles?: unknown; permissions?: unknown } | null | undefined;

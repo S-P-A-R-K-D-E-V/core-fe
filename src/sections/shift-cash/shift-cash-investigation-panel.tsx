@@ -21,7 +21,7 @@ import TableContainer from '@mui/material/TableContainer';
 
 import { useSearchParams } from 'src/routes/hooks';
 
-import { isShiftCashBypass } from 'src/utils/shift-cash-access';
+import { canOverseeShiftCash } from 'src/utils/shift-cash-access';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { getShiftCashInvestigation } from 'src/api/shiftCash';
@@ -151,7 +151,8 @@ export default function ShiftCashInvestigationPanel({ date, summary, sx }: Props
 
   // Cùng luật với trang: chỉ Admin (BE: [Authorize(Roles = "Admin")]) — vai trò khác không thấy gì,
   // không gọi API.
-  const isAdmin = isShiftCashBypass(user);
+  // Người giám sát Kiểm quầy (shift-cash.oversight.read — Admin, hoặc vai trò được cấp).
+  const canOversee = canOverseeShiftCash(user);
   const autoRun = searchParams.get('investigate') === '1';
   // Link từ thông báo có thể kèm ?date=yyyy-MM-dd (trang tự chuyển sang ngày đó): chờ trang đổi ngày
   // xong rồi mới tự kiểm tra — không thì chạy nhầm cho hôm nay.
@@ -211,13 +212,13 @@ export default function ShiftCashInvestigationPanel({ date, summary, sx }: Props
       autoRanRef.current = false;
       return;
     }
-    if (!isAdmin || !date || autoRanRef.current) return;
+    if (!canOversee || !date || autoRanRef.current) return;
     if (urlDate && date !== urlDate) return;
     autoRanRef.current = true;
     run(date);
-  }, [autoRun, isAdmin, date, urlDate, run]);
+  }, [autoRun, canOversee, date, urlDate, run]);
 
-  if (!isAdmin || forbidden) return null;
+  if (!canOversee || forbidden) return null;
 
   const muted = view.step === 'idle' && !loading && isTillBalanced(summary, date);
 

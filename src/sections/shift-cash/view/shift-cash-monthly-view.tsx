@@ -26,6 +26,9 @@ import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
+import { useAuthContext } from 'src/auth/hooks';
+import { getUserRoles } from 'src/auth/roles';
+import { PERMISSIONS } from 'src/auth/permissions';
 import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 
 import { IShiftCashTransaction, IShareholder } from 'src/types/corecms-api';
@@ -73,11 +76,12 @@ function suggestShareholder(
   );
 }
 
-// Thu chi cả tháng = xem lại ngày cũ → chỉ Admin (BE cũng chặn GET ngày khác hôm nay với vai trò khác).
+// Thu chi cả tháng = xem lại ngày cũ → chỉ người giám sát Kiểm quầy (shift-cash.oversight.read — Admin, hoặc vai trò được
+// cấp; BE cũng chặn GET ngày khác hôm nay với người khác).
 // Tách component con để người không đủ quyền không gọi API.
 export default function ShiftCashMonthlyView() {
   return (
-    <RoleBasedGuard hasContent roles={['Admin']}>
+    <RoleBasedGuard hasContent permissions={[PERMISSIONS.shiftCash.oversightRead]}>
       <ShiftCashMonthlyContent />
     </RoleBasedGuard>
   );
@@ -93,7 +97,10 @@ function ShiftCashMonthlyContent() {
   });
   const [transactions, setTransactions] = useState<IShiftCashTransaction[]>([]);
   const [shareholders, setShareholders] = useState<IShareholder[]>([]);
-  const shareholdersOn = useFeatureEnabled(FEATURE.shareholders);
+  // Gắn cổ đông cho khoản thu chi: chỉ chủ cửa hàng (danh sách cổ đông chỉ Admin đọc được) — người giám sát khác chỉ xem.
+  const { user } = useAuthContext();
+  const shareholdersFeature = useFeatureEnabled(FEATURE.shareholders);
+  const shareholdersOn = shareholdersFeature && getUserRoles(user).includes('Admin');
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
 

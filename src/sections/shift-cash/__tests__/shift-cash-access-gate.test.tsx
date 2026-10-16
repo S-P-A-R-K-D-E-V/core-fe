@@ -8,7 +8,12 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 // và vị trí đã kiểm phải được đặt cho src/api/shiftCash (header X-Geo-*).
 // ----------------------------------------------------------------------
 
-let mockUser: { role: string; roles: string[] } = { role: 'Staff', roles: ['Staff'] };
+// permissions: [] — quyền đã nạp từ /users/me (token không mang quyền), người thường không có quyền giám sát.
+let mockUser: { role: string; roles: string[]; permissions?: string[] } = {
+  role: 'Staff',
+  roles: ['Staff'],
+  permissions: [],
+};
 vi.mock('src/auth/hooks', () => ({
   useAuthContext: () => ({ user: mockUser }),
 }));
@@ -149,7 +154,7 @@ async function renderPassedStaffGate() {
 }
 
 beforeEach(() => {
-  mockUser = { role: 'Staff', roles: ['Staff'] };
+  mockUser = { role: 'Staff', roles: ['Staff'], permissions: [] };
   acquire.override = null;
 });
 
@@ -171,8 +176,33 @@ describe('ShiftCashAccessGate', () => {
     expect(geo.watchPosition).not.toHaveBeenCalled();
   });
 
+  it('vai trò được cấp quyền giám sát Kiểm quầy vào thẳng như Admin', async () => {
+    mockUser = { role: 'Staff', roles: ['Staff'], permissions: ['shift-cash.oversight.read'] };
+    const geo = mockGeolocation({ latitude: 0, longitude: 0, accuracy: 10 });
+
+    renderGate();
+
+    expect(await screen.findByText('NỘI DUNG KIỂM QUẦY')).toBeInTheDocument();
+    expect(getMySchedule).not.toHaveBeenCalled();
+    expect(geo.watchPosition).not.toHaveBeenCalled();
+  });
+
+  it('chưa nạp quyền (/users/me) → chờ, chưa kiểm ca', async () => {
+    mockUser = { role: 'Staff', roles: ['Staff'] };
+    mockGeolocation({ latitude: 0, longitude: 0, accuracy: 10 });
+
+    renderGate();
+
+    await new Promise((r) => {
+      setTimeout(r, 20);
+    });
+    expect(getMySchedule).not.toHaveBeenCalled();
+    expect(screen.queryByText('NỘI DUNG KIỂM QUẦY')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hôm nay bạn không có ca')).not.toBeInTheDocument();
+  });
+
   it('Manager không có ca hôm nay → chặn, không hỏi GPS', async () => {
-    mockUser = { role: 'Manager', roles: ['Manager'] };
+    mockUser = { role: 'Manager', roles: ['Manager'], permissions: [] };
     const geo = mockGeolocation({ latitude: 0, longitude: 0, accuracy: 10 });
     getMySchedule.mockResolvedValue([]);
 
@@ -244,7 +274,7 @@ describe('ShiftCashAccessGate', () => {
   });
 
   it('vai trò ngoài Admin/Manager/Staff → chặn ngay, không gọi API, không hỏi GPS', async () => {
-    mockUser = { role: 'User', roles: ['User'] };
+    mockUser = { role: 'User', roles: ['User'], permissions: [] };
     const geo = mockGeolocation({ latitude: 0, longitude: 0, accuracy: 10 });
 
     renderGate();

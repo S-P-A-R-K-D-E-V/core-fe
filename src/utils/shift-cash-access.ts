@@ -1,12 +1,15 @@
 import type { IBranchLocation, IShiftAssignment } from 'src/types/corecms-api';
 
 import { getUserRoles } from 'src/auth/roles';
+import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
 
 import { apiErrorMessage } from './api-error';
 
 // ----------------------------------------------------------------------
 // Quy tắc vào Kiểm quầy — khớp bộ lọc ShiftCashAccess ở core-be:
-//  - Admin: luôn được vào, chọn được ngày cũ, xem nhật ký / audit.
+//  - Người giám sát Kiểm quầy (quyền shift-cash.oversight.*, mặc định chỉ Admin — chủ cấp thêm qua vai trò tuỳ chỉnh):
+//    luôn được vào, chọn được ngày cũ, xem nhật ký / audit / điều tra. Ghi ngày cũ, sửa khoản của người khác cần thêm
+//    quyền sửa giám sát; chỉ có quyền xem thì trên web chỉ xem (API vẫn bắt ca hôm nay khi ghi).
 //  - Còn lại (Staff VÀ Manager): phải có ca trong NGÀY HÔM NAY theo giờ VN, chỉ thao tác ngày hôm nay,
 //    và đang ở trong bán kính một chi nhánh đang hoạt động có toạ độ, GPS chính xác ≤ 200 m.
 //    Không chi nhánh nào có toạ độ → bỏ qua GPS (giống chấm công SmartCheckIn).
@@ -14,9 +17,6 @@ import { apiErrorMessage } from './api-error';
 //  - BE từ chối → 403 { error: 'ShiftCash.*', message } (NoShiftToday, LocationRequired, OutsideStore,
 //    PastDateAdminOnly).
 // ----------------------------------------------------------------------
-
-// Vai trò được bỏ qua mọi kiểm tra. Manager theo đúng luật của Staff (chủ đã chốt).
-export const SHIFT_CASH_BYPASS_ROLES = ['Admin'];
 
 // Vai trò được dùng Kiểm quầy (BE: ShiftCashController [Authorize(Roles = "Admin,Manager,Staff")]).
 // Vai trò khác (vd. User tự đăng ký) mở thẳng URL thì chặn ngay — không gọi API, không hỏi GPS.
@@ -38,9 +38,14 @@ export type ShiftCashGeo = {
   accuracy?: number | null;
 };
 
-export function isShiftCashBypass(user: Record<string, any> | null | undefined): boolean {
-  const roles = getUserRoles(user);
-  return SHIFT_CASH_BYPASS_ROLES.some((r) => roles.includes(r));
+/** Được giám sát Kiểm quầy (bỏ qua cổng, xem ngày cũ, nhật ký, điều tra). Admin luôn có; Manager theo luật của Staff. */
+export function canOverseeShiftCash(user: Record<string, any> | null | undefined): boolean {
+  return hasPermission(user, PERMISSIONS.shiftCash.oversightRead);
+}
+
+/** Được ghi ngày cũ, sửa / xoá khoản thu chi của người khác. */
+export function canManageShiftCashOversight(user: Record<string, any> | null | undefined): boolean {
+  return hasPermission(user, PERMISSIONS.shiftCash.oversightManage);
 }
 
 export function canUseShiftCash(user: Record<string, any> | null | undefined): boolean {
@@ -147,7 +152,8 @@ const DENIAL_FALLBACK: Record<string, string> = {
   [SHIFT_CASH_DENIAL.LocationRequired]: 'Cần bật vị trí (GPS) để kiểm quầy.',
   [SHIFT_CASH_DENIAL.OutsideStore]:
     'Bạn đang ở ngoài cửa hàng — chỉ kiểm quầy được khi có mặt tại cửa hàng.',
-  [SHIFT_CASH_DENIAL.PastDateAdminOnly]: 'Chỉ Admin được xem / sửa ngày cũ.',
+  [SHIFT_CASH_DENIAL.PastDateAdminOnly]:
+    'Chỉ chủ cửa hàng hoặc người được giao giám sát Kiểm quầy được xem / sửa ngày cũ.',
 };
 
 export function shiftCashDenial(err: any): { code: string; message: string } | null {

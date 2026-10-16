@@ -27,7 +27,7 @@ import {
   canUseShiftCash,
   ShiftCashGeoError,
   geofenceBranches,
-  isShiftCashBypass,
+  canOverseeShiftCash,
   checkShiftCashGeofence,
   acquireShiftCashPosition,
   SHIFT_CASH_MAX_ACCURACY_M,
@@ -42,6 +42,7 @@ import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { permissionsKnown } from 'src/auth/permissions';
 
 import type { IBranchLocation } from 'src/types/corecms-api';
 
@@ -158,7 +159,10 @@ type Props = {
 export default function ShiftCashAccessGate({ children }: Props) {
   const settings = useSettingsContext();
   const { user } = useAuthContext();
-  const bypass = isShiftCashBypass(user);
+  // Người giám sát Kiểm quầy (Admin, hoặc vai trò được cấp shift-cash.oversight.read) không qua kiểm ca / vị trí.
+  // Quyền không nằm trong token: chưa nạp /users/me thì chờ, không kiểm ca rồi mới mở.
+  const bypass = canOverseeShiftCash(user);
+  const waitingPermissions = !bypass && !permissionsKnown(user);
   const allowedRole = canUseShiftCash(user);
 
   const [attempt, setAttempt] = useState(0);
@@ -184,6 +188,11 @@ export default function ShiftCashAccessGate({ children }: Props) {
 
     if (bypass) {
       setState({ step: 'passed', trackLocation: false });
+      return undefined;
+    }
+
+    if (waitingPermissions) {
+      setState({ step: 'checking-shift' });
       return undefined;
     }
 
@@ -283,7 +292,7 @@ export default function ShiftCashAccessGate({ children }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [bypass, allowedRole, attempt]);
+  }, [bypass, waitingPermissions, allowedRole, attempt]);
 
   // ── Đã qua cổng: cập nhật vị trí gửi kèm (người dùng mở trang cả ca) ──
   // Chỉ nhận điểm đủ chính xác; không tự khoá trang khi GPS chập chờn — BE quyết định khi bật geofence.
