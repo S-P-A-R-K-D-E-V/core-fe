@@ -1,16 +1,8 @@
-import RoleBasedGuard from 'src/auth/guard/role-based-guard';
-import { KioskDevicesView } from 'src/sections/kiosk-devices/view/kiosk-devices-view';
+import { redirect } from 'next/navigation';
 
-// ----------------------------------------------------------------------
+import { paths } from 'src/routes/paths';
 
-export const metadata = {
-  title: 'Dashboard: Thiết bị cửa hàng',
-};
-
+// Trang cũ — đã gộp vào Cài đặt cửa hàng → Thiết bị cửa hàng (máy quầy, kiosk, camera).
 export default function KioskDevicesPage() {
-  return (
-    <RoleBasedGuard hasContent roles={['Admin']}>
-      <KioskDevicesView />
-    </RoleBasedGuard>
-  );
+  redirect(paths.dashboard.storeSettings.devices);
 }

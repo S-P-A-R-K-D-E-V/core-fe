@@ -35,6 +35,13 @@ vi.mock('src/hooks/use-feature-enabled', () => ({
 vi.mock('src/api/attendance', () => ({
   getBranchLocations: () => Promise.resolve([{ id: 'b1', branchName: 'CiCi Cầu Giấy' }]),
 }));
+let roles: string[] = ['Admin'];
+vi.mock('src/auth/hooks', () => ({ useAuthContext: () => ({ user: { roles, role: roles[0] } }) }));
+vi.mock('src/store/working-branch-store', () => ({
+  useWorkingBranch: (pick: any) => pick({ options: [{ id: 'b1', name: 'CiCi Cầu Giấy', type: 'retail' }] }),
+}));
+// Ô "Đặt trình duyệt này làm máy quầy" có test riêng — ở đây chỉ cần chỗ của nó.
+vi.mock('src/sections/counter/counter-browser-card', () => ({ default: () => <div>counter-browser-card</div> }));
 
 // Imported after the mocks above.
 import { KioskDevicesView } from '../view/kiosk-devices-view';
@@ -60,6 +67,19 @@ const devices: IKioskDeviceItem[] = [
   },
   { ...base, id: 'd2', name: 'Laptop kho', kind: 'camera-agent', agentVersion: '0.1.0', online: false, cameras: [] },
   { ...base, id: 'd3', name: 'Kiosk lễ tân', kind: 'kiosk', agentVersion: null, lastHeartbeatAt: null, online: null, cameras: [] },
+  {
+    ...base,
+    id: 'd4',
+    name: 'Quầy 1',
+    kind: 'counter',
+    agentVersion: null,
+    lastHeartbeatAt: null,
+    online: null,
+    cameras: [],
+    platform: 'android',
+    currentUserName: 'Hoàng Giang',
+    sessionEndsAt: '2026-10-14T10:30:00Z',
+  },
 ];
 
 function renderView() {
@@ -77,6 +97,7 @@ describe('KioskDevicesView', () => {
     api.renameKioskDevice.mockResolvedValue(undefined);
     api.revokeKioskDevice.mockResolvedValue(undefined);
     cameraOn = true;
+    roles = ['Admin'];
   });
 
   it('only offers kiosk pairing when the store has no camera feature', async () => {
@@ -86,7 +107,28 @@ describe('KioskDevicesView', () => {
     await waitFor(() => expect(screen.getByText('Camera cửa chính')).toBeTruthy());
     expect(screen.queryByRole('tab', { name: /Camera đếm khách/ })).toBeNull();
     expect(screen.queryByText(/python -m agent pair/)).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: /Kiosk chấm công/ }));
     expect(screen.getByText(/kiosk-checkin/)).toBeTruthy();
+  });
+
+  it('defaults to counter pairing and shows who is using each counter', async () => {
+    renderView();
+
+    await waitFor(() => expect(screen.getByText('Quầy 1')).toBeTruthy());
+    expect(screen.getByText(/trang/).textContent).toBeTruthy();
+    expect(screen.getAllByText(/\/counter/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Máy quầy · Android')).toBeTruthy();
+    expect(screen.getByText(/Đang dùng: Hoàng Giang/)).toBeTruthy();
+    expect(screen.getByText('Đang bán hàng')).toBeTruthy();
+    expect(screen.getByText('counter-browser-card')).toBeTruthy();
+  });
+
+  it('managers never get the camera pairing guide', async () => {
+    roles = ['Manager'];
+    renderView();
+
+    await waitFor(() => expect(screen.getByText('Quầy 1')).toBeTruthy());
+    expect(screen.queryByRole('tab', { name: /Camera đếm khách/ })).toBeNull();
   });
 
   it('shows camera agents and kiosks with their status', async () => {
@@ -97,6 +139,7 @@ describe('KioskDevicesView', () => {
     expect(screen.getByText('Mất kết nối')).toBeTruthy();
     expect(screen.getByText('Đã ghép nối')).toBeTruthy();
     expect(screen.getByText('Cửa chính · 12 vào')).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: /Camera đếm khách/ }));
     expect(screen.getByText(/python -m agent pair/)).toBeTruthy();
   });
 

@@ -150,7 +150,6 @@ describe('useNavData — camera, giám sát, báo cáo chỉ Admin', () => {
   const ownerOnly = [
     paths.dashboard.general.storeMonitor,
     paths.dashboard.attendance.live,
-    paths.dashboard.attendance.kioskDevices,
     paths.dashboard.pos.report.root,
     paths.dashboard.pos.report.revenue,
     paths.dashboard.pos.report.tax,
@@ -167,6 +166,13 @@ describe('useNavData — camera, giám sát, báo cáo chỉ Admin', () => {
     ownerOnly.forEach((p) => expect(visible).not.toContain(p));
     // Quản lý vẫn quản lý chấm công như cũ.
     if (role === 'Manager') expect(visible).toContain(paths.dashboard.attendance.report);
+  });
+
+  // Thiết bị cửa hàng (máy quầy, kiosk): chủ + quản lý (quản lý chỉ chi nhánh mình — server lọc); nhân viên không.
+  it('Thiết bị cửa hàng: chủ và quản lý thấy, nhân viên không', () => {
+    expect(navPaths('Admin', features)).toContain(paths.dashboard.storeSettings.devices);
+    expect(navPaths('Manager', features)).toContain(paths.dashboard.storeSettings.devices);
+    expect(navPaths('Staff', features)).not.toContain(paths.dashboard.storeSettings.devices);
   });
 });
 

@@ -15,6 +15,8 @@ describe('requiredRolesFor', () => {
     [paths.dashboard.role.list, ADMIN_ROLES],
     [paths.dashboard.role.edit('r1'), ADMIN_ROLES],
     [paths.dashboard.storeSettings.root, ADMIN_ROLES],
+    // Thiết bị cửa hàng nằm dưới Cài đặt cửa hàng nhưng quản lý cũng vào (máy quầy / kiosk chi nhánh mình).
+    [paths.dashboard.storeSettings.devices, MANAGER_ROLES],
     [paths.dashboard.notificationConfig.root, ADMIN_ROLES],
     [paths.dashboard.user.list, MANAGER_ROLES],
     [paths.dashboard.user.edit('u1'), MANAGER_ROLES],

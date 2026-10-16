@@ -27,20 +27,27 @@ import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
 import CircularProgress from '@mui/material/CircularProgress';
 
+import { useAuthContext } from 'src/auth/hooks';
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
+import { useWorkingBranch } from 'src/store/working-branch-store';
 import { getBranchLocations } from 'src/api/attendance';
 import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 import { getKioskDevices, claimKioskPairing, revokeKioskDevice, renameKioskDevice } from 'src/api/kiosk';
+
+import CounterBrowserCard from 'src/sections/counter/counter-browser-card';
 
 import type { IBranchLocation } from 'src/types/corecms-api';
 import type { IKioskDeviceItem, IKioskAgentCamera } from 'src/types/kiosk';
 
 // ----------------------------------------------------------------------
 // Thiết bị cửa hàng — mọi thiết bị đăng nhập bằng key thiết bị (không có tài khoản người dùng):
+//  - Máy quầy: app S Store (POS / tablet) hoặc trình duyệt (/counter) — nhân viên có ca chọn tên + mã / mật khẩu, chỉ có
+//    bán hàng. Máy chưa ai đăng nhập hiện mã 6 số; hoặc quản lý đăng nhập trên chính máy rồi "Đặt làm máy quầy".
 //  - Kiosk chấm công: trang /kiosk-checkin trên tablet/laptop có webcam.
-//  - Camera đếm khách: Spark Camera Agent chạy trên máy tính ở quầy, đọc camera Wi-Fi trong mạng nội bộ.
-// Cả hai ghép nối bằng cùng một luồng mã 6 số (KioskPairingController); không seed tay qua DB.
+//  - Camera đếm khách: Spark Camera Agent chạy trên máy tính ở quầy, đọc camera Wi-Fi trong mạng nội bộ (chỉ chủ cửa hàng).
+// Cùng một luồng mã 6 số (KioskPairingController) — thiết bị tự khai loại, người duyệt chỉ đặt tên + chi nhánh.
+// Quản lý chỉ thấy / ghép / thu hồi máy quầy và kiosk của chi nhánh mình (server lọc).
 
 const REFRESH_MS = 30_000;
 
@@ -54,6 +61,7 @@ type StatusChip = { label: string; color: 'success' | 'error' | 'default' | 'inf
 function statusOf(d: IKioskDeviceItem): StatusChip {
   if (!d.isActive) return { label: 'Đã thu hồi', color: 'default' };
   if (d.kind === 'camera-agent') return d.online ? { label: 'Đang chạy', color: 'success' } : { label: 'Mất kết nối', color: 'error' };
+  if (d.kind === 'counter') return d.currentUserName ? { label: 'Đang bán hàng', color: 'success' } : { label: 'Sẵn sàng', color: 'info' };
   return { label: 'Đã ghép nối', color: 'info' };
 }
 
@@ -78,7 +86,38 @@ function cameraChipLabel(c: IKioskAgentCamera): string {
 
 // ----------------------------------------------------------------------
 
-function PairingGuide({ kind }: { kind: 'kiosk' | 'camera' }) {
+const PLATFORM_LABEL: Record<string, string> = { android: 'Android', ios: 'iPhone / iPad', web: 'Trình duyệt' };
+
+/** Dòng phụ dưới tên thiết bị. */
+export function deviceCaption(d: IKioskDeviceItem): string {
+  if (d.kind === 'camera-agent') return agentCaption(d);
+  if (d.kind === 'counter') return d.platform && PLATFORM_LABEL[d.platform] ? `Máy quầy · ${PLATFORM_LABEL[d.platform]}` : 'Máy quầy';
+  return 'Kiosk chấm công';
+}
+
+function formatTime(value: string | null | undefined) {
+  if (!value) return '';
+  return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
+
+type Guide = 'counter' | 'kiosk' | 'camera';
+
+function PairingGuide({ kind }: { kind: Guide }) {
+  if (kind === 'counter') {
+    return (
+      <Box component="ol" sx={{ pl: 2.5, m: 0, typography: 'body2', color: 'text.secondary', '& li': { mb: 0.5 } }}>
+        <li>
+          <strong>POS / tablet:</strong> mở app S Store, chọn cửa hàng, ở màn đăng nhập bấm <em>“Đặt máy này làm máy quầy”</em>{' '}
+          — máy hiện mã 6 số.
+        </li>
+        <li>
+          <strong>Máy tính:</strong> mở trang <strong>/counter</strong> của cửa hàng — trình duyệt hiện mã 6 số.
+        </li>
+        <li>Nhập mã, đặt tên (vd “Quầy 1”) và chọn chi nhánh bên dưới — hoặc quét QR trên máy bằng app (Hồ sơ → Ghép nối thiết bị).</li>
+        <li>Quản lý đang đăng nhập ngay trên máy đó: dùng “Đặt máy này / trình duyệt này làm máy quầy”, không cần mã.</li>
+      </Box>
+    );
+  }
   if (kind === 'kiosk') {
     return (
       <Box component="ol" sx={{ pl: 2.5, m: 0, typography: 'body2', color: 'text.secondary', '& li': { mb: 0.5 } }}>
@@ -116,14 +155,19 @@ function PairingGuide({ kind }: { kind: 'kiosk' | 'camera' }) {
 
 export function KioskDevicesView() {
   const { enqueueSnackbar } = useSnackbar();
-  const cameraOn = useFeatureEnabled(FEATURE.storeCamera);
+  const { user } = useAuthContext();
+  const isOwner = !!user?.roles?.includes('Admin') || user?.role === 'Admin';
+  // Camera là việc của chủ cửa hàng; quản lý chỉ máy quầy + kiosk của chi nhánh mình.
+  const cameraOn = useFeatureEnabled(FEATURE.storeCamera) && isOwner;
+  // Khoá chuỗi (không phải mảng) cho deps — mảng mới mỗi lần render làm tải lại liên tục.
+  const allowedBranchKey = useWorkingBranch((s) => (s.options ?? []).map((b) => b.id).join(','));
 
   const [devices, setDevices] = useState<IKioskDeviceItem[]>([]);
   const [branches, setBranches] = useState<IBranchLocation[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [guide, setGuide] = useState<'kiosk' | 'camera'>(cameraOn ? 'camera' : 'kiosk');
-  const pairingGuide = cameraOn ? guide : 'kiosk';
+  const [guide, setGuide] = useState<Guide>('counter');
+  const pairingGuide: Guide = guide === 'camera' && !cameraOn ? 'counter' : guide;
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [branchId, setBranchId] = useState('');
@@ -142,14 +186,16 @@ export function KioskDevicesView() {
       try {
         const [deviceList, branchList] = await Promise.all([getKioskDevices(), getBranchLocations()]);
         setDevices(deviceList);
-        setBranches(branchList);
+        // Quản lý: chỉ chi nhánh được phân công (danh sách chi nhánh làm việc đã lọc theo phạm vi) — server cũng chặn.
+        const allowed = !isOwner && allowedBranchKey ? new Set(allowedBranchKey.split(',')) : null;
+        setBranches(allowed ? branchList.filter((b: IBranchLocation) => allowed.has(b.id)) : branchList);
       } catch (err: any) {
         if (!silent) enqueueSnackbar(err?.title || err?.message || 'Không tải được danh sách thiết bị', { variant: 'error' });
       } finally {
         setLoading(false);
       }
     },
-    [enqueueSnackbar]
+    [enqueueSnackbar, isOwner, allowedBranchKey]
   );
 
   useEffect(() => {
@@ -162,8 +208,10 @@ export function KioskDevicesView() {
     if (!code.trim() || !name.trim() || !branchId) return;
     setClaiming(true);
     try {
-      await claimKioskPairing(code.trim(), name.trim(), branchId);
-      enqueueSnackbar('Ghép nối thiết bị thành công!', { variant: 'success' });
+      const res = await claimKioskPairing(code.trim(), name.trim(), branchId);
+      enqueueSnackbar(res.deviceType === 'counter' ? `Đã ghép máy quầy “${res.deviceName}”` : 'Ghép nối thiết bị thành công!', {
+        variant: 'success',
+      });
       setCode('');
       setName('');
       setBranchId('');
@@ -209,13 +257,15 @@ export function KioskDevicesView() {
     <Container maxWidth="lg">
       <Typography variant="h4">Thiết bị cửa hàng</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Kiosk chấm công bằng khuôn mặt và camera đếm khách. Thiết bị đăng nhập bằng key riêng, thu hồi là mất quyền ngay.
+        Máy quầy (app / trình duyệt), kiosk chấm công{cameraOn ? ' và camera đếm khách' : ''}. Thiết bị đăng nhập bằng khoá
+        riêng — thu hồi là mất quyền ngay, người đang dùng máy quầy bị đăng xuất.
       </Typography>
 
       <Card sx={{ mb: 3 }}>
         <Box sx={{ px: 3, pt: 2 }}>
           <Typography variant="subtitle1">Ghép nối thiết bị mới</Typography>
           <Tabs value={pairingGuide} onChange={(_, v) => setGuide(v)} sx={{ mt: 1 }}>
+            <Tab value="counter" label="Máy quầy" icon={<Iconify icon="solar:cash-out-bold" width={20} />} iconPosition="start" />
             {cameraOn && (
               <Tab value="camera" label="Camera đếm khách" icon={<Iconify icon="solar:videocamera-record-bold" width={20} />} iconPosition="start" />
             )}
@@ -237,7 +287,7 @@ export function KioskDevicesView() {
             <TextField
               id="pair-name"
               label="Tên thiết bị"
-              placeholder={pairingGuide === 'camera' ? 'VD: Camera cửa chính' : 'VD: Kiosk quầy lễ tân'}
+              placeholder={{ camera: 'VD: Camera cửa chính', kiosk: 'VD: Kiosk quầy lễ tân', counter: 'VD: Quầy 1' }[pairingGuide]}
               value={name}
               onChange={(e) => setName(e.target.value)}
               fullWidth
@@ -268,6 +318,10 @@ export function KioskDevicesView() {
           </Stack>
         </Stack>
       </Card>
+
+      <Box sx={{ mb: 3 }}>
+        <CounterBrowserCard onProvisioned={() => fetchData(true)} />
+      </Box>
 
       <Card>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ p: 2 }}>
@@ -314,8 +368,14 @@ export function KioskDevicesView() {
                           <Box>
                             <Typography variant="subtitle2">{d.name}</Typography>
                             <Typography variant="caption" color="text.secondary">
-                              {isAgent ? agentCaption(d) : d.kind === 'counter' ? 'Máy quầy (app)' : 'Kiosk chấm công'}
+                              {deviceCaption(d)}
                             </Typography>
+                            {d.kind === 'counter' && d.isActive && d.currentUserName && (
+                              <Typography variant="caption" color="success.main" component="div">
+                                Đang dùng: {d.currentUserName}
+                                {d.sessionEndsAt ? ` · đến ${formatTime(d.sessionEndsAt)}` : ''}
+                              </Typography>
+                            )}
                           </Box>
                         </Stack>
                       </TableCell>
@@ -398,8 +458,8 @@ export function KioskDevicesView() {
         <DialogTitle>Thu hồi &quot;{revoking?.name}&quot;?</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">
-            Thiết bị mất quyền gửi dữ liệu ngay lập tức. Muốn dùng lại phải ghép nối lại bằng mã mới. Số liệu đã ghi vẫn được
-            giữ.
+            Thiết bị mất quyền ngay lập tức{revoking?.kind === 'counter' ? ', người đang dùng máy quầy bị đăng xuất' : ''}. Muốn
+            dùng lại phải ghép nối lại bằng mã mới. Số liệu đã ghi vẫn được giữ.
           </Typography>
         </DialogContent>
         <DialogActions>

@@ -172,6 +172,8 @@ export const paths = {
     },
     storeSettings: {
       root: `${ROOTS.DASHBOARD}/store-settings`,
+      // Thiết bị cửa hàng: máy quầy (app / web), kiosk chấm công, camera — chủ cửa hàng + quản lý.
+      devices: `${ROOTS.DASHBOARD}/store-settings/devices`,
     },
     // Dịch vụ thanh toán: đối soát giao dịch ngân hàng / cổng với thanh toán; đơn online từ storefront.
     payment: {

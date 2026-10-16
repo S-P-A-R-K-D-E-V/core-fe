@@ -40,8 +40,12 @@ export async function confirmKioskCheckOut(
 // ── Ghép nối thiết bị — thay cho seed tay KioskDevice qua DB (KioskPairingController) ──
 
 /** Anonymous — màn kiosk (chưa có key) xin 1 mã ghép nối mới. */
-export async function requestKioskPairing(): Promise<IKioskPairingRequest> {
-  const res = await axios.post<IKioskPairingRequest>(endpoints.kiosk.pairingRequest);
+/**
+ * Thiết bị chưa có key xin mã ghép nối. deviceType "counter" = máy quầy (không truyền = kiosk chấm công);
+ * platform: android / ios / web.
+ */
+export async function requestKioskPairing(device?: { deviceType?: 'counter'; platform?: string }): Promise<IKioskPairingRequest> {
+  const res = await axios.post<IKioskPairingRequest>(endpoints.kiosk.pairingRequest, device ?? undefined);
   return res.data;
 }
 

@@ -227,12 +227,6 @@ export function useNavData(
             roles: ['Admin', 'Manager', 'Staff'],
             featureKey: 'workforce.attendance',
           },
-          {
-            title: 'Thiết bị cửa hàng',
-            path: paths.dashboard.attendance.kioskDevices,
-            icon: ICONS.tour,
-            roles: ['Admin'],
-          },
           // Chấm công trực tiếp: camera quầy + ca hôm nay + người camera thấy, theo chi nhánh — chỉ chủ cửa hàng.
           {
             title: 'Chấm công trực tiếp',
@@ -313,6 +307,13 @@ export function useNavData(
             path: paths.dashboard.storeSettings.root,
             icon: ICONS.label,
             roles: ['Admin'],
+          },
+          // THIẾT BỊ CỬA HÀNG: máy quầy (app / web), kiosk chấm công, camera — ghép bằng mã, đổi tên, thu hồi.
+          {
+            title: 'Thiết bị cửa hàng',
+            path: paths.dashboard.storeSettings.devices,
+            icon: ICONS.tour,
+            roles: ['Admin', 'Manager'],
           },
 
           // ROLE MANAGEMENT

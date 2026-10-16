@@ -248,7 +248,7 @@ export function StoreMonitorView() {
               <Alert severity="info">
                 Chưa có camera đếm khách nào gửi số liệu. Cài <strong>Spark Camera Agent</strong> trên máy tính ở
                 quầy (cùng mạng Wi-Fi với camera), rồi nhập mã 6 số agent hiện ra ở trang{' '}
-                <Link component={RouterLink} href={paths.dashboard.attendance.kioskDevices}>
+                <Link component={RouterLink} href={paths.dashboard.storeSettings.devices}>
                   Thiết bị cửa hàng
                 </Link>. Hoá đơn và nhân sự vẫn hiện
                 bên dưới.
