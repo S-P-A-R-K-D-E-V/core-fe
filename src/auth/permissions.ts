@@ -142,6 +142,18 @@ export const PERMISSIONS = {
   promotionCampaign: { read: 'promotion-campaign.read', manage: 'promotion-campaign.manage' },
   posCart: { read: 'pos-cart.read', manage: 'pos-cart.manage', convert: 'pos-cart.convert' },
   orders: { read: 'orders.read', create: 'orders.create', update: 'orders.update', delete: 'orders.delete' },
+  /**
+   * Nhân viên — hồ sơ của mình không cần quyền. Tài khoản Admin chỉ Admin đụng được, gán vai trò / thêm quản lý chỉ Admin
+   * (luật theo vai trò).
+   */
+  user: {
+    read: 'user.read',
+    create: 'user.create',
+    update: 'user.update',
+    status: 'user.status',
+    passwordReset: 'user.password.reset',
+    delete: 'user.delete',
+  },
 } as const;
 
 type PermissionSource = { role?: unknown; roles?: unknown; permissions?: unknown } | null | undefined;

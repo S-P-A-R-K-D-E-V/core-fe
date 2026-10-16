@@ -280,12 +280,12 @@ export function useNavData(
             icon: ICONS.chat,
           },
 
-          // USER
+          // USER — theo quyền user.read (Core-be; mặc định Admin, Manager).
           {
             title: t('user'),
             path: paths.dashboard.user.root,
             icon: ICONS.user,
-            roles: ['Admin', 'Manager'],
+            permissions: [PERMISSIONS.user.read],
             children: [
               { title: t('list'), path: paths.dashboard.user.list },
             ],

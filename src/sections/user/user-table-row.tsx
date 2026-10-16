@@ -24,6 +24,7 @@ import { changeUserStatus, resetUserPassword } from 'src/api/users';
 import UserQuickEditForm from './user-quick-edit-form';
 import UserRolesDialog from './user-roles-dialog';
 import UserBranchesDialog from './user-branches-dialog';
+import { canActOn, useUserAccess } from './user-access';
 
 // ----------------------------------------------------------------------
 
@@ -52,14 +53,18 @@ export default function UserTableRow({
   // Admin (Manager → 403) — Manager không thấy mục "Manage Roles".
   const { user } = useAuthContext();
   const isAdmin = user?.role === 'Admin' || (user?.roles ?? []).includes('Admin');
-  const isManager = user?.role === 'Manager' || (user?.roles ?? []).includes('Manager');
 
   // Phân công chi nhánh (BE kiểm tra lại): Admin luôn mọi chi nhánh nên không phân công; Admin phân công cho Quản lý và
   // Nhân viên; Quản lý chỉ cho Nhân viên. BE cũ không trả branchScope → ẩn mục này.
   const targetIsAdmin = (roles ?? []).includes('Admin');
   const targetIsManager = (roles ?? []).includes('Manager');
-  const canAssignBranches =
-    !!branchScope && !targetIsAdmin && (isAdmin || (isManager && !targetIsManager));
+  // Thao tác theo quyền user.* (Core-be); tài khoản Admin chỉ Admin đụng được.
+  const access = useUserAccess();
+  const canEdit = canActOn(access, access.canUpdate, roles);
+  const canChangeStatus = canActOn(access, access.canChangeStatus, roles);
+  const canResetPassword = canActOn(access, access.canResetPassword, roles);
+  const canDelete = canActOn(access, access.canDelete, roles);
+  const canAssignBranches = !!branchScope && !targetIsAdmin && access.canUpdate && (isAdmin || !targetIsManager);
 
   const confirm = useBoolean();
 
@@ -143,11 +148,13 @@ export default function UserTableRow({
         </TableCell>
 
         <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }}>
-          <Tooltip title="Quick Edit" placement="top" arrow>
-            <IconButton color={quickEdit.value ? 'inherit' : 'default'} onClick={quickEdit.onTrue}>
-              <Iconify icon="solar:pen-bold" />
-            </IconButton>
-          </Tooltip>
+          {canEdit && (
+            <Tooltip title="Quick Edit" placement="top" arrow>
+              <IconButton color={quickEdit.value ? 'inherit' : 'default'} onClick={quickEdit.onTrue}>
+                <Iconify icon="solar:pen-bold" />
+              </IconButton>
+            </Tooltip>
+          )}
 
           <IconButton color={popover.open ? 'inherit' : 'default'} onClick={popover.onOpen}>
             <Iconify icon="eva:more-vertical-fill" />
@@ -182,15 +189,17 @@ export default function UserTableRow({
         arrow="right-top"
         sx={{ width: 200 }}
       >
-        <MenuItem
-          onClick={() => {
-            onEditRow();
-            popover.onClose();
-          }}
-        >
-          <Iconify icon="solar:pen-bold" />
-          Edit
-        </MenuItem>
+        {canEdit && (
+          <MenuItem
+            onClick={() => {
+              onEditRow();
+              popover.onClose();
+            }}
+          >
+            <Iconify icon="solar:pen-bold" />
+            Edit
+          </MenuItem>
+        )}
 
         {isAdmin && (
           <MenuItem
@@ -216,7 +225,7 @@ export default function UserTableRow({
           </MenuItem>
         )}
 
-        {status !== 'Active' && (
+        {canChangeStatus && status !== 'Active' && (
           <MenuItem
             onClick={() => {
               handleChangeStatus('Active');
@@ -228,7 +237,7 @@ export default function UserTableRow({
           </MenuItem>
         )}
 
-        {status !== 'Banned' && (
+        {canChangeStatus && status !== 'Banned' && (
           <MenuItem
             onClick={() => {
               handleChangeStatus('Banned');
@@ -241,26 +250,30 @@ export default function UserTableRow({
           </MenuItem>
         )}
 
-        <MenuItem
-          onClick={() => {
-            resetPwConfirm.onTrue();
-            popover.onClose();
-          }}
-        >
-          <Iconify icon="solar:key-bold" />
-          Reset Password
-        </MenuItem>
+        {canResetPassword && (
+          <MenuItem
+            onClick={() => {
+              resetPwConfirm.onTrue();
+              popover.onClose();
+            }}
+          >
+            <Iconify icon="solar:key-bold" />
+            Reset Password
+          </MenuItem>
+        )}
 
-        <MenuItem
-          onClick={() => {
-            confirm.onTrue();
-            popover.onClose();
-          }}
-          sx={{ color: 'error.main' }}
-        >
-          <Iconify icon="solar:trash-bin-trash-bold" />
-          Delete
-        </MenuItem>
+        {canDelete && (
+          <MenuItem
+            onClick={() => {
+              confirm.onTrue();
+              popover.onClose();
+            }}
+            sx={{ color: 'error.main' }}
+          >
+            <Iconify icon="solar:trash-bin-trash-bold" />
+            Delete
+          </MenuItem>
+        )}
       </CustomPopover>
 
       <ConfirmDialog

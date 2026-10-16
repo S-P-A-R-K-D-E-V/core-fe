@@ -36,7 +36,8 @@ function renderAt(path: string, user: Record<string, any>) {
 
 describe('RouteRoleGuard', () => {
   it('nhân viên mở trang quản lý người dùng → màn chặn, không render trang', () => {
-    renderAt(paths.dashboard.user.list, { role: 'Staff', roles: ['Staff'] });
+    // Trang nhân viên theo quyền user.read — nhân viên thường không có (GET /users/me đã trả danh sách quyền).
+    renderAt(paths.dashboard.user.list, { role: 'Staff', roles: ['Staff'], permissions: [] });
 
     expect(screen.getByText('Không có quyền truy cập')).toBeInTheDocument();
     expect(screen.queryByText('nội dung trang')).not.toBeInTheDocument();

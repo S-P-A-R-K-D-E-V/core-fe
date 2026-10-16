@@ -18,8 +18,6 @@ describe('requiredRolesFor', () => {
     // Thiết bị cửa hàng nằm dưới Cài đặt cửa hàng nhưng quản lý cũng vào (máy quầy / kiosk chi nhánh mình).
     [paths.dashboard.storeSettings.devices, MANAGER_ROLES],
     [paths.dashboard.notificationConfig.root, ADMIN_ROLES],
-    [paths.dashboard.user.list, MANAGER_ROLES],
-    [paths.dashboard.user.edit('u1'), MANAGER_ROLES],
   ])('%s → chỉ %j', (path, roles) => {
     expect(requiredRolesFor(path)).toEqual(roles);
   });
@@ -110,6 +108,20 @@ describe('requiredPermissionsFor', () => {
   ])('nhập hàng / nhà cung cấp: %s → cần %j', (path, permissions) => {
     expect(requiredPermissionsFor(path)).toEqual(permissions);
     expect(requiredRolesFor(path)).toBeNull();
+  });
+
+  it.each([
+    [paths.dashboard.user.list, [PERMISSIONS.user.read]],
+    [paths.dashboard.user.edit('u1'), [PERMISSIONS.user.read]],
+    [paths.dashboard.user.new, [PERMISSIONS.user.create]],
+  ])('nhân viên: %s → cần %j, không còn giới hạn theo vai trò', (path, permissions) => {
+    expect(requiredPermissionsFor(path)).toEqual(permissions);
+    expect(requiredRolesFor(path)).toBeNull();
+  });
+
+  it('trang tài khoản / hồ sơ của chính mình không xét quyền', () => {
+    expect(requiredPermissionsFor(paths.dashboard.user.account)).toBeNull();
+    expect(requiredPermissionsFor(paths.dashboard.user.profile)).toBeNull();
   });
 
   it('danh sách hàng hoá (chỉ xem) mở cho mọi nhân viên; trang sửa hàng tự chặn', () => {
