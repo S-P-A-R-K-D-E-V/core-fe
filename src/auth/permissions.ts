@@ -39,6 +39,8 @@ export const PERMISSIONS = {
   shiftCash: {
     oversightRead: 'shift-cash.oversight.read',
     oversightManage: 'shift-cash.oversight.manage',
+    /** Doanh thu ở Kiểm quầy (theo kênh tiền, đối chiếu chuyển khoản / KiotViet, hoá đơn bán) — không có: hiện "****". */
+    revenueRead: 'shift-cash.revenue.read',
   },
   /** Lương — lương của chính mình (my-payroll) không cần quyền. Quyền ghi cần kèm quyền xem tương ứng. */
   payroll: {

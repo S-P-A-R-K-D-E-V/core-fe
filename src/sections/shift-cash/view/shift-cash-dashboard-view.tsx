@@ -58,12 +58,16 @@ import {
   vnToday,
   shiftCashDenial,
   canOverseeShiftCash,
+  canViewShiftCashRevenue,
   canManageShiftCashOversight,
   isShiftCashLocationDenial,
 } from 'src/utils/shift-cash-access';
 
 import ShiftCashAccessGate, { useShiftCashAccess } from '../shift-cash-access-gate';
 import ShiftCashInvestigationPanel from '../shift-cash-investigation-panel';
+import ShiftCashReconciliationPanel from '../shift-cash-reconciliation-panel';
+import ShiftCashRevenueBlock from '../shift-cash-revenue-block';
+import ShiftCashSalesTab from '../shift-cash-sales-tab';
 
 import {
   IShiftCashSummary,
@@ -71,12 +75,7 @@ import {
   IShiftCashDenomination,
   IShiftCashLog,
   IAuditLogEntry,
-  IKiotVietDailySummary,
-  IKiotVietInvoice,
-  IKiotVietReturn,
-  IKiotVietInvoiceDetailResponse,
-  IVietQRBank,
-  IKiotVietBankAccount,
+  IShiftCashRevenue,
   IShareholder,
 } from 'src/types/corecms-api';
 import {
@@ -89,11 +88,7 @@ import {
   openCounter,
   getShiftCashLogs,
   getShiftCashAuditLogs,
-  getKiotVietDailySummary,
-  getKiotVietInvoiceDetail,
-  getKiotVietBankAccounts,
-  getVietQRBanks,
-  exportKiotVietExcel,
+  getShiftCashRevenue,
 } from 'src/api/shiftCash';
 import { getShareholders } from 'src/api/shareholders';
 import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
@@ -158,7 +153,7 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
         popover: {
           title: 'Tổng hợp',
           description:
-            'Xem tồn đầu ca, doanh thu KiotViet, thu/chi quầy và tồn cuối. So sánh với tiền mặt kiểm đếm thực tế để biết chênh lệch.',
+            'Tồn cuối = tồn đầu ca + tiền mặt bán hàng + thu − chi quầy. So với tiền mặt kiểm đếm thực tế để biết chênh lệch.',
           side: 'left' as const,
           align: 'start' as const,
         },
@@ -184,7 +179,7 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
         popover: {
           title: 'Các tab chi tiết',
           description:
-            'Trang có các tab: Thu chi quầy, Bán hàng KiotViet (Admin có thêm Nhật ký chỉnh sửa).',
+            'Trang có các tab: Thu chi quầy, Hoá đơn bán hàng (người giám sát có thêm Nhật ký chỉnh sửa).',
           side: 'top' as const,
           align: 'start' as const,
         },
@@ -194,7 +189,7 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
         popover: {
           title: 'Thêm thu / chi',
           description:
-            'Nhấn "Thêm thu" hoặc "Thêm chi" để ghi nhận các khoản thu chi ngoài KiotViet (ví dụ: tiền ship, mua đồ dùng...).',
+            'Nhấn "Thêm thu" hoặc "Thêm chi" để ghi nhận các khoản thu chi ngoài bán hàng (ví dụ: tiền ship, mua đồ dùng...).',
           side: 'bottom' as const,
           align: 'start' as const,
         },
@@ -213,14 +208,14 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
   },
   {
     tourKey: 'shift-cash-kiotviet',
-    label: 'KiotViet',
+    label: 'Doanh thu & hoá đơn',
     steps: [
       {
         element: '#tour-kiotviet-summary',
         popover: {
-          title: 'Tổng quan KiotViet',
+          title: 'Doanh thu',
           description:
-            'Hiển thị tổng doanh thu từ KiotViet: tiền mặt, chuyển khoản, quẹt thẻ. Bao gồm cả đơn trả hàng.',
+            'Doanh thu trong ngày từ dữ liệu của hệ thống: tiền mặt, chuyển khoản (so với tiền ngân hàng thực nhận), quẹt thẻ, trả hàng. Chỉ người được cấp quyền mới thấy số — người khác thấy ****.',
           side: 'left' as const,
           align: 'start' as const,
         },
@@ -228,9 +223,9 @@ const SHIFT_CASH_TOURS: TourDefinition[] = [
       {
         element: '#tour-tabs-section',
         popover: {
-          title: 'Tab Bán hàng KiotViet',
+          title: 'Tab Hoá đơn bán hàng',
           description:
-            'Chuyển sang tab "Bán hàng KiotViet" để xem chi tiết từng hóa đơn khi cần kiểm tra lại thông tin khi lệch giá trị, phân loại theo tiền mặt / chuyển khoản / thẻ / trả hàng. Báo lại với a/c quản lý để xử lý trường hợp chênh lệch.',
+            'Chuyển sang tab "Hoá đơn bán hàng" để xem từng hoá đơn trong ngày (tiền mặt / chuyển khoản / thẻ / trả hàng), xem và in lại phiếu khi cần. Báo lại với a/c quản lý để xử lý trường hợp chênh lệch.',
           side: 'top' as const,
           align: 'start' as const,
         },
@@ -273,9 +268,11 @@ function ShiftCashDashboardContent() {
   const [logs, setLogs] = useState<IShiftCashLog[]>([]);
   const [auditLogs, setAuditLogs] = useState<IAuditLogEntry[]>([]);
   const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
-  const [kiotData, setKiotData] = useState<IKiotVietDailySummary | null>(null);
-  const [kiotLoading, setKiotLoading] = useState(false);
-  const [kiotTab, setKiotTab] = useState(0); // 0=Cash, 1=Bank, 2=Card, 3=Returns
+  // Doanh thu của ngày từ dữ liệu hệ thống (kèm hoá đơn cho tab bán hàng). Không có quyền → { masked: true }.
+  const [revenue, setRevenue] = useState<IShiftCashRevenue | null>(null);
+  const [revenueLoading, setRevenueLoading] = useState(false);
+  // Nút "Đối chiếu" ở khối Doanh thu → tăng để thẻ Đối chiếu doanh thu tự chạy.
+  const [reconcileRequest, setReconcileRequest] = useState(0);
   const [tab, setTab] = useState(0);
 
   // Denomination editing
@@ -284,17 +281,6 @@ function ShiftCashDashboardContent() {
   const [denomEditing, setDenomEditing] = useState(false);
   const confirmFinalize = useBoolean();
 
-  // Invoice detail
-  const invoiceDetailDialog = useBoolean();
-  const [invoiceDetailCache, setInvoiceDetailCache] = useState<Record<number, IKiotVietInvoiceDetailResponse>>({});
-  const [invoiceDetailLoading, setInvoiceDetailLoading] = useState<number | null>(null);
-  const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState<IKiotVietInvoiceDetailResponse | null>(null);
-  const [invoiceBatchProgress, setInvoiceBatchProgress] = useState<{ loaded: number; total: number } | null>(null);
-  const batchAbortRef = useRef(false);
-
-  // Bank data (VietQR + KiotViet bank accounts)
-  const [vietQRBanks, setVietQRBanks] = useState<IVietQRBank[]>([]);
-  const [kiotBankAccounts, setKiotBankAccounts] = useState<IKiotVietBankAccount[]>([]);
   const [shareholders, setShareholders] = useState<IShareholder[]>([]);
 
   // Transaction form
@@ -317,6 +303,7 @@ function ShiftCashDashboardContent() {
   // người chỉ được xem thì trang chỉ xem (họ vào không qua kiểm ca nên API sẽ chặn ghi).
   const canOversee = canOverseeShiftCash(user);
   const canManageOversight = canManageShiftCashOversight(user);
+  const canViewRevenue = canViewShiftCashRevenue(user);
   const viewOnly = canOversee && !canManageOversight;
   // Gắn cổ đông: chỉ chủ cửa hàng (danh sách cổ đông chỉ Admin đọc được).
   const isOwner = getUserRoles(user).includes('Admin');
@@ -397,16 +384,16 @@ function ShiftCashDashboardContent() {
       });
       setDenomQuantities(denomMap);
 
-      // Fetch KiotViet data (non-blocking)
-      setKiotLoading(true);
-      getKiotVietDailySummary(currentDate)
-        .then((data) => setKiotData(data))
+      // Doanh thu từ dữ liệu hệ thống (không chặn trang). BE tự che số với người không có quyền.
+      setRevenueLoading(true);
+      getShiftCashRevenue(currentDate, true)
+        .then((data) => setRevenue(data))
         .catch((err) => {
-          console.error('KiotViet fetch error:', err);
-          setKiotData(null);
+          console.error('Shift-cash revenue error:', err);
+          setRevenue(null);
           handleDenied(err, 'load');
         })
-        .finally(() => setKiotLoading(false));
+        .finally(() => setRevenueLoading(false));
     } catch (error) {
       console.error(error);
       if (handleDenied(error, 'load')) return;
@@ -417,120 +404,18 @@ function ShiftCashDashboardContent() {
   }, [currentDate, canOversee, enqueueSnackbar, handleDenied]);
 
   useEffect(() => {
+    // Đổi ngày → bỏ số doanh thu của ngày cũ ngay, không chờ lần tải mới.
+    setRevenue(null);
     fetchData();
-    // Reset cache when date changes
-    setInvoiceDetailCache({});
-    batchAbortRef.current = true;
   }, [fetchData]);
 
-  // Load VietQR banks + KiotViet bank accounts + cổ đông once on mount.
-  // GET /shareholders chỉ Admin (BE [Authorize(Roles = "Admin")]) — vai trò khác không gọi, khỏi 403 thừa.
+  // Cổ đông (để gắn vào khoản thu chi) — GET /shareholders chỉ Admin: vai trò khác không gọi, khỏi 403 thừa.
   useEffect(() => {
-    Promise.allSettled([
-      // getVietQRBanks().then((banks) => setVietQRBanks(banks)),
-      getKiotVietBankAccounts().then((accounts) => setKiotBankAccounts(accounts)),
-      ...(isOwner && shareholdersOn ? [getShareholders(true).then((list) => setShareholders(list))] : []),
-    ]);
+    if (!isOwner || !shareholdersOn) return;
+    getShareholders(true)
+      .then((list) => setShareholders(list))
+      .catch((err) => console.error('Shareholders error:', err));
   }, [isOwner, shareholdersOn]);
-
-  // Lazy-load all invoice details when kiotData is available
-  useEffect(() => {
-    if (!kiotData) return;
-
-    const allInvoices = [
-      ...kiotData.cashInvoices,
-      ...kiotData.bankInvoices,
-      ...kiotData.cardInvoices,
-    ];
-    const idsToFetch = allInvoices
-      .map((inv) => inv.id)
-      .filter((id, idx, arr) => arr.indexOf(id) === idx); // dedupe
-
-    if (idsToFetch.length === 0) return;
-
-    batchAbortRef.current = false;
-    setInvoiceBatchProgress({ loaded: 0, total: idsToFetch.length });
-
-    const BATCH_SIZE = 5;
-    const MAX_RETRIES = 3;
-    const RETRY_DELAY = 1000;
-
-    const delay = (ms: number) => new Promise((resolve) => { setTimeout(resolve, ms); });
-
-    const fetchBatch = async (ids: number[]): Promise<{ success: Record<number, IKiotVietInvoiceDetailResponse>; failed: number[] }> => {
-      const results = await Promise.allSettled(
-        ids.map((id) =>
-          getKiotVietInvoiceDetail(id).then((detail) => ({ id, detail }))
-        )
-      );
-      const success: Record<number, IKiotVietInvoiceDetailResponse> = {};
-      const failed: number[] = [];
-      results.forEach((r, idx) => {
-        if (r.status === 'fulfilled') {
-          success[r.value.id] = r.value.detail;
-        } else if (shiftCashDenial(r.reason)) {
-          // BE chặn Kiểm quầy (hết quyền / ngoài cửa hàng) — dừng tải, không retry vô ích
-          batchAbortRef.current = true;
-        } else {
-          failed.push(ids[idx]);
-        }
-      });
-      return { success, failed };
-    };
-
-    (async () => {
-      let loaded = 0;
-      let allFailed: number[] = [];
-
-      for (let i = 0; i < idsToFetch.length; i += BATCH_SIZE) {
-        if (batchAbortRef.current) break;
-
-        const batch = idsToFetch.slice(i, i + BATCH_SIZE);
-        const { success, failed } = await fetchBatch(batch);
-
-        if (batchAbortRef.current) break;
-
-        if (Object.keys(success).length > 0) {
-          setInvoiceDetailCache((prev) => ({ ...prev, ...success }));
-        }
-        allFailed.push(...failed);
-        loaded += batch.length;
-        setInvoiceBatchProgress({ loaded: Math.min(loaded, idsToFetch.length), total: idsToFetch.length });
-        await delay(250); // small delay between batches to avoid overwhelming the server
-      }
-
-      // Retry failed items
-      for (let attempt = 1; attempt <= MAX_RETRIES && allFailed.length > 0; attempt++) {
-        if (batchAbortRef.current) break;
-
-        await delay(RETRY_DELAY);
-        if (batchAbortRef.current) break;
-
-        const retryIds = [...allFailed];
-        allFailed = [];
-
-        for (let i = 0; i < retryIds.length; i += BATCH_SIZE) {
-          if (batchAbortRef.current) break;
-
-          const batch = retryIds.slice(i, i + BATCH_SIZE);
-          const { success, failed } = await fetchBatch(batch);
-
-          if (batchAbortRef.current) break;
-
-          if (Object.keys(success).length > 0) {
-            setInvoiceDetailCache((prev) => ({ ...prev, ...success }));
-          }
-          allFailed.push(...failed);
-        }
-      }
-
-      setInvoiceBatchProgress(null);
-    })();
-
-    return () => {
-      batchAbortRef.current = true;
-    };
-  }, [kiotData]);
 
   // ========== Denomination ==========
 
@@ -662,55 +547,6 @@ function ShiftCashDashboardContent() {
     }
   };
 
-  // ========== Invoice Detail ==========
-
-  const handleViewInvoiceDetail = async (invoiceId: number) => {
-    // Check cache first
-    if (invoiceDetailCache[invoiceId]) {
-      setSelectedInvoiceDetail(invoiceDetailCache[invoiceId]);
-      invoiceDetailDialog.onTrue();
-      return;
-    }
-    try {
-      setInvoiceDetailLoading(invoiceId);
-      const detail = await getKiotVietInvoiceDetail(invoiceId);
-      setInvoiceDetailCache((prev) => ({ ...prev, [invoiceId]: detail }));
-      setSelectedInvoiceDetail(detail);
-      invoiceDetailDialog.onTrue();
-    } catch (error) {
-      console.error(error);
-      if (handleDenied(error, 'action')) return;
-      enqueueSnackbar('Không tải được chi tiết hóa đơn', { variant: 'error' });
-    } finally {
-      setInvoiceDetailLoading(null);
-    }
-  };
-
-  // ========== Bank helpers ==========
-
-  const getBankInfoForPayment = (accountId?: number) => {
-    if (!accountId) return null;
-    const kiotAccount = kiotBankAccounts.find((a) => a.kiotVietId === accountId);
-    if (!kiotAccount?.bankName) return null;
-
-    // Try to match VietQR bank by shortName or code contained in KiotViet bankName
-    const bankNameLower = kiotAccount.bankName.toLowerCase();
-    const matchedBank = vietQRBanks.find((b) => {
-      const short = b.shortName.toLowerCase();
-      const code = b.code.toLowerCase();
-      return bankNameLower.includes(short) || bankNameLower.includes(code)
-        || short.includes(bankNameLower.split(' ')[0]);
-    });
-
-    return {
-      bankName: kiotAccount.bankName,
-      accountNumber: kiotAccount.accountNumber,
-      description: kiotAccount.description,
-      logo: matchedBank?.logo || null,
-      vietQRShortName: matchedBank?.shortName || null,
-    };
-  };
-
   // ========== Render ==========
 
   return (
@@ -839,7 +675,10 @@ function ShiftCashDashboardContent() {
           </Card>
         )}
 
-        {/* Kiểm tra chênh lệch của ngày đang chọn — chỉ Admin (component tự ẩn với vai trò khác) */}
+        {/* Đối chiếu doanh thu (hệ thống ↔ ngân hàng ↔ KiotViet) — người được xem doanh thu (tự ẩn với người khác) */}
+        <ShiftCashReconciliationPanel date={currentDate} runRequest={reconcileRequest} sx={{ mb: 3 }} />
+
+        {/* Kiểm tra chênh lệch của ngày đang chọn — chỉ người giám sát (component tự ẩn với vai trò khác) */}
         <ShiftCashInvestigationPanel date={currentDate} summary={summary} sx={{ mb: 3 }} />
 
         {loading ? (
@@ -1005,32 +844,12 @@ function ShiftCashDashboardContent() {
                     <Typography variant="body2" color="text.secondary">Tồn đầu ca</Typography>
                     <Typography variant="body2">{formatCurrency(summary?.openingBalance || 0)}</Typography>
                   </Stack>
-                  <Stack id="tour-kiotviet-summary" direction="row" justifyContent="space-between">
-                    <Typography variant="body2" color="text.secondary">+ KiotViet</Typography>
-                    <Typography variant="body2">
-                        {kiotLoading ? '...' : formatCurrency((kiotData?.totalRevenue || 0) - (kiotData?.totalReturns || 0))}
-                    </Typography>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Tooltip title="Tiền mặt thu từ hoá đơn trong ngày, đã trừ tiền mặt trả lại khách">
+                      <Typography variant="body2" color="text.secondary">+ Tiền mặt bán hàng</Typography>
+                    </Tooltip>
+                    <Typography variant="body2">{formatCurrency(summary?.totalCashFromKiot || 0)}</Typography>
                   </Stack>
-                  {kiotData && (
-                      <>
-                        <Stack direction="row" justifyContent="space-between" sx={{ pl: 2 }}>
-                          <Typography variant="caption" color="text.disabled">Tiền mặt</Typography>
-                          <Typography variant="caption" color="text.disabled">{formatCurrency(kiotData.totalCash)}</Typography>
-                        </Stack>
-                      <Stack direction="row" justifyContent="space-between" sx={{ pl: 2 }}>
-                        <Typography variant="caption" color="text.disabled">Chuyển khoản</Typography>
-                        <Typography variant="caption" color="text.disabled">{formatCurrency(kiotData.totalBank)}</Typography>
-                      </Stack>
-                      <Stack direction="row" justifyContent="space-between" sx={{ pl: 2 }}>
-                        <Typography variant="caption" color="text.disabled">Quẹt thẻ</Typography>
-                        <Typography variant="caption" color="text.disabled">{formatCurrency(kiotData.totalCard)}</Typography>
-                      </Stack>
-                      <Stack direction="row" justifyContent="space-between" sx={{ pl: 2 }}>
-                        <Typography variant="caption" color="text.disabled">Trả hàng (TM)</Typography>
-                        <Typography variant="caption" color="error.main">-{formatCurrency(kiotData.totalReturns)}</Typography>
-                      </Stack>
-                    </>
-                  )}
                   <Stack direction="row" justifyContent="space-between">
                     <Typography variant="body2" color="text.secondary">+ Thu quầy thủ công</Typography>
                     <Typography variant="body2" color="success.main">
@@ -1086,6 +905,12 @@ function ShiftCashDashboardContent() {
                       </Typography>
                     </Stack>
                   </Box>
+
+                  <ShiftCashRevenueBlock
+                    revenue={revenue}
+                    loading={revenueLoading}
+                    onReconcile={canViewRevenue ? () => setReconcileRequest((n) => n + 1) : undefined}
+                  />
 
                   {summary?.finalizations && summary.finalizations.length > 0 && (
                     <Stack spacing={1} style={{ maxHeight: 220, overflowY: 'auto' }}>
@@ -1218,7 +1043,7 @@ function ShiftCashDashboardContent() {
                   label={
                     <Stack direction="row" spacing={0.5} alignItems="center">
                       <Iconify icon="solar:shop-bold-duotone" width={20} />
-                      <span>Bán hàng KiotViet</span>
+                      <span>Hoá đơn bán hàng</span>
                     </Stack>
                   }
                 />
@@ -1365,322 +1190,14 @@ function ShiftCashDashboardContent() {
                   </>
                 )}
 
-                {/* Tab 1: KiotViet */}
+                {/* Tab 1: Hoá đơn bán hàng (dữ liệu hệ thống) */}
                 {tab === 1 && (
-                  <>
-                    {kiotLoading ? (
-                      <Box display="flex" justifyContent="center" py={4}>
-                        <CircularProgress size={32} />
-                      </Box>
-                    ) : !kiotData ? (
-                      <Box sx={{ py: 4, textAlign: 'center' }}>
-                        <Iconify icon="solar:shop-bold-duotone" width={48} sx={{ color: 'text.disabled', mb: 2 }} />
-                        <Typography variant="body1" color="text.secondary">
-                          Không tải được dữ liệu KiotViet
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <>
-                        {/* KiotViet Summary Bar */}
-                        <Stack direction="row" spacing={2} sx={{ mb: 2 }} flexWrap="wrap" alignItems="center">
-                          <Chip
-                            icon={<Iconify icon="solar:bill-list-bold" width={16} />}
-                            label={`${kiotData.totalInvoices} đơn`}
-                            variant="outlined"
-                          />
-                          <Chip
-                            label={`Tổng: ${formatCurrency(kiotData.totalRevenue)}`}
-                            color="primary"
-                            variant="soft"
-                          />
-                          <Chip
-                            label={`TM: ${formatCurrency(kiotData.totalCash)}`}
-                            color="success"
-                            variant="soft"
-                          />
-                          <Chip
-                            label={`CK: ${formatCurrency(kiotData.totalBank)}`}
-                            color="info"
-                            variant="soft"
-                          />
-                          <Chip
-                            label={`Thẻ: ${formatCurrency(kiotData.totalCard)}`}
-                            color="warning"
-                            variant="soft"
-                          />
-                          {kiotData.totalReturns > 0 && (
-                            <Chip
-                              label={`Trả: -${formatCurrency(kiotData.totalReturns)}`}
-                              color="error"
-                              variant="soft"
-                            />
-                          )}
-                          {invoiceBatchProgress && (
-                            <Chip
-                              icon={<CircularProgress size={14} />}
-                              label={`Đang tải chi tiết ${invoiceBatchProgress.loaded}/${invoiceBatchProgress.total}`}
-                              variant="outlined"
-                              size="small"
-                            />
-                          )}
-
-                          <Box sx={{ flexGrow: 1 }} />
-
-                          <LoadingButton
-                            variant="outlined"
-                            size="small"
-                            startIcon={<Iconify icon="solar:download-minimalistic-bold" />}
-                            onClick={async () => {
-                              try {
-                                await exportKiotVietExcel(currentDate);
-                                enqueueSnackbar('Đã tải xuống báo cáo Excel');
-                              } catch (err) {
-                                console.error(err);
-                                if (handleDenied(err, 'action')) return;
-                                enqueueSnackbar('Tải xuống thất bại', { variant: 'error' });
-                              }
-                            }}
-                          >
-                            Tải Excel
-                          </LoadingButton>
-                        </Stack>
-
-                        {/* KiotViet sub-tabs */}
-                        <Tabs
-                          value={kiotTab}
-                          onChange={(_, v) => setKiotTab(v)}
-                          sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
-                        >
-                          <Tab label={`Tiền mặt (${kiotData.cashInvoices.length})`} />
-                          <Tab label={`Chuyển khoản (${kiotData.bankInvoices.length})`} />
-                          <Tab label={`Thẻ (${kiotData.cardInvoices.length})`} />
-                          <Tab label={`Trả hàng (${kiotData.returns.length})`} />
-                        </Tabs>
-
-                        {/* Invoice tables */}
-                        {kiotTab < 3 && (
-                          <Scrollbar sx={{ maxHeight: 500 }}>
-                            <TableContainer>
-                              <Table size="small" stickyHeader sx={{ minWidth: 800 }}>
-                                <TableHead>
-                                  <TableRow>
-                                    <TableCell align="right">Số tiền</TableCell>
-                                    <TableCell>Mã đơn</TableCell>
-                                    <TableCell>Sản phẩm</TableCell>
-                                    <TableCell>Ghi chú</TableCell>
-                                    <TableCell align="center">Thao tác</TableCell>
-                                  </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                  {(() => {
-                                    const invoices = kiotTab === 0
-                                      ? kiotData.cashInvoices
-                                      : kiotTab === 1
-                                        ? kiotData.bankInvoices
-                                        : kiotData.cardInvoices;
-
-                                    if (invoices.length === 0) {
-                                      return (
-                                        <TableRow>
-                                          <TableCell colSpan={5} align="center">
-                                            <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-                                              Không có đơn
-                                            </Typography>
-                                          </TableCell>
-                                        </TableRow>
-                                      );
-                                    }
-
-                                    return invoices.map((inv) => {
-                                      const netAmount = inv.total - inv.returnAmount;
-                                      const hasPartialCash = inv.total !== inv.totalPayment && inv.cashDifference > 0;
-                                      const cached = invoiceDetailCache[inv.id];
-                                      const products = cached?.products ?? [];
-                                      const displayProducts = products.slice(0, 3);
-                                      const moreCount = products.length - 3;
-
-                                      return (
-                                        <TableRow
-                                          key={inv.id}
-                                          hover
-                                          sx={{
-                                            ...(inv.hasReturn && {
-                                              bgcolor: 'error.lighter',
-                                            }),
-                                            ...(hasPartialCash && {
-                                              bgcolor: 'warning.lighter',
-                                            }),
-                                          }}
-                                        >
-                                          <TableCell align="right">
-                                            <Typography variant="body2" fontWeight={600}>
-                                              {formatCurrency(netAmount)}
-                                            </Typography>
-                                            {inv.hasReturn && (
-                                              <Typography variant="caption" color="error.main" display="block">
-                                                {inv.returnNote}
-                                              </Typography>
-                                            )}
-                                            {hasPartialCash && (
-                                              <Typography variant="caption" color="warning.main" display="block">
-                                                Đơn: {formatCurrency(inv.total)}
-                                              </Typography>
-                                            )}
-                                          </TableCell>
-                                          <TableCell>
-                                            <Typography variant="body2">{inv.code}</Typography>
-                                            <Typography variant="caption" color="text.disabled">
-                                              {new Date(inv.createdDate).toLocaleTimeString('vi-VN', {
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                                second: '2-digit',
-                                              })}
-                                            </Typography>
-                                          </TableCell>
-                                          <TableCell sx={{ maxWidth: 250 }}>
-                                            {cached ? (
-                                              <Stack spacing={0.25}>
-                                                {displayProducts.map((p, idx) => (
-                                                  <Typography key={idx} variant="caption" noWrap>
-                                                    {p.productName} × {p.quantity} — {formatCurrency(p.price)}
-                                                  </Typography>
-                                                ))}
-                                                {moreCount > 0 && (
-                                                  <Typography variant="caption" color="text.disabled">
-                                                    +{moreCount} sản phẩm khác
-                                                  </Typography>
-                                                )}
-                                              </Stack>
-                                            ) : (
-                                              <Typography variant="caption" color="text.disabled">
-                                                —
-                                              </Typography>
-                                            )}
-                                          </TableCell>
-                                          <TableCell>
-                                            <Typography variant="caption">
-                                              {hasPartialCash
-                                                ? `Thu: ${formatCurrency(inv.cashDifference)}đ tiền mặt`
-                                                : inv.description || ''}
-                                            </Typography>
-                                          </TableCell>
-                                          <TableCell align="center">
-                                            <Tooltip title="Xem chi tiết">
-                                              <IconButton
-                                                size="small"
-                                                color="info"
-                                                onClick={() => handleViewInvoiceDetail(inv.id)}
-                                                disabled={invoiceDetailLoading === inv.id}
-                                              >
-                                                {invoiceDetailLoading === inv.id ? (
-                                                  <CircularProgress size={18} />
-                                                ) : (
-                                                  <Iconify icon="solar:eye-bold" width={18} />
-                                                )}
-                                              </IconButton>
-                                            </Tooltip>
-                                          </TableCell>
-                                        </TableRow>
-                                      );
-                                    });
-                                  })()}
-
-                                  {/* Total row */}
-                                  <TableRow>
-                                    <TableCell align="right">
-                                      <Typography variant="subtitle2" fontWeight={700} color="primary.main">
-                                        Tổng:{' '}
-                                        {formatCurrency(
-                                          kiotTab === 0
-                                            ? kiotData.totalCash
-                                            : kiotTab === 1
-                                              ? kiotData.totalBank
-                                              : kiotData.totalCard
-                                        )}
-                                      </Typography>
-                                    </TableCell>
-                                    <TableCell colSpan={4} />
-                                  </TableRow>
-                                </TableBody>
-                              </Table>
-                            </TableContainer>
-                          </Scrollbar>
-                        )}
-
-                        {/* Returns table */}
-                        {kiotTab === 3 && (
-                          <Scrollbar sx={{ maxHeight: 500 }}>
-                            <TableContainer>
-                              <Table size="small" stickyHeader sx={{ minWidth: 650 }}>
-                                <TableHead>
-                                  <TableRow>
-                                    <TableCell>Mã trả</TableCell>
-                                    <TableCell>Đơn gốc</TableCell>
-                                    <TableCell align="right">Trả</TableCell>
-                                    <TableCell align="right">Đổi</TableCell>
-                                    <TableCell align="right">Thực trả</TableCell>
-                                    <TableCell>PT gốc</TableCell>
-                                  </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                  {kiotData.returns.length === 0 && (
-                                    <TableRow>
-                                      <TableCell colSpan={6} align="center">
-                                        <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-                                          Không có đơn trả
-                                        </Typography>
-                                      </TableCell>
-                                    </TableRow>
-                                  )}
-                                  {kiotData.returns.map((ret) => (
-                                    <TableRow key={ret.id} hover>
-                                      <TableCell>
-                                        <Typography variant="body2">{ret.code}</Typography>
-                                      </TableCell>
-                                      <TableCell>
-                                        <Typography variant="caption">{ret.invoiceCode || '—'}</Typography>
-                                      </TableCell>
-                                      <TableCell align="right">
-                                        <Typography variant="body2" color="error.main">
-                                          {formatCurrency(ret.returnTotal)}
-                                        </Typography>
-                                      </TableCell>
-                                      <TableCell align="right">
-                                        <Typography variant="body2" color="success.main">
-                                          {ret.exchangeInvoiceTotal
-                                            ? formatCurrency(ret.exchangeInvoiceTotal)
-                                            : '—'}
-                                        </Typography>
-                                      </TableCell>
-                                      <TableCell align="right">
-                                        <Typography variant="body2" fontWeight={600}>
-                                          {formatCurrency(ret.netReturnAmount)}
-                                        </Typography>
-                                      </TableCell>
-                                      <TableCell>
-                                        <Label
-                                          variant="soft"
-                                          color={
-                                            ret.paymentMethod === 'Cash'
-                                              ? 'success'
-                                              : ret.paymentMethod === 'Transfer'
-                                                ? 'info'
-                                                : 'warning'
-                                          }
-                                        >
-                                          {ret.paymentMethod || '—'}
-                                        </Label>
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </TableContainer>
-                          </Scrollbar>
-                        )}
-                      </>
-                    )}
-                  </>
+                  <ShiftCashSalesTab
+                    date={currentDate}
+                    revenue={revenue}
+                    loading={revenueLoading}
+                    onReload={fetchData}
+                  />
                 )}
 
                 {/* Tab 2: Nhật ký chỉnh sửa (MongoDB audit logs) — chỉ người giám sát */}
@@ -2029,7 +1546,7 @@ function ShiftCashDashboardContent() {
                   <Typography variant="body2">{formatCurrency(summary?.openingBalance || 0)}</Typography>
                 </Stack>
                 <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="body2" color="text.secondary">+ KiotViet (tiền mặt)</Typography>
+                  <Typography variant="body2" color="text.secondary">+ Tiền mặt bán hàng</Typography>
                   <Typography variant="body2">{formatCurrency(summary?.totalCashFromKiot || 0)}</Typography>
                 </Stack>
                 <Stack direction="row" justifyContent="space-between">
@@ -2101,251 +1618,6 @@ function ShiftCashDashboardContent() {
         </DialogActions>
       </Dialog>
 
-      {/* Invoice Detail Dialog */}
-      <Dialog
-        open={invoiceDetailDialog.value}
-        onClose={invoiceDetailDialog.onFalse}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Iconify icon="solar:document-text-bold-duotone" width={24} />
-            <span>Chi tiết hóa đơn {selectedInvoiceDetail?.code}</span>
-          </Stack>
-        </DialogTitle>
-        <DialogContent>
-          {selectedInvoiceDetail && (
-            <Stack spacing={2.5} sx={{ mt: 1 }}>
-              {/* Invoice info */}
-              <Box sx={{ bgcolor: 'background.neutral', borderRadius: 1, p: 2 }}>
-                <Stack spacing={1}>
-                  <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="body2" color="text.secondary">Mã đơn</Typography>
-                    <Typography variant="body2" fontWeight={600}>{selectedInvoiceDetail.code}</Typography>
-                  </Stack>
-                  {selectedInvoiceDetail.orderCode && (
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">Mã đặt hàng</Typography>
-                      <Typography variant="body2">{selectedInvoiceDetail.orderCode}</Typography>
-                    </Stack>
-                  )}
-                  <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="body2" color="text.secondary">Ngày mua</Typography>
-                    <Typography variant="body2">
-                      {new Date(selectedInvoiceDetail.purchaseDate).toLocaleString('vi-VN')}
-                    </Typography>
-                  </Stack>
-                  {selectedInvoiceDetail.customerName && (
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">Khách hàng</Typography>
-                      <Typography variant="body2">
-                        {selectedInvoiceDetail.customerName}
-                        {selectedInvoiceDetail.customerCode && ` (${selectedInvoiceDetail.customerCode})`}
-                      </Typography>
-                    </Stack>
-                  )}
-                  {selectedInvoiceDetail.soldByName && (
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">Nhân viên bán</Typography>
-                      <Typography variant="body2">{selectedInvoiceDetail.soldByName}</Typography>
-                    </Stack>
-                  )}
-                  {selectedInvoiceDetail.branchName && (
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">Chi nhánh</Typography>
-                      <Typography variant="body2">{selectedInvoiceDetail.branchName}</Typography>
-                    </Stack>
-                  )}
-                  <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="body2" color="text.secondary">Trạng thái</Typography>
-                    <Label
-                      variant="soft"
-                      color={selectedInvoiceDetail.status === 1 ? 'success' : 'default'}
-                    >
-                      {selectedInvoiceDetail.statusValue || `Status ${selectedInvoiceDetail.status}`}
-                    </Label>
-                  </Stack>
-                  {selectedInvoiceDetail.description && (
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">Ghi chú</Typography>
-                      <Typography variant="body2">{selectedInvoiceDetail.description}</Typography>
-                    </Stack>
-                  )}
-                </Stack>
-              </Box>
-
-              {/* Products table */}
-              <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  <Iconify icon="solar:box-bold-duotone" width={20} sx={{ mr: 0.5, verticalAlign: 'middle' }} />
-                  Sản phẩm ({selectedInvoiceDetail.products.length})
-                </Typography>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Tên sản phẩm</TableCell>
-                        <TableCell align="right">SL</TableCell>
-                        <TableCell align="right">Đơn giá</TableCell>
-                        <TableCell align="right">Giảm giá</TableCell>
-                        <TableCell align="right">Thành tiền</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {selectedInvoiceDetail.products.map((p, idx) => {
-                        const lineTotal = p.price * p.quantity - (p.discount || 0);
-                        return (
-                          <TableRow key={idx} hover>
-                            <TableCell>
-                              <Typography variant="body2">{p.productName}</Typography>
-                              {p.productCode && (
-                                <Typography variant="caption" color="text.disabled">
-                                  {p.productCode}
-                                </Typography>
-                              )}
-                              {p.note && (
-                                <Typography variant="caption" color="text.secondary" display="block">
-                                  {p.note}
-                                </Typography>
-                              )}
-                            </TableCell>
-                            <TableCell align="right">
-                              <Typography variant="body2">{p.quantity}</Typography>
-                            </TableCell>
-                            <TableCell align="right">
-                              <Typography variant="body2">{formatCurrency(p.price)}</Typography>
-                            </TableCell>
-                            <TableCell align="right">
-                              {p.discount ? (
-                                <Typography variant="body2" color="error.main">
-                                  -{formatCurrency(p.discount)}
-                                  {p.discountRatio ? ` (${p.discountRatio}%)` : ''}
-                                </Typography>
-                              ) : (
-                                <Typography variant="body2" color="text.disabled">—</Typography>
-                              )}
-                            </TableCell>
-                            <TableCell align="right">
-                              <Typography variant="body2" fontWeight={600}>
-                                {formatCurrency(lineTotal)}
-                              </Typography>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Box>
-
-              {/* Surcharges */}
-              {selectedInvoiceDetail.surcharges.length > 0 && (
-                <Box>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Phụ thu</Typography>
-                  <Stack spacing={0.5}>
-                    {selectedInvoiceDetail.surcharges.map((s) => (
-                      <Stack key={s.id} direction="row" justifyContent="space-between">
-                        <Typography variant="body2" color="text.secondary">
-                          {s.surchargeName || 'Phụ thu'}
-                        </Typography>
-                        <Typography variant="body2">{formatCurrency(s.price || 0)}</Typography>
-                      </Stack>
-                    ))}
-                  </Stack>
-                </Box>
-              )}
-
-              {/* Payments */}
-              <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  <Iconify icon="solar:card-bold-duotone" width={20} sx={{ mr: 0.5, verticalAlign: 'middle' }} />
-                  Thanh toán ({selectedInvoiceDetail.payments.length})
-                </Typography>
-                <Stack spacing={1}>
-                  {selectedInvoiceDetail.payments.map((pm) => {
-                    const bankInfo = getBankInfoForPayment(pm.accountId);
-                    return (
-                      <Stack key={pm.id} direction="row" justifyContent="space-between" alignItems="center">
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          {bankInfo?.logo && (
-                            <Box
-                              component="img"
-                              src={bankInfo.logo}
-                              alt={bankInfo.vietQRShortName || ''}
-                              sx={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 0.5 }}
-                            />
-                          )}
-                          <Label
-                            variant="soft"
-                            color={
-                              pm.method === 'Cash'
-                                ? 'success'
-                                : pm.method === 'Transfer'
-                                  ? 'info'
-                                  : 'warning'
-                            }
-                          >
-                            {pm.method === 'Cash' ? 'Tiền mặt' : pm.method === 'Transfer' ? 'Chuyển khoản' : pm.method}
-                          </Label>
-                          {bankInfo ? (
-                            <Stack>
-                              <Typography variant="caption" fontWeight={600}>
-                                {bankInfo.vietQRShortName || bankInfo.bankName}
-                              </Typography>
-                              {bankInfo.accountNumber && (
-                                <Typography variant="caption" color="text.secondary">
-                                  {bankInfo.accountNumber}
-                                </Typography>
-                              )}
-                            </Stack>
-                          ) : pm.bankAccount ? (
-                            <Typography variant="caption" color="text.secondary">
-                              {pm.bankAccount}
-                            </Typography>
-                          ) : null}
-                        </Stack>
-                        <Typography variant="body2" fontWeight={600}>
-                          {formatCurrency(pm.amount)}
-                        </Typography>
-                      </Stack>
-                    );
-                  })}
-                </Stack>
-              </Box>
-
-              {/* Total summary */}
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 1,
-                  bgcolor: alpha(theme.palette.primary.main, 0.08),
-                }}
-              >
-                <Stack spacing={0.5}>
-                  <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="subtitle2">Khách cần trả</Typography>
-                    <Typography variant="subtitle2" fontWeight={700}>
-                      {formatCurrency(selectedInvoiceDetail.total)}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="body2" color="text.secondary">Khách đã trả</Typography>
-                    <Typography variant="body2" fontWeight={600}>
-                      {formatCurrency(selectedInvoiceDetail.totalPayment)}
-                    </Typography>
-                  </Stack>
-                </Stack>
-              </Box>
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button variant="outlined" onClick={invoiceDetailDialog.onFalse}>
-            Đóng
-          </Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 }

@@ -432,6 +432,8 @@ export const endpoints = {
     logs: '/shift-cash/logs',
     auditLogs: '/shift-cash/audit-logs',
     investigation: '/shift-cash/investigation',
+    revenue: '/shift-cash/revenue',
+    reconciliation: '/shift-cash/reconciliation',
   },
   kiotViet: {
     dailySummary: '/kiotviet/daily-summary',

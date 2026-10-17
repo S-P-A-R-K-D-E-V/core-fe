@@ -14,6 +14,8 @@ import {
   IKiotVietBankAccount,
   IVietQRBank,
   IShiftCashInvestigationResult,
+  IShiftCashRevenue,
+  IShiftCashReconciliation,
 } from 'src/types/corecms-api';
 import { hasApiErrorCode } from 'src/utils/api-error';
 import { ShiftCashGeo, shiftCashGeoHeaders } from 'src/utils/shift-cash-access';
@@ -181,6 +183,39 @@ export async function getShiftCashInvestigation(
       ? { status: 'not-finalized' }
       : { status: 'unavailable' };
   }
+  return { status: 'ok', result: res.data };
+}
+
+// ======================================================================
+// Doanh thu + đối chiếu (dữ liệu hệ thống, mọi cửa hàng)
+// ======================================================================
+
+// Không có quyền xem doanh thu → BE trả 200 { date, masked: true } (không con số nào) — trang hiện "****".
+export async function getShiftCashRevenue(
+  date: string,
+  includeInvoices = false
+): Promise<IShiftCashRevenue> {
+  const res = await axios.get(endpoints.shiftCash.revenue, {
+    params: { date, includeInvoices },
+    ...geoConfig(),
+  });
+  return res.data;
+}
+
+export type ShiftCashReconciliationOutcome =
+  | { status: 'ok'; result: IShiftCashReconciliation }
+  // 403 không kèm mã ShiftCash.*: không có quyền xem doanh thu
+  | { status: 'forbidden' };
+
+export async function getShiftCashReconciliation(
+  date: string
+): Promise<ShiftCashReconciliationOutcome> {
+  const res = await axios.get(endpoints.shiftCash.reconciliation, {
+    params: { date },
+    validateStatus: (status) => (status >= 200 && status < 300) || status === 403,
+    ...geoConfig(),
+  });
+  if (res.status === 403) return { status: 'forbidden' };
   return { status: 'ok', result: res.data };
 }
 

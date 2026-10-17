@@ -43,6 +43,17 @@ export function canOverseeShiftCash(user: Record<string, any> | null | undefined
   return hasPermission(user, PERMISSIONS.shiftCash.oversightRead);
 }
 
+/**
+ * Xem doanh thu ở Kiểm quầy (khối "Doanh thu", tab hoá đơn bán, đối chiếu doanh thu): quyền shift-cash.revenue.read (mặc
+ * định Chủ + Quản lý) hoặc người giám sát. Chỉ để ẩn / hiện — BE tự che số ("masked") với người không có quyền.
+ */
+export function canViewShiftCashRevenue(user: Record<string, any> | null | undefined): boolean {
+  return (
+    hasPermission(user, PERMISSIONS.shiftCash.revenueRead) ||
+    hasPermission(user, PERMISSIONS.shiftCash.oversightRead)
+  );
+}
+
 /** Được ghi ngày cũ, sửa / xoá khoản thu chi của người khác. */
 export function canManageShiftCashOversight(user: Record<string, any> | null | undefined): boolean {
   return hasPermission(user, PERMISSIONS.shiftCash.oversightManage);

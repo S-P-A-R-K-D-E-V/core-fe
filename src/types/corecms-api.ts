@@ -1585,6 +1585,169 @@ export interface IShiftCashInvestigationResult {
   message: string;
 }
 
+// --- Kiểm quầy: doanh thu + đối chiếu (dữ liệu hệ thống) — GET /shift-cash/revenue, /shift-cash/reconciliation ---
+
+export interface ISalesChannelTotals {
+  invoiceCount: number;
+  /** Σ tổng hoá đơn hoàn thành. */
+  revenue: number;
+  /** Tiền mặt theo luật kiểm quầy, CHƯA trừ trả hàng. */
+  cash: number;
+  transfer: number;
+  card: number;
+  eWallet: number;
+  /** Voucher, điểm… — không phải tiền. */
+  other: number;
+  returnCount: number;
+  /** Σ giá trị phiếu trả. */
+  returns: number;
+  netRevenue: number;
+}
+
+export interface IShiftCashRevenueTotals {
+  sales: ISalesChannelTotals;
+  /** Tiền mặt trả lại khách (đã trừ đơn đổi hàng). */
+  cashRefunds: number;
+  /** Tiền mặt bán hàng thực vào két (= số trong "Tồn cuối"). */
+  netCash: number;
+}
+
+export interface ITransferInvoice {
+  salesOrderId: string;
+  code: string;
+  at: string;
+  amount: number;
+}
+
+export interface IUnmatchedCredit {
+  at: string;
+  amount: number;
+  source: string | null;
+  /** Mã hoá đơn mà mã QR của khoản này trỏ tới (vd hoá đơn ghi tiền mặt). */
+  linkedInvoiceCode: string | null;
+}
+
+export interface IBankTransferCheck {
+  /** false = cửa hàng chưa theo dõi tiền vào ngân hàng — các số còn lại không có ý nghĩa. */
+  hasBankFeed: boolean;
+  systemTransfer: number;
+  transferInvoiceCount: number;
+  received: number;
+  creditCount: number;
+  matched: number;
+  /** Ngân hàng nhận − chuyển khoản trên hoá đơn (âm = nhận thiếu). */
+  difference: number;
+  missingCredits: ITransferInvoice[];
+  unmatchedCredits: IUnmatchedCredit[];
+}
+
+export type ShiftCashTransferStatus = 'received' | 'missing' | 'unknown';
+
+export interface IShiftCashSalesInvoice {
+  salesOrderId: string;
+  kiotVietId: number | null;
+  code: string;
+  purchaseDate: string;
+  customerName: string | null;
+  description: string | null;
+  total: number;
+  cash: number;
+  transfer: number;
+  card: number;
+  eWallet: number;
+  other: number;
+  /** Phần chưa ghi thanh toán — luật kiểm quầy tính là tiền mặt (đã nằm trong cash). */
+  untracked: number;
+  methods: string[];
+  hasReturn: boolean;
+  returnAmount: number;
+  /** null = không có chuyển khoản. */
+  transferStatus: ShiftCashTransferStatus | null;
+}
+
+export interface IShiftCashSalesReturn {
+  returnId: string;
+  code: string;
+  salesOrderId: string | null;
+  invoiceCode: string | null;
+  returnDate: string;
+  customerName: string | null;
+  returnTotal: number;
+  exchangeTotal: number;
+  cashRefund: number;
+}
+
+/** GET /shift-cash/revenue — không có quyền xem doanh thu: chỉ { date, masked: true }. */
+export type IShiftCashRevenue =
+  | { date: string; masked: true }
+  | {
+      date: string;
+      masked?: false;
+      kiotVietConnected: boolean;
+      revenue: IShiftCashRevenueTotals;
+      bank: IBankTransferCheck;
+      invoices: IShiftCashSalesInvoice[] | null;
+      returns: IShiftCashSalesReturn[] | null;
+    };
+
+export type ShiftCashInvoiceIssue = 'missing-in-system' | 'not-on-kiotviet' | 'amount' | 'payment';
+
+export interface IShiftCashInvoiceDiff {
+  code: string;
+  purchaseDate: string | null;
+  issue: ShiftCashInvoiceIssue;
+  kiotVietTotal: number | null;
+  systemTotal: number | null;
+  detail: string;
+}
+
+export interface IKiotVietComparison {
+  ok: boolean;
+  error: string | null;
+  totals: ISalesChannelTotals | null;
+  systemOnlyCount: number;
+  systemOnlyRevenue: number;
+  diffs: IShiftCashInvoiceDiff[];
+}
+
+export interface ICashDrawerCheck {
+  openingBalance: number;
+  cashFromSales: number;
+  manualIncome: number;
+  manualExpense: number;
+  expected: number;
+  /** null = chưa đếm. */
+  counted: number | null;
+  difference: number | null;
+  isFinalized: boolean;
+  finalizedAt: string | null;
+}
+
+export interface IReconciliationRow {
+  key: 'revenue' | 'cash' | 'transfer' | 'card' | 'ewallet' | 'other' | 'returns' | 'net';
+  label: string;
+  system: number;
+  kiotViet: number | null;
+  /** KiotViet − hệ thống. */
+  kiotVietDiff: number | null;
+  bank: number | null;
+  /** Ngân hàng nhận − hệ thống (chỉ dòng chuyển khoản). */
+  bankDiff: number | null;
+}
+
+export interface IShiftCashReconciliation {
+  date: string;
+  system: IShiftCashRevenueTotals;
+  bank: IBankTransferCheck;
+  kiotVietConnected: boolean;
+  kiotViet: IKiotVietComparison | null;
+  drawer: ICashDrawerCheck;
+  rows: IReconciliationRow[];
+  /** Nhận xét dựng sẵn (tiếng Việt), mạnh → nhẹ. */
+  notes: string[];
+  allMatched: boolean;
+}
+
 // --- KiotViet Integration ---
 
 export interface IKiotVietInvoice {

@@ -118,6 +118,18 @@ const CALLS: Array<{
     url: '/shift-cash/investigation',
   },
   {
+    name: 'revenue',
+    run: () => api.getShiftCashRevenue('2026-10-02', true),
+    method: 'get',
+    url: '/shift-cash/revenue',
+  },
+  {
+    name: 'reconciliation',
+    run: () => api.getShiftCashReconciliation('2026-10-02'),
+    method: 'get',
+    url: '/shift-cash/reconciliation',
+  },
+  {
     name: 'kiotviet daily-summary',
     run: () => api.getKiotVietDailySummary('2026-10-02'),
     method: 'get',
