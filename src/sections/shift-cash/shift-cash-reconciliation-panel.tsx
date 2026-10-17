@@ -140,14 +140,7 @@ export default function ShiftCashReconciliationPanel({ date, runRequest = 0, sx 
               <Iconify icon="solar:scale-bold-duotone" width={22} sx={{ mr: 1, verticalAlign: 'middle' }} />
               Đối chiếu doanh thu
             </Typography>
-            {view.step === 'result' && (
-              <Chip
-                size="small"
-                variant="soft"
-                color={view.result.allMatched ? 'success' : 'warning'}
-                label={view.result.allMatched ? 'Khớp' : 'Có chênh lệch'}
-              />
-            )}
+            {view.step === 'result' && <StatusChip result={view.result} />}
           </Stack>
           {view.step !== 'result' && (
             <Typography
@@ -201,6 +194,23 @@ export default function ShiftCashReconciliationPanel({ date, runRequest = 0, sx 
 
 // ----------------------------------------------------------------------
 
+// Két chưa đếm thì chưa nói được "khớp": hiện "Chưa đếm két" (trừ khi đã thấy lệch ở phần khác).
+function StatusChip({ result }: { result: IShiftCashReconciliation }) {
+  const notCounted = result.drawer.counted === null;
+  const hasIssue =
+    (result.bank.hasBankFeed && (result.bank.missingCredits.length > 0 || result.bank.unmatchedCredits.length > 0)) ||
+    (!!result.kiotViet && (!result.kiotViet.ok || result.kiotViet.diffs.length > 0));
+  if (notCounted && !hasIssue) return <Chip size="small" variant="soft" label="Chưa đếm két" />;
+  return (
+    <Chip
+      size="small"
+      variant="soft"
+      color={result.allMatched ? 'success' : 'warning'}
+      label={result.allMatched ? 'Khớp' : 'Có chênh lệch'}
+    />
+  );
+}
+
 function DiffCell({ value }: { value: number | null }) {
   if (value === null) return <TableCell align="right">—</TableCell>;
   const color = Math.abs(value) < 1 ? 'success.main' : value < 0 ? 'error.main' : 'warning.main';
@@ -215,7 +225,8 @@ export function ReconciliationResult({ result }: { result: IShiftCashReconciliat
   const { drawer, bank, kiotViet, kiotVietConnected, rows, notes, date } = result;
   const showKiotViet = kiotVietConnected && !!kiotViet?.ok && !!kiotViet.totals;
   const showBank = bank.hasBankFeed;
-  const value = (row: IReconciliationRow, v: number) => (row.key === 'returns' ? `−${formatCurrency(v)}` : formatCurrency(v));
+  const value = (row: IReconciliationRow, v: number) =>
+    row.key === 'returns' && v !== 0 ? `−${formatCurrency(v)}` : formatCurrency(v);
 
   return (
     <Stack spacing={2.5}>
