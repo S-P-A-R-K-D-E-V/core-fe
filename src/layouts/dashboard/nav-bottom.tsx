@@ -43,6 +43,7 @@ const NAV_ITEMS: NavBottomItem[] = [
     label: 'Lương',
     path: paths.dashboard.payroll.myPayroll,
     icon: 'solar:money-bag-bold-duotone',
+    platformFeature: PLATFORM_FEATURES.payrollSelf,
   },
 ];
 

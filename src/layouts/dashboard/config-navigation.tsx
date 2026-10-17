@@ -275,6 +275,7 @@ export function useNavData(
             icon: ICONS.banking,
             roles: ['Admin', 'Manager', 'Staff'],
             featureKey: 'payroll.core',
+            platformFeature: PLATFORM_FEATURES.payrollSelf,
           },
         ]
       },

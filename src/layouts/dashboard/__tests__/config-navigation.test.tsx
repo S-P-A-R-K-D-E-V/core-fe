@@ -423,6 +423,13 @@ describe('useNavData — tính năng tắt theo nền tảng', () => {
     expect(blocked).not.toContain(paths.dashboard.salary.root);
     expect(blocked).not.toContain(paths.dashboard.payroll.cycles);
     expect(blocked).not.toContain(paths.dashboard.salary.configuration);
+    expect(blocked).toContain(paths.dashboard.payroll.myPayroll);
+  });
+
+  it('Lương của tôi ẩn khi "Xem lương của mình" bị tắt', () => {
+    const FEATURES = ['payroll.core'];
+    expect(navPaths('Staff', FEATURES, [])).toContain(paths.dashboard.payroll.myPayroll);
+    expect(navPaths('Staff', FEATURES, [], ['payroll.self'])).not.toContain(paths.dashboard.payroll.myPayroll);
   });
 
   it('kiểm quầy, checklist vệ sinh, bán hàng, báo cáo ẩn theo đúng tính năng bị tắt', () => {

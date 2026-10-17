@@ -19,6 +19,8 @@ export const PLATFORM_FEATURES = {
   reports: 'analytics.reports',
   /** Quản lý lương: bảng lương, kỳ lương, mức lương, chính sách. Không gồm "Lương của tôi". */
   payroll: 'payroll.records',
+  /** Lương của chính mình ("Lương của tôi"). */
+  payrollSelf: 'payroll.self',
 } as const;
 
 export type PlatformFeatureKey = (typeof PLATFORM_FEATURES)[keyof typeof PLATFORM_FEATURES];
