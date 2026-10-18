@@ -300,6 +300,24 @@ export async function checkIn(data: ICheckInRequest): Promise<IAttendanceLog> {
   return response.data;
 }
 
+/** Thiết lập chấm công của cửa hàng. Máy chủ cũ chưa có endpoint → coi như tắt bắt buộc khuôn mặt. */
+export async function getAttendanceSettings(): Promise<{ requireFaceVerification: boolean }> {
+  try {
+    const response = await axios.get<{ requireFaceVerification: boolean }>(endpoints.attendance.settings);
+    return { requireFaceVerification: !!response.data?.requireFaceVerification };
+  } catch {
+    return { requireFaceVerification: false };
+  }
+}
+
+/** Bật / tắt "Bắt buộc xác minh khuôn mặt" (quyền attendance.adjust). */
+export async function updateAttendanceSettings(data: {
+  requireFaceVerification: boolean;
+}): Promise<{ requireFaceVerification: boolean }> {
+  const response = await axios.put<{ requireFaceVerification: boolean }>(endpoints.attendance.settings, data);
+  return response.data;
+}
+
 export async function checkInFace(data: ICheckInWithFaceRequest): Promise<IAttendanceLog> {
   const response = await axios.post<IAttendanceLog>(endpoints.attendance.checkInFace, data);
   return response.data;

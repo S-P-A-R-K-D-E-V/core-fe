@@ -238,6 +238,8 @@ export const endpoints = {
     report: '/attendance/report',
     myReport: '/attendance/my-report',
     todayBoard: '/attendance/today-board',
+    // Thiết lập chấm công của cửa hàng: { requireFaceVerification }.
+    settings: '/attendance/settings',
     // Chấm công trực tiếp theo chi nhánh (camera quầy).
     branchBoard: '/attendance/branch-board',
     branchBoardBranches: '/attendance/branch-board/branches',

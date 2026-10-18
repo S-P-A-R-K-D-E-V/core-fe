@@ -50,6 +50,7 @@ import {
   checkIn,
   smartCheckIn,
   smartCheckOut,
+  getAttendanceSettings,
 } from 'src/api/attendance';
 import { checkinFace } from 'src/api/checkinFace';
 import { completeCleaningTask, getMyCleaningChecklist } from 'src/api/cleaning';
@@ -132,6 +133,14 @@ export default function AttendanceCheckinView() {
   const { enqueueSnackbar } = useSnackbar();
   const { user, refreshUser } = useAuthContext();
   const hasFaceEmbedding = !!user?.hasFaceEmbedding;
+  // Cửa hàng bật "Bắt buộc khuôn mặt": chưa đăng ký khuôn mặt thì không chấm công bằng ảnh chụp được nữa.
+  const [requireFace, setRequireFace] = useState(false);
+  useEffect(() => {
+    getAttendanceSettings().then((s) => setRequireFace(s.requireFaceVerification));
+  }, []);
+  // Đã đăng ký khuôn mặt → check-in / check-out chính qua quét mặt (máy chủ so khuôn mặt). Chưa → ảnh chụp gửi nhóm
+  // chấm công như cũ, máy chủ ghi "chưa xác minh" (trừ khi cửa hàng bắt buộc khuôn mặt).
+  const photoOnly = !hasFaceEmbedding && !requireFace;
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -1026,12 +1035,15 @@ export default function AttendanceCheckinView() {
                   variant="contained"
                   size="large"
                   fullWidth
-                  onClick={() =>
-                    openFaceDialog(
-                      'checkout',
-                      currentShiftDisplay.currentShift.shiftName || currentShiftDisplay.currentShift.scheduleName
-                    )
-                  }
+                  onClick={() => {
+                    if (hasFaceEmbedding) setFaceCheckinMode('checkout');
+                    else if (requireFace) router.push(paths.dashboard.attendance.faceEnrollment);
+                    else
+                      openFaceDialog(
+                        'checkout',
+                        currentShiftDisplay.currentShift.shiftName || currentShiftDisplay.currentShift.scheduleName
+                      );
+                  }}
                   disabled={!!actionLoading}
                   startIcon={
                     actionLoading === 'checkout' ? (
@@ -1052,22 +1064,22 @@ export default function AttendanceCheckinView() {
                     color: '#fff',
                   }}
                 >
-                  Kết thúc làm việc
+                  {hasFaceEmbedding || photoOnly ? 'Kết thúc làm việc' : 'Đăng ký khuôn mặt để check-out'}
                 </Button>
 
-                <Button
-                  variant="text"
-                  size="small"
-                  fullWidth
-                  onClick={() =>
-                    hasFaceEmbedding ? setFaceCheckinMode('checkout') : router.push(paths.dashboard.attendance.faceEnrollment)
-                  }
-                  disabled={!!actionLoading}
-                  startIcon={<Iconify icon="mdi:face-recognition" />}
-                  sx={{ mt: 1, color: 'rgba(255,255,255,0.85)' }}
-                >
-                  {hasFaceEmbedding ? 'Check-out bằng khuôn mặt (mới)' : 'Đăng ký khuôn mặt để dùng tính năng này'}
-                </Button>
+                {photoOnly && (
+                  <Button
+                    variant="text"
+                    size="small"
+                    fullWidth
+                    onClick={() => router.push(paths.dashboard.attendance.faceEnrollment)}
+                    disabled={!!actionLoading}
+                    startIcon={<Iconify icon="mdi:face-recognition" />}
+                    sx={{ mt: 1, color: 'rgba(255,255,255,0.85)' }}
+                  >
+                    Chưa xác minh khuôn mặt — đăng ký ngay
+                  </Button>
+                )}
 
                 {currentShiftCleaning && currentShiftCleaning.tasks.length > 0 && (
                   <Button
@@ -1188,6 +1200,10 @@ export default function AttendanceCheckinView() {
                       onClick={() => {
                         if (todayAssignments.length === 0) {
                           setOvertimeConfirmOpen(true);
+                        } else if (hasFaceEmbedding) {
+                          setFaceCheckinMode('checkin');
+                        } else if (requireFace) {
+                          router.push(paths.dashboard.attendance.faceEnrollment);
                         } else {
                           openFaceDialog('smart');
                         }
@@ -1203,7 +1219,7 @@ export default function AttendanceCheckinView() {
                         ) : todayAssignments.length > 0 && !activeSmartShift ? (
                           <Iconify icon="mdi:clock-outline" />
                         ) : (
-                          <Iconify icon="mdi:camera" />
+                          <Iconify icon={photoOnly ? 'mdi:camera' : 'mdi:face-recognition'} />
                         )
                       }
                       sx={{
@@ -1220,27 +1236,31 @@ export default function AttendanceCheckinView() {
                       }}
                     >
                       {todayAssignments.length === 0
-                        ? 'Chụp ảnh & Check-in ngoài giờ'
-                        : activeSmartShift
+                        ? hasFaceEmbedding
+                          ? 'Quét khuôn mặt & Check-in ngoài giờ'
+                          : 'Đăng ký khuôn mặt để check-in ngoài giờ'
+                        : !activeSmartShift
+                        ? 'Chưa đến giờ check-in'
+                        : hasFaceEmbedding
+                        ? 'Quét khuôn mặt & Bắt đầu làm việc'
+                        : photoOnly
                         ? 'Chụp ảnh & Bắt đầu làm việc'
-                        : 'Chưa đến giờ check-in'}
+                        : 'Đăng ký khuôn mặt để check-in'}
                     </Button>
                   </span>
                 </Tooltip>
 
-                {activeSmartShift && (
+                {activeSmartShift && photoOnly && (
                   <Button
                     variant="text"
                     size="small"
                     fullWidth
-                    onClick={() =>
-                      hasFaceEmbedding ? setFaceCheckinMode('checkin') : router.push(paths.dashboard.attendance.faceEnrollment)
-                    }
+                    onClick={() => router.push(paths.dashboard.attendance.faceEnrollment)}
                     disabled={!!actionLoading}
                     startIcon={<Iconify icon="mdi:face-recognition" />}
                     sx={{ mt: 1, color: 'rgba(255,255,255,0.75)' }}
                   >
-                    {hasFaceEmbedding ? 'Check-in bằng khuôn mặt (mới)' : 'Đăng ký khuôn mặt để dùng tính năng này'}
+                    Chưa xác minh khuôn mặt — đăng ký ngay
                   </Button>
                 )}
               </Box>

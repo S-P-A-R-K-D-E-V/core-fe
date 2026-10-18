@@ -21,6 +21,9 @@ import Label from 'src/components/label';
 import { AppDatePicker } from 'src/components/date-time-picker';
 import Scrollbar from 'src/components/scrollbar';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
+import { useAuthContext } from 'src/auth/hooks';
+import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
+import AttendanceFaceSetting from 'src/sections/attendance/attendance-face-setting';
 import {
   useTable,
   emptyRows,
@@ -45,6 +48,7 @@ const TABLE_HEAD = [
   { id: 'isLate', label: 'Late', width: 100 },
   { id: 'status', label: 'Status', width: 100 },
   { id: 'isAutoClosedBySystem', label: 'Auto', width: 80 },
+  { id: 'checkInFaceVerified', label: 'Khuôn mặt', width: 130 },
 ];
 
 // ----------------------------------------------------------------------
@@ -53,6 +57,8 @@ export default function AttendanceLogsView() {
   const { enqueueSnackbar } = useSnackbar();
   const table = useTable();
   const settings = useSettingsContext();
+  const { user } = useAuthContext();
+  const canManageAttendance = hasPermission(user, PERMISSIONS.attendance.adjust);
 
   const [tableData, setTableData] = useState<IAttendanceLog[]>([]);
   const [users, setUsers] = useState<IUser[]>([]);
@@ -107,6 +113,8 @@ export default function AttendanceLogsView() {
         ]}
         sx={{ mb: { xs: 3, md: 5 } }}
       />
+
+      {canManageAttendance && <AttendanceFaceSetting />}
 
       <Card sx={{ mb: 3, p: 2.5 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
@@ -191,6 +199,12 @@ export default function AttendanceLogsView() {
                       ) : (
                         '-'
                       )}
+                    </TableCell>
+                    <TableCell>
+                      {/* Chỉ "Đã xác minh" khi máy chủ đã so khuôn mặt (quét mặt / kiosk); ảnh chụp gửi nhóm = chưa. */}
+                      <Label variant="soft" color={row.checkInFaceVerified ? 'success' : 'default'}>
+                        {row.checkInFaceVerified ? 'Đã xác minh' : 'Chưa xác minh'}
+                      </Label>
                     </TableCell>
                   </TableRow>
                 ))}
