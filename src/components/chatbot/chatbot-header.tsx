@@ -41,7 +41,8 @@ type Props = {
   showExpand: boolean;
   onNewSession: () => void;
   onToggleExpand: () => void;
-  onClose: () => void;
+  /** Không có = khung chat nằm trong trang (Chatbot nội bộ), không có nút Đóng. */
+  onClose?: () => void;
 };
 
 export default function ChatbotHeader({
@@ -147,11 +148,13 @@ export default function ChatbotHeader({
           </Tooltip>
         )}
 
-        <Tooltip title="Đóng">
-          <IconButton size="small" aria-label="Đóng" onClick={onClose} sx={{ color: 'inherit' }}>
-            <Iconify icon="mingcute:close-line" />
-          </IconButton>
-        </Tooltip>
+        {onClose && (
+          <Tooltip title="Đóng">
+            <IconButton size="small" aria-label="Đóng" onClick={onClose} sx={{ color: 'inherit' }}>
+              <Iconify icon="mingcute:close-line" />
+            </IconButton>
+          </Tooltip>
+        )}
       </Stack>
     </Stack>
   );

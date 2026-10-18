@@ -11,6 +11,9 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
+import { paths } from 'src/routes/paths';
+import { usePathname } from 'src/routes/hooks';
+
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useResponsive } from 'src/hooks/use-responsive';
 import { useMobileView } from 'src/hooks/use-mobile-view';
@@ -62,6 +65,9 @@ export default function DashboardLayout({ children }: Props) {
   const { user, updateUser, refreshUser } = useAuthContext();
   // Máy quầy: không tin nhắn, trợ lý, nhắc ca, hộp thoại hồ sơ — chỉ bán hàng (server cũng chặn).
   const counterSession = useCounterSession();
+  // Trang Chatbot nội bộ đã có khung chat nằm trong trang — không mở thêm khung nổi (hai kết nối cùng một phiên).
+  const pathname = usePathname();
+  const showChatbotWidget = !counterSession && !pathname.startsWith(paths.dashboard.chatbotAdmin);
 
   // Safety net: re-sync role/permissions from JWT + server on first dashboard mount.
   // Catches cases where login (especially Google OAuth redirect) left stale auth state.
@@ -153,7 +159,7 @@ export default function DashboardLayout({ children }: Props) {
           {lgUp ? renderHorizontal : renderNavVertical}
           <Main sx={mobileNavSx}>{children}</Main>
           {isMobileView && <NavBottom onOpenMenu={nav.onTrue} />}
-          {!counterSession && <ChatbotWidget />}
+          {showChatbotWidget && <ChatbotWidget />}
           {renderMobilePrompt}
           {!counterSession && <ProfileCompletionDialog />}
           <ShiftPreferencePromptDialog
@@ -183,7 +189,7 @@ export default function DashboardLayout({ children }: Props) {
             <Main sx={mobileNavSx}>{children}</Main>
           </Box>
           {isMobileView && <NavBottom onOpenMenu={nav.onTrue} />}
-          {!counterSession && <ChatbotWidget />}
+          {showChatbotWidget && <ChatbotWidget />}
           {renderMobilePrompt}
           {!counterSession && <ProfileCompletionDialog />}
           <ShiftPreferencePromptDialog
@@ -212,7 +218,7 @@ export default function DashboardLayout({ children }: Props) {
           <Main sx={mobileNavSx}>{children}</Main>
         </Box>
         {isMobileView && <NavBottom onOpenMenu={nav.onTrue} />}
-        {!counterSession && <ChatbotWidget />}
+        {showChatbotWidget && <ChatbotWidget />}
         {renderMobilePrompt}
         {!counterSession && <ProfileCompletionDialog />}
         <ShiftPreferencePromptDialog

@@ -812,11 +812,60 @@ describe('ChatbotWidget — ảnh hoá đơn nhập hàng', () => {
     );
   });
 
-  it('không có quyền gửi ảnh → không có nút máy ảnh', async () => {
+  it('máy chủ chưa bật đọc ảnh → vẫn có nút máy ảnh, bấm thì nói lý do', async () => {
+    const user = userEvent.setup();
+    const panel = await openWidget(user);
+
+    await user.click(await within(panel).findByRole('button', { name: 'Chọn ảnh gửi kèm' }));
+
+    expect(within(panel).getByRole('alert')).toHaveTextContent('chưa bật đọc ảnh');
+    expect(panel.querySelector('input[type="file"]')).toBeNull();
+  });
+
+  it('trợ lý chưa bật → không có nút máy ảnh', async () => {
+    api.getChatbotCapabilities.mockResolvedValue({
+      enabled: false,
+      imageInput: false,
+      maxImages: 5,
+      maxImageBytes: 10_000_000,
+      imageTypes: ['image/jpeg'],
+    });
     const user = userEvent.setup();
     const panel = await openWidget(user);
     await waitFor(() => expect(api.getChatbotCapabilities).toHaveBeenCalled());
 
     expect(within(panel).queryByRole('button', { name: 'Chọn ảnh gửi kèm' })).not.toBeInTheDocument();
+  });
+
+  it('tối đa số ảnh máy chủ cho (5): ảnh thứ 6 bị bỏ, có thông báo', async () => {
+    api.getChatbotCapabilities.mockResolvedValue({ ...invoiceCaps(true), maxImages: 5 });
+    const user = userEvent.setup();
+    const panel = await openWidget(user);
+    await within(panel).findByRole('button', { name: 'Chọn ảnh gửi kèm' });
+
+    const input = panel.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(
+      input,
+      Array.from({ length: 6 }, (_, i) => new File(['x'], `hd-${i}.jpg`, { type: 'image/jpeg' }))
+    );
+
+    expect(within(panel).getAllByRole('button', { name: /^Bỏ ảnh/ })).toHaveLength(5);
+    expect(within(panel).getByRole('alert')).toHaveTextContent('tối đa 5 ảnh');
+  });
+});
+
+describe('ChatbotWidget — nằm trong trang (Chatbot nội bộ)', () => {
+  it('luôn mở, không nút tròn / đóng, vẫn có ô soạn', async () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <ChatbotWidget variant="page" />
+      </ThemeProvider>
+    );
+
+    const region = await screen.findByRole('region');
+    await within(region).findByText('Sẵn sàng');
+    expect(screen.queryByRole('button', { name: 'Mở trợ lý' })).not.toBeInTheDocument();
+    expect(within(region).queryByRole('button', { name: 'Đóng' })).not.toBeInTheDocument();
+    expect(within(region).getByRole('textbox', { name: 'Nhập tin nhắn' })).toBeInTheDocument();
   });
 });

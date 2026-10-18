@@ -76,8 +76,10 @@ type Props = {
   autoFocus?: boolean;
   chips: ChatbotChip[];
   chipsLabel: string;
-  /** null = không có nút gửi ảnh. */
+  /** null = không gửi được ảnh. */
   imageInput?: ChatbotImageInput | null;
+  /** Người đăng nhập chưa được gửi ảnh: vẫn hiện nút ảnh, bấm thì báo lý do này. */
+  imageInputBlocked?: string | null;
   /** Gửi một câu hỏi (lệnh "/…" đã được đổi thành câu hỏi đầy đủ), kèm ảnh nếu có. */
   onSend: (text: string, options?: ChatbotSendOptions) => void;
   onLocalCommand: (id: Exclude<ChatbotLocalCommandId, 'help'>) => void;
@@ -94,6 +96,7 @@ export default function ChatbotComposer({
   chips,
   chipsLabel,
   imageInput,
+  imageInputBlocked,
   onSend,
   onLocalCommand,
 }: Props) {
@@ -315,6 +318,16 @@ export default function ChatbotComposer({
   return (
     <ClickAwayListener onClickAway={handleClickAway}>
       <Box
+        // Kéo thả ảnh vào ô soạn (như dán).
+        onDragOver={(event) => {
+          if (imageInput && event.dataTransfer.types.includes('Files')) event.preventDefault();
+        }}
+        onDrop={(event) => {
+          const files = Array.from(event.dataTransfer.files ?? []);
+          if (!imageInput || !files.some((f) => f.type.startsWith('image/'))) return;
+          event.preventDefault();
+          addImages(files);
+        }}
         sx={{ position: 'relative', flexShrink: 0, borderTop: '1px solid', borderColor: 'divider' }}
       >
         {menuOpen && (
@@ -559,9 +572,24 @@ export default function ChatbotComposer({
             </IconButton>
           </Tooltip>
 
+          {!imageInput && imageInputBlocked && (
+            <Tooltip title="Gửi ảnh">
+              <IconButton
+                size="small"
+                aria-label="Chọn ảnh gửi kèm"
+                onClick={() => setNotice(imageInputBlocked)}
+                sx={{ mb: '2px', width: 30, height: 30, flexShrink: 0, color: 'text.disabled' }}
+              >
+                <Iconify icon="solar:camera-add-linear" width={20} />
+              </IconButton>
+            </Tooltip>
+          )}
+
           {imageInput && (
             <>
-              <Tooltip title={imageInput.invoiceImport ? 'Gửi ảnh / ảnh hoá đơn nhập hàng' : 'Gửi ảnh'}>
+              <Tooltip
+                title={`${imageInput.invoiceImport ? 'Gửi ảnh / ảnh hoá đơn nhập hàng' : 'Gửi ảnh'} — tối đa ${imageInput.maxImages} ảnh, dán (Ctrl+V) hoặc kéo thả vào đây`}
+              >
                 <IconButton
                   size="small"
                   aria-label="Chọn ảnh gửi kèm"
@@ -597,9 +625,13 @@ export default function ChatbotComposer({
             onKeyDown={handleKeyDown}
             onPaste={(event) => {
               const files = Array.from(event.clipboardData?.files ?? []);
-              if (imageInput && files.some((f) => f.type.startsWith('image/'))) {
+              if (!files.some((f) => f.type.startsWith('image/'))) return;
+              if (imageInput) {
                 event.preventDefault();
                 addImages(files);
+              } else if (imageInputBlocked) {
+                event.preventDefault();
+                setNotice(imageInputBlocked);
               }
             }}
             placeholder={
