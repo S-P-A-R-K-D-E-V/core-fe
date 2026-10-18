@@ -92,11 +92,20 @@ function saveExpanded(value: boolean) {
   }
 }
 
+const IMAGE_INPUT_OFF =
+  'Cửa hàng chưa bật đọc ảnh trong trợ lý — nhờ quản trị cấu hình model đọc ảnh (Chatbot:Vision hoặc PurchaseImport) trên máy chủ.';
+
 type Props = {
   defaultOpen?: boolean;
+  /**
+   * floating (mặc định): nút tròn góc phải + khung nổi. page: khung chat nằm trong trang (Chatbot nội bộ) — luôn mở,
+   * chiếm hết khung cha, không có nút tròn / mở rộng / đóng.
+   */
+  variant?: 'floating' | 'page';
 };
 
-export default function ChatbotWidget({ defaultOpen = false }: Props) {
+export default function ChatbotWidget({ defaultOpen = false, variant = 'floating' }: Props) {
+  const inPage = variant === 'page';
   const { user, loading: authLoading } = useAuthContext();
   // Tên xưng hô trong khung chat theo cửa hàng đang mở (CiCi giữ "CiCi").
   const { brandName } = useStoreBrand();
@@ -109,7 +118,7 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
   // Màn nhỏ: khung mở luôn toàn màn hình.
   const isXs = useResponsive('down', 'sm');
 
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(defaultOpen || variant === 'page');
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState('');
   const [unread, setUnread] = useState(false);
@@ -229,19 +238,23 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
 
   // Gửi ảnh (người đăng nhập): server báo có cho gửi ảnh / ảnh hoá đơn nhập hàng không.
   const [imageInput, setImageInput] = useState<ChatbotImageInput | null>(null);
+  // Người đăng nhập mà server chưa cho gửi ảnh: vẫn hiện nút ảnh, bấm thì nói lý do (thay vì giấu nút).
+  const [imageInputBlocked, setImageInputBlocked] = useState<string | null>(null);
   const capabilityUserId: string | null = user?.id ?? null;
   const capabilitySessionId = session?.sessionId ?? null;
   useEffect(() => {
     if (!capabilityUserId || !capabilitySessionId) {
       setImageInput(null);
+      setImageInputBlocked(null);
       return undefined;
     }
     let cancelled = false;
     getChatbotCapabilities()
       .then((caps) => {
         if (cancelled) return;
+        const allowed = caps.enabled && caps.imageInput;
         setImageInput(
-          caps.enabled && caps.imageInput
+          allowed
             ? {
                 maxImages: caps.maxImages,
                 invoiceImport: !!caps.invoiceImport,
@@ -250,8 +263,13 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
               }
             : null
         );
+        setImageInputBlocked(allowed || !caps.enabled ? null : IMAGE_INPUT_OFF);
       })
-      .catch(() => !cancelled && setImageInput(null));
+      .catch(() => {
+        if (cancelled) return;
+        setImageInput(null);
+        setImageInputBlocked(null);
+      });
     return () => {
       cancelled = true;
     };
@@ -345,9 +363,9 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
     (href: string) => {
       router.push(href);
       // Màn nhỏ khung đang che cả trang → đóng lại để thấy trang vừa mở.
-      if (isXs) closePanel();
+      if (isXs && !inPage) closePanel();
     },
-    [router, isXs, closePanel]
+    [router, isXs, inPage, closePanel]
   );
 
   // "Sửa và gửi lại": đưa câu vừa gửi vào lại ô nhập — KHÔNG tự gửi.
@@ -432,9 +450,85 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
 
   // Esc đóng khung. Danh sách lệnh và hộp xác nhận tự xử lý Esc của mình (không lan tới đây).
   const handlePanelKeyDown = (event: React.KeyboardEvent) => {
+    if (inPage) return;
     if (event.key !== 'Escape' || event.defaultPrevented || event.nativeEvent.isComposing) return;
     closePanel();
   };
+
+  const panelBody = (
+    <>
+      <ChatbotHeader
+        title={header.title}
+        icon={header.icon}
+        status={status}
+        sessionId={sessionId}
+        canStartNew={panelReady && !needsGuestGate}
+        expanded={inPage || expanded}
+        showExpand={!isXs && !inPage}
+        onNewSession={handleNewSession}
+        onToggleExpand={handleToggleExpand}
+        onClose={inPage ? undefined : closePanel}
+      />
+
+      {needsGuestGate ? (
+        <ChatbotGuestGate brandName={brandName} onSubmit={handleGuestInfoSubmit} />
+      ) : (
+        <>
+          <ChatbotMessages
+            ready={panelReady}
+            offline={!session}
+            messages={messages}
+            busy={busy}
+            streamingMessageId={streamingMessageId}
+            activity={activity}
+            error={error}
+            turnFailed={turnFailed}
+            canRetry={!!lastUserText}
+            showSteps={audience !== 'customer'}
+            expanded={inPage || (expanded && !isXs)}
+            user={routeUser}
+            greeting={greeting}
+            starters={defaultActions}
+            onQuickAction={handleQuickAction}
+            onSend={handleSend}
+            onNavigate={handleNavigate}
+            onRetry={handleRetry}
+            onReconnect={reconnect}
+            onCopy={handleCopyMessage}
+          />
+
+          <ChatbotComposer
+            draft={draft}
+            onDraftChange={setDraft}
+            inputRef={inputRef}
+            audience={audience}
+            ready={panelReady && !!session}
+            busy={busy}
+            autoFocus={!isXs}
+            chips={chips}
+            chipsLabel={hasFollowUps ? 'Gợi ý câu hỏi tiếp theo' : 'Câu hỏi nhanh'}
+            imageInput={imageInput}
+            imageInputBlocked={imageInputBlocked}
+            onSend={handleSend}
+            onLocalCommand={handleLocalCommand}
+          />
+        </>
+      )}
+    </>
+  );
+
+  if (inPage) {
+    return (
+      <Paper
+        role="region"
+        aria-label={header.title}
+        variant="outlined"
+        sx={{ height: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: 2 }}
+      >
+        {panelBody}
+      </Paper>
+    );
+  }
 
   return (
     <Box sx={{ position: 'fixed', right: 24, bottom: 24, zIndex: 1400 }}>
@@ -488,62 +582,7 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
                 }),
             }}
           >
-            <ChatbotHeader
-              title={header.title}
-              icon={header.icon}
-              status={status}
-              sessionId={sessionId}
-              canStartNew={panelReady && !needsGuestGate}
-              expanded={expanded}
-              showExpand={!isXs}
-              onNewSession={handleNewSession}
-              onToggleExpand={handleToggleExpand}
-              onClose={closePanel}
-            />
-
-            {needsGuestGate ? (
-              <ChatbotGuestGate brandName={brandName} onSubmit={handleGuestInfoSubmit} />
-            ) : (
-              <>
-                <ChatbotMessages
-                  ready={panelReady}
-                  offline={!session}
-                  messages={messages}
-                  busy={busy}
-                  streamingMessageId={streamingMessageId}
-                  activity={activity}
-                  error={error}
-                  turnFailed={turnFailed}
-                  canRetry={!!lastUserText}
-                  showSteps={audience !== 'customer'}
-                  expanded={expanded && !isXs}
-                  user={routeUser}
-                  greeting={greeting}
-                  starters={defaultActions}
-                  onQuickAction={handleQuickAction}
-                  onSend={handleSend}
-                  onNavigate={handleNavigate}
-                  onRetry={handleRetry}
-                  onReconnect={reconnect}
-                  onCopy={handleCopyMessage}
-                />
-
-                <ChatbotComposer
-                  draft={draft}
-                  onDraftChange={setDraft}
-                  inputRef={inputRef}
-                  audience={audience}
-                  ready={panelReady && !!session}
-                  busy={busy}
-                  autoFocus={!isXs}
-                  chips={chips}
-                  chipsLabel={hasFollowUps ? 'Gợi ý câu hỏi tiếp theo' : 'Câu hỏi nhanh'}
-                  imageInput={imageInput}
-                  onSend={handleSend}
-                  onLocalCommand={handleLocalCommand}
-                />
-              </>
-            )}
+            {panelBody}
           </Paper>
         </Box>
       </Grow>
