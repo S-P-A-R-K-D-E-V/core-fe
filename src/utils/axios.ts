@@ -609,6 +609,18 @@ export const endpoints = {
     paidBy: (id: string) => `/purchase-orders/${id}/paid-by`,
     draft: '/purchase-orders/draft',
   },
+  // Nhập phiếu từ ảnh hoá đơn NCC (Core-be PurchaseImportsController).
+  purchaseImports: {
+    capabilities: '/purchase-imports/capabilities',
+    presign: '/purchase-imports/presign',
+    list: '/purchase-imports',
+    create: '/purchase-imports',
+    details: (id: string) => `/purchase-imports/${id}`,
+    line: (id: string, lineNo: number) => `/purchase-imports/${id}/lines/${lineNo}`,
+    commit: (id: string) => `/purchase-imports/${id}/commit`,
+    retry: (id: string) => `/purchase-imports/${id}/retry`,
+    cancel: (id: string) => `/purchase-imports/${id}/cancel`,
+  },
   customers: {
     list: '/customers',
     create: '/customers',

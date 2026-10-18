@@ -33,6 +33,8 @@ const BACKEND_API_PREFIXES = [
   'counter-devices',
   // Trả hàng từ hoá đơn (máy quầy + quản lý).
   'sales-returns',
+  // Nhập phiếu từ ảnh hoá đơn NCC (đọc ảnh bằng AI, gợi ý mã, tạo phiếu nhập nháp).
+  'purchase-imports',
 ];
 
 const nextConfig = {

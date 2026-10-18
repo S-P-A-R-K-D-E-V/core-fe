@@ -17,9 +17,11 @@ type Props = {
   open: boolean;
   onClose: VoidFunction;
   onCreated: (product: IProduct) => void;
+  /** Điền sẵn tên / giá nhập (tạo mã từ dòng hoá đơn NCC). */
+  initialValues?: { name?: string; costPrice?: number };
 };
 
-export default function PurchaseOrderQuickCreateProduct({ open, onClose, onCreated }: Props) {
+export default function PurchaseOrderQuickCreateProduct({ open, onClose, onCreated, initialValues }: Props) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -34,6 +36,7 @@ export default function PurchaseOrderQuickCreateProduct({ open, onClose, onCreat
           isDialog
           onDialogClose={onClose}
           onProductCreated={onCreated}
+          initialValues={initialValues}
         />
       </DialogContent>
     </Dialog>

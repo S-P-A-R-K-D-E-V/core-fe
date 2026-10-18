@@ -74,9 +74,18 @@ type Props = {
   onDialogClose?: () => void;
   onDialogSaved?: () => void;
   onProductCreated?: (product: IProduct) => void;
+  /** Điền sẵn khi tạo mới (vd tạo mã từ một dòng hoá đơn NCC: tên như ghi, giá nhập). Bỏ qua khi sửa hàng. */
+  initialValues?: { name?: string; costPrice?: number };
 };
 
-export default function ProductNewEditForm({ currentProduct, isDialog, onDialogClose, onDialogSaved, onProductCreated }: Props) {
+export default function ProductNewEditForm({
+  currentProduct,
+  isDialog,
+  onDialogClose,
+  onDialogSaved,
+  onProductCreated,
+  initialValues,
+}: Props) {
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
 
@@ -157,13 +166,13 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
         ? Math.round(currentProduct.inventories.reduce((sum, inv) => sum + (inv.cost || 0), 0) / currentProduct.inventories.length)
         : currentProduct?.costPrice ?? currentProduct?.basePrice ?? 0;
       return ({
-        name: currentProduct?.name || '',
+        name: currentProduct?.name || initialValues?.name || '',
         sku: currentProduct?.sku || currentProduct?.code || '',
         barcode: currentProduct?.barcode || currentProduct?.barCode || '',
         description: currentProduct?.description || '',
         categoryId: currentProduct?.categoryId || '',
         unitOfMeasureId: currentProduct?.unitOfMeasureId || '',
-        costPrice: avgCostPrice || currentProduct?.costPrice || currentProduct?.basePrice || 0,
+        costPrice: avgCostPrice || currentProduct?.costPrice || currentProduct?.basePrice || initialValues?.costPrice || 0,
         sellingPrice: currentProduct?.sellingPrice ?? currentProduct?.basePrice ?? 0,
         imageUrl: currentProduct?.imageUrl || currentProduct?.images?.[0]?.imageUrl || '',
         lowStockThreshold: currentProduct?.lowStockThreshold ?? currentProduct?.minQuantity ?? 0,
@@ -187,7 +196,7 @@ export default function ProductNewEditForm({ currentProduct, isDialog, onDialogC
           })) || [],
       })
     },
-    [currentProduct]
+    [currentProduct, initialValues]
   );
 
   const methods = useForm({ resolver: yupResolver(Schema), defaultValues });

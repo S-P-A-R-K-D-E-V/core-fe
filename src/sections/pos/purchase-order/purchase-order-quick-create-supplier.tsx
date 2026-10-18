@@ -1,6 +1,7 @@
 'use client';
 
 import * as Yup from 'yup';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 
@@ -35,9 +36,11 @@ type Props = {
   open: boolean;
   onClose: VoidFunction;
   onCreated: (supplier: ISupplier) => void;
+  /** Điền sẵn tên / SĐT (in trên đầu hoá đơn NCC). */
+  initialValues?: { name?: string; phone?: string };
 };
 
-export default function PurchaseOrderQuickCreateSupplier({ open, onClose, onCreated }: Props) {
+export default function PurchaseOrderQuickCreateSupplier({ open, onClose, onCreated, initialValues }: Props) {
   const { enqueueSnackbar } = useSnackbar();
 
   const defaultValues = {
@@ -58,6 +61,11 @@ export default function PurchaseOrderQuickCreateSupplier({ open, onClose, onCrea
     handleSubmit,
     formState: { isSubmitting },
   } = methods;
+
+  useEffect(() => {
+    if (open && initialValues) reset({ ...defaultValues, name: initialValues.name ?? '', phone: initialValues.phone ?? '' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const onSubmit = handleSubmit(async (data) => {
     try {

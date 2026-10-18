@@ -205,9 +205,19 @@ export default function PurchaseOrderListView() {
           ]}
           action={
             access.canCreate && (
-              <Button component={RouterLink} href={paths.dashboard.pos.purchaseOrder.new} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
-                Tạo đơn nhập
-              </Button>
+              <Stack direction="row" spacing={1}>
+                <Button
+                  component={RouterLink}
+                  href={paths.dashboard.pos.purchaseOrder.import}
+                  variant="outlined"
+                  startIcon={<Iconify icon="solar:camera-add-bold" />}
+                >
+                  Nhập từ ảnh hoá đơn
+                </Button>
+                <Button component={RouterLink} href={paths.dashboard.pos.purchaseOrder.new} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+                  Tạo đơn nhập
+                </Button>
+              </Stack>
             )
           }
           sx={{ mb: { xs: 3, md: 5 } }}
