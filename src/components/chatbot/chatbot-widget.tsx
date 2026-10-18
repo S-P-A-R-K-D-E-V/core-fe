@@ -11,12 +11,12 @@ import Badge from '@mui/material/Badge';
 
 import { useRouter } from 'src/routes/hooks';
 
-import { useChatbot } from 'src/hooks/use-chatbot';
+import { useChatbot, type ChatbotSendOptions } from 'src/hooks/use-chatbot';
 import { useResponsive } from 'src/hooks/use-responsive';
 import { useCopyToClipboard } from 'src/hooks/use-copy-to-clipboard';
 
 import { useAuthContext } from 'src/auth/hooks';
-import { chatbotCallbackOrder } from 'src/api/chatbot';
+import { chatbotCallbackOrder, getChatbotCapabilities } from 'src/api/chatbot';
 
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
@@ -24,7 +24,7 @@ import { useStoreBrand } from 'src/components/branding';
 
 import ChatbotMessages from './chatbot-messages';
 import { suggestionsOf, normalizeChatbotBlocks } from './chatbot-blocks';
-import ChatbotComposer, { type ChatbotChip } from './chatbot-composer';
+import ChatbotComposer, { type ChatbotChip, type ChatbotImageInput } from './chatbot-composer';
 import ChatbotHeader, { type ChatbotHeaderStatus } from './chatbot-header';
 import ChatbotGuestGate, { type ChatbotGuestInfo } from './chatbot-guest-gate';
 import {
@@ -220,12 +220,42 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
   // ---------------------------------------------------------------------- hành động
 
   const handleSend = useCallback(
-    (text: string) => {
+    (text: string, options?: ChatbotSendOptions) => {
       if (!ready || busy) return;
-      void sendMessage(text, guestPhone);
+      void sendMessage(text, guestPhone, options);
     },
     [ready, busy, sendMessage, guestPhone]
   );
+
+  // Gửi ảnh (người đăng nhập): server báo có cho gửi ảnh / ảnh hoá đơn nhập hàng không.
+  const [imageInput, setImageInput] = useState<ChatbotImageInput | null>(null);
+  const capabilityUserId: string | null = user?.id ?? null;
+  const capabilitySessionId = session?.sessionId ?? null;
+  useEffect(() => {
+    if (!capabilityUserId || !capabilitySessionId) {
+      setImageInput(null);
+      return undefined;
+    }
+    let cancelled = false;
+    getChatbotCapabilities()
+      .then((caps) => {
+        if (cancelled) return;
+        setImageInput(
+          caps.enabled && caps.imageInput
+            ? {
+                maxImages: caps.maxImages,
+                invoiceImport: !!caps.invoiceImport,
+                // Server cũ không có trường này: imageInput=true khi đó nghĩa là trợ lý xem được ảnh.
+                imageReading: caps.imageReading ?? true,
+              }
+            : null
+        );
+      })
+      .catch(() => !cancelled && setImageInput(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [capabilityUserId, capabilitySessionId]);
 
   const lastContent = messages[messages.length - 1]?.content;
   const sessionId = session?.sessionId ?? null;
@@ -508,6 +538,7 @@ export default function ChatbotWidget({ defaultOpen = false }: Props) {
                   autoFocus={!isXs}
                   chips={chips}
                   chipsLabel={hasFollowUps ? 'Gợi ý câu hỏi tiếp theo' : 'Câu hỏi nhanh'}
+                  imageInput={imageInput}
                   onSend={handleSend}
                   onLocalCommand={handleLocalCommand}
                 />

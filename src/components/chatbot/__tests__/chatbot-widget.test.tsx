@@ -53,6 +53,8 @@ const api = vi.hoisted(() => ({
   getChatbotMessages: vi.fn(),
   sendChatbotMessage: vi.fn(),
   chatbotCallbackOrder: vi.fn(),
+  getChatbotCapabilities: vi.fn(),
+  uploadChatbotImages: vi.fn(),
 }));
 
 vi.mock('src/api/chatbot', async (importOriginal) => ({
@@ -61,6 +63,8 @@ vi.mock('src/api/chatbot', async (importOriginal) => ({
   getChatbotMessages: api.getChatbotMessages,
   sendChatbotMessage: api.sendChatbotMessage,
   chatbotCallbackOrder: api.chatbotCallbackOrder,
+  getChatbotCapabilities: api.getChatbotCapabilities,
+  uploadChatbotImages: api.uploadChatbotImages,
 }));
 
 const hub = vi.hoisted(() => {
@@ -178,6 +182,13 @@ beforeEach(() => {
   mockUser = ADMIN_USER;
   api.startChatbotSession.mockResolvedValue(adminSession());
   api.getChatbotMessages.mockResolvedValue([]);
+  api.getChatbotCapabilities.mockResolvedValue({
+    enabled: true,
+    imageInput: false,
+    maxImages: 4,
+    maxImageBytes: 10_000_000,
+    imageTypes: ['image/jpeg'],
+  });
   api.sendChatbotMessage.mockResolvedValue({
     messageId: 'm1',
     assistantMessageId: 'a1',
@@ -734,5 +745,78 @@ describe('ChatbotWidget', () => {
     });
     expect(within(panel).queryByLabelText('Tên của bạn')).toBeNull();
     expect(within(panel).getByRole('button', { name: 'Gọi lại đặt hàng' })).toBeInTheDocument();
+  });
+});
+
+// ----------------------------------------------------------------------
+
+describe('ChatbotWidget — ảnh hoá đơn nhập hàng', () => {
+  const invoiceCaps = (imageReading: boolean) => ({
+    enabled: true,
+    imageInput: true,
+    maxImages: 4,
+    maxImageBytes: 10_000_000,
+    imageTypes: ['image/jpeg'],
+    invoiceImport: true,
+    imageReading,
+  });
+
+  beforeEach(() => {
+    // jsdom không có URL.createObjectURL.
+    URL.createObjectURL = vi.fn(() => 'blob:preview');
+    URL.revokeObjectURL = vi.fn();
+    api.uploadChatbotImages.mockResolvedValue(['assistant/u1/s-admin/1.jpg']);
+  });
+
+  const attach = async (user: ReturnType<typeof userEvent.setup>, panel: HTMLElement) => {
+    const input = panel.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, new File(['x'], 'hoa-don.jpg', { type: 'image/jpeg' }));
+  };
+
+  it('ảnh + ghi chú gửi kèm intent purchase-import (chip bật sẵn)', async () => {
+    api.getChatbotCapabilities.mockResolvedValue(invoiceCaps(true));
+    const user = userEvent.setup();
+    const panel = await openWidget(user);
+    await within(panel).findByRole('button', { name: 'Chọn ảnh gửi kèm' });
+
+    await attach(user, panel);
+    expect(within(panel).getByText('Hoá đơn nhập hàng')).toBeInTheDocument();
+    await user.type(composer(), 'đơn này nhà Ngọc Bang');
+    await user.click(within(panel).getByRole('button', { name: 'Gửi tin nhắn' }));
+
+    await waitFor(() => expect(api.sendChatbotMessage).toHaveBeenCalled());
+    expect(api.uploadChatbotImages).toHaveBeenCalledWith('s-admin', [expect.any(File)]);
+    expect(api.sendChatbotMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 's-admin',
+        content: 'đơn này nhà Ngọc Bang',
+        attachments: ['assistant/u1/s-admin/1.jpg'],
+        intent: 'purchase-import',
+      })
+    );
+  });
+
+  it('tắt chip → ảnh hỏi trợ lý như thường (không intent)', async () => {
+    api.getChatbotCapabilities.mockResolvedValue(invoiceCaps(true));
+    const user = userEvent.setup();
+    const panel = await openWidget(user);
+    await within(panel).findByRole('button', { name: 'Chọn ảnh gửi kèm' });
+
+    await attach(user, panel);
+    await user.click(within(panel).getByText('Hoá đơn nhập hàng'));
+    await user.click(within(panel).getByRole('button', { name: 'Gửi tin nhắn' }));
+
+    await waitFor(() => expect(api.sendChatbotMessage).toHaveBeenCalled());
+    expect(api.sendChatbotMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ content: '', intent: null })
+    );
+  });
+
+  it('không có quyền gửi ảnh → không có nút máy ảnh', async () => {
+    const user = userEvent.setup();
+    const panel = await openWidget(user);
+    await waitFor(() => expect(api.getChatbotCapabilities).toHaveBeenCalled());
+
+    expect(within(panel).queryByRole('button', { name: 'Chọn ảnh gửi kèm' })).not.toBeInTheDocument();
   });
 });

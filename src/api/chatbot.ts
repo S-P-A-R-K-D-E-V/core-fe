@@ -1,5 +1,7 @@
 import axios, { endpoints } from 'src/utils/axios';
 
+import { compressInvoiceImage } from './purchase-imports';
+
 // ----------------------------------------------------------------------
 
 export type ChatbotOwnerType = 'Guest' | 'User' | 'Customer';
@@ -70,14 +72,40 @@ export type ChatbotLinkBlock = { type: 'link'; url: string; title?: string };
 
 export type ChatbotImageBlock = { type: 'image'; url?: string; objectKey?: string; alt?: string };
 
+/** Thẻ hoá đơn nhập (chỉ server tạo): app tự tải lần nhập qua REST purchase-imports bằng quyền người dùng. */
+export type ChatbotPurchaseImportBlock = { type: 'purchase-import'; importId: string };
+
 export type ChatbotBlock =
   | ChatbotSuggestionsBlock
   | ChatbotNavigateActionBlock
   | ChatbotToolActionBlock
   | ChatbotLinkBlock
-  | ChatbotImageBlock;
+  | ChatbotImageBlock
+  | ChatbotPurchaseImportBlock;
 
-/** Tệp người dùng gửi kèm (hiện chỉ app mobile gửi ảnh) — `url` là đường dẫn /media đã ký có hạn. */
+/** Ý định kèm tin có ảnh: ảnh là hoá đơn nhà cung cấp → server tạo lần nhập phiếu thay vì hỏi trợ lý. */
+export type ChatbotIntent = 'purchase-import';
+
+/** GET chatbot/capabilities — chỉ người đăng nhập. */
+export type ChatbotCapabilities = {
+  enabled: boolean;
+  reason?: string | null;
+  tier?: ChatbotTier | null;
+  /** Hiện nút gửi ảnh. */
+  imageInput: boolean;
+  maxImages: number;
+  maxImageBytes: number;
+  imageTypes: string[];
+  /** Gửi được ảnh hoá đơn để tạo phiếu nhập (server cũ không có → false). */
+  invoiceImport?: boolean;
+  /** Trợ lý xem được ảnh thường; false thì ảnh chỉ dùng được cho hoá đơn nhập. */
+  imageReading?: boolean;
+};
+
+/**
+ * Tệp người dùng gửi kèm — `url` là đường dẫn /media đã ký có hạn (tin vừa gửi từ web chưa có phản hồi
+ * server thì là blob: xem trước).
+ */
 export type ChatbotAttachment = {
   kind: string;
   url?: string | null;
@@ -136,13 +164,46 @@ export async function sendChatbotMessage(params: {
   sessionId: string;
   content: string;
   phone?: string | null;
+  /** objectKey ảnh đã PUT lên R2 (uploadChatbotImages). */
+  attachments?: string[];
+  intent?: ChatbotIntent | null;
 }): Promise<SendMessageResponse> {
   const res = await axios.post(endpoints.chatbot.sendMessage, {
     sessionId: params.sessionId,
     content: params.content,
     phone: params.phone ?? null,
+    ...(params.attachments?.length && {
+      attachments: params.attachments.map((objectKey) => ({ objectKey })),
+      intent: params.intent ?? null,
+    }),
   });
   return res.data;
+}
+
+export async function getChatbotCapabilities(): Promise<ChatbotCapabilities> {
+  const res = await axios.get<ChatbotCapabilities>(endpoints.chatbot.capabilities);
+  return res.data;
+}
+
+type PresignedUpload = { objectKey: string; uploadUrl: string; headers?: Record<string, string> };
+
+/** Nén + PUT thẳng ảnh lên R2 theo URL server ký cho phiên này; trả objectKey theo đúng thứ tự ảnh. */
+export async function uploadChatbotImages(sessionId: string, files: File[]): Promise<string[]> {
+  const prepared = await Promise.all(files.map(compressInvoiceImage));
+  const presign = await axios.post<PresignedUpload[]>(endpoints.chatbot.attachmentsPresign(sessionId), {
+    files: prepared.map((f) => ({ fileName: f.name, contentType: f.type, sizeBytes: f.size })),
+  });
+  await Promise.all(
+    presign.data.map(async (p, i) => {
+      const put = await fetch(p.uploadUrl, {
+        method: 'PUT',
+        headers: p.headers ?? { 'Content-Type': prepared[i].type },
+        body: prepared[i],
+      });
+      if (!put.ok) throw new Error(`Tải ảnh lên thất bại (${put.status})`);
+    })
+  );
+  return presign.data.map((p) => p.objectKey);
 }
 
 export async function getChatbotStock(keyword: string) {

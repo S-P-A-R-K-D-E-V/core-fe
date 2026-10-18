@@ -34,12 +34,15 @@ export type ChatbotUiToolAction = {
 };
 export type ChatbotUiAction = ChatbotUiNavigateAction | ChatbotUiToolAction;
 export type ChatbotUiSuggestions = { type: 'suggestions'; items: ChatbotSuggestion[] };
+/** Thẻ hoá đơn nhập (server tạo khi người dùng gửi ảnh hoá đơn NCC) — tự tải lần nhập theo id. */
+export type ChatbotUiPurchaseImport = { type: 'purchase-import'; importId: string };
 
 export type ChatbotUiBlock =
   | ChatbotUiImage
   | ChatbotUiLink
   | ChatbotUiAction
-  | ChatbotUiSuggestions;
+  | ChatbotUiSuggestions
+  | ChatbotUiPurchaseImport;
 
 export const CHATBOT_BLOCK_LIMITS = {
   total: 12,
@@ -48,7 +51,10 @@ export const CHATBOT_BLOCK_LIMITS = {
   action: 3,
   suggestions: 1,
   suggestionItems: 4,
+  purchaseImport: 2,
 } as const;
+
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const OBJECT_KEY = /^[A-Za-z0-9/_.-]{1,256}$/;
 // Vùng lưu trữ nhạy cảm / riêng tư — model không được trỏ ảnh tới đây.
@@ -176,7 +182,7 @@ function suggestionsBlock(b: Record<string, unknown>): ChatbotUiSuggestions | nu
 export function normalizeChatbotBlocks(raw: unknown, user: ChatbotRouteUser): ChatbotUiBlock[] {
   if (!Array.isArray(raw)) return [];
   const out: ChatbotUiBlock[] = [];
-  const count = { image: 0, link: 0, action: 0, suggestions: 0 };
+  const count = { image: 0, link: 0, action: 0, suggestions: 0, purchaseImport: 0 };
   // Model hay lặp cùng một link / ảnh → chỉ giữ một (url cũng là key khi vẽ).
   const seen = new Set<string>();
 
@@ -208,6 +214,17 @@ export function normalizeChatbotBlocks(raw: unknown, user: ChatbotRouteUser): Ch
         if (block) {
           out.push(block);
           count.suggestions += 1;
+        }
+      } else if (
+        b.type === 'purchase-import' &&
+        count.purchaseImport < CHATBOT_BLOCK_LIMITS.purchaseImport
+      ) {
+        // Chỉ người có quyền nhập hàng mới tải được lần nhập — thẻ tự báo khi không xem được.
+        const importId = str(b.importId).trim();
+        if (GUID.test(importId) && !seen.has(`purchase-import:${importId}`)) {
+          seen.add(`purchase-import:${importId}`);
+          out.push({ type: 'purchase-import', importId });
+          count.purchaseImport += 1;
         }
       }
       // loại lạ → bỏ

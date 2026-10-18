@@ -1,4 +1,4 @@
-import { useId, useState, useEffect } from 'react';
+import { useId, useRef, useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -14,6 +14,8 @@ import ClickAwayListener from '@mui/material/ClickAwayListener';
 import { CHATBOT_MAX_CONTENT_LENGTH } from 'src/api/chatbot';
 
 import Iconify from 'src/components/iconify';
+
+import type { ChatbotSendOptions } from 'src/hooks/use-chatbot';
 
 import {
   findCommand,
@@ -34,10 +36,24 @@ import type { ChatbotAudience } from './chatbot-quick-actions';
 //
 // Bàn phím: Enter gửi, Shift+Enter xuống dòng. Khi danh sách lệnh mở: ↑/↓ chọn, Enter hoặc Tab lấy
 // lệnh đang chọn, Esc đóng. Gõ chữ vẫn được trong lúc trợ lý đang trả lời — chỉ nút gửi bị khoá.
+//
+// Ảnh (người đăng nhập, server cho phép): chọn bằng nút máy ảnh hoặc dán (Ctrl+V). Chip "Hoá đơn nhập
+// hàng" bật → ảnh là hoá đơn NCC, server tạo lần nhập phiếu và trả thẻ hoá đơn thay vì hỏi trợ lý.
 // ----------------------------------------------------------------------
 
 /** Hiện bộ đếm ký tự khi vượt mốc này. */
 const COUNTER_FROM = 1800;
+
+/** Gửi ảnh kèm câu hỏi (GET chatbot/capabilities). */
+export type ChatbotImageInput = {
+  maxImages: number;
+  /** Người dùng nhập được phiếu từ ảnh hoá đơn. */
+  invoiceImport: boolean;
+  /** Trợ lý xem được ảnh thường — false thì ảnh chỉ gửi được dưới dạng hoá đơn nhập. */
+  imageReading: boolean;
+};
+
+type PickedImage = { file: File; preview: string };
 
 export type ChatbotChip = {
   key: string;
@@ -60,8 +76,10 @@ type Props = {
   autoFocus?: boolean;
   chips: ChatbotChip[];
   chipsLabel: string;
-  /** Gửi một câu hỏi (lệnh "/…" đã được đổi thành câu hỏi đầy đủ). */
-  onSend: (text: string) => void;
+  /** null = không có nút gửi ảnh. */
+  imageInput?: ChatbotImageInput | null;
+  /** Gửi một câu hỏi (lệnh "/…" đã được đổi thành câu hỏi đầy đủ), kèm ảnh nếu có. */
+  onSend: (text: string, options?: ChatbotSendOptions) => void;
   onLocalCommand: (id: Exclude<ChatbotLocalCommandId, 'help'>) => void;
 };
 
@@ -75,10 +93,21 @@ export default function ChatbotComposer({
   autoFocus,
   chips,
   chipsLabel,
+  imageInput,
   onSend,
   onLocalCommand,
 }: Props) {
   const baseId = useId();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [images, setImages] = useState<PickedImage[]>([]);
+  const [asInvoice, setAsInvoice] = useState(true);
+  const imagesRef = useRef(images);
+  imagesRef.current = images;
+  useEffect(() => () => imagesRef.current.forEach((i) => URL.revokeObjectURL(i.preview)), []);
+
+  // Trợ lý không xem được ảnh thường → ảnh nào gửi đi cũng là hoá đơn nhập.
+  const invoiceLocked = !!imageInput?.invoiceImport && !imageInput.imageReading;
+  const invoiceOn = !!imageInput?.invoiceImport && (asInvoice || invoiceLocked);
   const listId = `${baseId}-commands`;
   const optionId = (index: number) => `${baseId}-command-${index}`;
 
@@ -104,8 +133,9 @@ export default function ChatbotComposer({
   const preview = argCommand?.kind === 'prompt' ? argCommand.build(parsed?.arg ?? '') : null;
 
   const trimmed = draft.trim();
-  const isLocalCommand = expandCommand(trimmed, audience)?.kind === 'local';
-  const canSubmit = trimmed.length > 0 && (isLocalCommand || (ready && !busy));
+  const hasImages = images.length > 0;
+  const isLocalCommand = !hasImages && expandCommand(trimmed, audience)?.kind === 'local';
+  const canSubmit = (trimmed.length > 0 || hasImages) && (isLocalCommand || (ready && !busy));
 
   const activeOptionId = menuOpen ? optionId(index) : undefined;
 
@@ -140,7 +170,41 @@ export default function ChatbotComposer({
     onLocalCommand(id);
   };
 
+  const addImages = (files: File[]) => {
+    if (!imageInput) return;
+    const accepted = files.filter((f) => f.type.startsWith('image/'));
+    if (!accepted.length) return;
+    const room = Math.max(0, imageInput.maxImages - images.length);
+    if (accepted.length > room) setNotice(`Mỗi tin tối đa ${imageInput.maxImages} ảnh.`);
+    const added = accepted.slice(0, room).map((file) => ({ file, preview: URL.createObjectURL(file) }));
+    if (added.length) setImages((prev) => [...prev, ...added]);
+  };
+
+  const removeImage = (preview: string) => {
+    URL.revokeObjectURL(preview);
+    setImages((prev) => prev.filter((i) => i.preview !== preview));
+  };
+
+  const submitImages = () => {
+    if (!ready || busy) return;
+    if (trimmed.length > CHATBOT_MAX_CONTENT_LENGTH) {
+      setNotice(`Câu hỏi dài quá ${CHATBOT_MAX_CONTENT_LENGTH} ký tự — bạn rút gọn bớt nhé.`);
+      return;
+    }
+    // Tin vừa gửi tự tạo ảnh xem trước của nó (use-chatbot) — ảnh xem trước ở ô soạn thu hồi luôn.
+    const files = images.map((i) => i.file);
+    images.forEach((i) => URL.revokeObjectURL(i.preview));
+    setImages([]);
+    onDraftChange('');
+    setShowAll(false);
+    onSend(trimmed, { images: files, intent: invoiceOn ? 'purchase-import' : null });
+  };
+
   const submit = () => {
+    if (hasImages) {
+      submitImages();
+      return;
+    }
     if (!trimmed) return;
     const result = expandCommand(trimmed, audience);
 
@@ -417,6 +481,58 @@ export default function ChatbotComposer({
           </Box>
         )}
 
+        {hasImages && (
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1.5, pt: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.5} sx={{ flex: 1, minWidth: 0, overflowX: 'auto' }}>
+              {images.map((img, i) => (
+                <Box key={img.preview} sx={{ position: 'relative', width: 48, height: 48, flexShrink: 0 }}>
+                  <Box
+                    component="img"
+                    src={img.preview}
+                    alt={`Ảnh ${i + 1}`}
+                    sx={{ width: 1, height: 1, objectFit: 'cover', borderRadius: 1, display: 'block' }}
+                  />
+                  <IconButton
+                    size="small"
+                    aria-label={`Bỏ ảnh ${i + 1}`}
+                    onClick={() => removeImage(img.preview)}
+                    sx={{
+                      p: 0.25,
+                      top: -6,
+                      right: -6,
+                      position: 'absolute',
+                      bgcolor: 'background.paper',
+                      boxShadow: 1,
+                      '&:hover': { bgcolor: 'background.paper' },
+                    }}
+                  >
+                    <Iconify icon="mingcute:close-line" width={12} />
+                  </IconButton>
+                </Box>
+              ))}
+            </Stack>
+            {imageInput?.invoiceImport && (
+              <Tooltip
+                title={
+                  invoiceLocked
+                    ? 'Trợ lý chỉ đọc được ảnh hoá đơn nhập hàng'
+                    : 'Bật: tạo phiếu nhập từ ảnh hoá đơn nhà cung cấp'
+                }
+              >
+                <Chip
+                  size="small"
+                  color={invoiceOn ? 'primary' : 'default'}
+                  variant={invoiceOn ? 'filled' : 'outlined'}
+                  icon={<Iconify icon="solar:bill-list-bold" width={16} />}
+                  label="Hoá đơn nhập hàng"
+                  onClick={invoiceLocked ? undefined : () => setAsInvoice((v) => !v)}
+                  sx={{ flexShrink: 0 }}
+                />
+              </Tooltip>
+            )}
+          </Stack>
+        )}
+
         <Stack direction="row" alignItems="flex-end" spacing={0.5} sx={{ p: 1.5, pt: 1 }}>
           <Tooltip title="Lệnh nhanh">
             <IconButton
@@ -443,6 +559,33 @@ export default function ChatbotComposer({
             </IconButton>
           </Tooltip>
 
+          {imageInput && (
+            <>
+              <Tooltip title={imageInput.invoiceImport ? 'Gửi ảnh / ảnh hoá đơn nhập hàng' : 'Gửi ảnh'}>
+                <IconButton
+                  size="small"
+                  aria-label="Chọn ảnh gửi kèm"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={images.length >= imageInput.maxImages}
+                  sx={{ mb: '2px', width: 30, height: 30, flexShrink: 0, color: 'text.secondary' }}
+                >
+                  <Iconify icon="solar:camera-add-linear" width={20} />
+                </IconButton>
+              </Tooltip>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(event) => {
+                  addImages(Array.from(event.target.files ?? []));
+                  event.target.value = '';
+                }}
+              />
+            </>
+          )}
+
           <InputBase
             fullWidth
             multiline
@@ -452,7 +595,18 @@ export default function ChatbotComposer({
             inputRef={inputRef}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            placeholder="Nhập tin nhắn… gõ / để xem lệnh"
+            onPaste={(event) => {
+              const files = Array.from(event.clipboardData?.files ?? []);
+              if (imageInput && files.some((f) => f.type.startsWith('image/'))) {
+                event.preventDefault();
+                addImages(files);
+              }
+            }}
+            placeholder={
+              hasImages && invoiceOn
+                ? 'Ghi chú cho hoá đơn (vd: đơn này nhà Ngọc Bang)…'
+                : 'Nhập tin nhắn… gõ / để xem lệnh'
+            }
             inputProps={{
               maxLength: CHATBOT_MAX_CONTENT_LENGTH,
               'aria-label': 'Nhập tin nhắn',

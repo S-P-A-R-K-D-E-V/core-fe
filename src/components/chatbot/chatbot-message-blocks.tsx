@@ -1,3 +1,4 @@
+import dynamic from 'next/dynamic';
 import { memo, useState } from 'react';
 
 import Box from '@mui/material/Box';
@@ -7,16 +8,23 @@ import Typography from '@mui/material/Typography';
 
 import Iconify from 'src/components/iconify';
 
+// Thẻ hoá đơn nhập chỉ tải khi có (kéo theo màn chọn mã hàng) — khung chat thường không mang theo.
+const PurchaseImportChatCard = dynamic(
+  () => import('src/sections/pos/purchase-import/purchase-import-chat-card'),
+  { ssr: false }
+);
+
 import type {
   ChatbotUiLink,
   ChatbotUiBlock,
   ChatbotUiImage,
   ChatbotUiAction,
   ChatbotUiToolAction,
+  ChatbotUiPurchaseImport,
 } from './chatbot-blocks';
 
 // ----------------------------------------------------------------------
-// Phần có cấu trúc dưới câu trả lời đã xong (đã qua normalizeChatbotBlocks): ảnh, thẻ link, nút.
+// Phần có cấu trúc dưới câu trả lời đã xong (đã qua normalizeChatbotBlocks): thẻ hoá đơn nhập, ảnh, thẻ link, nút.
 // Gợi ý câu hỏi tiếp theo (suggestions) KHÔNG vẽ ở đây — nằm ở hàng chip phía trên ô nhập.
 // ----------------------------------------------------------------------
 
@@ -143,10 +151,15 @@ function ChatbotMessageBlocks({ blocks, busy, onNavigate, onRequestTool }: Props
   const images = blocks.filter((b): b is ChatbotUiImage => b.type === 'image');
   const links = blocks.filter((b): b is ChatbotUiLink => b.type === 'link');
   const actions = blocks.filter((b): b is ChatbotUiAction => b.type === 'action');
-  if (!images.length && !links.length && !actions.length) return null;
+  const invoices = blocks.filter((b): b is ChatbotUiPurchaseImport => b.type === 'purchase-import');
+  if (!images.length && !links.length && !actions.length && !invoices.length) return null;
 
   return (
     <Stack spacing={1} sx={{ mt: 1, minWidth: 0 }}>
+      {invoices.map((invoice) => (
+        <PurchaseImportChatCard key={invoice.importId} importId={invoice.importId} onNavigate={onNavigate} />
+      ))}
+
       {images.length > 0 && <ImageGrid images={images} />}
 
       {links.map((link) => (

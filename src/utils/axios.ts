@@ -708,7 +708,9 @@ export const endpoints = {
   },
   chatbot: {
     startSession: '/chatbot/sessions',
+    capabilities: '/chatbot/capabilities',
     messages: (sessionId: string) => `/chatbot/sessions/${sessionId}/messages`,
+    attachmentsPresign: (sessionId: string) => `/chatbot/sessions/${sessionId}/attachments/presign`,
     sendMessage: '/chatbot/messages',
     stockContext: '/chatbot/context/stock',
     customerContext: '/chatbot/context/customer',
