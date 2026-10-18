@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useId, useRef, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -50,6 +50,17 @@ import {
 // ----------------------------------------------------------------------
 
 const POLL_MS = 3000;
+
+// Một lần nhập hiện ở nhiều tin (tin gửi ảnh, mỗi lần nhắn sửa dòng lại kèm thẻ mới): thẻ nào đổi / thẻ mới xuất hiện
+// thì báo, các thẻ khác của cùng lần nhập tải lại. Bỏ qua tin báo trong lúc cả loạt thẻ vừa mở (tải lịch sử).
+const CHANGED_EVENT = 'purchase-import:changed';
+const SETTLE_MS = 1500;
+
+type ChangedDetail = { importId: string; source: string };
+
+function announceChange(importId: string, source: string) {
+  window.dispatchEvent(new CustomEvent<ChangedDetail>(CHANGED_EVENT, { detail: { importId, source } }));
+}
 /** Khung chat ở zIndex 1400 — danh sách gợi ý phải nổi trên nó. */
 const POPPER_Z = 1500;
 
@@ -70,6 +81,21 @@ export default function PurchaseImportChatCard({ importId, onNavigate }: Props) 
   const [duplicate, setDuplicate] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const instanceId = useId();
+  const mountedAt = useRef(Date.now());
+
+  useEffect(() => {
+    const onChanged = (event: Event) => {
+      const { detail } = event as CustomEvent<ChangedDetail>;
+      if (detail?.importId !== importId || detail.source === instanceId) return;
+      if (Date.now() - mountedAt.current < SETTLE_MS) return;
+      setPollKey((k) => k + 1);
+    };
+    window.addEventListener(CHANGED_EVENT, onChanged);
+    // Thẻ mới (vd câu trả lời sau khi nhắn sửa dòng) → thẻ cũ của cùng lần nhập cập nhật theo.
+    announceChange(importId, instanceId);
+    return () => window.removeEventListener(CHANGED_EVENT, onChanged);
+  }, [importId, instanceId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,13 +125,14 @@ export default function PurchaseImportChatCard({ importId, onNavigate }: Props) 
       try {
         setItem(await updatePurchaseImportLine(importId, lineNo, patch));
         setChanging(null);
+        announceChange(importId, instanceId);
       } catch (error) {
         setActionError(importErrorMessage(error, 'Không lưu được dòng.'));
       } finally {
         setBusyLine(null);
       }
     },
-    [importId]
+    [importId, instanceId]
   );
 
   const run = async (action: () => Promise<void>, fallback: string) => {
@@ -113,6 +140,7 @@ export default function PurchaseImportChatCard({ importId, onNavigate }: Props) 
     setActionError(null);
     try {
       await action();
+      announceChange(importId, instanceId);
     } catch (error) {
       setActionError(importErrorMessage(error, fallback));
     } finally {
