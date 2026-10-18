@@ -622,6 +622,11 @@ export function useNavData(
             children: [
               { title: 'Danh sách', path: paths.dashboard.pos.purchaseOrder.list },
               { title: 'Tạo đơn', path: paths.dashboard.pos.purchaseOrder.new, allPermissions: [PERMISSIONS.purchase.create] },
+              {
+                title: 'Nhập từ ảnh hoá đơn',
+                path: paths.dashboard.pos.purchaseOrder.import,
+                allPermissions: [PERMISSIONS.purchase.create],
+              },
             ],
           },
           // Khách hàng, đơn bán — theo quyền customer.* / sales.* (Core-be; mặc định Admin, Manager).

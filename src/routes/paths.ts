@@ -303,6 +303,9 @@ export const paths = {
         new: `${ROOTS.DASHBOARD}/pos/purchase-order/new`,
         details: (id: string) => `${ROOTS.DASHBOARD}/pos/purchase-order/${id}`,
         edit: (id: string) => `${ROOTS.DASHBOARD}/pos/purchase-order/${id}/edit`,
+        /** Nhập phiếu từ ảnh hoá đơn NCC: gửi ảnh + danh sách hoá đơn chờ duyệt. */
+        import: `${ROOTS.DASHBOARD}/pos/purchase-order/import`,
+        importDetails: (id: string) => `${ROOTS.DASHBOARD}/pos/purchase-order/import/${id}`,
       },
       customer: {
         root: `${ROOTS.DASHBOARD}/pos/customer`,

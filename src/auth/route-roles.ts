@@ -71,6 +71,7 @@ export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   { prefix: paths.dashboard.pos.warehouse.root, roles: null, permissions: [PERMISSIONS.inventory.warehouseManage] },
   { prefix: paths.dashboard.pos.purchaseOrder.root, roles: null, permissions: [PERMISSIONS.purchase.read] },
   { prefix: paths.dashboard.pos.purchaseOrder.new, roles: null, permissions: [PERMISSIONS.purchase.create] },
+  { prefix: paths.dashboard.pos.purchaseOrder.import, roles: null, permissions: [PERMISSIONS.purchase.create] },
   { prefix: paths.dashboard.pos.supplier.root, roles: null, permissions: [PERMISSIONS.supplier.read] },
   { prefix: paths.dashboard.pos.supplier.new, roles: null, permissions: [PERMISSIONS.supplier.manage] },
 
