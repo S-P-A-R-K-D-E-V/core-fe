@@ -150,4 +150,18 @@ describe('PurchaseImportChatCard', () => {
 
     expect(onNavigate).toHaveBeenCalledWith(expect.stringContaining('/pos/purchase-order/po1'));
   });
+
+  it('thẻ mới của cùng lần nhập xuất hiện (sau khi nhắn sửa dòng) → thẻ cũ tải lại', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    renderCard();
+    await screen.findByText('Có thể là');
+    expect(api.getPurchaseImport).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(1_010_000);
+    renderCard();
+
+    // Thẻ cũ tải lại + thẻ mới tải lần đầu.
+    await waitFor(() => expect(api.getPurchaseImport).toHaveBeenCalledTimes(3));
+    now.mockRestore();
+  });
 });
