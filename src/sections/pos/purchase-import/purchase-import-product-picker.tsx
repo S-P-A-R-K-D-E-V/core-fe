@@ -36,10 +36,17 @@ type Props = {
   /** Gợi ý ô tìm (tên đọc được trên hoá đơn). */
   defaultKeyword?: string;
   disabled?: boolean;
+  /** Danh sách gợi ý nổi trên khung có zIndex cao (khung chat 1400 > popper mặc định 1300). */
+  popperZIndex?: number;
   onPick: (product: PickedProduct) => void;
 };
 
-export default function PurchaseImportProductPicker({ defaultKeyword, disabled, onPick }: Props) {
+export default function PurchaseImportProductPicker({
+  defaultKeyword,
+  disabled,
+  popperZIndex,
+  onPick,
+}: Props) {
   const [input, setInput] = useState('');
   const [options, setOptions] = useState<PickedProduct[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,6 +83,7 @@ export default function PurchaseImportProductPicker({ defaultKeyword, disabled, 
       inputValue={input}
       filterOptions={(x) => x}
       noOptionsText={input.trim().length < MIN_CHARS ? 'Gõ tên hoặc mã hàng' : 'Không tìm thấy'}
+      slotProps={popperZIndex ? { popper: { sx: { zIndex: popperZIndex } } } : undefined}
       getOptionLabel={(o) => `${o.code} — ${o.name}`}
       isOptionEqualToValue={(a, b) => a.id === b.id}
       onOpen={() => {

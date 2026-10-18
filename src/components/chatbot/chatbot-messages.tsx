@@ -141,11 +141,11 @@ const MessageRow = memo(function MessageRow({
   const hasText = text.trim().length > 0;
   const hasBlocks = blocks.some((b) => b.type !== 'suggestions');
 
-  // Ảnh người dùng gửi kèm (từ app mobile, cùng phiên) — server trả đường dẫn /media đã ký.
+  // Ảnh người dùng gửi kèm — server trả đường dẫn /media đã ký; tin vừa gửi từ web là blob: xem trước.
   const sentImages = isUser
     ? (message.attachments ?? [])
         .filter((a) => a.kind === 'image' && typeof a.url === 'string' && a.url)
-        .map((a) => getStorageUrl(a.url))
+        .map((a) => (a.url!.startsWith('blob:') ? a.url! : getStorageUrl(a.url)))
     : [];
 
   // Không vẽ bong bóng rỗng.

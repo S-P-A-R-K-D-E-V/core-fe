@@ -493,3 +493,21 @@ describe('đối tượng + câu hỏi nhanh', () => {
     ]);
   });
 });
+
+describe('normalizeChatbotBlocks — thẻ hoá đơn nhập', () => {
+  const id = '3f2a8c1e-1b2c-4d5e-8f90-a1b2c3d4e5f6';
+
+  it('giữ thẻ có id lần nhập hợp lệ, bỏ trùng và id lạ', () => {
+    const blocks = normalizeChatbotBlocks(
+      [
+        { type: 'purchase-import', importId: id },
+        { type: 'purchase-import', importId: id },
+        { type: 'purchase-import', importId: '../../admin' },
+        { type: 'purchase-import' },
+      ],
+      admin
+    );
+
+    expect(blocks).toEqual([{ type: 'purchase-import', importId: id }]);
+  });
+});

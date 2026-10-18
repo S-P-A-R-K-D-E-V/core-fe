@@ -8,13 +8,18 @@ import {
   type ChatbotTier,
   type ChatbotAgent,
   type ChatbotBlock,
+  type ChatbotIntent,
   type ChatbotSession,
   type ChatbotMessage,
   getChatbotMessages,
   sendChatbotMessage,
   startChatbotSession,
+  uploadChatbotImages,
   CHATBOT_MAX_CONTENT_LENGTH,
 } from 'src/api/chatbot';
+
+/** Ảnh kèm câu gửi (web): tải thẳng lên R2 trước khi gửi tin; intent cho server biết ảnh là gì. */
+export type ChatbotSendOptions = { images?: File[]; intent?: ChatbotIntent | null };
 
 // ----------------------------------------------------------------------
 // ChatHub (SignalR) + REST /chatbot/* trên core-be — KHÔNG qua "agent-middleware".
@@ -135,8 +140,12 @@ export type ChatbotPanelState = {
   lastUserText: string | null;
   /** Thời điểm (máy) câu trả lời gần nhất hoàn tất — UI dùng cho chấm "chưa đọc". */
   lastReplyAt: number | null;
-  /** true = server đã nhận câu hỏi. */
-  sendMessage: (content: string, phone?: string | null) => Promise<boolean>;
+  /** true = server đã nhận câu hỏi. Có ảnh thì chữ được để trống. */
+  sendMessage: (
+    content: string,
+    phone?: string | null,
+    options?: ChatbotSendOptions
+  ) => Promise<boolean>;
   /** Tạo phiên mới thật trên server rồi thay phiên + tin nhắn. true = thành công. */
   startNewSession: () => Promise<boolean>;
   /** Tên cũ của startNewSession (trang Chatbot nội bộ còn dùng). */
@@ -807,9 +816,14 @@ export function useChatbot(opts?: {
   }, [session?.sessionId, mutate, beginReply, finishReply, failReply, failPending, reconcile]);
 
   const sendMessage = useCallback(
-    async (content: string, phoneOverride?: string | null): Promise<boolean> => {
+    async (
+      content: string,
+      phoneOverride?: string | null,
+      options?: ChatbotSendOptions
+    ): Promise<boolean> => {
       const text = (content ?? '').trim();
-      if (!text) return false;
+      const images = options?.images ?? [];
+      if (!text && images.length === 0) return false;
 
       const sid = sessionIdRef.current;
       if (!sid) {
@@ -826,9 +840,23 @@ export function useChatbot(opts?: {
       const token: PostToken = { localId };
       postingRef.current.add(token);
       // Bỏ tin gửi lỗi của lượt trước (người dùng đang gửi lại) rồi hiện ngay tin mới.
+      // Ảnh đang tải lên: xem trước bằng blob: (tin của server thay thế khi tải lại lịch sử).
+      const previews = images.map((file) => ({
+        kind: 'image',
+        url: URL.createObjectURL(file),
+        contentType: file.type,
+        sizeBytes: file.size,
+        fileName: file.name,
+      }));
       mutate((list) => [
         ...list.filter((m) => !isFailedLocal(m)),
-        { id: localId, role: 'user', content: text, createdAt: new Date().toISOString() },
+        {
+          id: localId,
+          role: 'user',
+          content: text,
+          createdAt: new Date().toISOString(),
+          ...(previews.length > 0 && { attachments: previews }),
+        },
       ]);
       setError(null);
       setTurnFailed(false);
@@ -847,10 +875,14 @@ export function useChatbot(opts?: {
           if (!joined) throw new HubNotReadyError();
         }
 
+        const attachments = images.length > 0 ? await uploadChatbotImages(sid, images) : undefined;
+        if (abandoned()) return false;
+
         const res = await sendChatbotMessage({
           sessionId: sid,
           content: text,
           phone: phoneOverride ?? phone,
+          ...(attachments && { attachments, intent: options?.intent ?? null }),
         });
         if (abandoned()) return false;
         postingRef.current.delete(token);

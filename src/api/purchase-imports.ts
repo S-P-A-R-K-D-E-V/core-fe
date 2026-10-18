@@ -23,7 +23,8 @@ export async function getPurchaseImportCapabilities(): Promise<IPurchaseImportCa
   return response.data;
 }
 
-async function compress(file: File): Promise<File> {
+/** Nén ảnh chụp hoá đơn / ảnh gửi trợ lý (giữ đọc được chữ số nhỏ); lỗi thì gửi nguyên ảnh. */
+export async function compressInvoiceImage(file: File): Promise<File> {
   try {
     const blob = await imageCompression(file, COMPRESSION);
     return new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' });
@@ -34,7 +35,7 @@ async function compress(file: File): Promise<File> {
 
 /** Nén + tải các tờ hoá đơn lên R2, trả objectKey theo đúng thứ tự tờ. */
 export async function uploadInvoiceImages(files: File[]): Promise<string[]> {
-  const prepared = await Promise.all(files.map(compress));
+  const prepared = await Promise.all(files.map(compressInvoiceImage));
   const presign = await axios.post<PresignedUpload[]>(endpoints.purchaseImports.presign, {
     files: prepared.map((f) => ({ fileName: f.name, contentType: f.type, sizeBytes: f.size })),
   });
