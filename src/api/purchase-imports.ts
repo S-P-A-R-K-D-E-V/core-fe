@@ -4,6 +4,9 @@ import axios, { endpoints } from 'src/utils/axios';
 
 import type {
   IPurchaseImport,
+  IPurchaseImportNewProduct,
+  IPurchaseImportSupplierSuggestions,
+  ICreatePurchaseImportProductsResponse,
   IPurchaseImportMessage,
   IPurchaseImportSummary,
   IPurchaseImportAssistResponse,
@@ -95,6 +98,22 @@ export async function retryPurchaseImport(id: string): Promise<void> {
 
 export async function cancelPurchaseImport(id: string): Promise<void> {
   await axios.post(endpoints.purchaseImports.cancel(id));
+}
+
+export async function getPurchaseImportSupplierSuggestions(id: string): Promise<IPurchaseImportSupplierSuggestions> {
+  const response = await axios.get<IPurchaseImportSupplierSuggestions>(endpoints.purchaseImports.supplierSuggestions(id));
+  return response.data;
+}
+
+/** Tạo mã mới cho các dòng đã tích rồi chốt mã cho dòng — dòng lỗi báo riêng trong `results`. */
+export async function createPurchaseImportProducts(
+  id: string,
+  items: IPurchaseImportNewProduct[]
+): Promise<ICreatePurchaseImportProductsResponse> {
+  const response = await axios.post<ICreatePurchaseImportProductsResponse>(endpoints.purchaseImports.createProducts(id), {
+    items,
+  });
+  return response.data;
 }
 
 export async function getPurchaseImportConversation(id: string): Promise<IPurchaseImportMessage[]> {

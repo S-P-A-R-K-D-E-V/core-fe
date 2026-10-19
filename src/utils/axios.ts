@@ -626,6 +626,8 @@ export const endpoints = {
     cancel: (id: string) => `/purchase-imports/${id}/cancel`,
     conversation: (id: string) => `/purchase-imports/${id}/conversation`,
     assist: (id: string) => `/purchase-imports/${id}/assist`,
+    supplierSuggestions: (id: string) => `/purchase-imports/${id}/supplier-suggestions`,
+    createProducts: (id: string) => `/purchase-imports/${id}/create-products`,
   },
   customers: {
     list: '/customers',

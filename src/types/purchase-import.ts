@@ -102,6 +102,40 @@ export interface IPurchaseImportDuplicate {
   totalMatches: boolean;
 }
 
+/** NCC đã có giống tên / SĐT in trên hoá đơn. */
+export interface IPurchaseImportSupplierCandidate {
+  id: string;
+  code?: string | null;
+  name: string;
+  phone?: string | null;
+  address?: string | null;
+  isActive: boolean;
+  /** 0–1: trùng SĐT 1, trùng tên 0,9, tên gần giống 0,6, chung chữ 0,4. */
+  score: number;
+  reason: string;
+}
+
+export interface IPurchaseImportSupplierSuggestions {
+  candidates: IPurchaseImportSupplierCandidate[];
+  /** NCC in trên hoá đơn — điền sẵn khi tạo NCC mới. */
+  invoice?: { name?: string | null; phones: string[]; address?: string | null } | null;
+}
+
+/** Mã mới cho một dòng đã tích "tạo mã mới". */
+export interface IPurchaseImportNewProduct {
+  lineNo: number;
+  name: string;
+  salePrice: number;
+  /** Trống → danh mục hay gặp của các mã gợi ý trên hoá đơn. */
+  categoryId?: string | null;
+  unit?: string | null;
+}
+
+export interface ICreatePurchaseImportProductsResponse {
+  results: { lineNo: number; productId?: string | null; code?: string | null; error?: string | null }[];
+  import: IPurchaseImport;
+}
+
 export interface IPurchaseImportAssistResponse {
   reply: string;
   changes: string[];

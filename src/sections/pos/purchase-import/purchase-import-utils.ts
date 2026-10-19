@@ -35,6 +35,7 @@ const ISSUE_LABELS: Record<string, string> = {
   ambiguous_reading: 'Chữ số không rõ (vd 2 × 80 hay 20 × 8)',
   missing_numbers: 'Thiếu số lượng / tiền',
   unit_converted: 'Đã đổi tá / lố / chục ra cái',
+  pack_guess: 'Giá có thể theo tá / chục — kiểm số lượng',
 };
 
 export function issueLabel(code: string): string {

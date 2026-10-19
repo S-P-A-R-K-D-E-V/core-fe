@@ -23,9 +23,20 @@ const api = vi.hoisted(() => ({
   commitPurchaseImport: vi.fn(),
   retryPurchaseImport: vi.fn(),
   cancelPurchaseImport: vi.fn(),
+  updatePurchaseImport: vi.fn(),
+  createPurchaseImportProducts: vi.fn(),
+  getPurchaseImportSupplierSuggestions: vi.fn(),
 }));
 vi.mock('src/api/purchase-imports', () => api);
 vi.mock('src/api/products', () => ({ getAllProducts: vi.fn() }));
+vi.mock('src/api/suppliers', () => ({
+  getAllSuppliers: vi.fn().mockResolvedValue([]),
+  createSupplier: vi.fn(),
+}));
+vi.mock('src/api/categories', () => ({ getAllCategories: vi.fn().mockResolvedValue([]) }));
+vi.mock('src/sections/pos/purchase-order/purchase-access', () => ({
+  usePurchaseAccess: () => ({ canCreateProducts: true }),
+}));
 
 // eslint-disable-next-line import/first
 import PurchaseImportDrawer from '../purchase-import-drawer';
@@ -128,7 +139,7 @@ describe('PurchaseImportDrawer', () => {
     window.addEventListener('purchase-import:changed', changed);
     renderDrawer();
 
-    expect(await screen.findByText('Phượng Hồng')).toBeInTheDocument();
+    expect(await screen.findByText('NCC: Phượng Hồng')).toBeInTheDocument();
     expect(screen.getByText('1 Máy sấy 8035 4 x 180 220')).toBeInTheDocument();
 
     await user.type(
@@ -204,5 +215,83 @@ describe('PurchaseImportDrawer', () => {
     expect(screen.getByPlaceholderText(/Nhắn trợ lý về hoá đơn này/)).toHaveValue(
       'Nhận hết các mã gợi ý'
     );
+  });
+
+  it('tích dòng chưa có gợi ý → tạo mã mới với tên "nhóm - giá bán" rồi gửi máy chủ', async () => {
+    api.createPurchaseImportProducts.mockResolvedValue({
+      results: [{ lineNo: 1, productId: 'p-new', code: 'SP015900' }],
+      import: invoice({
+        lines: invoice().lines.map((l) => ({ ...l, status: 'Resolved', productId: 'p-new' })),
+      }),
+    });
+    const user = userEvent.setup();
+    renderDrawer();
+
+    await user.click(await screen.findByRole('button', { name: 'Tích 1 dòng chưa có gợi ý' }));
+    await user.click(screen.getByRole('button', { name: 'Tạo 1 mã mới' }));
+    // Giá nhập 180.000đ → giá bán gợi ý 360.000đ → tên "Máy sấy 8035 - 360".
+    expect(await screen.findByDisplayValue('Máy sấy 8035 - 360')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Tạo 1 mã' }));
+
+    await waitFor(() =>
+      expect(api.createPurchaseImportProducts).toHaveBeenCalledWith(ID, [
+        { lineNo: 1, name: 'Máy sấy 8035 - 360', salePrice: 360_000, categoryId: null, unit: null },
+      ])
+    );
+  });
+
+  it('chưa nhận ra NCC: hiện NCC trùng SĐT trên hoá đơn, chọn thì lưu NCC cho lần nhập', async () => {
+    api.getPurchaseImport.mockResolvedValue(
+      invoice({ supplierId: null, supplierName: null, supplierText: 'Hùng Hương' })
+    );
+    api.getPurchaseImportSupplierSuggestions.mockResolvedValue({
+      candidates: [
+        {
+          id: 'sup-hh',
+          code: 'NCC000017',
+          name: 'Hùng Hương',
+          phone: '02439282168',
+          address: '33 Cầu Đông',
+          isActive: true,
+          score: 1,
+          reason: 'trùng SĐT 024.39282168 trên hoá đơn',
+        },
+      ],
+      invoice: {
+        name: 'Hùng Hương',
+        phones: ['0985 33 1972', '024.39282168'],
+        address: '33 Cầu Đông',
+      },
+    });
+    api.updatePurchaseImport.mockResolvedValue(
+      invoice({ supplierId: 'sup-hh', supplierName: 'Hùng Hương' })
+    );
+    const user = userEvent.setup();
+    renderDrawer();
+
+    expect(await screen.findByText('Chưa nhận ra nhà cung cấp')).toBeInTheDocument();
+    expect(await screen.findByText('trùng SĐT 024.39282168 trên hoá đơn')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Chọn' }));
+
+    expect(api.updatePurchaseImport).toHaveBeenCalledWith(ID, { supplierId: 'sup-hh' });
+    expect(await screen.findByText('NCC: Hùng Hương')).toBeInTheDocument();
+  });
+
+  it('dòng "như trên" gom vào nhóm của dòng có tên phía trên', async () => {
+    const base = invoice().lines[0];
+    api.getPurchaseImport.mockResolvedValue(
+      invoice({
+        lines: [
+          { ...base, lineNo: 1, rawText: '2 Lô dính x90 180', name: 'Lô dính' },
+          { ...base, lineNo: 2, rawText: '3 x80 240', name: null, sameAsAbove: true },
+          { ...base, lineNo: 3, rawText: '10 x20 200', name: null, sameAsAbove: true },
+          { ...base, lineNo: 4, rawText: '1 Lược x140 140', name: 'Lược' },
+        ],
+      })
+    );
+    renderDrawer();
+
+    expect(await screen.findByText(/3 dòng cùng loại, khác bậc giá/)).toBeInTheDocument();
+    expect(screen.getByText('Lô dính', { selector: 'strong' })).toBeInTheDocument();
   });
 });
