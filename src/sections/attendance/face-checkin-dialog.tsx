@@ -63,6 +63,8 @@ type Props = {
   mode: 'checkin' | 'checkout' | 'overtime';
   geoLocation?: { lat: number; lng: number } | null;
   geoAccuracy?: number | null;
+  /** GPS lỗi đã quá ~5 giây — gửi kèm để máy chủ vẫn nhận, đánh dấu log không có vị trí. */
+  locationUnavailable?: boolean;
   /** Tên hiển thị của nhân viên — dùng cho thông báo Telegram (checkinFace), không ảnh
    *  hưởng tới xác thực khuôn mặt (BE tự xác định staff qua token). */
   staffName: string;
@@ -71,7 +73,7 @@ type Props = {
   onSuccess: () => void;
 };
 
-export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, staffName, onClose, onSuccess }: Props) {
+export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, locationUnavailable, staffName, onClose, onSuccess }: Props) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -144,6 +146,7 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, staffN
           latitude: geoLocation?.lat,
           longitude: geoLocation?.lng,
           accuracy: geoAccuracy ?? undefined,
+          locationUnavailable: !geoLocation && !!locationUnavailable,
         };
         // faceMatchConfidence (%) do RequireFaceMatchAsync tính ngay khi verify — đưa vào nội
         // dung Telegram để biết đúng người với độ tin cậy bao nhiêu, không phải đoán mò.
@@ -180,7 +183,7 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, staffN
         setPhase('error');
       }
     },
-    [mode, geoLocation, geoAccuracy, staffName, onSuccess, onClose]
+    [mode, geoLocation, geoAccuracy, locationUnavailable, staffName, onSuccess, onClose]
   );
 
   // ── Auto-detect: lấy mẫu frame nền, tự chụp khi đạt "nhìn thẳng" — KHÔNG cần bấm nút. ──

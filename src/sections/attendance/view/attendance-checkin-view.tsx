@@ -597,6 +597,7 @@ export default function AttendanceCheckinView() {
           longitude: geoLocation?.lng,
           accuracy: geoAccuracy ?? undefined,
           faceVerified: true,
+          locationUnavailable: !geoLocation && gpsErrorFallbackEnabled,
         });
         await checkinFace({
           candidateName: staffName,
@@ -635,6 +636,7 @@ export default function AttendanceCheckinView() {
           longitude: geoLocation?.lng,
           accuracy: geoAccuracy ?? undefined,
           faceVerified: true,
+          locationUnavailable: !geoLocation && gpsErrorFallbackEnabled,
         });
       }
 
@@ -669,7 +671,7 @@ export default function AttendanceCheckinView() {
       setSubmitting(false);
       setActionLoading(null);
     }
-  }, [capturedImage, pendingCheckin, activeSmartShift, user, geoLocation, geoAccuracy, isWithinGeofence, nearestBranch, enqueueSnackbar, closeFaceDialog, fetchData, refreshUser]);
+  }, [capturedImage, pendingCheckin, activeSmartShift, user, geoLocation, geoAccuracy, gpsErrorFallbackEnabled, isWithinGeofence, nearestBranch, enqueueSnackbar, closeFaceDialog, fetchData, refreshUser]);
 
 
   useEffect(
@@ -1873,6 +1875,7 @@ export default function AttendanceCheckinView() {
         mode={faceCheckinMode ?? 'checkin'}
         geoLocation={geoLocation}
         geoAccuracy={geoAccuracy}
+        locationUnavailable={gpsErrorFallbackEnabled}
         staffName={user?.displayName || user?.name || user?.email || 'N/A'}
         onClose={() => setFaceCheckinMode(null)}
         onSuccess={() => {

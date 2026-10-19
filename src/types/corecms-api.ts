@@ -476,6 +476,9 @@ export interface IAttendanceLog {
   /** % khớp khuôn mặt (0-100) — chỉ có giá trị ở response của check-in-face/smart-check-in-face/
    *  smart-check-out-face (RequireFaceMatchAsync), dùng để đưa vào nội dung thông báo Telegram. */
   faceMatchConfidence?: number;
+  /** Chấm công vào / ra không có toạ độ GPS (GPS lỗi trên app sau ~5 giây thử lại) — quản lý xem lại. */
+  checkInLocationMissing?: boolean;
+  checkOutLocationMissing?: boolean;
 }
 
 export interface ICheckInRequest {
@@ -521,6 +524,8 @@ export interface ISmartCheckInRequest {
   ipAddress?: string;
   wifiName?: string;
   faceVerified: boolean;
+  /** GPS lỗi (đã chờ ~5 giây) — vẫn chấm công, máy chủ đánh dấu log không có vị trí. */
+  locationUnavailable?: boolean;
 }
 
 export interface ISmartCheckOutRequest {
@@ -530,6 +535,8 @@ export interface ISmartCheckOutRequest {
   ipAddress?: string;
   wifiName?: string;
   faceVerified: boolean;
+  /** GPS lỗi (đã chờ ~5 giây) — vẫn chấm công, máy chủ đánh dấu log không có vị trí. */
+  locationUnavailable?: boolean;
 }
 
 /** POST /attendance/smart-check-in-face — khác ISmartCheckInRequest: KHÔNG có faceVerified,
@@ -542,6 +549,8 @@ export interface ISmartCheckInWithFaceRequest {
   accuracy?: number;
   ipAddress?: string;
   wifiName?: string;
+  /** GPS lỗi (đã chờ ~5 giây) — vẫn chấm công, máy chủ đánh dấu log không có vị trí. */
+  locationUnavailable?: boolean;
 }
 
 /** POST /attendance/smart-check-out-face — đối xứng ISmartCheckInWithFaceRequest. */
@@ -552,6 +561,8 @@ export interface ISmartCheckOutWithFaceRequest {
   accuracy?: number;
   ipAddress?: string;
   wifiName?: string;
+  /** GPS lỗi (đã chờ ~5 giây) — vẫn chấm công, máy chủ đánh dấu log không có vị trí. */
+  locationUnavailable?: boolean;
 }
 
 export interface IManualAttendanceAdjustmentRequest {

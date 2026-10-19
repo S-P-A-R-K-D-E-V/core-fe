@@ -49,6 +49,7 @@ const TABLE_HEAD = [
   { id: 'status', label: 'Status', width: 100 },
   { id: 'isAutoClosedBySystem', label: 'Auto', width: 80 },
   { id: 'checkInFaceVerified', label: 'Khuôn mặt', width: 130 },
+  { id: 'checkInLocationMissing', label: 'GPS', width: 150 },
 ];
 
 // ----------------------------------------------------------------------
@@ -205,6 +206,20 @@ export default function AttendanceLogsView() {
                       <Label variant="soft" color={row.checkInFaceVerified ? 'success' : 'default'}>
                         {row.checkInFaceVerified ? 'Đã xác minh' : 'Chưa xác minh'}
                       </Label>
+                    </TableCell>
+                    <TableCell>
+                      {/* GPS lỗi trên app (thử lại ~5 giây không được) nên vẫn cho chấm công — đánh dấu để xem lại. */}
+                      {row.checkInLocationMissing || row.checkOutLocationMissing ? (
+                        <Label variant="soft" color="warning">
+                          {row.checkInLocationMissing && row.checkOutLocationMissing
+                            ? 'Vào + ra: không GPS'
+                            : row.checkInLocationMissing
+                              ? 'Vào: không GPS'
+                              : 'Ra: không GPS'}
+                        </Label>
+                      ) : (
+                        '-'
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
