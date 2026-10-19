@@ -628,6 +628,7 @@ export const endpoints = {
     assist: (id: string) => `/purchase-imports/${id}/assist`,
     supplierSuggestions: (id: string) => `/purchase-imports/${id}/supplier-suggestions`,
     createProducts: (id: string) => `/purchase-imports/${id}/create-products`,
+    kiotVietPush: (id: string) => `/purchase-imports/${id}/kiotviet-push`,
   },
   customers: {
     list: '/customers',

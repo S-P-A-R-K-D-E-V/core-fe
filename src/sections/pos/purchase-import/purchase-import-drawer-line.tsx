@@ -29,13 +29,21 @@ import type {
 } from 'src/types/purchase-import';
 
 import PurchaseImportProductPicker from './purchase-import-product-picker';
-import { issueLabel, LINE_STATUS, parseAmount } from './purchase-import-utils';
+import {
+  issueLabel,
+  LINE_STATUS,
+  parseAmount,
+  perPieceCost,
+  receiptUnitCost,
+  suggestSalePrice,
+} from './purchase-import-utils';
 
 // ----------------------------------------------------------------------
 // Một dòng hoá đơn trong drawer duyệt nhanh, gọn như một hàng trên toa: [tích tạo mã mới] số dòng · TÊN hàng (chữ gốc
 // nhỏ bên dưới) · SL × giá = tiền · trạng thái; hàng dưới là mã đã chốt / mã mới sẽ tạo / gợi ý số 1 kèm "Đúng". Bấm ▾
-// mở thêm: gợi ý khác (kèm lý do), tìm mã có sẵn, hoặc đặt tên MÃ MỚI (tạo khi tạo phiếu nhập), sửa số, bỏ dòng, gắn
-// ảnh sản phẩm. Dòng trợ lý / người duyệt vừa sửa được tô sáng.
+// mở thêm: gợi ý khác (kèm lý do), tìm mã có sẵn, hoặc đặt tên MÃ MỚI (tạo khi tạo phiếu nhập), sửa số, đếm số cái
+// (hàng theo gói / bọc — phiếu ghi số cái, giá mỗi cái = thành tiền / số cái), bỏ dòng, gắn ảnh sản phẩm. Dòng trợ lý /
+// người duyệt vừa sửa được tô sáng.
 // ----------------------------------------------------------------------
 
 /** Drawer ở zIndex 1450 — danh sách gợi ý / menu phải nổi trên nó. */
@@ -81,6 +89,8 @@ function PurchaseImportDrawerLine({
   const [lineTotal, setLineTotal] = useState('');
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
+  const [counting, setCounting] = useState(false);
+  const [counted, setCounted] = useState('');
   const [imageMenu, setImageMenu] = useState<HTMLElement | null>(null);
 
   const skipped = line.status === 'Skipped';
@@ -98,6 +108,10 @@ function PurchaseImportDrawerLine({
     : LINE_STATUS[line.status];
   const imageIndex = line.imageId ? productImages.findIndex((i) => i.id === line.imageId) : -1;
   const issues = line.issues.filter((i) => i !== 'unit_converted');
+  const pieceCost = perPieceCost(line);
+  const countedDraft = parseAmount(counted);
+  const draftPieceCost = perPieceCost(line, countedDraft);
+  const suggestedPrice = suggestSalePrice(receiptUnitCost(line));
 
   // Chọn xong (hoặc dữ liệu tải lại) thì thu gọn.
   useEffect(() => setExpanded(false), [line.productId, line.status, line.newProductName]);
@@ -106,6 +120,9 @@ function PurchaseImportDrawerLine({
     setNewName(line.newProductName || name || '');
     setNewPrice(line.newProductSalePrice ? String(line.newProductSalePrice) : '');
   }, [expanded, line.newProductName, line.newProductSalePrice, name]);
+  useEffect(() => {
+    if (counting) setCounted(line.countedQuantity ? String(line.countedQuantity) : '');
+  }, [counting, line.countedQuantity]);
   useEffect(() => {
     if (!editingNumbers) return;
     setQuantity(line.quantity != null ? String(line.quantity) : '');
@@ -123,6 +140,11 @@ function PurchaseImportDrawerLine({
     if (t != null && t !== line.lineTotal) patch.lineTotal = t;
     setEditingNumbers(false);
     if (Object.keys(patch).length > 0) onSave(patch);
+  };
+
+  const saveCounted = (value: number) => {
+    setCounting(false);
+    if (value !== (line.countedQuantity ?? 0)) onSave({ countedQuantity: value });
   };
 
   const applyNewProduct = () => {
@@ -310,6 +332,17 @@ function PurchaseImportDrawerLine({
         </Stack>
       )}
 
+      {pieceCost != null && !skipped && (
+        <Typography
+          variant="caption"
+          sx={{ display: 'block', pl: '50px', mt: 0.25, color: 'info.dark' }}
+        >
+          <Iconify icon="solar:box-linear" width={14} sx={{ mr: 0.5, verticalAlign: -2 }} />
+          Đếm được <strong>{line.countedQuantity} cái</strong> · giá nhập {fCurrency(pieceCost)}/cái
+          — phiếu ghi theo cái
+        </Typography>
+      )}
+
       {issues.length > 0 && !skipped && (
         <Stack
           direction="row"
@@ -382,6 +415,7 @@ function PurchaseImportDrawerLine({
                 size="small"
                 label="Giá bán (tuỳ chọn)"
                 value={newPrice}
+                placeholder={suggestedPrice ? `≈ ${fCurrency(suggestedPrice)}` : undefined}
                 onChange={(e) => setNewPrice(e.target.value)}
                 sx={{ flex: 1 }}
               />
@@ -394,6 +428,38 @@ function PurchaseImportDrawerLine({
               >
                 Dùng mã mới
               </Button>
+            </Stack>
+          )}
+
+          {counting && (
+            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+              <TextField
+                size="small"
+                label="Số cái đếm được"
+                value={counted}
+                autoFocus
+                onChange={(e) => setCounted(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && countedDraft && saveCounted(countedDraft)}
+                sx={{ width: 140 }}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ flex: 1, minWidth: 120 }}>
+                {draftPieceCost != null
+                  ? `≈ ${fCurrency(draftPieceCost)}/cái (thành tiền ÷ số cái)`
+                  : 'Hàng theo gói / bọc: kho đếm số cái, giá mỗi cái tự chia.'}
+              </Typography>
+              <Button
+                size="small"
+                variant="contained"
+                disabled={busy || !countedDraft}
+                onClick={() => countedDraft && saveCounted(countedDraft)}
+              >
+                Lưu
+              </Button>
+              {!!line.countedQuantity && (
+                <Button size="small" color="inherit" disabled={busy} onClick={() => saveCounted(0)}>
+                  Bỏ số đếm
+                </Button>
+              )}
             </Stack>
           )}
 
@@ -434,6 +500,19 @@ function PurchaseImportDrawerLine({
               onClick={() => setEditingNumbers((v) => !v)}
             >
               {editingNumbers ? 'Thôi sửa số' : 'Sửa số'}
+            </Button>
+            <Button
+              size="small"
+              color="inherit"
+              disabled={busy}
+              startIcon={<Iconify icon="solar:box-linear" width={16} />}
+              onClick={() => setCounting((v) => !v)}
+            >
+              {counting
+                ? 'Thôi đếm'
+                : line.countedQuantity
+                  ? `Đếm: ${line.countedQuantity} cái`
+                  : 'Đếm số cái'}
             </Button>
             <Button
               size="small"

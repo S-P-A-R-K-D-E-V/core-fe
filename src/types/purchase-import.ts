@@ -9,6 +9,10 @@ export interface IPurchaseImportCapabilities {
   maxImages: number;
   maxImageBytes: number;
   imageTypes: string[];
+  /** Tạo phiếu thì mã mới + phiếu nhập được tạo bên KiotViet (cửa hàng nối KiotViet, công tắc bật). */
+  kiotVietPush?: boolean;
+  /** Phiếu bên KiotViet là phiếu tạm — kho hoàn thành bên KiotViet mới cộng tồn + giá vốn. */
+  kiotVietDraft?: boolean;
 }
 
 export interface IPurchaseImportCandidate {
@@ -45,6 +49,8 @@ export interface IPurchaseImportLine {
   /** Hàng chưa có trong danh mục: tên mã mới (mã được tạo khi tạo phiếu nhập). */
   newProductName?: string | null;
   newProductSalePrice?: number | null;
+  /** Hàng theo gói: số cái kho đếm được — phiếu ghi số cái này, giá mỗi cái = thành tiền / số cái. */
+  countedQuantity?: number | null;
 }
 
 /** Ảnh của lần nhập: `id` dùng để gắn vào dòng, `url` đã ký (ghép getStorageUrl). */
@@ -81,6 +87,10 @@ export interface IPurchaseImport {
   productImages?: IPurchaseImportImage[];
   /** Số tin đã trao đổi với trợ lý về lần nhập này. */
   conversationCount?: number;
+  /** Phiếu nhập đã sang KiotViet chưa (cửa hàng nối KiotViet). */
+  kiotVietPush?: 'None' | 'Pushed' | 'Failed';
+  kiotVietPurchaseOrderCode?: string | null;
+  kiotVietPushError?: string | null;
 }
 
 /** Một tin trao đổi với trợ lý về lần nhập. */
@@ -185,4 +195,6 @@ export interface IUpdatePurchaseImportLineRequest {
   /** Đặt tên mã mới cho dòng (tạo khi tạo phiếu nhập); chuỗi rỗng = bỏ. */
   newProductName?: string | null;
   newProductSalePrice?: number | null;
+  /** Hàng theo gói: số cái đếm được; 0 = bỏ số đếm. */
+  countedQuantity?: number | null;
 }

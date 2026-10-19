@@ -22,17 +22,29 @@ import { fCurrency } from 'src/utils/format-number';
 
 import { updatePurchaseImportLine } from 'src/api/purchase-imports';
 
-import type { IPurchaseImport, IPurchaseImportLine } from 'src/types/purchase-import';
+import type {
+  IPurchaseImport,
+  IPurchaseImportLine,
+  IUpdatePurchaseImportLineRequest,
+} from 'src/types/purchase-import';
 
-import { parseAmount, importErrorMessage } from './purchase-import-utils';
+import {
+  parseAmount,
+  perPieceCost,
+  receiptUnitCost,
+  suggestSalePrice,
+  importErrorMessage,
+} from './purchase-import-utils';
 
 // ----------------------------------------------------------------------
-// Đặt mã mới cho các dòng đã tích (hàng chưa có trong danh mục): tên mặc định là tên hàng trên hoá đơn — KHÔNG kèm số
-// (số trên toa là số lượng / đơn giá, đưa vào tên sẽ sai) — giá bán tuỳ chọn. Chỉ ghi lên dòng; mã thật được tạo (SP…)
-// khi bấm "Tạo phiếu nhập", trống giá bán thì lấy gấp đôi giá nhập.
+// Đặt mã mới cho các dòng đã tích (hàng chưa có trong danh mục). Tên mặc định là tên hàng trên hoá đơn — KHÔNG kèm số
+// (số trên toa là số lượng / đơn giá). "Tên chung cho cả nhóm" đặt một tên cho mọi dòng: các dòng cùng tên là một nhóm,
+// mỗi giá bán là một mã (mã gốc + mã con như danh mục KiotViet, vd "Lô dính - 15", "Lô dính - 20"). Hàng theo gói: ghi
+// số cái kho đếm được → giá nhập mỗi cái = thành tiền ÷ số cái, giá bán trống thì gấp đôi giá đó. Chỉ ghi lên dòng; mã
+// thật được tạo khi bấm "Tạo phiếu nhập".
 // ----------------------------------------------------------------------
 
-type Row = { lineNo: number; name: string; salePrice: string };
+type Row = { lineNo: number; name: string; salePrice: string; counted: string };
 
 type Props = {
   open: boolean;
@@ -44,6 +56,8 @@ type Props = {
   onClose: () => void;
   onSaved: (next: IPurchaseImport, savedLineNos: number[]) => void;
 };
+
+const groupKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
 
 export default function PurchaseImportNewProductsDialog({
   open,
@@ -59,19 +73,51 @@ export default function PurchaseImportNewProductsDialog({
     [item.lines, lineNos]
   );
   const [rows, setRows] = useState<Row[]>([]);
+  const [groupName, setGroupName] = useState('');
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
-    setRows(lines.map((line) => ({ lineNo: line.lineNo, name: familyName(line), salePrice: '' })));
+    setGroupName('');
+    setRows(
+      lines.map((line) => ({
+        lineNo: line.lineNo,
+        name: familyName(line),
+        salePrice: '',
+        counted: line.countedQuantity ? String(line.countedQuantity) : '',
+      }))
+    );
   }, [open, lines, familyName]);
 
   const update = (lineNo: number, patch: Partial<Row>) =>
     setRows((current) =>
       current.map((row) => (row.lineNo === lineNo ? { ...row, ...patch } : row))
     );
+
+  const lineOf = (row: Row) => lines.find((l) => l.lineNo === row.lineNo);
+  const costOf = (row: Row) => {
+    const line = lineOf(row);
+    if (!line) return null;
+    return perPieceCost(line, parseAmount(row.counted)) ?? receiptUnitCost(line);
+  };
+  const priceOf = (row: Row) => parseAmount(row.salePrice) ?? suggestSalePrice(costOf(row));
+
+  // Xem trước: mỗi tên là một nhóm, mỗi giá bán trong nhóm là một mã.
+  const groups = new Map<string, { name: string; prices: Set<number> }>();
+  rows.forEach((row) => {
+    const name = row.name.trim().replace(/\s+/g, ' ');
+    if (!name) return;
+    const group = groups.get(groupKey(name)) ?? { name, prices: new Set<number>() };
+    const price = priceOf(row);
+    if (price) group.prices.add(price);
+    groups.set(groupKey(name), group);
+  });
+  const preview = Array.from(groups.values()).map((g) => ({
+    name: g.name,
+    prices: Array.from(g.prices).sort((a, b) => a - b),
+  }));
 
   const submit = async () => {
     setWorking(true);
@@ -81,11 +127,16 @@ export default function PurchaseImportNewProductsDialog({
     try {
       // eslint-disable-next-line no-restricted-syntax
       for (const row of rows) {
-        // eslint-disable-next-line no-await-in-loop
-        latest = await updatePurchaseImportLine(item.id, row.lineNo, {
+        const line = lineOf(row);
+        const counted = parseAmount(row.counted);
+        const patch: IUpdatePurchaseImportLineRequest = {
           newProductName: row.name.trim(),
           newProductSalePrice: parseAmount(row.salePrice),
-        });
+        };
+        if (counted) patch.countedQuantity = counted;
+        else if (line?.countedQuantity) patch.countedQuantity = 0;
+        // eslint-disable-next-line no-await-in-loop
+        latest = await updatePurchaseImportLine(item.id, row.lineNo, patch);
         saved.push(row.lineNo);
       }
       onSaved(latest!, saved);
@@ -100,14 +151,17 @@ export default function PurchaseImportNewProductsDialog({
   };
 
   const invalid = rows.some(
-    (row) => !row.name.trim() || (row.salePrice.trim() !== '' && parseAmount(row.salePrice) == null)
+    (row) =>
+      !row.name.trim() ||
+      (row.salePrice.trim() !== '' && parseAmount(row.salePrice) == null) ||
+      (row.counted.trim() !== '' && parseAmount(row.counted) == null)
   );
 
   return (
     <Dialog
       open={open}
       onClose={working ? undefined : onClose}
-      maxWidth="md"
+      maxWidth="lg"
       fullWidth
       sx={{ zIndex }}
     >
@@ -115,18 +169,44 @@ export default function PurchaseImportNewProductsDialog({
       <DialogContent dividers>
         <Stack spacing={2}>
           {error && <Alert severity="error">{error}</Alert>}
+          {rows.length > 1 && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <TextField
+                size="small"
+                label="Tên chung cho cả nhóm (tuỳ chọn)"
+                placeholder="vd Lô dính"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                sx={{ flex: 1, maxWidth: 420 }}
+              />
+              <Button
+                size="small"
+                variant="outlined"
+                disabled={!groupName.trim()}
+                onClick={() =>
+                  setRows((current) => current.map((row) => ({ ...row, name: groupName })))
+                }
+              >
+                Đặt cho {rows.length} dòng
+              </Button>
+            </Stack>
+          )}
           <Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell sx={{ width: 40 }}>Dòng</TableCell>
                 <TableCell>Trên hoá đơn</TableCell>
-                <TableCell sx={{ minWidth: 220 }}>Tên sản phẩm mới</TableCell>
+                <TableCell sx={{ minWidth: 200 }}>Tên sản phẩm mới</TableCell>
+                <TableCell sx={{ width: 120 }}>Số cái đếm được</TableCell>
+                <TableCell sx={{ width: 110 }}>Giá nhập/cái</TableCell>
                 <TableCell sx={{ width: 150 }}>Giá bán (tuỳ chọn)</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {rows.map((row) => {
-                const line = lines.find((l) => l.lineNo === row.lineNo);
+                const line = lineOf(row);
+                const cost = costOf(row);
+                const suggested = suggestSalePrice(cost);
                 return (
                   <TableRow key={row.lineNo} sx={{ verticalAlign: 'top' }}>
                     <TableCell>{row.lineNo}</TableCell>
@@ -151,12 +231,22 @@ export default function PurchaseImportNewProductsDialog({
                     <TableCell>
                       <TextField
                         size="small"
+                        value={row.counted}
+                        placeholder="theo gói"
+                        error={row.counted.trim() !== '' && parseAmount(row.counted) == null}
+                        onChange={(e) => update(row.lineNo, { counted: e.target.value })}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ pt: 1 }}>
+                        {cost != null ? fCurrency(cost) : '—'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <TextField
+                        size="small"
                         value={row.salePrice}
-                        placeholder={
-                          line?.unitPrice
-                            ? `≈ ${fCurrency(Math.ceil((line.unitPrice * 2) / 1000) * 1000)}`
-                            : undefined
-                        }
+                        placeholder={suggested ? `≈ ${fCurrency(suggested)}` : undefined}
                         error={row.salePrice.trim() !== '' && parseAmount(row.salePrice) == null}
                         onChange={(e) => update(row.lineNo, { salePrice: e.target.value })}
                       />
@@ -166,10 +256,25 @@ export default function PurchaseImportNewProductsDialog({
               })}
             </TableBody>
           </Table>
+          {preview.length > 0 && (
+            <Stack spacing={0.5}>
+              <Typography variant="subtitle2">Sẽ tạo khi tạo phiếu nhập</Typography>
+              {preview.map((group) => (
+                <Typography key={group.name} variant="body2">
+                  <strong>«{group.name}»</strong> —{' '}
+                  {group.prices.length > 1
+                    ? `nhóm ${group.prices.length} mã (mã gốc + ${group.prices.length - 1} mã con): `
+                    : '1 mã: '}
+                  {group.prices.map((p) => fCurrency(p)).join(' · ') || 'giá bán gấp đôi giá nhập'}
+                </Typography>
+              ))}
+            </Stack>
+          )}
           <Typography variant="caption" color="text.secondary">
-            Mã thật (SP…) được tạo khi bấm <strong>Tạo phiếu nhập</strong> — danh mục theo các mã
-            gần giống, trống giá bán thì lấy gấp đôi giá nhập (sửa sau trong Sản phẩm). Hệ thống ghi
-            nhớ chữ trên hoá đơn của NCC này = mã mới.
+            Mã thật (SP…) được tạo khi bấm <strong>Tạo phiếu nhập</strong> — cùng tên là một nhóm,
+            mỗi giá bán một mã; dòng cùng giá dùng chung mã. Danh mục theo các mã gần giống, trống
+            giá bán thì lấy gấp đôi giá nhập mỗi cái (sửa sau trong Sản phẩm). Hệ thống ghi nhớ chữ
+            trên hoá đơn của NCC này = mã mới.
           </Typography>
         </Stack>
       </DialogContent>

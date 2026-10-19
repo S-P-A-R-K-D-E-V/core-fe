@@ -26,6 +26,8 @@ const api = vi.hoisted(() => ({
   updatePurchaseImport: vi.fn(),
   createPurchaseImportProducts: vi.fn(),
   getPurchaseImportSupplierSuggestions: vi.fn(),
+  getPurchaseImportCapabilities: vi.fn(),
+  pushPurchaseImportToKiotViet: vi.fn(),
 }));
 vi.mock('src/api/purchase-imports', () => api);
 vi.mock('src/api/products', () => ({ getAllProducts: vi.fn() }));
@@ -125,10 +127,20 @@ const renderDrawer = (onNavigate = vi.fn()) =>
     </ThemeProvider>
   );
 
+const capabilities = {
+  enabled: true,
+  maxImages: 6,
+  maxImageBytes: 10_000_000,
+  imageTypes: ['image/jpeg'],
+  kiotVietPush: false,
+  kiotVietDraft: true,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   api.getPurchaseImport.mockResolvedValue(invoice());
   api.getPurchaseImportConversation.mockResolvedValue([]);
+  api.getPurchaseImportCapabilities.mockResolvedValue(capabilities);
 });
 
 describe('PurchaseImportDrawer', () => {
@@ -319,5 +331,140 @@ describe('PurchaseImportDrawer', () => {
 
     expect(await screen.findByText(/3 dòng cùng loại, khác bậc giá/)).toBeInTheDocument();
     expect(screen.getByText('Lô dính', { selector: 'strong' })).toBeInTheDocument();
+  });
+
+  it('chi tiết dòng: đếm số cái của gói → lưu số cái, hiện giá nhập mỗi cái', async () => {
+    api.updatePurchaseImportLine.mockResolvedValue(
+      invoice({ lines: invoice().lines.map((l) => ({ ...l, countedQuantity: 10 })) })
+    );
+    const user = userEvent.setup();
+    renderDrawer();
+
+    await user.click(await screen.findByRole('button', { name: /Chọn mã khác, tạo mã mới/ }));
+    await user.click(screen.getByRole('button', { name: 'Đếm số cái' }));
+    await user.type(screen.getByLabelText('Số cái đếm được'), '10');
+    expect(screen.getByText(/thành tiền ÷ số cái/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Lưu' }));
+
+    expect(api.updatePurchaseImportLine).toHaveBeenCalledWith(ID, 1, { countedQuantity: 10 });
+    expect(await screen.findByText('10 cái')).toBeInTheDocument();
+    expect(screen.getByText(/phiếu ghi theo cái/)).toBeInTheDocument();
+  });
+
+  it('đặt mã mới cho cả nhóm: tên chung, số cái, giá bán từng dòng → xem trước mã gốc + mã con', async () => {
+    const base = invoice().lines[0];
+    const lines = [
+      {
+        ...base,
+        lineNo: 1,
+        rawText: '1 bọc lô dính 150',
+        name: 'Lô dính',
+        quantity: 1,
+        unitPrice: 150_000,
+        lineTotal: 150_000,
+        issues: [],
+      },
+      {
+        ...base,
+        lineNo: 2,
+        rawText: '1 bọc lô dính 180',
+        name: 'lô dính to',
+        quantity: 1,
+        unitPrice: 180_000,
+        lineTotal: 180_000,
+        issues: [],
+      },
+    ];
+    api.getPurchaseImport.mockResolvedValue(invoice({ lines }));
+    api.updatePurchaseImportLine.mockResolvedValue(invoice({ lines }));
+    const user = userEvent.setup();
+    renderDrawer();
+
+    await user.click(await screen.findByRole('button', { name: 'Tích 2 dòng chưa có gợi ý' }));
+    await user.click(screen.getByRole('button', { name: 'Đặt mã mới (2)' }));
+    await user.type(await screen.findByLabelText('Tên chung cho cả nhóm (tuỳ chọn)'), 'Lô dính');
+    await user.click(screen.getByRole('button', { name: 'Đặt cho 2 dòng' }));
+    const counted = screen.getAllByPlaceholderText('theo gói');
+    await user.type(counted[0], '12');
+    await user.type(counted[1], '12');
+    const prices = screen
+      .getAllByRole('textbox')
+      .filter((el) => (el as HTMLInputElement).placeholder.startsWith('≈'));
+    await user.type(prices[0], '25.000');
+    await user.type(prices[1], '30.000');
+
+    expect(screen.getByText(/nhóm 2 mã \(mã gốc \+ 1 mã con\)/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Đặt mã mới' }));
+
+    await waitFor(() => expect(api.updatePurchaseImportLine).toHaveBeenCalledTimes(2));
+    expect(api.updatePurchaseImportLine).toHaveBeenCalledWith(ID, 1, {
+      newProductName: 'Lô dính',
+      newProductSalePrice: 25_000,
+      countedQuantity: 12,
+    });
+    expect(api.updatePurchaseImportLine).toHaveBeenCalledWith(ID, 2, {
+      newProductName: 'Lô dính',
+      newProductSalePrice: 30_000,
+      countedQuantity: 12,
+    });
+  });
+
+  it('cửa hàng đẩy KiotViet: hỏi tạo phiếu nói rõ tạo luôn phiếu tạm bên KiotViet', async () => {
+    api.getPurchaseImportCapabilities.mockResolvedValue({ ...capabilities, kiotVietPush: true });
+    api.getPurchaseImport.mockResolvedValue(
+      invoice({
+        lines: invoice().lines.map((l) => ({ ...l, status: 'Resolved', productId: 'p901' })),
+      })
+    );
+    const user = userEvent.setup();
+    renderDrawer();
+
+    await waitFor(() => expect(api.getPurchaseImportCapabilities).toHaveBeenCalled());
+    await user.click(await screen.findByRole('button', { name: 'Tạo phiếu nhập' }));
+    expect(
+      await screen.findByText(/Mã mới và phiếu nhập \(phiếu tạm\) được tạo luôn bên KiotViet/)
+    ).toBeInTheDocument();
+  });
+
+  it('phiếu đã tạo nhưng đẩy KiotViet lỗi → báo lỗi, bấm Đẩy lại', async () => {
+    api.getPurchaseImport.mockResolvedValue(
+      invoice({
+        status: 'Committed',
+        purchaseOrderId: 'po1',
+        purchaseOrderNumber: 'PO-20261019-001',
+        kiotVietPush: 'Failed',
+        kiotVietPushError: 'Mã chưa có bên KiotViet: SP900001',
+      })
+    );
+    api.pushPurchaseImportToKiotViet.mockResolvedValue(
+      invoice({
+        status: 'Committed',
+        purchaseOrderId: 'po1',
+        kiotVietPush: 'Pushed',
+        kiotVietPurchaseOrderCode: 'PN008801',
+      })
+    );
+    const user = userEvent.setup();
+    renderDrawer();
+
+    expect(await screen.findByText(/SP900001/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Đẩy lại' }));
+    expect(api.pushPurchaseImportToKiotViet).toHaveBeenCalledWith(ID);
+  });
+
+  it('phiếu đã sang KiotViet → hiện mã phiếu bên KiotViet', async () => {
+    api.getPurchaseImport.mockResolvedValue(
+      invoice({
+        status: 'Committed',
+        purchaseOrderId: 'po1',
+        purchaseOrderNumber: 'PO-20261019-001',
+        kiotVietPush: 'Pushed',
+        kiotVietPurchaseOrderCode: 'PN008801',
+      })
+    );
+    renderDrawer();
+
+    expect(await screen.findByText('PN008801')).toBeInTheDocument();
+    expect(screen.getByText(/phiếu tạm — hoàn thành bên KiotViet/)).toBeInTheDocument();
   });
 });

@@ -47,6 +47,28 @@ export function hasNumberIssue(line: IPurchaseImportLine): boolean {
   return line.issues.some((i) => i !== 'unit_converted' && i !== 'number_corrected');
 }
 
+/** Thành tiền dòng: số trên hoá đơn, không có thì SL × đơn giá. */
+export function lineTotalOf(line: IPurchaseImportLine): number | null {
+  if (line.lineTotal != null && line.lineTotal > 0) return line.lineTotal;
+  return line.quantity && line.unitPrice ? Math.round(line.quantity * line.unitPrice * 100) / 100 : null;
+}
+
+/** Giá nhập mỗi cái khi đã đếm số cái của gói (thành tiền / số cái); chưa đếm → null. */
+export function perPieceCost(line: IPurchaseImportLine, counted = line.countedQuantity): number | null {
+  const total = lineTotalOf(line);
+  return counted && counted > 0 && total ? Math.round((total / counted) * 100) / 100 : null;
+}
+
+/** Giá nhập đưa vào phiếu cho mỗi đơn vị (đã đếm thì mỗi cái). */
+export function receiptUnitCost(line: IPurchaseImportLine): number | null {
+  return perPieceCost(line) ?? line.unitPrice ?? (line.lineTotal && line.quantity ? line.lineTotal / line.quantity : null);
+}
+
+/** Giá bán gợi ý cho mã mới khi người duyệt bỏ trống: gấp đôi giá nhập, làm tròn lên nghìn (khớp Core-be). */
+export function suggestSalePrice(cost: number | null | undefined): number | null {
+  return cost && cost > 0 ? Math.ceil((cost * 2) / 1000) * 1000 : null;
+}
+
 /** Dòng còn phải quyết: chưa có mã (mã có sẵn hoặc tên mã mới) hoặc thiếu số (dòng bỏ không tính). */
 export function isLinePending(line: IPurchaseImportLine): boolean {
   if (line.status === 'Skipped') return false;

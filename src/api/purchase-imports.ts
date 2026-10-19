@@ -92,6 +92,12 @@ export async function commitPurchaseImport(id: string, allowDuplicate = false): 
   return response.data;
 }
 
+/** Đẩy lại phiếu nhập đã tạo sang KiotViet (lần trước lỗi). */
+export async function pushPurchaseImportToKiotViet(id: string): Promise<IPurchaseImport> {
+  const response = await axios.post<IPurchaseImport>(endpoints.purchaseImports.kiotVietPush(id));
+  return response.data;
+}
+
 export async function retryPurchaseImport(id: string): Promise<void> {
   await axios.post(endpoints.purchaseImports.retry(id));
 }

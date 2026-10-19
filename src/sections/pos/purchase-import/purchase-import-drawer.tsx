@@ -33,6 +33,8 @@ import {
   cancelPurchaseImport,
   commitPurchaseImport,
   updatePurchaseImportLine,
+  pushPurchaseImportToKiotViet,
+  getPurchaseImportCapabilities,
   getPurchaseImportConversation,
 } from 'src/api/purchase-imports';
 
@@ -106,6 +108,8 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
   const [duplicateCommit, setDuplicateCommit] = useState<string | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [creatingProducts, setCreatingProducts] = useState(false);
+  // Cửa hàng nối KiotViet + bật đẩy: tạo phiếu thì mã mới + phiếu nhập tạo luôn bên KiotViet.
+  const [kiotViet, setKiotViet] = useState({ push: false, draft: true });
 
   const [draft, setDraft] = useState('');
   const [photos, setPhotos] = useState<ComposerPhoto[]>([]);
@@ -116,6 +120,18 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
   const [highlight, setHighlight] = useState<number[]>([]);
   const [zoom, setZoom] = useState<{ slides: { src: string }[]; index: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    getPurchaseImportCapabilities()
+      .then(
+        (c) => alive && setKiotViet({ push: !!c.kiotVietPush, draft: c.kiotVietDraft !== false })
+      )
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Ảnh xem trước (blob:) thu hồi khi bỏ ảnh, gửi xong hoặc đóng drawer.
   const photosRef = useRef<ComposerPhoto[]>([]);
@@ -417,19 +433,53 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
       );
     if (item.status === 'Committed' && item.purchaseOrderId)
       return (
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Typography variant="body2" sx={{ flex: 1 }}>
-            Đã tạo phiếu nhập {item.purchaseOrderNumber ?? ''} (nháp).
-          </Typography>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() =>
-              onNavigate(paths.dashboard.pos.purchaseOrder.details(item.purchaseOrderId!))
-            }
-          >
-            Xem phiếu
-          </Button>
+        <Stack spacing={1}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="body2" sx={{ flex: 1 }}>
+              Đã tạo phiếu nhập {item.purchaseOrderNumber ?? ''} (nháp).
+              {item.kiotVietPush === 'Pushed' && (
+                <>
+                  {' '}
+                  Bên KiotViet: <strong>{item.kiotVietPurchaseOrderCode}</strong>
+                  {kiotViet.draft
+                    ? ' (phiếu tạm — hoàn thành bên KiotViet để cộng tồn, tính giá vốn)'
+                    : ''}
+                  .
+                </>
+              )}
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() =>
+                onNavigate(paths.dashboard.pos.purchaseOrder.details(item.purchaseOrderId!))
+              }
+            >
+              Xem phiếu
+            </Button>
+          </Stack>
+          {item.kiotVietPush === 'Failed' && (
+            <Alert
+              severity="warning"
+              action={
+                <LoadingButton
+                  size="small"
+                  color="warning"
+                  variant="contained"
+                  loading={working}
+                  onClick={() =>
+                    run(async () => {
+                      await pushPurchaseImportToKiotViet(item.id);
+                    }, 'Chưa đẩy được sang KiotViet.')
+                  }
+                >
+                  Đẩy lại
+                </LoadingButton>
+              }
+            >
+              Chưa đẩy được phiếu sang KiotViet: {item.kiotVietPushError || 'lỗi không rõ'}
+            </Alert>
+          )}
         </Stack>
       );
     if (!reviewing) return null;
@@ -516,6 +566,8 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
           }
         >
           Tạo phiếu nhập nháp từ hoá đơn này?
+          {kiotViet.push &&
+            ` Mã mới và phiếu nhập${kiotViet.draft ? ' (phiếu tạm)' : ''} được tạo luôn bên KiotViet.`}
         </Alert>
       );
     return (
