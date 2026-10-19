@@ -22,7 +22,7 @@ export const SAAS_PRIVACY: PolicyLanguage[] = [
   {
     lang: 'en',
     heading: 'Privacy Policy',
-    updated: 'Last updated: October 1, 2026',
+    updated: 'Last updated: October 19, 2026',
     intro:
       `${SAAS_PRODUCT_NAME} is a platform businesses (stores) use to run their teams: attendance, shifts, payroll, ` +
       'team chat and store reports. This policy explains what we collect when you use the app or a store’s website on ' +
@@ -41,6 +41,10 @@ export const SAAS_PRIVACY: PolicyLanguage[] = [
           '• Account: name, email, profile photo; Sign in with Apple or Google identifiers when you use them.',
           '• Location (GPS): only when you check in/out or count the cash drawer, to confirm you are at the store.',
           '• Face photos: taken at check-in and during face enrollment to verify it is really you.',
+          '• On-device face detection: during face enrollment and face check-in the app uses Google ML Kit on your ' +
+            'phone to find your face and head angle. Images are processed on the device and are not sent to Google; ML ' +
+            'Kit sends Google technical usage metrics (device model, OS and app version, processing time, image size, ' +
+            'error codes).',
           '• Work data: shifts, attendance, pay, requests, chat messages and anything you enter.',
           '• Device: push-notification token, app version, IP address and crash diagnostics.',
         ],
@@ -66,7 +70,8 @@ export const SAAS_PRIVACY: PolicyLanguage[] = [
         title: '5. Sharing',
         content: [
           'We do not sell personal data. Data is shared only with the store you work for, with service providers that ' +
-            'run the platform (cloud hosting, email and push notifications, AI when enabled), or when the law requires it.',
+            'run the platform (cloud hosting, email and push notifications, AI when enabled, Google ML Kit usage metrics), ' +
+            'or when the law requires it.',
         ],
       },
       {
@@ -74,6 +79,9 @@ export const SAAS_PRIVACY: PolicyLanguage[] = [
         content: [
           '• Data is encrypted in transit (HTTPS/TLS) and passwords are hashed.',
           '• Check-in photos and locations are kept as long as the related attendance and payroll records.',
+          '• Face enrollment photos are kept in private storage. A store manager may review a new enrollment before ' +
+            'it is used; the photos are deleted when you enroll again, when a manager removes your face, or when you ' +
+            'delete your account.',
           '• When you delete your account, your personal data is deleted or anonymised; your name remains on ' +
             'timesheets and payslips that already exist.',
         ],
@@ -97,7 +105,7 @@ export const SAAS_PRIVACY: PolicyLanguage[] = [
   {
     lang: 'vi',
     heading: 'Chính sách quyền riêng tư',
-    updated: 'Cập nhật lần cuối: 01/10/2026',
+    updated: 'Cập nhật lần cuối: 19/10/2026',
     intro:
       `${SAAS_PRODUCT_NAME} là nền tảng các doanh nghiệp (cửa hàng) dùng để quản lý đội ngũ: chấm công, ca làm, lương, ` +
       'nhắn tin nội bộ và báo cáo cửa hàng. Chính sách này mô tả thông tin chúng tôi thu thập khi bạn dùng ứng dụng ' +
@@ -116,6 +124,10 @@ export const SAAS_PRIVACY: PolicyLanguage[] = [
           '• Tài khoản: họ tên, email, ảnh đại diện; định danh Sign in with Apple hoặc Google khi bạn dùng.',
           '• Vị trí (GPS): chỉ khi chấm công hoặc kiểm tiền quầy, để xác nhận bạn đang ở cửa hàng.',
           '• Ảnh khuôn mặt: chụp khi chấm công và khi đăng ký khuôn mặt để xác thực đúng người.',
+          '• Nhận diện khuôn mặt trên máy: khi đăng ký và chấm công bằng khuôn mặt, ứng dụng dùng Google ML Kit ngay ' +
+            'trên điện thoại để tìm khuôn mặt và góc đầu. Ảnh được xử lý trên máy, không gửi cho Google; ML Kit gửi ' +
+            'cho Google số liệu kỹ thuật (dòng máy, phiên bản hệ điều hành và ứng dụng, thời gian xử lý, kích thước ' +
+            'ảnh, mã lỗi).',
           '• Dữ liệu công việc: ca làm, chấm công, lương, yêu cầu, tin nhắn và mọi thông tin bạn nhập.',
           '• Thiết bị: mã nhận thông báo, phiên bản ứng dụng, địa chỉ IP và thông tin lỗi.',
         ],
@@ -140,7 +152,8 @@ export const SAAS_PRIVACY: PolicyLanguage[] = [
         title: '5. Chia sẻ',
         content: [
           'Chúng tôi không bán dữ liệu cá nhân. Dữ liệu chỉ được chia sẻ với cửa hàng bạn làm việc, các nhà cung cấp vận ' +
-            'hành nền tảng (lưu trữ đám mây, email và thông báo, AI khi được bật), hoặc khi pháp luật yêu cầu.',
+            'hành nền tảng (lưu trữ đám mây, email và thông báo, AI khi được bật, số liệu sử dụng Google ML Kit), hoặc khi ' +
+            'pháp luật yêu cầu.',
         ],
       },
       {
@@ -148,6 +161,8 @@ export const SAAS_PRIVACY: PolicyLanguage[] = [
         content: [
           '• Dữ liệu được mã hoá khi truyền (HTTPS/TLS), mật khẩu được băm.',
           '• Ảnh và vị trí chấm công được lưu cùng thời hạn với bảng công, bảng lương liên quan.',
+          '• Ảnh đăng ký khuôn mặt được lưu riêng tư. Quản lý cửa hàng có thể duyệt lần đăng ký mới trước khi dùng; ' +
+            'ảnh bị xoá khi bạn đăng ký lại, khi quản lý huỷ khuôn mặt hoặc khi bạn xoá tài khoản.',
           '• Khi bạn xoá tài khoản, dữ liệu cá nhân được xoá hoặc ẩn danh; họ tên vẫn giữ trên bảng công, bảng lương đã ' +
             'phát sinh.',
         ],
