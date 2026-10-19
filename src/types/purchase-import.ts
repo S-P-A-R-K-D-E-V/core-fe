@@ -39,6 +39,15 @@ export interface IPurchaseImportLine {
   suggestedProductId?: string | null;
   productId?: string | null;
   resolution: string;
+  /** Ảnh sản phẩm gắn với dòng — id trong `productImages`, url đã ký (ghép getStorageUrl). */
+  imageId?: string | null;
+  imageUrl?: string | null;
+}
+
+/** Ảnh của lần nhập: `id` dùng để gắn vào dòng, `url` đã ký (ghép getStorageUrl). */
+export interface IPurchaseImportImage {
+  id: string;
+  url: string;
 }
 
 export interface IPurchaseImport {
@@ -65,6 +74,44 @@ export interface IPurchaseImport {
   createdAt: string;
   updatedAt: string;
   lines: IPurchaseImportLine[];
+  /** Ảnh chụp món hàng (không phải tờ hoá đơn) — tách khi đọc hoặc gửi thêm khi trao đổi với trợ lý. */
+  productImages?: IPurchaseImportImage[];
+  /** Số tin đã trao đổi với trợ lý về lần nhập này. */
+  conversationCount?: number;
+}
+
+/** Một tin trao đổi với trợ lý về lần nhập. */
+export interface IPurchaseImportMessage {
+  role: 'user' | 'assistant';
+  /** Markdown nhẹ (trợ lý: đã kèm thay đổi đã áp, kết quả đối chiếu). */
+  text: string;
+  images: IPurchaseImportImage[];
+  changes: string[];
+  at: string;
+}
+
+/** Phiếu nhập cũ của cùng NCC giống hoá đơn đang duyệt. */
+export interface IPurchaseImportDuplicate {
+  purchaseOrderId: string;
+  orderNumber: string;
+  date: string;
+  total: number;
+  status: string;
+  matchedLines: number;
+  importLines: number;
+  totalMatches: boolean;
+}
+
+export interface IPurchaseImportAssistResponse {
+  reply: string;
+  changes: string[];
+  /** Số dòng vừa đổi — đánh dấu trên màn hình. */
+  changedLines: number[];
+  /** Lần nhập đang đọc lại ảnh — hỏi lại tới khi hết Extracting. */
+  rereading: boolean;
+  duplicates: IPurchaseImportDuplicate[];
+  import: IPurchaseImport;
+  conversation: IPurchaseImportMessage[];
 }
 
 export interface IPurchaseImportSummary {
@@ -96,4 +143,6 @@ export interface IUpdatePurchaseImportLineRequest {
   quantity?: number | null;
   unitPrice?: number | null;
   lineTotal?: number | null;
+  /** Gắn ảnh sản phẩm của lần nhập vào dòng (id trong `productImages`); chuỗi rỗng = gỡ. */
+  imageId?: string | null;
 }

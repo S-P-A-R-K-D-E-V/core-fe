@@ -4,7 +4,9 @@ import axios, { endpoints } from 'src/utils/axios';
 
 import type {
   IPurchaseImport,
+  IPurchaseImportMessage,
   IPurchaseImportSummary,
+  IPurchaseImportAssistResponse,
   IPurchaseImportCapabilities,
   IUpdatePurchaseImportRequest,
   IUpdatePurchaseImportLineRequest,
@@ -93,4 +95,23 @@ export async function retryPurchaseImport(id: string): Promise<void> {
 
 export async function cancelPurchaseImport(id: string): Promise<void> {
   await axios.post(endpoints.purchaseImports.cancel(id));
+}
+
+export async function getPurchaseImportConversation(id: string): Promise<IPurchaseImportMessage[]> {
+  const response = await axios.get<IPurchaseImportMessage[]>(endpoints.purchaseImports.conversation(id));
+  return response.data;
+}
+
+/** Trợ lý đọc ảnh + trạng thái lần nhập rồi sửa — chạy đồng bộ (thường 5–30 giây, tối đa ~90 giây). */
+const ASSIST_TIMEOUT_MS = 120_000;
+
+/** Nhắn trợ lý về lần nhập (câu tự do, kèm ảnh sản phẩm đã tải lên bằng `uploadInvoiceImages`). */
+export async function assistPurchaseImport(
+  id: string,
+  data: { message?: string | null; objectKeys?: string[] }
+): Promise<IPurchaseImportAssistResponse> {
+  const response = await axios.post<IPurchaseImportAssistResponse>(endpoints.purchaseImports.assist(id), data, {
+    timeout: ASSIST_TIMEOUT_MS,
+  });
+  return response.data;
 }

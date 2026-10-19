@@ -34,6 +34,12 @@ import type {
 
 import PurchaseImportProductPicker from './purchase-import-product-picker';
 import {
+  openPurchaseImportDrawer,
+  PURCHASE_IMPORT_CHANGED_EVENT,
+  announcePurchaseImportChange,
+  type PurchaseImportChangedDetail,
+} from './purchase-import-events';
+import {
   lineCounts,
   issueLabel,
   IMPORT_STATUS,
@@ -46,21 +52,21 @@ import {
 
 // ----------------------------------------------------------------------
 // Thẻ hoá đơn nhập trong khung chat trợ lý (khối "purchase-import"): tự tải lần nhập bằng quyền của người dùng, chọn mã
-// cho các dòng chưa khớp, bỏ dòng, tạo phiếu nháp. Sửa số / tạo mã mới / đổi NCC → màn duyệt đầy đủ.
+// cho các dòng chưa khớp, bỏ dòng, tạo phiếu nháp. Bấm thẻ / "Xem & trao đổi" → drawer duyệt nhanh bên phải (xem ảnh,
+// nhắn trợ lý sửa lần nhập); trang duyệt đầy đủ mở từ drawer.
 // ----------------------------------------------------------------------
 
 const POLL_MS = 3000;
 
-// Một lần nhập hiện ở nhiều tin (tin gửi ảnh, mỗi lần nhắn sửa dòng lại kèm thẻ mới): thẻ nào đổi / thẻ mới xuất hiện
-// thì báo, các thẻ khác của cùng lần nhập tải lại. Bỏ qua tin báo trong lúc cả loạt thẻ vừa mở (tải lịch sử).
-const CHANGED_EVENT = 'purchase-import:changed';
+// Một lần nhập hiện ở nhiều tin (tin gửi ảnh, mỗi lần nhắn sửa dòng lại kèm thẻ mới) và trong drawer duyệt nhanh: nơi
+// nào đổi / thẻ mới xuất hiện thì báo, các nơi khác của cùng lần nhập tải lại. Bỏ qua tin báo trong lúc cả loạt thẻ
+// vừa mở (tải lịch sử).
+const CHANGED_EVENT = PURCHASE_IMPORT_CHANGED_EVENT;
 const SETTLE_MS = 1500;
 
-type ChangedDetail = { importId: string; source: string };
+type ChangedDetail = PurchaseImportChangedDetail;
 
-function announceChange(importId: string, source: string) {
-  window.dispatchEvent(new CustomEvent<ChangedDetail>(CHANGED_EVENT, { detail: { importId, source } }));
-}
+const announceChange = announcePurchaseImportChange;
 /** Khung chat ở zIndex 1400 — danh sách gợi ý phải nổi trên nó. */
 const POPPER_Z = 1500;
 
@@ -190,7 +196,6 @@ export default function PurchaseImportChatCard({ importId, onNavigate }: Props) 
   const settled = active.filter((l) => !pending.includes(l));
   const counts = lineCounts(item);
   const blockers = commitBlockers(item);
-  const reviewHref = paths.dashboard.pos.purchaseOrder.importDetails(item.id);
 
   const renderPendingLine = (line: IPurchaseImportLine) => {
     const busy = busyLine === line.lineNo;
@@ -210,8 +215,8 @@ export default function PurchaseImportChatCard({ importId, onNavigate }: Props) 
         </Stack>
         {hasNumberIssue(line) && (
           <Typography variant="caption" sx={{ color: 'warning.main', display: 'block' }}>
-            {line.issues.filter((i) => i !== 'unit_converted').map(issueLabel).join(' · ')} — sửa số trong
-            màn duyệt
+            {line.issues.filter((i) => i !== 'unit_converted').map(issueLabel).join(' · ')} — nhắn trợ lý
+            trong «Xem & trao đổi»
           </Typography>
         )}
 
@@ -274,7 +279,22 @@ export default function PurchaseImportChatCard({ importId, onNavigate }: Props) 
 
   return (
     <Card variant="outlined" sx={{ p: 1.5, minWidth: 0 }}>
-      <Stack direction="row" spacing={1} alignItems="center">
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        role="button"
+        tabIndex={0}
+        title="Mở drawer duyệt nhanh"
+        onClick={() => openPurchaseImportDrawer(item.id)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openPurchaseImportDrawer(item.id);
+          }
+        }}
+        sx={{ cursor: 'pointer', borderRadius: 1, '&:hover .import-open-hint': { color: 'primary.main' } }}
+      >
         <Iconify icon="solar:bill-list-bold-duotone" width={22} sx={{ color: 'primary.main', flexShrink: 0 }} />
         <Typography variant="subtitle2" sx={{ flex: 1, minWidth: 0 }} noWrap>
           {item.supplierName || item.supplierText || 'Chưa rõ nhà cung cấp'}
@@ -283,6 +303,12 @@ export default function PurchaseImportChatCard({ importId, onNavigate }: Props) 
         <Label color={status.color} sx={{ flexShrink: 0 }}>
           {status.label}
         </Label>
+        <Iconify
+          className="import-open-hint"
+          icon="solar:sidebar-minimalistic-linear"
+          width={18}
+          sx={{ color: 'text.disabled', flexShrink: 0, transform: 'scaleX(-1)' }}
+        />
       </Stack>
 
       {item.status === 'Extracting' && (
@@ -418,8 +444,8 @@ export default function PurchaseImportChatCard({ importId, onNavigate }: Props) 
           ) : (
             !duplicate && (
               <Stack direction="row" spacing={1} justifyContent="flex-end" flexWrap="wrap" useFlexGap>
-                <Button size="small" color="inherit" onClick={() => onNavigate(reviewHref)}>
-                  Mở màn duyệt
+                <Button size="small" color="inherit" onClick={() => openPurchaseImportDrawer(item.id)}>
+                  Xem & trao đổi
                 </Button>
                 <Button
                   size="small"

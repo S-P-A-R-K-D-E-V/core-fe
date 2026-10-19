@@ -624,6 +624,8 @@ export const endpoints = {
     commit: (id: string) => `/purchase-imports/${id}/commit`,
     retry: (id: string) => `/purchase-imports/${id}/retry`,
     cancel: (id: string) => `/purchase-imports/${id}/cancel`,
+    conversation: (id: string) => `/purchase-imports/${id}/conversation`,
+    assist: (id: string) => `/purchase-imports/${id}/assist`,
   },
   customers: {
     list: '/customers',

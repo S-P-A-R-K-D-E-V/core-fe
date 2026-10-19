@@ -17,10 +17,13 @@ import { useCopyToClipboard } from 'src/hooks/use-copy-to-clipboard';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { chatbotCallbackOrder, getChatbotCapabilities } from 'src/api/chatbot';
+import type { ChatbotMessage } from 'src/api/chatbot';
 
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 import { useStoreBrand } from 'src/components/branding';
+
+import PurchaseImportDrawerHost from 'src/sections/pos/purchase-import/purchase-import-drawer-host';
 
 import ChatbotMessages from './chatbot-messages';
 import { suggestionsOf, normalizeChatbotBlocks } from './chatbot-blocks';
@@ -102,9 +105,11 @@ type Props = {
    * chiếm hết khung cha, không có nút tròn / mở rộng / đóng.
    */
   variant?: 'floating' | 'page';
+  /** Báo danh sách tin mỗi lần đổi — trang Chatbot nội bộ dựng cột "Tệp đã tải lên" / "Phiên nhập" từ đây. */
+  onMessagesChange?: (messages: ChatbotMessage[]) => void;
 };
 
-export default function ChatbotWidget({ defaultOpen = false, variant = 'floating' }: Props) {
+export default function ChatbotWidget({ defaultOpen = false, variant = 'floating', onMessagesChange }: Props) {
   const inPage = variant === 'page';
   const { user, loading: authLoading } = useAuthContext();
   // Tên xưng hô trong khung chat theo cửa hàng đang mở (CiCi giữ "CiCi").
@@ -174,6 +179,10 @@ export default function ChatbotWidget({ defaultOpen = false, variant = 'floating
     // phiên — không mở một phiên khách thừa rồi mở lại ngay.
     enabled: !authLoading && storageLoaded,
   });
+
+  useEffect(() => {
+    onMessagesChange?.(messages);
+  }, [messages, onMessagesChange]);
 
   // Chấm "chưa đọc": có câu trả lời hoàn tất trong lúc khung đang đóng; mở khung thì xoá.
   useEffect(() => {
@@ -512,6 +521,8 @@ export default function ChatbotWidget({ defaultOpen = false, variant = 'floating
             onSend={handleSend}
             onLocalCommand={handleLocalCommand}
           />
+
+          {user && <PurchaseImportDrawerHost onNavigate={handleNavigate} />}
         </>
       )}
     </>
