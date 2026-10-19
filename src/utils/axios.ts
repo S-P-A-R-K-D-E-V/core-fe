@@ -490,6 +490,9 @@ export const endpoints = {
     enrollBatch: '/face-tracking/enroll/batch',
     verifySelf: '/face-tracking/verify-self',
     enrollCameras: '/face-tracking/enroll/cameras',
+    enrollmentRequests: '/face-tracking/enrollment-requests',
+    approveEnrollment: (id: string) => `/face-tracking/enrollment-requests/${id}/approve`,
+    rejectEnrollment: (id: string) => `/face-tracking/enrollment-requests/${id}/reject`,
   },
   notificationConfig: {
     list: '/notification/config',

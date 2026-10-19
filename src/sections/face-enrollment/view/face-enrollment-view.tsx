@@ -186,6 +186,8 @@ export default function FaceEnrollmentView() {
   const [hint, setHint] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  /** Máy chủ giữ khuôn mặt mới chờ quản lý duyệt (lần đầu, hoặc khác khuôn mặt đang dùng). */
+  const [pendingApproval, setPendingApproval] = useState(false);
   const [failedReason, setFailedReason] = useState<string | null>(null);
 
   // ── Nguồn ảnh: camera máy này hoặc camera chấm công của chi nhánh (ảnh độ phân giải cao do agent chụp). ──
@@ -278,7 +280,8 @@ export default function FaceEnrollmentView() {
     setSubmitting(true);
     setFailedReason(null);
     try {
-      await submitFaceEnrollment(finalImages);
+      const saved = await submitFaceEnrollment(finalImages);
+      setPendingApproval(saved?.status === 'PendingApproval');
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       setDone(true);
@@ -443,12 +446,18 @@ export default function FaceEnrollmentView() {
           </Card>
         ) : done ? (
           <Card sx={{ p: 5, textAlign: 'center' }}>
-            <Iconify icon="mdi:check-decagram" width={64} sx={{ color: 'success.main', mb: 2 }} />
+            <Iconify
+              icon={pendingApproval ? 'mdi:timer-sand' : 'mdi:check-decagram'}
+              width={64}
+              sx={{ color: pendingApproval ? 'warning.main' : 'success.main', mb: 2 }}
+            />
             <Typography variant="h5" sx={{ mb: 1 }}>
-              Đăng ký khuôn mặt thành công!
+              {pendingApproval ? 'Đã gửi — chờ quản lý duyệt' : 'Đăng ký khuôn mặt thành công!'}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Bạn có thể dùng khuôn mặt để chấm công tại quầy từ bây giờ.
+              {pendingApproval
+                ? 'Quản lý sẽ xem ảnh và duyệt. Trong lúc chờ, bạn vẫn chấm công bằng khuôn mặt cũ (nếu đã có).'
+                : 'Bạn có thể dùng khuôn mặt để chấm công tại quầy từ bây giờ.'}
             </Typography>
             <Button variant="contained" size="large" onClick={() => router.push(paths.dashboard.root)}>
               Về trang chủ

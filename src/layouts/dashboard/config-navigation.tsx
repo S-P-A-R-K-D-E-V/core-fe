@@ -247,6 +247,14 @@ export function useNavData(
             roles: ['Admin', 'Manager', 'Staff'],
             featureKey: 'workforce.attendance',
           },
+          // Duyệt đăng ký khuôn mặt của nhân viên — theo quyền user.update (Core-be).
+          {
+            title: t('faceApprovals'),
+            path: paths.dashboard.attendance.faceApprovals,
+            icon: ICONS.user,
+            permissions: [PERMISSIONS.user.update],
+            featureKey: 'workforce.attendance',
+          },
           // Chấm công trực tiếp: camera quầy + ca hôm nay + người camera thấy, theo chi nhánh — chỉ chủ cửa hàng.
           {
             title: 'Chấm công trực tiếp',

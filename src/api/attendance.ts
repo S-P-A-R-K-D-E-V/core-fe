@@ -301,20 +301,25 @@ export async function checkIn(data: ICheckInRequest): Promise<IAttendanceLog> {
 }
 
 /** Thiết lập chấm công của cửa hàng. Máy chủ cũ chưa có endpoint → coi như tắt bắt buộc khuôn mặt. */
-export async function getAttendanceSettings(): Promise<{ requireFaceVerification: boolean }> {
+export type AttendanceSettings = { requireFaceVerification: boolean; requireFaceEnrollmentApproval: boolean };
+
+export async function getAttendanceSettings(): Promise<AttendanceSettings> {
   try {
-    const response = await axios.get<{ requireFaceVerification: boolean }>(endpoints.attendance.settings);
-    return { requireFaceVerification: !!response.data?.requireFaceVerification };
+    const response = await axios.get<Partial<AttendanceSettings>>(endpoints.attendance.settings);
+    return {
+      requireFaceVerification: !!response.data?.requireFaceVerification,
+      // Máy chủ cũ chưa có công tắc này → coi như bật (mặc định của máy chủ mới).
+      requireFaceEnrollmentApproval: response.data?.requireFaceEnrollmentApproval ?? true,
+    };
   } catch {
-    return { requireFaceVerification: false };
+    return { requireFaceVerification: false, requireFaceEnrollmentApproval: true };
   }
 }
 
 /** Bật / tắt "Bắt buộc xác minh khuôn mặt" (quyền attendance.adjust). */
-export async function updateAttendanceSettings(data: {
-  requireFaceVerification: boolean;
-}): Promise<{ requireFaceVerification: boolean }> {
-  const response = await axios.put<{ requireFaceVerification: boolean }>(endpoints.attendance.settings, data);
+/** Chỉ đổi công tắc được gửi. */
+export async function updateAttendanceSettings(data: Partial<AttendanceSettings>): Promise<AttendanceSettings> {
+  const response = await axios.put<AttendanceSettings>(endpoints.attendance.settings, data);
   return response.data;
 }
 
