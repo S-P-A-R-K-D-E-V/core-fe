@@ -32,9 +32,10 @@ import PurchaseImportProductPicker from './purchase-import-product-picker';
 import { issueLabel, LINE_STATUS, parseAmount } from './purchase-import-utils';
 
 // ----------------------------------------------------------------------
-// Một dòng hoá đơn trong drawer duyệt nhanh, gọn như một hàng trên toa: [tích tạo mã mới] số dòng · chữ gốc · SL × giá =
-// tiền · trạng thái; hàng dưới là mã đã chốt, hoặc gợi ý số 1 kèm "Đúng". Bấm ▾ mở thêm: các gợi ý khác (kèm lý do),
-// tìm mã, sửa số, bỏ dòng, gắn ảnh sản phẩm. Dòng trợ lý / người duyệt vừa sửa được tô sáng.
+// Một dòng hoá đơn trong drawer duyệt nhanh, gọn như một hàng trên toa: [tích tạo mã mới] số dòng · TÊN hàng (chữ gốc
+// nhỏ bên dưới) · SL × giá = tiền · trạng thái; hàng dưới là mã đã chốt / mã mới sẽ tạo / gợi ý số 1 kèm "Đúng". Bấm ▾
+// mở thêm: gợi ý khác (kèm lý do), tìm mã có sẵn, hoặc đặt tên MÃ MỚI (tạo khi tạo phiếu nhập), sửa số, bỏ dòng, gắn
+// ảnh sản phẩm. Dòng trợ lý / người duyệt vừa sửa được tô sáng.
 // ----------------------------------------------------------------------
 
 /** Drawer ở zIndex 1450 — danh sách gợi ý / menu phải nổi trên nó. */
@@ -55,6 +56,8 @@ type Props = {
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
+  /** Được đặt tên mã mới (quyền tạo sản phẩm). */
+  canCreateProduct?: boolean;
 };
 
 function PurchaseImportDrawerLine({
@@ -69,32 +72,40 @@ function PurchaseImportDrawerLine({
   selectable = false,
   selected = false,
   onToggleSelect,
+  canCreateProduct = false,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [editingNumbers, setEditingNumbers] = useState(false);
   const [quantity, setQuantity] = useState('');
   const [unitPrice, setUnitPrice] = useState('');
   const [lineTotal, setLineTotal] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newPrice, setNewPrice] = useState('');
   const [imageMenu, setImageMenu] = useState<HTMLElement | null>(null);
 
   const skipped = line.status === 'Skipped';
+  const name = (line.sameAsAbove ? familyName : line.name) || null;
   const chosen = line.productId
     ? line.candidates.find((c) => c.productId === line.productId)
     : undefined;
-  const top = !chosen ? line.candidates[0] : undefined;
+  const pendingNew = !line.productId && !!line.newProductName;
+  const top = !chosen && !pendingNew ? line.candidates[0] : undefined;
   const others = line.candidates
     .filter((c) => c.productId !== line.productId && c.productId !== top?.productId)
     .slice(0, 3);
-  const status = LINE_STATUS[line.status];
+  const status = pendingNew
+    ? { label: 'Mã mới', color: 'info' as const }
+    : LINE_STATUS[line.status];
   const imageIndex = line.imageId ? productImages.findIndex((i) => i.id === line.imageId) : -1;
   const issues = line.issues.filter((i) => i !== 'unit_converted');
-  const showName =
-    !line.sameAsAbove &&
-    !!line.name &&
-    !line.rawText.toLowerCase().includes(line.name.toLowerCase());
 
   // Chọn xong (hoặc dữ liệu tải lại) thì thu gọn.
-  useEffect(() => setExpanded(false), [line.productId, line.status]);
+  useEffect(() => setExpanded(false), [line.productId, line.status, line.newProductName]);
+  useEffect(() => {
+    if (!expanded) return;
+    setNewName(line.newProductName || name || '');
+    setNewPrice(line.newProductSalePrice ? String(line.newProductSalePrice) : '');
+  }, [expanded, line.newProductName, line.newProductSalePrice, name]);
   useEffect(() => {
     if (!editingNumbers) return;
     setQuantity(line.quantity != null ? String(line.quantity) : '');
@@ -114,6 +125,12 @@ function PurchaseImportDrawerLine({
     if (Object.keys(patch).length > 0) onSave(patch);
   };
 
+  const applyNewProduct = () => {
+    const text = newName.trim();
+    if (!text) return;
+    onSave({ newProductName: text, newProductSalePrice: parseAmount(newPrice) });
+  };
+
   return (
     <Box
       sx={{
@@ -126,7 +143,7 @@ function PurchaseImportDrawerLine({
         bgcolor: (theme) => (highlighted ? alpha(theme.palette.success.main, 0.1) : 'transparent'),
       }}
     >
-      {/* Hàng 1: như trên toa */}
+      {/* Hàng 1: tên hàng như trên toa */}
       <Stack direction="row" spacing={0.75} alignItems="center">
         {selectable ? (
           <Checkbox
@@ -134,7 +151,7 @@ function PurchaseImportDrawerLine({
             checked={selected}
             onChange={onToggleSelect}
             inputProps={{ 'aria-label': `Tạo mã mới cho dòng ${line.lineNo}` }}
-            title="Tích để tạo mã mới cho dòng này"
+            title="Tích để đặt mã mới cho dòng này"
             sx={{ p: 0.25 }}
           />
         ) : (
@@ -147,18 +164,24 @@ function PurchaseImportDrawerLine({
           {line.lineNo}
         </Typography>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="body2" sx={{ fontFamily: 'monospace' }} noWrap title={line.rawText}>
-            {line.rawText}
+          <Typography variant="subtitle2" noWrap title={name ?? line.rawText}>
+            {line.sameAsAbove ? '″ ' : ''}
+            {name ?? line.rawText}
+            {line.unitText ? ` · ${line.unitText}` : ''}
           </Typography>
-          {showName && (
+          {name && (
             <Typography
               variant="caption"
-              color="text.secondary"
               noWrap
-              sx={{ display: 'block', lineHeight: 1.2 }}
+              title="Chữ trên hoá đơn"
+              sx={{
+                display: 'block',
+                color: 'text.disabled',
+                fontFamily: 'monospace',
+                lineHeight: 1.2,
+              }}
             >
-              {line.name}
-              {line.unitText ? ` · ${line.unitText}` : ''}
+              {line.rawText}
             </Typography>
           )}
         </Box>
@@ -189,7 +212,7 @@ function PurchaseImportDrawerLine({
           />
         )}
         {editable && !skipped && (
-          <Tooltip title={expanded ? 'Thu gọn' : 'Chọn mã khác, sửa số, bỏ dòng…'}>
+          <Tooltip title={expanded ? 'Thu gọn' : 'Chọn mã khác, tạo mã mới, sửa số, bỏ dòng…'}>
             <IconButton size="small" onClick={() => setExpanded((v) => !v)} sx={{ flexShrink: 0 }}>
               <Iconify
                 icon="eva:arrow-ios-downward-fill"
@@ -204,7 +227,7 @@ function PurchaseImportDrawerLine({
         )}
       </Stack>
 
-      {/* Hàng 2: mã đã chốt / gợi ý số 1 */}
+      {/* Hàng 2: mã đã chốt / mã mới sẽ tạo / gợi ý số 1 */}
       {!skipped && (
         <Stack
           direction="row"
@@ -221,6 +244,37 @@ function PurchaseImportDrawerLine({
               />
               <strong>{chosen.code}</strong> — {chosen.name}
             </Typography>
+          ) : pendingNew ? (
+            <>
+              <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }}>
+                <Iconify
+                  icon="mingcute:add-circle-fill"
+                  width={14}
+                  sx={{ color: 'info.main', mr: 0.5, verticalAlign: -2 }}
+                />
+                Mã mới <strong>«{line.newProductName}»</strong>
+                {line.newProductSalePrice
+                  ? ` · giá bán ${fCurrency(line.newProductSalePrice)}`
+                  : ''}
+                <Box
+                  component="span"
+                  sx={{ color: 'text.secondary', ml: 0.75, typography: 'caption' }}
+                >
+                  tạo khi tạo phiếu nhập
+                </Box>
+              </Typography>
+              {editable && (
+                <Button
+                  size="small"
+                  color="inherit"
+                  disabled={busy}
+                  onClick={() => onSave({ newProductName: '' })}
+                  sx={{ flexShrink: 0, minWidth: 0, px: 1 }}
+                >
+                  Bỏ
+                </Button>
+              )}
+            </>
           ) : top ? (
             <>
               <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }} title={top.reason}>
@@ -250,8 +304,7 @@ function PurchaseImportDrawerLine({
             </>
           ) : (
             <Typography variant="caption" color="error.main" sx={{ flex: 1 }}>
-              Chưa có mã{line.sameAsAbove && familyName ? ` — như trên (${familyName})` : ''} — chọn
-              mã hoặc tích để tạo mã mới
+              Chưa có mã — chọn mã có sẵn hoặc đặt mã mới (▾)
             </Typography>
           )}
         </Stack>
@@ -278,9 +331,9 @@ function PurchaseImportDrawerLine({
         </Stack>
       )}
 
-      {/* Mở thêm: gợi ý khác, tìm mã, sửa số, bỏ dòng, gắn ảnh */}
+      {/* Mở thêm: gợi ý khác, tìm mã, mã mới, sửa số, bỏ dòng, gắn ảnh */}
       <Collapse in={expanded && editable} unmountOnExit>
-        <Stack spacing={0.75} sx={{ pl: '50px', mt: 0.75 }}>
+        <Stack spacing={1} sx={{ pl: '50px', mt: 0.75 }}>
           {others.map((c) => (
             <Stack key={c.productId} direction="row" spacing={1} alignItems="center">
               <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -307,12 +360,42 @@ function PurchaseImportDrawerLine({
               </Button>
             </Stack>
           ))}
+
           <PurchaseImportProductPicker
-            defaultKeyword={line.name || familyName || undefined}
+            defaultKeyword={name || undefined}
             disabled={busy}
             popperZIndex={DRAWER_POPPER_Z}
             onPick={(product) => onSave({ productId: product.id })}
           />
+
+          {canCreateProduct && (
+            <Stack direction="row" spacing={0.75} alignItems="center">
+              <TextField
+                size="small"
+                label="Hoặc tạo mã mới — tên sản phẩm"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && applyNewProduct()}
+                sx={{ flex: 2 }}
+              />
+              <TextField
+                size="small"
+                label="Giá bán (tuỳ chọn)"
+                value={newPrice}
+                onChange={(e) => setNewPrice(e.target.value)}
+                sx={{ flex: 1 }}
+              />
+              <Button
+                size="small"
+                variant="outlined"
+                disabled={busy || !newName.trim()}
+                onClick={applyNewProduct}
+                sx={{ flexShrink: 0 }}
+              >
+                Dùng mã mới
+              </Button>
+            </Stack>
+          )}
 
           {editingNumbers && (
             <Stack direction="row" spacing={0.75} alignItems="center">

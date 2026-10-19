@@ -47,10 +47,10 @@ export function hasNumberIssue(line: IPurchaseImportLine): boolean {
   return line.issues.some((i) => i !== 'unit_converted' && i !== 'number_corrected');
 }
 
-/** Dòng còn phải quyết: chưa có mã hoặc thiếu số (dòng bỏ không tính). */
+/** Dòng còn phải quyết: chưa có mã (mã có sẵn hoặc tên mã mới) hoặc thiếu số (dòng bỏ không tính). */
 export function isLinePending(line: IPurchaseImportLine): boolean {
   if (line.status === 'Skipped') return false;
-  return !line.productId || !(line.quantity && line.quantity > 0) || !((line.unitPrice ?? 0) > 0 || (line.lineTotal ?? 0) > 0);
+  return !(line.productId || line.newProductName) || !(line.quantity && line.quantity > 0) || !((line.unitPrice ?? 0) > 0 || (line.lineTotal ?? 0) > 0);
 }
 
 /** Lý do chưa tạo được phiếu — rỗng là tạo được. */

@@ -388,7 +388,7 @@ export default function PurchaseImportChatCard({ importId, onNavigate }: Props) 
                       <Stack key={line.lineNo} direction="row" spacing={1} alignItems="center">
                         <Typography variant="caption" sx={{ flex: 1, minWidth: 0 }} noWrap>
                           {line.lineNo}. {line.name || line.rawText} →{' '}
-                          <strong>{chosen ? `${chosen.code} ${chosen.name}` : 'đã chọn'}</strong>
+                          <strong>{chosen ? `${chosen.code} ${chosen.name}` : line.newProductName ? `mã mới «${line.newProductName}»` : 'đã chọn'}</strong>
                         </Typography>
                         <Button
                           size="small"

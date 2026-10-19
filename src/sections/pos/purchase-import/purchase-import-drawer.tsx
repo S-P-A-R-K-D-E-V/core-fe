@@ -66,7 +66,8 @@ import {
 } from './purchase-import-utils';
 
 // ----------------------------------------------------------------------
-// Drawer duyệt nhanh một lần nhập từ ảnh (mở từ thẻ hoá đơn trong chat / cột "Phiên nhập"). Màn rộng: 3 cột — ảnh hoá
+// Drawer duyệt nhanh một lần nhập từ ảnh (mở từ thẻ hoá đơn trong chat / cột "Phiên nhập"). Màn vừa (iPad): 2 cột dòng
+// hàng (tab Ảnh) | trao đổi. Màn rộng: 3 cột — ảnh hoá
 // đơn + ảnh sản phẩm | dòng hàng theo đúng hoá đơn (dòng cùng loại "như trên" gom nhóm), nhà cung cấp, tích dòng để tạo
 // mã mới | trò chuyện với trợ lý (câu tự do + ảnh sản phẩm, trợ lý sửa lần nhập). Màn hẹp: 3 tab. Trang duyệt đầy đủ mở
 // từ nút ở đầu drawer.
@@ -89,6 +90,7 @@ type Props = {
 export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: Props) {
   const instanceId = useId();
   const wide = useResponsive('up', 'lg');
+  const medium = useResponsive('up', 'md');
   const access = usePurchaseAccess();
   const [item, setItem] = useState<IPurchaseImport | null>(null);
   const [messages, setMessages] = useState<IPurchaseImportMessage[]>([]);
@@ -100,6 +102,7 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
   const [working, setWorking] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [confirmReread, setConfirmReread] = useState(false);
   const [duplicateCommit, setDuplicateCommit] = useState<string | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [creatingProducts, setCreatingProducts] = useState(false);
@@ -195,7 +198,7 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
   const canCreateProducts = access.canCreateProducts && reviewing;
   const selectable = useCallback(
     (line: IPurchaseImportLine) =>
-      canCreateProducts && line.status !== 'Skipped' && !line.productId,
+      canCreateProducts && line.status !== 'Skipped' && !line.productId && !line.newProductName,
     [canCreateProducts]
   );
 
@@ -278,7 +281,7 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
     const sentPhotos = photos;
     setSending(true);
     setSendError(null);
-    if (!wide) setTab('chat');
+    if (!medium) setTab('chat');
     setPending({ text: message, images: sentPhotos.map((p) => p.preview) });
     setDraft('');
     try {
@@ -454,6 +457,39 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
           {duplicateCommit}
         </Alert>
       );
+    if (confirmReread)
+      return (
+        <Alert
+          severity="info"
+          action={
+            <Stack direction="row" spacing={0.5}>
+              <LoadingButton
+                size="small"
+                variant="contained"
+                loading={working}
+                onClick={() =>
+                  run(async () => {
+                    await retryPurchaseImport(item.id);
+                    setConfirmReread(false);
+                  }, 'Không đọc lại được.')
+                }
+              >
+                Đọc lại
+              </LoadingButton>
+              <Button
+                size="small"
+                color="inherit"
+                disabled={working}
+                onClick={() => setConfirmReread(false)}
+              >
+                Thôi
+              </Button>
+            </Stack>
+          }
+        >
+          Đọc lại ảnh hoá đơn và gợi ý mã lại từ đầu? Mã đã chọn / mã mới đã đặt sẽ được gợi ý lại.
+        </Alert>
+      );
     if (confirming)
       return (
         <Alert
@@ -490,6 +526,16 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
             ? `Tổng các dòng lệch hoá đơn ${fCurrency(Math.abs(mismatch))}.`
             : ''}
         </Typography>
+        {item.images.length > 0 && (
+          <Button
+            size="small"
+            color="inherit"
+            disabled={working}
+            onClick={() => setConfirmReread(true)}
+          >
+            Đọc lại
+          </Button>
+        )}
         <Button
           size="small"
           color="inherit"
@@ -529,8 +575,8 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
       >
         <Typography variant="caption" sx={{ flex: 1, minWidth: 0 }}>
           {selected.length > 0
-            ? `${selected.length} dòng đã tích để tạo mã mới`
-            : 'Hàng chưa có trong danh mục? Tích dòng để tạo mã mới.'}
+            ? `${selected.length} dòng đã tích — đặt mã mới`
+            : 'Hàng chưa có trong danh mục? Tích dòng để đặt mã mới (tạo khi tạo phiếu nhập).'}
         </Typography>
         {selected.length === 0 && unsuggested.length > 0 && (
           <Button size="small" color="inherit" onClick={() => setSelected(unsuggested)}>
@@ -548,7 +594,7 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
               startIcon={<Iconify icon="mingcute:add-line" width={16} />}
               onClick={() => setCreatingProducts(true)}
             >
-              Tạo {selected.length} mã mới
+              Đặt mã mới ({selected.length})
             </Button>
           </>
         )}
@@ -568,6 +614,7 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
       onSave={(patch) => saveLine(line.lineNo, patch)}
       onZoomImage={(url) => zoomImages([url], 0)}
       selectable={selectable(line)}
+      canCreateProduct={!!canCreateProducts}
       selected={selected.includes(line.lineNo)}
       onToggleSelect={() =>
         setSelected((current) =>
@@ -750,6 +797,56 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
         </Box>
       );
 
+    if (medium)
+      return (
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr) 360px',
+          }}
+        >
+          <Box sx={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <Tabs
+              value={tab === 'chat' ? 'lines' : tab}
+              onChange={(_, value: DrawerTab) => setTab(value)}
+              sx={{ px: 2, flexShrink: 0 }}
+            >
+              <Tab value="lines" label={`Dòng hàng (${item.lines.length})`} />
+              <Tab
+                value="images"
+                label={`Ảnh (${item.images.length + (item.productImages?.length ?? 0)})`}
+              />
+            </Tabs>
+            <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 2 }}>
+              {tab === 'images' ? <Box sx={{ py: 1.5 }}>{renderImages()}</Box> : renderReview()}
+            </Box>
+          </Box>
+          <Box
+            sx={{
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
+            }}
+          >
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 2, pt: 1.5 }}>
+              <Iconify
+                icon="solar:chat-round-dots-bold-duotone"
+                width={20}
+                sx={{ color: 'primary.main' }}
+              />
+              <Typography variant="subtitle2">Trao đổi với trợ lý</Typography>
+            </Stack>
+            <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 2 }}>
+              {renderConversation()}
+            </Box>
+            {renderComposer()}
+          </Box>
+        </Box>
+      );
+
     return (
       <>
         <Tabs
@@ -782,7 +879,7 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
       sx={{ zIndex: DRAWER_Z }}
       PaperProps={{
         sx: {
-          width: wide ? 'min(1440px, 96vw)' : { xs: '100%', sm: 600 },
+          width: wide ? 'min(1440px, 96vw)' : medium ? '96vw' : { xs: '100%', sm: 600 },
           display: 'flex',
           flexDirection: 'column',
         },
@@ -799,10 +896,10 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
           familyName={familyOf}
           zIndex={DRAWER_POPPER_Z}
           onClose={() => setCreatingProducts(false)}
-          onCreated={(next, created) => {
+          onSaved={(next, saved) => {
             changed(next);
-            setHighlight(created);
-            setSelected((current) => current.filter((n) => !created.includes(n)));
+            setHighlight(saved);
+            setSelected((current) => current.filter((n) => !saved.includes(n)));
           }}
         />
       )}

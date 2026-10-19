@@ -42,6 +42,9 @@ export interface IPurchaseImportLine {
   /** Ảnh sản phẩm gắn với dòng — id trong `productImages`, url đã ký (ghép getStorageUrl). */
   imageId?: string | null;
   imageUrl?: string | null;
+  /** Hàng chưa có trong danh mục: tên mã mới (mã được tạo khi tạo phiếu nhập). */
+  newProductName?: string | null;
+  newProductSalePrice?: number | null;
 }
 
 /** Ảnh của lần nhập: `id` dùng để gắn vào dòng, `url` đã ký (ghép getStorageUrl). */
@@ -179,4 +182,7 @@ export interface IUpdatePurchaseImportLineRequest {
   lineTotal?: number | null;
   /** Gắn ảnh sản phẩm của lần nhập vào dòng (id trong `productImages`); chuỗi rỗng = gỡ. */
   imageId?: string | null;
+  /** Đặt tên mã mới cho dòng (tạo khi tạo phiếu nhập); chuỗi rỗng = bỏ. */
+  newProductName?: string | null;
+  newProductSalePrice?: number | null;
 }

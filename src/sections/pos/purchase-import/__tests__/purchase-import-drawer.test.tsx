@@ -217,27 +217,53 @@ describe('PurchaseImportDrawer', () => {
     );
   });
 
-  it('tích dòng chưa có gợi ý → tạo mã mới với tên "nhóm - giá bán" rồi gửi máy chủ', async () => {
-    api.createPurchaseImportProducts.mockResolvedValue({
-      results: [{ lineNo: 1, productId: 'p-new', code: 'SP015900' }],
-      import: invoice({
-        lines: invoice().lines.map((l) => ({ ...l, status: 'Resolved', productId: 'p-new' })),
-      }),
-    });
+  it('tích dòng chưa có gợi ý → đặt mã mới tên đúng như hàng (không kèm số), tạo khi tạo phiếu', async () => {
+    api.updatePurchaseImportLine.mockResolvedValue(
+      invoice({
+        lines: invoice().lines.map((l) => ({
+          ...l,
+          status: 'Resolved',
+          newProductName: 'Máy sấy 8035',
+        })),
+      })
+    );
     const user = userEvent.setup();
     renderDrawer();
 
     await user.click(await screen.findByRole('button', { name: 'Tích 1 dòng chưa có gợi ý' }));
-    await user.click(screen.getByRole('button', { name: 'Tạo 1 mã mới' }));
-    // Giá nhập 180.000đ → giá bán gợi ý 360.000đ → tên "Máy sấy 8035 - 360".
-    expect(await screen.findByDisplayValue('Máy sấy 8035 - 360')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Tạo 1 mã' }));
+    await user.click(screen.getByRole('button', { name: 'Đặt mã mới (1)' }));
+    expect(await screen.findByDisplayValue('Máy sấy 8035')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Đặt mã mới' }));
 
     await waitFor(() =>
-      expect(api.createPurchaseImportProducts).toHaveBeenCalledWith(ID, [
-        { lineNo: 1, name: 'Máy sấy 8035 - 360', salePrice: 360_000, categoryId: null, unit: null },
-      ])
+      expect(api.updatePurchaseImportLine).toHaveBeenCalledWith(ID, 1, {
+        newProductName: 'Máy sấy 8035',
+        newProductSalePrice: null,
+      })
     );
+    expect(await screen.findByText('«Máy sấy 8035»')).toBeInTheDocument();
+    // Dòng đặt mã mới coi như đã chốt → không chặn tạo phiếu.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Tạo phiếu nhập' })).toBeEnabled()
+    );
+  });
+
+  it('chi tiết dòng: gõ tên sản phẩm mới + giá bán → đặt mã mới cho dòng', async () => {
+    api.updatePurchaseImportLine.mockResolvedValue(invoice());
+    const user = userEvent.setup();
+    renderDrawer();
+
+    await user.click(await screen.findByRole('button', { name: /Chọn mã khác, tạo mã mới/ }));
+    const name = screen.getByLabelText('Hoặc tạo mã mới — tên sản phẩm');
+    await user.clear(name);
+    await user.type(name, 'Lô dính');
+    await user.type(screen.getByLabelText('Giá bán (tuỳ chọn)'), '15.000');
+    await user.click(screen.getByRole('button', { name: 'Dùng mã mới' }));
+
+    expect(api.updatePurchaseImportLine).toHaveBeenCalledWith(ID, 1, {
+      newProductName: 'Lô dính',
+      newProductSalePrice: 15_000,
+    });
   });
 
   it('chưa nhận ra NCC: hiện NCC trùng SĐT trên hoá đơn, chọn thì lưu NCC cho lần nhập', async () => {
