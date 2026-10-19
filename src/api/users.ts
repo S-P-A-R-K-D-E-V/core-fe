@@ -53,6 +53,11 @@ export async function resetUserPassword(id: string, data: IResetPasswordRequest)
   await axios.post(endpoints.users.resetPassword(id), data);
 }
 
+/** Huỷ khuôn mặt đã đăng ký của nhân viên ở cửa hàng này — nhân viên phải đăng ký lại (quyền user.update). */
+export async function resetUserFace(id: string): Promise<void> {
+  await axios.delete(endpoints.users.face(id));
+}
+
 // Self-service endpoints
 
 export async function getCurrentUser(): Promise<IUser> {

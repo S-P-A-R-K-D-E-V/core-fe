@@ -10,6 +10,8 @@ import ListItemText from '@mui/material/ListItemText';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
+import { apiErrorMessage } from 'src/utils/api-error';
+
 import { useAuthContext } from 'src/auth/hooks';
 
 import Label from 'src/components/label';
@@ -19,7 +21,7 @@ import { ConfirmDialog } from 'src/components/custom-dialog';
 import CustomPopover, { usePopover } from 'src/components/custom-popover';
 
 import { IUser, UserStatus } from 'src/types/corecms-api';
-import { changeUserStatus, resetUserPassword } from 'src/api/users';
+import { changeUserStatus, resetUserFace, resetUserPassword } from 'src/api/users';
 
 import UserQuickEditForm from './user-quick-edit-form';
 import UserRolesDialog from './user-roles-dialog';
@@ -70,6 +72,8 @@ export default function UserTableRow({
 
   const resetPwConfirm = useBoolean();
 
+  const resetFaceConfirm = useBoolean();
+
   const quickEdit = useBoolean();
 
   const rolesDialog = useBoolean();
@@ -97,6 +101,17 @@ export default function UserTableRow({
     } catch (error) {
       console.error(error);
       enqueueSnackbar('Failed to reset password', { variant: 'error' });
+    }
+  };
+
+  const handleResetFace = async () => {
+    try {
+      await resetUserFace(row.id);
+      enqueueSnackbar(`Đã huỷ khuôn mặt của ${fullName} — nhân viên sẽ được báo đăng ký lại`);
+      resetFaceConfirm.onFalse();
+      onRefresh?.();
+    } catch (error) {
+      enqueueSnackbar(apiErrorMessage(error, 'Không huỷ được khuôn mặt'), { variant: 'error' });
     }
   };
 
@@ -145,6 +160,11 @@ export default function UserTableRow({
           >
             {status}
           </Label>
+          {row.hasFaceEmbedding && (
+            <Tooltip title="Đã đăng ký khuôn mặt chấm công" placement="top" arrow>
+              <Iconify icon="solar:face-scan-square-bold" width={18} sx={{ ml: 1, color: 'success.main', verticalAlign: 'middle' }} />
+            </Tooltip>
+          )}
         </TableCell>
 
         <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }}>
@@ -250,6 +270,19 @@ export default function UserTableRow({
           </MenuItem>
         )}
 
+        {canEdit && row.hasFaceEmbedding && (
+          <MenuItem
+            onClick={() => {
+              resetFaceConfirm.onTrue();
+              popover.onClose();
+            }}
+            sx={{ color: 'warning.main' }}
+          >
+            <Iconify icon="solar:face-scan-square-bold" />
+            Huỷ khuôn mặt
+          </MenuItem>
+        )}
+
         {canResetPassword && (
           <MenuItem
             onClick={() => {
@@ -284,6 +317,18 @@ export default function UserTableRow({
         action={
           <Button variant="contained" color="error" onClick={onDeleteRow}>
             Delete
+          </Button>
+        }
+      />
+
+      <ConfirmDialog
+        open={resetFaceConfirm.value}
+        onClose={resetFaceConfirm.onFalse}
+        title="Huỷ khuôn mặt"
+        content={`Xoá khuôn mặt chấm công đã đăng ký của ${fullName}? Nhân viên sẽ được báo đăng ký lại; nếu cửa hàng bật "Bắt buộc khuôn mặt", họ không chấm công được cho tới khi đăng ký lại.`}
+        action={
+          <Button variant="contained" color="warning" onClick={handleResetFace}>
+            Huỷ khuôn mặt
           </Button>
         }
       />

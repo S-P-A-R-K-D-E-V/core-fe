@@ -118,6 +118,7 @@ export const endpoints = {
     delete: (id: string) => `/users/${id}`,
     changeStatus: (id: string) => `/users/${id}/status`,
     resetPassword: (id: string) => `/users/${id}/reset-password`,
+    face: (id: string) => `/users/${id}/face`,
     me: '/users/me',
     updateProfile: '/users/me/profile',
     uploadAvatar: '/users/me/avatar',
