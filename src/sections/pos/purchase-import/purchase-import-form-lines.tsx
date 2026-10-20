@@ -16,6 +16,7 @@ import TableHead from '@mui/material/TableHead';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import Autocomplete from '@mui/material/Autocomplete';
 import CircularProgress from '@mui/material/CircularProgress';
 
@@ -35,21 +36,23 @@ import type {
   IUpdatePurchaseImportLineRequest,
 } from 'src/types/purchase-import';
 
-import PurchaseImportPackField from './purchase-import-pack-field';
 import { flattenProducts } from './purchase-import-product-picker';
 import {
   issueLabel,
   LINE_STATUS,
+  lineTotalOf,
   parseAmount,
   perPieceCost,
   hasNumberIssue,
+  implausiblePieceCost,
 } from './purchase-import-utils';
 
 // ----------------------------------------------------------------------
 // Các dòng của lần nhập dạng FORM PHIẾU NHẬP (trang duyệt đầy đủ): mỗi dòng như một dòng phiếu chính thức — chọn / đổi
 // sản phẩm ngay trong ô (gợi ý của hệ thống trước, gõ để tìm cả danh mục, hoặc đặt mã mới tạo khi tạo phiếu), sửa SL /
-// đơn giá / thành tiền tại chỗ, tích "Giá theo gói" khi đơn giá là giá cả gói. Hàng dưới mỗi dòng: số sẽ vào phiếu
-// (chiếc × giá mỗi chiếc), lịch sử nhập của mã ở NCC này, cảnh báo số. Lưu từng ô khi rời ô.
+// đơn giá / thành tiền tại chỗ. Tích "Giá theo gói" khi dòng là một túi / gói lớn (đơn giá = giá cả túi): ô SL thành
+// "Số chiếc" kiểm được, ô đơn giá hiện cả giá trên hoá đơn (cả túi) và giá sản phẩm mỗi chiếc = thành tiền ÷ số chiếc.
+// Hàng dưới mỗi dòng: số sẽ vào phiếu, lịch sử nhập của mã ở NCC này, cảnh báo số. Lưu từng ô khi rời ô.
 // ----------------------------------------------------------------------
 
 type Props = {
@@ -158,9 +161,17 @@ function FormRow({
 }: RowProps) {
   const skipped = line.status === 'Skipped';
   const locked = !editable || skipped || busy;
-  const pieces =
-    line.countedQuantity && line.countedQuantity > 0 ? line.countedQuantity : line.quantity;
+  const counted = line.countedQuantity && line.countedQuantity > 0 ? line.countedQuantity : null;
+  // Giá theo gói: tích là bật ngay (chưa lưu gì) để nhập số chiếc; bỏ tích thì xoá số chiếc đã lưu.
+  const [pack, setPack] = useState(counted != null);
+  useEffect(() => setPack(counted != null), [counted]);
+  const pieces = counted ?? line.quantity;
   const pieceCost = perPieceCost(line) ?? line.unitPrice;
+  const total = lineTotalOf(line);
+  const togglePack = (next: boolean) => {
+    setPack(next);
+    if (!next && counted) onSave({ countedQuantity: 0 });
+  };
   const issues = line.issues.filter((i) => i !== 'unit_converted');
   const rowSx = {
     opacity: skipped ? 0.5 : 1,
@@ -210,20 +221,46 @@ function FormRow({
           />
         </TableCell>
         <TableCell align="right">
-          <NumberField
-            label="SL"
-            value={line.quantity}
-            disabled={locked}
-            onCommit={(quantity) => onSave({ quantity })}
-          />
+          {pack ? (
+            <NumberField
+              label="Số chiếc"
+              value={counted}
+              disabled={locked}
+              autoFocus={counted == null}
+              caption={`HĐ: ${line.quantity ?? '?'} túi`}
+              onCommit={(countedQuantity) => onSave({ countedQuantity })}
+            />
+          ) : (
+            <NumberField
+              label="SL"
+              value={line.quantity}
+              disabled={locked}
+              onCommit={(quantity) => onSave({ quantity })}
+            />
+          )}
         </TableCell>
         <TableCell align="right">
           <NumberField
-            label="Đơn giá"
+            label={pack ? 'Đơn giá hoá đơn (cả túi)' : 'Đơn giá'}
             value={line.unitPrice}
             disabled={locked}
             onCommit={(unitPrice) => onSave({ unitPrice })}
           />
+          {pack && (
+            <Typography
+              variant="caption"
+              component="div"
+              sx={{
+                textAlign: 'right',
+                fontWeight: 600,
+                color: implausiblePieceCost(perPieceCost(line)) ? 'error.main' : 'info.dark',
+              }}
+            >
+              {counted && perPieceCost(line) != null
+                ? `SP: ${fCurrency(perPieceCost(line))}/chiếc`
+                : 'SP: nhập số chiếc'}
+            </Typography>
+          )}
         </TableCell>
         <TableCell align="right">
           <NumberField
@@ -257,12 +294,35 @@ function FormRow({
         <TableCell colSpan={5} sx={{ pt: 0 }}>
           <Stack direction="row" spacing={1.5} alignItems="flex-start" flexWrap="wrap" useFlexGap>
             {!skipped && (
-              <PurchaseImportPackField line={line} disabled={locked} dense onSave={onSave} />
+              <FormControlLabel
+                sx={{ mr: 0 }}
+                disabled={locked || !total}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={pack}
+                    onChange={(e) => togglePack(e.target.checked)}
+                  />
+                }
+                label={
+                  <Typography variant="caption" noWrap>
+                    Giá theo gói (cả túi)
+                  </Typography>
+                }
+              />
             )}
             {!skipped && pieces != null && pieceCost != null && (
               <Typography variant="caption" sx={{ color: 'text.secondary', pt: 1 }}>
                 Vào phiếu: <strong>{fNumber(pieces)}</strong>
-                {line.countedQuantity ? ' chiếc' : ''} × <strong>{fCurrency(pieceCost)}</strong>
+                {counted ? ' chiếc' : ''} × <strong>{fCurrency(pieceCost)}</strong>
+                {counted && total
+                  ? ` (thành tiền ${fCurrency(total)} ÷ ${fNumber(counted)} chiếc)`
+                  : ''}
+              </Typography>
+            )}
+            {!skipped && counted != null && implausiblePieceCost(perPieceCost(line)) && (
+              <Typography variant="caption" sx={{ color: 'error.main', pt: 1 }}>
+                Giá mỗi chiếc quá thấp — ô Số chiếc có bị nhập nhầm giá không?
               </Typography>
             )}
             {history && !skipped && (
@@ -564,11 +624,22 @@ type NumberFieldProps = {
   value?: number | null;
   disabled: boolean;
   warn?: boolean;
+  autoFocus?: boolean;
+  /** Dòng nhỏ dưới ô thay cho số định dạng (vd "HĐ: 2 túi"). */
+  caption?: string;
   onCommit: (value: number) => void;
 };
 
-/** Ô số sửa tại chỗ: lưu khi rời ô / Enter, chỉ khi giá trị đổi và > 0. */
-function NumberField({ label, value, disabled, warn, onCommit }: NumberFieldProps) {
+/** Ô số sửa tại chỗ: lưu khi rời ô / Enter, chỉ khi giá trị đổi và > 0. Có placeholder = tên ô khi trống. */
+function NumberField({
+  label,
+  value,
+  disabled,
+  warn,
+  autoFocus,
+  caption,
+  onCommit,
+}: NumberFieldProps) {
   const [text, setText] = useState(value != null ? String(value) : '');
 
   useEffect(() => setText(value != null ? String(value) : ''), [value]);
@@ -594,8 +665,10 @@ function NumberField({ label, value, disabled, warn, onCommit }: NumberFieldProp
       onKeyDown={(e) => {
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
       }}
+      autoFocus={autoFocus}
+      placeholder={label}
       inputProps={{ inputMode: 'decimal', 'aria-label': label, style: { textAlign: 'right' } }}
-      helperText={value != null && value >= 1000 ? fNumber(value) : undefined}
+      helperText={caption ?? (value != null && value >= 1000 ? fNumber(value) : undefined)}
       FormHelperTextProps={{ sx: { textAlign: 'right', mx: 0 } }}
     />
   );

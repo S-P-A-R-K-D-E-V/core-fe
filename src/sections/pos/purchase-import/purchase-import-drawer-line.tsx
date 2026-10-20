@@ -37,7 +37,6 @@ import {
   LINE_STATUS,
   parseAmount,
   perPieceCost,
-  piecesPerPack,
   receiptUnitCost,
   suggestSalePrice,
 } from './purchase-import-utils';
@@ -115,7 +114,6 @@ function PurchaseImportDrawerLine({
   const imageIndex = line.imageId ? productImages.findIndex((i) => i.id === line.imageId) : -1;
   const issues = line.issues.filter((i) => i !== 'unit_converted');
   const pieceCost = perPieceCost(line);
-  const perPack = piecesPerPack(line);
   const suggestedPrice = suggestSalePrice(receiptUnitCost(line));
 
   // Chọn xong (hoặc dữ liệu tải lại) thì thu gọn.
@@ -354,9 +352,8 @@ function PurchaseImportDrawerLine({
           sx={{ display: 'block', pl: '50px', mt: 0.25, color: 'info.dark' }}
         >
           <Iconify icon="solar:box-linear" width={14} sx={{ mr: 0.5, verticalAlign: -2 }} />
-          Giá theo gói{perPack != null ? ` · ${perPack} chiếc/gói` : ''} →{' '}
-          <strong>{line.countedQuantity} chiếc</strong> × {fCurrency(pieceCost)} — phiếu ghi theo
-          chiếc
+          Giá theo gói (cả túi) → <strong>{line.countedQuantity} chiếc</strong> ×{' '}
+          {fCurrency(pieceCost)} — phiếu ghi theo chiếc
         </Typography>
       )}
 
@@ -504,7 +501,11 @@ function PurchaseImportDrawerLine({
               startIcon={<Iconify icon="solar:box-linear" width={16} />}
               onClick={() => setCounting((v) => !v)}
             >
-              {counting ? 'Thôi' : perPack != null ? `Gói ${perPack} chiếc` : 'Giá theo gói'}
+              {counting
+                ? 'Thôi'
+                : line.countedQuantity
+                  ? `Gói: ${line.countedQuantity} chiếc`
+                  : 'Giá theo gói'}
             </Button>
             <Button
               size="small"

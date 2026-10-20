@@ -345,8 +345,8 @@ describe('PurchaseImportDrawer', () => {
     expect(screen.getByText('Lô dính', { selector: 'strong' })).toBeInTheDocument();
   });
 
-  it('chi tiết dòng: giá theo gói → nhập chiếc/gói, phiếu ghi SL gói × chiếc/gói', async () => {
-    // Dòng 2 gói × 180.000; mỗi gói 10 chiếc → 20 chiếc.
+  it('chi tiết dòng: giá theo gói (cả túi) → nhập tổng số chiếc, giá SP = thành tiền ÷ số chiếc', async () => {
+    // Dòng thành tiền 220.000; kiểm được 20 chiếc → 11.000đ/chiếc.
     api.updatePurchaseImportLine.mockResolvedValue(
       invoice({ lines: invoice().lines.map((l) => ({ ...l, countedQuantity: 20 })) })
     );
@@ -355,9 +355,11 @@ describe('PurchaseImportDrawer', () => {
 
     await user.click(await screen.findByRole('button', { name: /Chọn mã khác, tạo mã mới/ }));
     await user.click(screen.getByRole('button', { name: 'Giá theo gói' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Giá theo gói' }));
-    await user.type(screen.getByLabelText('Chiếc / gói'), '10');
-    expect(screen.getByText(/= 20 chiếc/)).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Giá theo gói (đơn giá là giá cả túi)' })
+    );
+    await user.type(screen.getByLabelText('Số chiếc kiểm được'), '20');
+    expect(screen.getByText(/Giá SP .*\/chiếc = thành tiền/)).toBeInTheDocument();
     await user.tab();
 
     expect(api.updatePurchaseImportLine).toHaveBeenCalledWith(ID, 1, { countedQuantity: 20 });
@@ -591,20 +593,23 @@ describe('PurchaseImportDrawer', () => {
     expect(api.updatePurchaseImportLine).toHaveBeenCalledWith(ID, 1, { productId: 'p901' });
   });
 
-  it('trang duyệt: tích giá theo gói tại dòng → phiếu ghi SL gói × chiếc/gói', async () => {
+  it('trang duyệt: tích giá theo gói → ô SL thành Số chiếc, ô đơn giá hiện giá HĐ + giá SP', async () => {
     api.updatePurchaseImportLine.mockResolvedValue(
       invoice({ lines: invoice().lines.map((l) => ({ ...l, countedQuantity: 20 })) })
     );
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole('checkbox', { name: 'Giá theo gói' }));
-    await user.type(screen.getByLabelText('Chiếc / gói'), '10');
+    await user.click(await screen.findByRole('checkbox', { name: 'Giá theo gói (cả túi)' }));
+    expect(screen.getByLabelText('Đơn giá hoá đơn (cả túi)')).toBeInTheDocument();
+    expect(screen.getByText('SP: nhập số chiếc')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Số chiếc'), '20');
     await user.tab();
 
     expect(api.updatePurchaseImportLine).toHaveBeenCalledWith(ID, 1, { countedQuantity: 20 });
-    // 2 gói × 10 chiếc, thành tiền 220.000 → 11.000đ/chiếc vào phiếu.
-    expect(await screen.findByText(/Vào phiếu:/)).toBeInTheDocument();
+    // Thành tiền 220.000 ÷ 20 chiếc → 11.000đ/chiếc.
+    expect(await screen.findByText(/SP: .*\/chiếc/)).toBeInTheDocument();
+    expect(screen.getByText(/÷ 20 chiếc/)).toBeInTheDocument();
   });
 
   it('trang duyệt: ô sản phẩm cho đặt mã mới theo tên hàng (tạo khi tạo phiếu)', async () => {

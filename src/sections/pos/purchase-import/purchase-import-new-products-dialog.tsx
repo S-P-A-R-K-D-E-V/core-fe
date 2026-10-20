@@ -31,7 +31,6 @@ import type {
 import {
   parseAmount,
   perPieceCost,
-  piecesPerPack,
   receiptUnitCost,
   suggestSalePrice,
   importErrorMessage,
@@ -40,8 +39,9 @@ import {
 // ----------------------------------------------------------------------
 // Đặt mã mới cho các dòng đã tích (hàng chưa có trong danh mục). Tên mặc định là tên hàng trên hoá đơn — KHÔNG kèm số
 // (số trên toa là số lượng / đơn giá). "Tên chung cho cả nhóm" đặt một tên cho mọi dòng: các dòng cùng tên là một nhóm,
-// mỗi giá bán là một mã (mã gốc + mã con như danh mục KiotViet, vd "Lô dính - 15", "Lô dính - 20"). Giá theo gói (đơn
-// giá là giá cả gói): ghi số chiếc mỗi gói → giá nhập mỗi chiếc = đơn giá ÷ chiếc/gói, giá bán trống thì gấp đôi giá đó.
+// mỗi giá bán là một mã (mã gốc + mã con như danh mục KiotViet, vd "Lô dính - 15", "Lô dính - 20"). Giá theo gói (dòng
+// là túi lớn, đơn giá là giá cả túi): ghi tổng số chiếc kiểm được → giá nhập mỗi chiếc = thành tiền ÷ số chiếc, giá bán
+// trống thì gấp đôi giá đó.
 // Chỉ ghi lên dòng; mã thật được tạo khi bấm "Tạo phiếu nhập".
 // ----------------------------------------------------------------------
 
@@ -60,11 +60,9 @@ type Props = {
 
 const groupKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
 
-/** Giá theo gói: tổng chiếc = SL gói trên hoá đơn × chiếc/gói đã nhập; không nhập → null. */
-const totalPieces = (line: IPurchaseImportLine, row: { counted: string }) => {
-  const perPack = parseAmount(row.counted);
-  return perPack && line.quantity ? Math.round(line.quantity * perPack * 1000) / 1000 : null;
-};
+/** Giá theo gói: tổng số chiếc kiểm được của dòng; không nhập → null. */
+const totalPieces = (_line: IPurchaseImportLine, row: { counted: string }) =>
+  parseAmount(row.counted);
 
 export default function PurchaseImportNewProductsDialog({
   open,
@@ -93,7 +91,7 @@ export default function PurchaseImportNewProductsDialog({
         lineNo: line.lineNo,
         name: familyName(line),
         salePrice: '',
-        counted: piecesPerPack(line) != null ? String(piecesPerPack(line)) : '',
+        counted: line.countedQuantity ? String(line.countedQuantity) : '',
       }))
     );
   }, [open, lines, familyName]);
@@ -204,7 +202,7 @@ export default function PurchaseImportNewProductsDialog({
                 <TableCell sx={{ width: 40 }}>Dòng</TableCell>
                 <TableCell>Trên hoá đơn</TableCell>
                 <TableCell sx={{ minWidth: 200 }}>Tên sản phẩm mới</TableCell>
-                <TableCell sx={{ width: 120 }}>Giá theo gói: chiếc/gói</TableCell>
+                <TableCell sx={{ width: 130 }}>Giá theo gói: số chiếc</TableCell>
                 <TableCell sx={{ width: 110 }}>Giá nhập/cái</TableCell>
                 <TableCell sx={{ width: 150 }}>Giá bán (tuỳ chọn)</TableCell>
               </TableRow>

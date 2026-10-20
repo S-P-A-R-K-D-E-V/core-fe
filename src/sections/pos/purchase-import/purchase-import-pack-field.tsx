@@ -15,24 +15,27 @@ import type {
   IUpdatePurchaseImportLineRequest,
 } from 'src/types/purchase-import';
 
-import { parseAmount, piecesPerPack } from './purchase-import-utils';
+import {
+  parseAmount,
+  lineTotalOf,
+  perPieceCost,
+  implausiblePieceCost,
+} from './purchase-import-utils';
 
 // ----------------------------------------------------------------------
-// "Giá theo gói": đơn giá trên hoá đơn là giá CẢ GÓI (vd 1 bọc lô dính 90.000). Tích ô rồi nhập số chiếc mỗi gói kho
-// đếm được (20) → phiếu ghi SL gói × chiếc/gói chiếc (2 × 20 = 40), giá mỗi chiếc = đơn giá ÷ chiếc/gói (4.500đ).
-// Lưu lên dòng là tổng số chiếc (countedQuantity) — Core-be chia thành tiền dòng cho số này.
+// "Giá theo gói" (chi tiết dòng trong drawer): dòng là một túi / gói lớn — đơn giá trên hoá đơn là giá CẢ TÚI. Tích ô rồi
+// nhập tổng số chiếc kho kiểm được → giá sản phẩm mỗi chiếc = thành tiền dòng ÷ số chiếc (1 túi 90.000, 20 chiếc →
+// 4.500đ/chiếc). Lưu lên dòng là số chiếc (countedQuantity); phiếu nhập ghi số chiếc × giá mỗi chiếc.
 // ----------------------------------------------------------------------
 
 type Props = {
   line: IPurchaseImportLine;
   disabled?: boolean;
-  /** Gọn (một hàng, không nhãn dài) cho ô trong bảng. */
-  dense?: boolean;
   onSave: (patch: IUpdatePurchaseImportLineRequest) => void;
 };
 
-export default function PurchaseImportPackField({ line, disabled, dense, onSave }: Props) {
-  const saved = piecesPerPack(line);
+export default function PurchaseImportPackField({ line, disabled, onSave }: Props) {
+  const saved = line.countedQuantity && line.countedQuantity > 0 ? line.countedQuantity : null;
   const [checked, setChecked] = useState(saved != null);
   const [text, setText] = useState(saved != null ? String(saved) : '');
 
@@ -41,16 +44,12 @@ export default function PurchaseImportPackField({ line, disabled, dense, onSave 
     setText(saved != null ? String(saved) : '');
   }, [saved]);
 
-  const perPack = parseAmount(text);
-  const quantity = line.quantity && line.quantity > 0 ? line.quantity : null;
-  const pieces = perPack && quantity ? Math.round(quantity * perPack * 1000) / 1000 : null;
-  const pieceCost =
-    perPack && line.unitPrice ? Math.round((line.unitPrice / perPack) * 100) / 100 : null;
+  const pieces = parseAmount(text);
+  const total = lineTotalOf(line);
+  const pieceCost = perPieceCost(line, pieces);
 
   const commit = () => {
-    if (!perPack || !quantity) return;
-    const total = Math.round(quantity * perPack * 1000) / 1000;
-    if (total !== line.countedQuantity) onSave({ countedQuantity: total });
+    if (pieces && pieces !== line.countedQuantity) onSave({ countedQuantity: pieces });
   };
 
   const toggle = (next: boolean) => {
@@ -66,37 +65,40 @@ export default function PurchaseImportPackField({ line, disabled, dense, onSave 
       <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
         <FormControlLabel
           sx={{ mr: 0 }}
-          disabled={disabled || !quantity}
+          disabled={disabled || !total}
           control={
             <Checkbox size="small" checked={checked} onChange={(e) => toggle(e.target.checked)} />
           }
-          label={
-            <Typography variant={dense ? 'caption' : 'body2'} noWrap>
-              Giá theo gói
-            </Typography>
-          }
+          label={<Typography variant="body2">Giá theo gói (đơn giá là giá cả túi)</Typography>}
         />
         {checked && (
           <TextField
             size="small"
-            label="Chiếc / gói"
+            label="Số chiếc kiểm được"
             value={text}
             disabled={disabled}
             autoFocus={saved == null}
-            error={text.trim() !== '' && perPack == null}
+            error={text.trim() !== '' && pieces == null}
             onChange={(e) => setText(e.target.value)}
             onBlur={commit}
             onKeyDown={(e) => {
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
             }}
             inputProps={{ inputMode: 'decimal' }}
-            sx={{ width: dense ? 92 : 110 }}
+            sx={{ width: 150 }}
           />
         )}
       </Stack>
-      {checked && pieces != null && pieceCost != null && (
-        <Typography variant="caption" sx={{ color: 'info.dark' }}>
-          = {fNumber(pieces)} chiếc · {fCurrency(pieceCost)}/chiếc
+      {checked && pieces != null && pieceCost != null && total != null && (
+        <Typography
+          variant="caption"
+          sx={{ color: implausiblePieceCost(pieceCost) ? 'error.main' : 'info.dark' }}
+        >
+          Giá SP {fCurrency(pieceCost)}/chiếc = thành tiền {fCurrency(total)} ÷ {fNumber(pieces)}{' '}
+          chiếc
+          {implausiblePieceCost(pieceCost)
+            ? ' — quá thấp, số chiếc có bị nhập nhầm giá không?'
+            : ''}
         </Typography>
       )}
     </Stack>
