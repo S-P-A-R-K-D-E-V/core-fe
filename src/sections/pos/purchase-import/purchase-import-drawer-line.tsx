@@ -16,6 +16,7 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 
+import { fDate } from 'src/utils/format-time';
 import { getStorageUrl } from 'src/utils/storage';
 import { fCurrency } from 'src/utils/format-number';
 
@@ -25,6 +26,7 @@ import Iconify from 'src/components/iconify';
 import type {
   IPurchaseImportLine,
   IPurchaseImportImage,
+  IPurchaseImportProductHistory,
   IUpdatePurchaseImportLineRequest,
 } from 'src/types/purchase-import';
 
@@ -55,6 +57,8 @@ type Props = {
   familyName?: string | null;
   /** Ảnh sản phẩm của lần nhập (S1, S2…) để gắn vào dòng. */
   productImages: IPurchaseImportImage[];
+  /** Lịch sử nhập từ NCC này của mã đang chốt / gợi ý số 1 (cả lịch sử NCC). */
+  history?: IPurchaseImportProductHistory | null;
   editable: boolean;
   busy: boolean;
   highlighted: boolean;
@@ -72,6 +76,7 @@ function PurchaseImportDrawerLine({
   line,
   familyName,
   productImages,
+  history = null,
   editable,
   busy,
   highlighted,
@@ -330,6 +335,25 @@ function PurchaseImportDrawerLine({
             </Typography>
           )}
         </Stack>
+      )}
+
+      {history && !skipped && !pendingNew && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          title={`Nhập từ NCC này lần đầu ${fDate(history.firstDate, 'dd/MM/yyyy')}, tổng ${history.totalQuantity} cái`}
+          sx={{ display: 'block', pl: '50px', mt: 0.25 }}
+        >
+          <Iconify
+            icon="solar:clock-circle-outline"
+            width={13}
+            sx={{ mr: 0.5, verticalAlign: -2 }}
+          />
+          Đã nhập NCC này {history.times} lần · gần nhất {fDate(history.lastDate, 'dd/MM/yyyy')}:{' '}
+          {history.lastQuantity} cái × {fCurrency(history.lastCost)}
+          {history.minCost !== history.maxCost &&
+            ` (từng ${fCurrency(history.minCost)}–${fCurrency(history.maxCost)})`}
+        </Typography>
       )}
 
       {pieceCost != null && !skipped && (

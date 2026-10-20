@@ -28,6 +28,7 @@ const api = vi.hoisted(() => ({
   getPurchaseImportSupplierSuggestions: vi.fn(),
   getPurchaseImportCapabilities: vi.fn(),
   pushPurchaseImportToKiotViet: vi.fn(),
+  getPurchaseImportSupplierOverview: vi.fn(),
 }));
 vi.mock('src/api/purchase-imports', () => api);
 vi.mock('src/api/products', () => ({ getAllProducts: vi.fn() }));
@@ -141,6 +142,7 @@ beforeEach(() => {
   api.getPurchaseImport.mockResolvedValue(invoice());
   api.getPurchaseImportConversation.mockResolvedValue([]);
   api.getPurchaseImportCapabilities.mockResolvedValue(capabilities);
+  api.getPurchaseImportSupplierOverview.mockResolvedValue(null);
 });
 
 describe('PurchaseImportDrawer', () => {
@@ -450,6 +452,100 @@ describe('PurchaseImportDrawer', () => {
     expect(await screen.findByText(/SP900001/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Đẩy lại' }));
     expect(api.pushPurchaseImportToKiotViet).toHaveBeenCalledWith(ID);
+  });
+
+  it('thẻ lịch sử NCC: tổng quan cả lịch sử, phiếu cũ nghi trùng mở được, lịch sử mã hiện trên dòng', async () => {
+    api.getPurchaseImport.mockResolvedValue(
+      invoice({
+        lines: invoice().lines.map((l) => ({
+          ...l,
+          status: 'Suggested',
+          candidates: [
+            {
+              productId: 'p147',
+              code: 'SP000147',
+              name: 'Lô uốn tóc - size 18',
+              score: 0.8,
+              reason: 'Trợ lý',
+            },
+          ],
+        })),
+      })
+    );
+    api.getPurchaseImportSupplierOverview.mockResolvedValue({
+      supplierId: 's1',
+      orders: 132,
+      lines: 1674,
+      amount: 830_600_000,
+      firstDate: '2022-06-06T03:00:00Z',
+      lastDate: '2026-09-01T03:00:00Z',
+      years: [{ year: 2026, orders: 18, amount: 41_200_000 }],
+      recent: [
+        {
+          purchaseOrderId: 'po-recent',
+          orderNumber: 'PN001534',
+          date: '2026-03-15T03:00:00Z',
+          total: 2_857_000,
+          lines: 18,
+          status: 'Completed',
+        },
+      ],
+      duplicates: [
+        {
+          purchaseOrderId: 'po-old',
+          orderNumber: 'PN000292',
+          date: '2022-12-28T03:00:00Z',
+          total: 2_156_000,
+          status: 'Completed',
+          matchedLines: 9,
+          importLines: 13,
+          totalMatches: true,
+          amountOnlyLines: 2,
+          sameDate: false,
+        },
+      ],
+      products: [
+        {
+          productId: 'p147',
+          times: 35,
+          firstDate: '2022-06-06T03:00:00Z',
+          lastDate: '2026-09-01T03:00:00Z',
+          lastCost: 7_500,
+          minCost: 6_000,
+          maxCost: 8_000,
+          lastQuantity: 24,
+          totalQuantity: 840,
+        },
+      ],
+    });
+    const onNavigate = vi.fn();
+    const user = userEvent.setup();
+    renderDrawer(onNavigate);
+
+    expect(await screen.findByText('132 phiếu')).toBeInTheDocument();
+    expect(
+      screen.getByText(/9\/13 dòng cùng mã \+ 2 chỉ cùng thành tiền · cùng tổng tiền/)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Đã nhập NCC này 35 lần/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Xem phiếu' }));
+    expect(onNavigate).toHaveBeenCalledWith(expect.stringContaining('po-old'));
+  });
+
+  it('NCC chưa từng bán → báo lần nhập đầu, không có lịch sử trên dòng', async () => {
+    api.getPurchaseImportSupplierOverview.mockResolvedValue({
+      supplierId: 's1',
+      orders: 0,
+      lines: 0,
+      amount: 0,
+      years: [],
+      recent: [],
+      duplicates: [],
+      products: [],
+    });
+    renderDrawer();
+
+    expect(await screen.findByText(/hàng trên hoá đơn sẽ là lần nhập đầu/)).toBeInTheDocument();
+    expect(screen.queryByText(/Đã nhập NCC này/)).not.toBeInTheDocument();
   });
 
   it('phiếu đã sang KiotViet → hiện mã phiếu bên KiotViet', async () => {

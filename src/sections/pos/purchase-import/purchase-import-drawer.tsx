@@ -36,6 +36,7 @@ import {
   pushPurchaseImportToKiotViet,
   getPurchaseImportCapabilities,
   getPurchaseImportConversation,
+  getPurchaseImportSupplierOverview,
 } from 'src/api/purchase-imports';
 
 import type {
@@ -44,12 +45,14 @@ import type {
   IPurchaseImportMessage,
   IPurchaseImportDuplicate,
   IUpdatePurchaseImportLineRequest,
+  IPurchaseImportSupplierOverview,
 } from 'src/types/purchase-import';
 
 import { usePurchaseAccess } from '../purchase-order/purchase-access';
 import PurchaseImportImagesPanel from './purchase-import-images-panel';
 import PurchaseImportConversation from './purchase-import-conversation';
 import PurchaseImportSupplierPanel from './purchase-import-supplier-panel';
+import PurchaseImportSupplierOverview from './purchase-import-supplier-overview';
 import PurchaseImportComposer, { type ComposerPhoto } from './purchase-import-composer';
 import PurchaseImportDrawerLine, { DRAWER_POPPER_Z } from './purchase-import-drawer-line';
 import PurchaseImportNewProductsDialog from './purchase-import-new-products-dialog';
@@ -110,6 +113,9 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
   const [creatingProducts, setCreatingProducts] = useState(false);
   // Cửa hàng nối KiotViet + bật đẩy: tạo phiếu thì mã mới + phiếu nhập tạo luôn bên KiotViet.
   const [kiotViet, setKiotViet] = useState({ push: false, draft: true });
+  // Lịch sử nhập của NCC (cả lịch sử): thẻ tổng quan + lịch sử từng mã trên dòng.
+  const [overview, setOverview] = useState<IPurchaseImportSupplierOverview | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
 
   const [draft, setDraft] = useState('');
   const [photos, setPhotos] = useState<ComposerPhoto[]>([]);
@@ -193,6 +199,32 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
       clearTimeout(timer);
     };
   }, [importId, pollKey]);
+
+  // Đọc lại tổng quan khi đổi NCC / dòng đổi gợi ý (updatedAt đổi); bỏ qua lúc đang đọc ảnh.
+  const overviewKey =
+    item && item.supplierId && item.status !== 'Extracting'
+      ? `${item.id}|${item.supplierId}|${item.updatedAt}`
+      : null;
+  useEffect(() => {
+    if (!overviewKey || !item) {
+      setOverview(null);
+      return undefined;
+    }
+    let alive = true;
+    setOverviewLoading(true);
+    getPurchaseImportSupplierOverview(item.id)
+      .then((data) => alive && setOverview(data))
+      .catch(() => alive && setOverview(null))
+      .finally(() => alive && setOverviewLoading(false));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overviewKey]);
+  const historyOf = useMemo(
+    () => new Map((overview?.products ?? []).map((p) => [p.productId, p])),
+    [overview]
+  );
 
   // Thẻ trong chat / nơi khác sửa cùng lần nhập → tải lại.
   useEffect(() => {
@@ -660,6 +692,7 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
       line={line}
       familyName={aboveNames.get(line.lineNo)}
       productImages={item?.productImages ?? []}
+      history={historyOf.get(line.productId ?? line.candidates[0]?.productId ?? '') ?? null}
       editable={!!reviewing}
       busy={busyLine === line.lineNo}
       highlighted={highlight.includes(line.lineNo)}
@@ -736,6 +769,16 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
           popperZIndex={DRAWER_POPPER_Z}
           onChanged={changed}
         />
+        {item.supplierId && item.status !== 'Extracting' && (
+          <PurchaseImportSupplierOverview
+            supplierName={item.supplierName}
+            overview={overview}
+            loading={overviewLoading}
+            onOpenOrder={(orderId) =>
+              onNavigate(paths.dashboard.pos.purchaseOrder.details(orderId))
+            }
+          />
+        )}
         {item.warnings.length > 0 && (
           <Alert severity="warning">
             {item.warnings.slice(0, 4).map((w) => (

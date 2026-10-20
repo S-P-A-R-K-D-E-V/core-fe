@@ -110,9 +110,48 @@ export interface IPurchaseImportDuplicate {
   date: string;
   total: number;
   status: string;
+  /** Dòng cùng mã / cùng nhóm hàng + cùng thành tiền. */
   matchedLines: number;
   importLines: number;
   totalMatches: boolean;
+  /** Dòng chỉ cùng thành tiền (tín hiệu yếu). */
+  amountOnlyLines?: number;
+  /** Ngày phiếu cách ngày trên hoá đơn ≤ 3 ngày. */
+  sameDate?: boolean;
+}
+
+/** Lịch sử nhập từ NCC này của một mã — giá theo cái, phiếu nháp không tính. */
+export interface IPurchaseImportProductHistory {
+  productId: string;
+  times: number;
+  firstDate: string;
+  lastDate: string;
+  lastCost: number;
+  minCost: number;
+  maxCost: number;
+  lastQuantity: number;
+  totalQuantity: number;
+}
+
+/** Tổng quan NCC của lần nhập — đọc từ mọi phiếu nhập của NCC (cả lịch sử). */
+export interface IPurchaseImportSupplierOverview {
+  supplierId: string;
+  orders: number;
+  lines: number;
+  amount: number;
+  firstDate?: string | null;
+  lastDate?: string | null;
+  years: { year: number; orders: number; amount: number }[];
+  recent: {
+    purchaseOrderId: string;
+    orderNumber: string;
+    date: string;
+    total: number;
+    lines: number;
+    status: string;
+  }[];
+  duplicates: IPurchaseImportDuplicate[];
+  products: IPurchaseImportProductHistory[];
 }
 
 /** NCC đã có giống tên / SĐT in trên hoá đơn. */
@@ -145,7 +184,12 @@ export interface IPurchaseImportNewProduct {
 }
 
 export interface ICreatePurchaseImportProductsResponse {
-  results: { lineNo: number; productId?: string | null; code?: string | null; error?: string | null }[];
+  results: {
+    lineNo: number;
+    productId?: string | null;
+    code?: string | null;
+    error?: string | null;
+  }[];
   import: IPurchaseImport;
 }
 

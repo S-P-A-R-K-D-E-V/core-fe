@@ -6,6 +6,7 @@ import type {
   IPurchaseImport,
   IPurchaseImportNewProduct,
   IPurchaseImportSupplierSuggestions,
+  IPurchaseImportSupplierOverview,
   ICreatePurchaseImportProductsResponse,
   IPurchaseImportMessage,
   IPurchaseImportSummary,
@@ -90,6 +91,12 @@ export async function updatePurchaseImportLine(
 export async function commitPurchaseImport(id: string, allowDuplicate = false): Promise<{ purchaseOrderId: string }> {
   const response = await axios.post<{ purchaseOrderId: string }>(endpoints.purchaseImports.commit(id), { allowDuplicate });
   return response.data;
+}
+
+/** Tổng quan NCC của lần nhập (cả lịch sử nhập của NCC); chưa có NCC → null. */
+export async function getPurchaseImportSupplierOverview(id: string): Promise<IPurchaseImportSupplierOverview | null> {
+  const response = await axios.get<IPurchaseImportSupplierOverview | ''>(endpoints.purchaseImports.supplierOverview(id));
+  return response.status === 204 || !response.data ? null : response.data;
 }
 
 /** Đẩy lại phiếu nhập đã tạo sang KiotViet (lần trước lỗi). */
