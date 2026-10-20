@@ -84,22 +84,22 @@ export default function PurchaseImportFormLines({
 }: Props) {
   return (
     <Scrollbar>
-      <Table size="small" sx={{ minWidth: 820 }}>
+      <Table size="small" sx={{ minWidth: 700, tableLayout: 'fixed' }}>
         <TableHead>
           <TableRow>
-            <TableCell sx={{ width: 56 }}>#</TableCell>
-            <TableCell sx={{ minWidth: 150 }}>Trên hoá đơn</TableCell>
-            <TableCell sx={{ minWidth: 260 }}>Sản phẩm</TableCell>
-            <TableCell align="right" sx={{ width: 84 }}>
+            <TableCell sx={{ width: 52 }}>#</TableCell>
+            <TableCell sx={{ width: 128 }}>Trên hoá đơn</TableCell>
+            <TableCell sx={{ width: 'auto', minWidth: 210 }}>Sản phẩm</TableCell>
+            <TableCell align="right" sx={{ width: 72 }}>
               SL
             </TableCell>
-            <TableCell align="right" sx={{ width: 112 }}>
+            <TableCell align="right" sx={{ width: 104 }}>
               Đơn giá
             </TableCell>
-            <TableCell align="right" sx={{ width: 124 }}>
+            <TableCell align="right" sx={{ width: 112 }}>
               Thành tiền
             </TableCell>
-            <TableCell sx={{ width: 40 }} />
+            <TableCell sx={{ width: 36 }} />
           </TableRow>
         </TableHead>
         <TableBody>
@@ -186,7 +186,7 @@ function FormRow({
           )}
           {line.lineNo}
         </TableCell>
-        <TableCell>
+        <TableCell sx={{ overflowWrap: 'anywhere' }}>
           <Typography variant="subtitle2">
             {line.sameAsAbove ? '″ ' : ''}
             {familyName}
@@ -438,7 +438,13 @@ function ProductCell({
           o.kind === 'candidate' ? 'Gợi ý' : o.kind === 'search' ? 'Danh mục' : 'Hàng mới'
         }
         noOptionsText="Gõ tên hoặc mã hàng để tìm"
-        slotProps={popperZIndex ? { popper: { sx: { zIndex: popperZIndex } } } : undefined}
+        // Danh sách rộng hơn ô (tên mã + lý do gợi ý dài), canh trái theo ô.
+        slotProps={{
+          popper: {
+            placement: 'bottom-start',
+            sx: { minWidth: 460, ...(popperZIndex ? { zIndex: popperZIndex } : {}) },
+          },
+        }}
         getOptionLabel={(o) =>
           o.kind === 'new' ? `Đặt mã mới «${o.name}»` : `${o.code} — ${o.name}`
         }
@@ -578,6 +584,7 @@ function NumberField({ label, value, disabled, warn, onCommit }: NumberFieldProp
   return (
     <TextField
       size="small"
+      fullWidth
       value={text}
       error={warn}
       disabled={disabled}

@@ -904,7 +904,7 @@ export default function PurchaseImportDrawer({
             flex: 1,
             minHeight: 0,
             display: 'grid',
-            gridTemplateColumns: wide ? 'minmax(0, 1fr) 400px' : 'minmax(0, 1fr) 340px',
+            gridTemplateColumns: wide ? 'minmax(0, 1fr) 360px' : 'minmax(0, 1fr) 320px',
           }}
         >
           <Box sx={{ minHeight: 0, overflowY: 'auto', px: 2 }}>{renderReview()}</Box>
