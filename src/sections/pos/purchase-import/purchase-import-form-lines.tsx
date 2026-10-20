@@ -84,12 +84,11 @@ export default function PurchaseImportFormLines({
 }: Props) {
   return (
     <Scrollbar>
-      <Table size="small" sx={{ minWidth: 700, tableLayout: 'fixed' }}>
+      <Table size="small" sx={{ minWidth: 560, tableLayout: 'fixed' }}>
         <TableHead>
           <TableRow>
             <TableCell sx={{ width: 52 }}>#</TableCell>
-            <TableCell sx={{ width: 128 }}>Trên hoá đơn</TableCell>
-            <TableCell sx={{ width: 'auto', minWidth: 210 }}>Sản phẩm</TableCell>
+            <TableCell sx={{ width: 'auto' }}>Hàng trên hoá đơn → sản phẩm</TableCell>
             <TableCell align="right" sx={{ width: 72 }}>
               SL
             </TableCell>
@@ -187,18 +186,20 @@ function FormRow({
           {line.lineNo}
         </TableCell>
         <TableCell sx={{ overflowWrap: 'anywhere' }}>
-          <Typography variant="subtitle2">
-            {line.sameAsAbove ? '″ ' : ''}
-            {familyName}
-          </Typography>
-          <Typography
-            variant="caption"
-            sx={{ color: 'text.disabled', fontFamily: 'monospace', display: 'block' }}
-          >
-            {line.rawText}
-          </Typography>
-        </TableCell>
-        <TableCell>
+          <Stack direction="row" spacing={1} alignItems="baseline" sx={{ mb: 0.5 }}>
+            <Typography variant="subtitle2" sx={{ flexShrink: 0 }}>
+              {line.sameAsAbove ? '″ ' : ''}
+              {familyName}
+            </Typography>
+            <Typography
+              variant="caption"
+              noWrap
+              title="Chữ trên hoá đơn"
+              sx={{ color: 'text.disabled', fontFamily: 'monospace', minWidth: 0 }}
+            >
+              {line.rawText}
+            </Typography>
+          </Stack>
           <ProductCell
             line={line}
             familyName={familyName}
@@ -253,7 +254,7 @@ function FormRow({
 
       <TableRow sx={rowSx}>
         <TableCell />
-        <TableCell colSpan={6} sx={{ pt: 0 }}>
+        <TableCell colSpan={5} sx={{ pt: 0 }}>
           <Stack direction="row" spacing={1.5} alignItems="flex-start" flexWrap="wrap" useFlexGap>
             {!skipped && (
               <PurchaseImportPackField line={line} disabled={locked} dense onSave={onSave} />

@@ -108,6 +108,8 @@ export default function PurchaseImportDrawer({
 }: Props) {
   const page = variant === 'page';
   const [sideTab, setSideTab] = useState<SideTab>('chat');
+  // Trang: ẩn cột trao đổi / ảnh để form dòng rộng hết khung.
+  const [sideOpen, setSideOpen] = useState(true);
   const instanceId = useId();
   const wide = useResponsive('up', 'lg');
   const medium = useResponsive('up', 'md');
@@ -432,6 +434,17 @@ export default function PurchaseImportDrawer({
           <Label color={status.color} sx={{ flexShrink: 0 }}>
             {status.label}
           </Label>
+        )}
+        {page && medium && (
+          <Button
+            size="small"
+            color="inherit"
+            onClick={() => setSideOpen((v) => !v)}
+            startIcon={<Iconify icon="solar:chat-round-dots-bold-duotone" width={18} />}
+            sx={{ flexShrink: 0 }}
+          >
+            {sideOpen ? 'Ẩn trao đổi' : 'Hiện trao đổi'}
+          </Button>
         )}
         {importId && !page && (
           <Tooltip title="Mở trang duyệt đầy đủ">
@@ -904,43 +917,49 @@ export default function PurchaseImportDrawer({
             flex: 1,
             minHeight: 0,
             display: 'grid',
-            gridTemplateColumns: wide ? 'minmax(0, 1fr) 360px' : 'minmax(0, 1fr) 320px',
+            gridTemplateColumns: !sideOpen
+              ? 'minmax(0, 1fr)'
+              : wide
+                ? 'minmax(0, 1fr) 360px'
+                : 'minmax(0, 1fr) 320px',
           }}
         >
           <Box sx={{ minHeight: 0, overflowY: 'auto', px: 2 }}>{renderReview()}</Box>
-          <Box
-            sx={{
-              minHeight: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
-            }}
-          >
-            <Tabs
-              value={sideTab}
-              onChange={(_, value: SideTab) => setSideTab(value)}
-              sx={{ px: 2, flexShrink: 0 }}
+          {sideOpen && (
+            <Box
+              sx={{
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
+              }}
             >
-              <Tab
-                value="chat"
-                label={`Trao đổi với trợ lý${messages.length ? ` (${messages.length})` : ''}`}
-              />
-              <Tab
-                value="images"
-                label={`Ảnh (${item.images.length + (item.productImages?.length ?? 0)})`}
-              />
-            </Tabs>
-            {sideTab === 'images' ? (
-              <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: 2 }}>{renderImages()}</Box>
-            ) : (
-              <>
-                <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 2 }}>
-                  {renderConversation()}
-                </Box>
-                {renderComposer()}
-              </>
-            )}
-          </Box>
+              <Tabs
+                value={sideTab}
+                onChange={(_, value: SideTab) => setSideTab(value)}
+                sx={{ px: 2, flexShrink: 0 }}
+              >
+                <Tab
+                  value="chat"
+                  label={`Trao đổi với trợ lý${messages.length ? ` (${messages.length})` : ''}`}
+                />
+                <Tab
+                  value="images"
+                  label={`Ảnh (${item.images.length + (item.productImages?.length ?? 0)})`}
+                />
+              </Tabs>
+              {sideTab === 'images' ? (
+                <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: 2 }}>{renderImages()}</Box>
+              ) : (
+                <>
+                  <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 2 }}>
+                    {renderConversation()}
+                  </Box>
+                  {renderComposer()}
+                </>
+              )}
+            </Box>
+          )}
         </Box>
       );
 
