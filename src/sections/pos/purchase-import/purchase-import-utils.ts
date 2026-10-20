@@ -59,6 +59,12 @@ export function perPieceCost(line: IPurchaseImportLine, counted = line.countedQu
   return counted && counted > 0 && total ? Math.round((total / counted) * 100) / 100 : null;
 }
 
+/** Giá theo gói: số chiếc mỗi gói (dòng lưu tổng chiếc = SL gói × chiếc/gói); chưa tích → null. */
+export function piecesPerPack(line: IPurchaseImportLine): number | null {
+  if (!line.countedQuantity || !line.quantity || line.quantity <= 0) return null;
+  return Math.round((line.countedQuantity / line.quantity) * 1000) / 1000;
+}
+
 /** Giá nhập đưa vào phiếu cho mỗi đơn vị (đã đếm thì mỗi cái). */
 export function receiptUnitCost(line: IPurchaseImportLine): number | null {
   return perPieceCost(line) ?? line.unitPrice ?? (line.lineTotal && line.quantity ? line.lineTotal / line.quantity : null);

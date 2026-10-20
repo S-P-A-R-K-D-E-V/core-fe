@@ -23,7 +23,7 @@ export type PickedProduct = { id: string; code: string; name: string; price?: nu
 const MIN_CHARS = 2;
 const DEBOUNCE_MS = 300;
 
-function flatten(items: IProductListItem[]): PickedProduct[] {
+export function flattenProducts(items: IProductListItem[]): PickedProduct[] {
   return items.flatMap((p) => [
     { id: p.id, code: p.sku || p.code, name: p.fullName || p.name, price: p.sellingPrice ?? p.basePrice },
     ...(p.childProducts ?? [])
@@ -66,7 +66,7 @@ export default function PurchaseImportProductPicker({
     const current = ++request.current;
     timer.current = setTimeout(() => {
       getAllProducts({ keyword: keyword.trim(), pageSize: 20 })
-        .then((res) => current === request.current && setOptions(flatten(res.items)))
+        .then((res) => current === request.current && setOptions(flattenProducts(res.items)))
         .catch(() => current === request.current && setOptions([]))
         .finally(() => current === request.current && setLoading(false));
     }, DEBOUNCE_MS);

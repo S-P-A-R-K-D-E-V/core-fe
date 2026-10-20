@@ -51,6 +51,8 @@ import type {
 import { usePurchaseAccess } from '../purchase-order/purchase-access';
 import PurchaseImportImagesPanel from './purchase-import-images-panel';
 import PurchaseImportConversation from './purchase-import-conversation';
+import PurchaseImportFormLines from './purchase-import-form-lines';
+import PurchaseImportHeaderForm from './purchase-import-header-form';
 import PurchaseImportSupplierPanel from './purchase-import-supplier-panel';
 import PurchaseImportSupplierOverview from './purchase-import-supplier-overview';
 import PurchaseImportComposer, { type ComposerPhoto } from './purchase-import-composer';
@@ -84,15 +86,28 @@ const HIGHLIGHT_MS = 5000;
 const MAX_PHOTOS_PER_MESSAGE = 5;
 
 type DrawerTab = 'lines' | 'images' | 'chat';
+type SideTab = 'chat' | 'images';
 
 type Props = {
   importId: string | null;
   onClose: () => void;
   /** Mở trang trong dashboard (drawer đóng theo). */
   onNavigate: (href: string) => void;
+  /**
+   * <c>page</c>: trang duyệt đầy đủ — cùng khung (trao đổi với trợ lý, NCC, tạo phiếu…) nhưng không phải drawer, các
+   * dòng là form phiếu nhập (chọn sản phẩm tại ô, sửa số, giá theo gói) kèm ô kho / số / ngày / tổng hoá đơn.
+   */
+  variant?: 'drawer' | 'page';
 };
 
-export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: Props) {
+export default function PurchaseImportDrawer({
+  importId,
+  onClose,
+  onNavigate,
+  variant = 'drawer',
+}: Props) {
+  const page = variant === 'page';
+  const [sideTab, setSideTab] = useState<SideTab>('chat');
   const instanceId = useId();
   const wide = useResponsive('up', 'lg');
   const medium = useResponsive('up', 'md');
@@ -418,7 +433,7 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
             {status.label}
           </Label>
         )}
-        {importId && (
+        {importId && !page && (
           <Tooltip title="Mở trang duyệt đầy đủ">
             <IconButton
               size="small"
@@ -428,11 +443,13 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
             </IconButton>
           </Tooltip>
         )}
-        <Tooltip title="Đóng">
-          <IconButton size="small" onClick={onClose}>
-            <Iconify icon="mingcute:close-line" width={20} />
-          </IconButton>
-        </Tooltip>
+        {!page && (
+          <Tooltip title="Đóng">
+            <IconButton size="small" onClick={onClose}>
+              <Iconify icon="mingcute:close-line" width={20} />
+            </IconButton>
+          </Tooltip>
+        )}
       </Stack>
       {item && counts && item.lines.length > 0 && (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
@@ -769,6 +786,15 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
           popperZIndex={DRAWER_POPPER_Z}
           onChanged={changed}
         />
+        {page && item.status !== 'Extracting' && (
+          <PurchaseImportHeaderForm
+            key={item.id}
+            item={item}
+            editable={!!reviewing}
+            onChanged={changed}
+            onError={setActionError}
+          />
+        )}
         {item.supplierId && item.status !== 'Extracting' && (
           <PurchaseImportSupplierOverview
             supplierName={item.supplierName}
@@ -795,7 +821,31 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
         )}
         {renderActions()}
         {renderSelectionBar()}
-        {renderLines()}
+        {page && item.status !== 'Extracting' && item.lines.length > 0 ? (
+          <PurchaseImportFormLines
+            item={item}
+            editable={!!reviewing}
+            busyLine={busyLine}
+            highlight={highlight}
+            familyName={familyOf}
+            history={(line) =>
+              historyOf.get(line.productId ?? line.candidates[0]?.productId ?? '') ?? null
+            }
+            canCreateProduct={!!canCreateProducts}
+            selectable={selectable}
+            selected={selected}
+            onToggleSelect={(lineNo) =>
+              setSelected((current) =>
+                current.includes(lineNo)
+                  ? current.filter((n) => n !== lineNo)
+                  : [...current, lineNo]
+              )
+            }
+            onSave={saveLine}
+          />
+        ) : (
+          renderLines()
+        )}
       </Stack>
     );
 
@@ -845,6 +895,53 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
         </Alert>
       ) : (
         <LinearProgress sx={{ mx: 2, my: 3 }} />
+      );
+
+    if (page && medium)
+      return (
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            display: 'grid',
+            gridTemplateColumns: wide ? 'minmax(0, 1fr) 400px' : 'minmax(0, 1fr) 340px',
+          }}
+        >
+          <Box sx={{ minHeight: 0, overflowY: 'auto', px: 2 }}>{renderReview()}</Box>
+          <Box
+            sx={{
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
+            }}
+          >
+            <Tabs
+              value={sideTab}
+              onChange={(_, value: SideTab) => setSideTab(value)}
+              sx={{ px: 2, flexShrink: 0 }}
+            >
+              <Tab
+                value="chat"
+                label={`Trao đổi với trợ lý${messages.length ? ` (${messages.length})` : ''}`}
+              />
+              <Tab
+                value="images"
+                label={`Ảnh (${item.images.length + (item.productImages?.length ?? 0)})`}
+              />
+            </Tabs>
+            {sideTab === 'images' ? (
+              <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: 2 }}>{renderImages()}</Box>
+            ) : (
+              <>
+                <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 2 }}>
+                  {renderConversation()}
+                </Box>
+                {renderComposer()}
+              </>
+            )}
+          </Box>
+        </Box>
       );
 
     if (wide)
@@ -966,23 +1063,8 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
     );
   };
 
-  return (
-    <Drawer
-      anchor="right"
-      open={!!importId}
-      onClose={onClose}
-      sx={{ zIndex: DRAWER_Z }}
-      PaperProps={{
-        sx: {
-          width: wide ? 'min(1440px, 96vw)' : medium ? '96vw' : { xs: '100%', sm: 600 },
-          display: 'flex',
-          flexDirection: 'column',
-        },
-      }}
-    >
-      {renderHeader()}
-      {renderBody()}
-
+  const dialogs = (
+    <>
       {item && (
         <PurchaseImportNewProductsDialog
           open={creatingProducts}
@@ -1007,6 +1089,46 @@ export default function PurchaseImportDrawer({ importId, onClose, onNavigate }: 
         disabledSlideshow
         styles={{ root: { zIndex: DRAWER_POPPER_Z + 100 } }}
       />
+    </>
+  );
+
+  if (page)
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: { xs: 'auto', md: 'calc(100dvh - 180px)' },
+          minHeight: { md: 560 },
+          borderRadius: 2,
+          bgcolor: 'background.paper',
+          boxShadow: (theme) => theme.customShadows?.card,
+          overflow: 'hidden',
+        }}
+      >
+        {renderHeader()}
+        {renderBody()}
+        {dialogs}
+      </Box>
+    );
+
+  return (
+    <Drawer
+      anchor="right"
+      open={!!importId}
+      onClose={onClose}
+      sx={{ zIndex: DRAWER_Z }}
+      PaperProps={{
+        sx: {
+          width: wide ? 'min(1440px, 96vw)' : medium ? '96vw' : { xs: '100%', sm: 600 },
+          display: 'flex',
+          flexDirection: 'column',
+        },
+      }}
+    >
+      {renderHeader()}
+      {renderBody()}
+      {dialogs}
     </Drawer>
   );
 }

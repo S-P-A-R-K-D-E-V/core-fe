@@ -31,6 +31,7 @@ import type {
 import {
   parseAmount,
   perPieceCost,
+  piecesPerPack,
   receiptUnitCost,
   suggestSalePrice,
   importErrorMessage,
@@ -39,9 +40,9 @@ import {
 // ----------------------------------------------------------------------
 // Đặt mã mới cho các dòng đã tích (hàng chưa có trong danh mục). Tên mặc định là tên hàng trên hoá đơn — KHÔNG kèm số
 // (số trên toa là số lượng / đơn giá). "Tên chung cho cả nhóm" đặt một tên cho mọi dòng: các dòng cùng tên là một nhóm,
-// mỗi giá bán là một mã (mã gốc + mã con như danh mục KiotViet, vd "Lô dính - 15", "Lô dính - 20"). Hàng theo gói: ghi
-// số cái kho đếm được → giá nhập mỗi cái = thành tiền ÷ số cái, giá bán trống thì gấp đôi giá đó. Chỉ ghi lên dòng; mã
-// thật được tạo khi bấm "Tạo phiếu nhập".
+// mỗi giá bán là một mã (mã gốc + mã con như danh mục KiotViet, vd "Lô dính - 15", "Lô dính - 20"). Giá theo gói (đơn
+// giá là giá cả gói): ghi số chiếc mỗi gói → giá nhập mỗi chiếc = đơn giá ÷ chiếc/gói, giá bán trống thì gấp đôi giá đó.
+// Chỉ ghi lên dòng; mã thật được tạo khi bấm "Tạo phiếu nhập".
 // ----------------------------------------------------------------------
 
 type Row = { lineNo: number; name: string; salePrice: string; counted: string };
@@ -58,6 +59,12 @@ type Props = {
 };
 
 const groupKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
+
+/** Giá theo gói: tổng chiếc = SL gói trên hoá đơn × chiếc/gói đã nhập; không nhập → null. */
+const totalPieces = (line: IPurchaseImportLine, row: { counted: string }) => {
+  const perPack = parseAmount(row.counted);
+  return perPack && line.quantity ? Math.round(line.quantity * perPack * 1000) / 1000 : null;
+};
 
 export default function PurchaseImportNewProductsDialog({
   open,
@@ -86,7 +93,7 @@ export default function PurchaseImportNewProductsDialog({
         lineNo: line.lineNo,
         name: familyName(line),
         salePrice: '',
-        counted: line.countedQuantity ? String(line.countedQuantity) : '',
+        counted: piecesPerPack(line) != null ? String(piecesPerPack(line)) : '',
       }))
     );
   }, [open, lines, familyName]);
@@ -100,7 +107,7 @@ export default function PurchaseImportNewProductsDialog({
   const costOf = (row: Row) => {
     const line = lineOf(row);
     if (!line) return null;
-    return perPieceCost(line, parseAmount(row.counted)) ?? receiptUnitCost(line);
+    return perPieceCost(line, totalPieces(line, row)) ?? receiptUnitCost(line);
   };
   const priceOf = (row: Row) => parseAmount(row.salePrice) ?? suggestSalePrice(costOf(row));
 
@@ -128,7 +135,7 @@ export default function PurchaseImportNewProductsDialog({
       // eslint-disable-next-line no-restricted-syntax
       for (const row of rows) {
         const line = lineOf(row);
-        const counted = parseAmount(row.counted);
+        const counted = line ? totalPieces(line, row) : null;
         const patch: IUpdatePurchaseImportLineRequest = {
           newProductName: row.name.trim(),
           newProductSalePrice: parseAmount(row.salePrice),
@@ -197,7 +204,7 @@ export default function PurchaseImportNewProductsDialog({
                 <TableCell sx={{ width: 40 }}>Dòng</TableCell>
                 <TableCell>Trên hoá đơn</TableCell>
                 <TableCell sx={{ minWidth: 200 }}>Tên sản phẩm mới</TableCell>
-                <TableCell sx={{ width: 120 }}>Số cái đếm được</TableCell>
+                <TableCell sx={{ width: 120 }}>Giá theo gói: chiếc/gói</TableCell>
                 <TableCell sx={{ width: 110 }}>Giá nhập/cái</TableCell>
                 <TableCell sx={{ width: 150 }}>Giá bán (tuỳ chọn)</TableCell>
               </TableRow>
@@ -232,7 +239,7 @@ export default function PurchaseImportNewProductsDialog({
                       <TextField
                         size="small"
                         value={row.counted}
-                        placeholder="theo gói"
+                        placeholder="vd 20"
                         error={row.counted.trim() !== '' && parseAmount(row.counted) == null}
                         onChange={(e) => update(row.lineNo, { counted: e.target.value })}
                       />

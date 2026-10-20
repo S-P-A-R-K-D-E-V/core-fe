@@ -32,6 +32,9 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('src/api/purchase-imports', () => api);
 vi.mock('src/api/products', () => ({ getAllProducts: vi.fn() }));
+vi.mock('src/api/warehouses', () => ({
+  getAllWarehouses: vi.fn().mockResolvedValue([{ id: 'w1', name: 'Kho', isActive: true }]),
+}));
 vi.mock('src/api/suppliers', () => ({
   getAllSuppliers: vi.fn().mockResolvedValue([]),
   createSupplier: vi.fn(),
@@ -120,6 +123,13 @@ const reply = (
   ],
   ...patch,
 });
+
+const renderPage = () =>
+  render(
+    <ThemeProvider theme={createTheme()}>
+      <PurchaseImportDrawer variant="page" importId={ID} onClose={vi.fn()} onNavigate={vi.fn()} />
+    </ThemeProvider>
+  );
 
 const renderDrawer = (onNavigate = vi.fn()) =>
   render(
@@ -335,22 +345,24 @@ describe('PurchaseImportDrawer', () => {
     expect(screen.getByText('Lô dính', { selector: 'strong' })).toBeInTheDocument();
   });
 
-  it('chi tiết dòng: đếm số cái của gói → lưu số cái, hiện giá nhập mỗi cái', async () => {
+  it('chi tiết dòng: giá theo gói → nhập chiếc/gói, phiếu ghi SL gói × chiếc/gói', async () => {
+    // Dòng 2 gói × 180.000; mỗi gói 10 chiếc → 20 chiếc.
     api.updatePurchaseImportLine.mockResolvedValue(
-      invoice({ lines: invoice().lines.map((l) => ({ ...l, countedQuantity: 10 })) })
+      invoice({ lines: invoice().lines.map((l) => ({ ...l, countedQuantity: 20 })) })
     );
     const user = userEvent.setup();
     renderDrawer();
 
     await user.click(await screen.findByRole('button', { name: /Chọn mã khác, tạo mã mới/ }));
-    await user.click(screen.getByRole('button', { name: 'Đếm số cái' }));
-    await user.type(screen.getByLabelText('Số cái đếm được'), '10');
-    expect(screen.getByText(/thành tiền ÷ số cái/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Lưu' }));
+    await user.click(screen.getByRole('button', { name: 'Giá theo gói' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Giá theo gói' }));
+    await user.type(screen.getByLabelText('Chiếc / gói'), '10');
+    expect(screen.getByText(/= 20 chiếc/)).toBeInTheDocument();
+    await user.tab();
 
-    expect(api.updatePurchaseImportLine).toHaveBeenCalledWith(ID, 1, { countedQuantity: 10 });
-    expect(await screen.findByText('10 cái')).toBeInTheDocument();
-    expect(screen.getByText(/phiếu ghi theo cái/)).toBeInTheDocument();
+    expect(api.updatePurchaseImportLine).toHaveBeenCalledWith(ID, 1, { countedQuantity: 20 });
+    expect(await screen.findByText('20 chiếc')).toBeInTheDocument();
+    expect(screen.getByText(/phiếu ghi theo chiếc/)).toBeInTheDocument();
   });
 
   it('đặt mã mới cho cả nhóm: tên chung, số cái, giá bán từng dòng → xem trước mã gốc + mã con', async () => {
@@ -386,7 +398,7 @@ describe('PurchaseImportDrawer', () => {
     await user.click(screen.getByRole('button', { name: 'Đặt mã mới (2)' }));
     await user.type(await screen.findByLabelText('Tên chung cho cả nhóm (tuỳ chọn)'), 'Lô dính');
     await user.click(screen.getByRole('button', { name: 'Đặt cho 2 dòng' }));
-    const counted = screen.getAllByPlaceholderText('theo gói');
+    const counted = screen.getAllByPlaceholderText('vd 20');
     await user.type(counted[0], '12');
     await user.type(counted[1], '12');
     const prices = screen
@@ -546,6 +558,66 @@ describe('PurchaseImportDrawer', () => {
 
     expect(await screen.findByText(/hàng trên hoá đơn sẽ là lần nhập đầu/)).toBeInTheDocument();
     expect(screen.queryByText(/Đã nhập NCC này/)).not.toBeInTheDocument();
+  });
+
+  it('trang duyệt: form phiếu — ô thông tin hoá đơn, bấm "Đúng" chốt gợi ý ngay tại dòng', async () => {
+    api.getPurchaseImport.mockResolvedValue(
+      invoice({
+        lines: invoice().lines.map((l) => ({
+          ...l,
+          status: 'Suggested',
+          suggestedProductId: 'p901',
+          candidates: [
+            {
+              productId: 'p901',
+              code: 'SP000901',
+              name: 'Máy sấy 8035',
+              score: 0.7,
+              reason: 'Tên giống',
+            },
+          ],
+        })),
+      })
+    );
+    api.updatePurchaseImportLine.mockResolvedValue(invoice());
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByLabelText('Số hoá đơn')).toBeInTheDocument();
+    expect(screen.getByLabelText('Ngày hoá đơn')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tổng trên hoá đơn')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Đúng' }));
+
+    expect(api.updatePurchaseImportLine).toHaveBeenCalledWith(ID, 1, { productId: 'p901' });
+  });
+
+  it('trang duyệt: tích giá theo gói tại dòng → phiếu ghi SL gói × chiếc/gói', async () => {
+    api.updatePurchaseImportLine.mockResolvedValue(
+      invoice({ lines: invoice().lines.map((l) => ({ ...l, countedQuantity: 20 })) })
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('checkbox', { name: 'Giá theo gói' }));
+    await user.type(screen.getByLabelText('Chiếc / gói'), '10');
+    await user.tab();
+
+    expect(api.updatePurchaseImportLine).toHaveBeenCalledWith(ID, 1, { countedQuantity: 20 });
+    // 2 gói × 10 chiếc, thành tiền 220.000 → 11.000đ/chiếc vào phiếu.
+    expect(await screen.findByText(/Vào phiếu:/)).toBeInTheDocument();
+  });
+
+  it('trang duyệt: ô sản phẩm cho đặt mã mới theo tên hàng (tạo khi tạo phiếu)', async () => {
+    api.updatePurchaseImportLine.mockResolvedValue(invoice());
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByPlaceholderText('Gõ tên / mã hàng…'));
+    await user.click(await screen.findByText('Đặt mã mới «Máy sấy 8035» (tạo khi tạo phiếu)'));
+
+    expect(api.updatePurchaseImportLine).toHaveBeenCalledWith(ID, 1, {
+      newProductName: 'Máy sấy 8035',
+    });
   });
 
   it('phiếu đã sang KiotViet → hiện mã phiếu bên KiotViet', async () => {
