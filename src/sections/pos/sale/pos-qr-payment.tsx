@@ -70,9 +70,10 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
   // Nguồn xác nhận chuyển khoản: '' = theo tài khoản (như cũ); kết nối (vd ApiPay — VA) = QR vào tài khoản của kết nối.
   const {
     connections,
+    selectionKey,
     connectionId,
     connection,
-    setConnectionId,
+    setSelectionKey,
     loaded: connectionsLoaded,
   } = usePosPaymentConnections();
 
@@ -84,7 +85,7 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
   const [createdFor, setCreatedFor] = useState<{
     amount: number;
     bankAccountId: string;
-    connectionId: string;
+    selectionKey: string;
   } | null>(null);
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -195,14 +196,14 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
 
       setQrOrder(result);
       setStatusData(null);
-      setCreatedFor({ amount: debouncedAmount, bankAccountId: selectedAccountId, connectionId });
+      setCreatedFor({ amount: debouncedAmount, bankAccountId: selectedAccountId, selectionKey });
       setQrState('active');
       startPolling(result.id);
     } catch (err: any) {
       if (!mountedRef.current) return;
       setQrState('error');
       // Đổi nguồn xác nhận mà mã mới lỗi: bỏ mã đang hiện — mã đó không thuộc nguồn đang chọn, thu ngân dễ nhầm.
-      if (createdFor && createdFor.connectionId !== connectionId) {
+      if (createdFor && createdFor.selectionKey !== selectionKey) {
         stopPolling();
         setQrOrder(null);
         setStatusData(null);
@@ -214,6 +215,7 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     debouncedAmount,
     selectedAccountId,
     connectionId,
+    selectionKey,
     connection,
     createdFor,
     salesOrderId,
@@ -232,12 +234,12 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
       createdFor &&
       createdFor.amount === debouncedAmount &&
       createdFor.bankAccountId === selectedAccountId &&
-      createdFor.connectionId === connectionId
+      createdFor.selectionKey === selectionKey
     )
       return;
     handleGenerateQr();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedAmount, selectedAccountId, connectionId, connectionsLoaded]);
+  }, [debouncedAmount, selectedAccountId, selectionKey, connectionsLoaded]);
 
   const handleCheckPayment = useCallback(async () => {
     if (!qrOrder) return;
@@ -378,8 +380,8 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     <>
       <PaymentConnectionSelect
         connections={connections}
-        value={connectionId}
-        onChange={setConnectionId}
+        value={selectionKey}
+        onChange={setSelectionKey}
         disabled={qrState === 'completed'}
       />
       {!connection && bankAccounts.length > 0 && bankSelector}
@@ -388,7 +390,9 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
 
   // Kết nối của mã đang hiện (mã tạo theo kết nối) — để ghi "xác nhận qua ApiPay" dưới QR.
   const qrConnection = qrOrder?.connectionId
-    ? connections.find((c) => c.id === qrOrder.connectionId)
+    ? (connection?.id === qrOrder.connectionId
+        ? connection
+        : connections.find((c) => c.id === qrOrder.connectionId))
     : undefined;
 
   if (accountsLoading || !connectionsLoaded) {

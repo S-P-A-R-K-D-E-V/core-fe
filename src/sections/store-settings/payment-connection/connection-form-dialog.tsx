@@ -66,6 +66,8 @@ export type BankAccountOption = {
   id: string;
   label: string;
   bin?: string | null;
+  /** Số tài khoản — gợi ý tên kết nối */
+  accountNumber?: string | null;
 };
 
 type Props = {
@@ -422,7 +424,7 @@ function ProviderPicker({ loading, providers, value, accountBin, onChange }: Pic
 
 // ----------------------------------------------------------------------
 
-function ProviderGuide({
+export function ProviderGuide({
   provider,
   defaultExpanded,
 }: {

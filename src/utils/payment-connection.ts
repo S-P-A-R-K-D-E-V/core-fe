@@ -10,18 +10,23 @@ import { paymentProviderLabel } from './payment-status';
 /** localStorage: nguồn thu ngân chọn lần trước trên máy này ('' = theo tài khoản). */
 export const POS_PAYMENT_CONNECTION_STORAGE_KEY = 'pos.paymentConnectionId';
 
+/** Khoá lựa chọn ở quầy: key của BE (kết nối chưa gắn tài khoản × tài khoản), BE cũ không có thì id kết nối. */
+export function posConnectionKey(connection: Pick<IPosPaymentConnection, 'id' | 'key'>): string {
+  return connection.key || connection.id;
+}
+
 /** "ApiPay — MB 9704229999": nhà cung cấp — ngân hàng + tài khoản / VA nhận tiền. */
 export function posConnectionLabel(connection: IPosPaymentConnection): string {
   const account = [connection.bankName, connection.accountNumber].filter(Boolean).join(' ');
   return `${paymentProviderLabel(connection.provider)} — ${account}`;
 }
 
-/** Lựa chọn đã lưu còn trong danh sách (chưa bị tắt) thì giữ, không thì về mặc định theo tài khoản. */
+/** Lựa chọn đã lưu (khoá) còn trong danh sách (chưa bị tắt) thì giữ, không thì về mặc định theo tài khoản. */
 export function resolveSavedConnectionId(
   saved: string | null | undefined,
-  connections: Pick<IPosPaymentConnection, 'id'>[]
+  connections: Pick<IPosPaymentConnection, 'id' | 'key'>[]
 ): string {
-  return saved && connections.some((c) => c.id === saved) ? saved : '';
+  return saved && connections.some((c) => posConnectionKey(c) === saved) ? saved : '';
 }
 
 /**

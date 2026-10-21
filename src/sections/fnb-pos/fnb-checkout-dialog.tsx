@@ -73,7 +73,14 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
   const [qr, setQr] = useState<IQrPaymentResponse | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
-  const { connections, connectionId, connection, setConnectionId } = usePosPaymentConnections();
+  const { connections, selectionKey, connectionId, connection, setSelectionKey } =
+    usePosPaymentConnections();
+  // Lựa chọn gắn tài khoản của cửa hàng (vd VietinBank VietQR Pay — tài khoản VietinBank) → ô tài khoản theo luôn.
+  const selectSource = (key: string) => {
+    setSelectionKey(key);
+    const chosen = connections.find((c) => (c.key || c.id) === key);
+    if (chosen?.bankAccountId) setAccountId(chosen.bankAccountId);
+  };
   const qrRef = useRef<IQrPaymentResponse | null>(null);
   qrRef.current = qr;
 
@@ -121,7 +128,7 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
   useEffect(() => {
     dropQr();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, accountId, connectionId, total]);
+  }, [method, accountId, selectionKey, total]);
 
   /** Trạng thái mã (poll hoặc SignalR): tiền về → thanh toán luôn; huỷ / hết hạn → báo tạo lại. true = đã xử lý xong mã. */
   const handleQrStatus = (qrId: string, status: string) => {
@@ -191,7 +198,7 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
     try {
       setQr(
         await createQrPayment({
-          ...qrTarget(connectionId, accountId),
+          ...qrTarget(connectionId, connection?.bankAccountId || accountId),
           amount: total,
           description: transferRef.trim() || undefined,
         })
@@ -266,8 +273,8 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
               </TextField>
               <PaymentConnectionSelect
                 connections={connections}
-                value={connectionId}
-                onChange={setConnectionId}
+                value={selectionKey}
+                onChange={selectSource}
               />
               <TextField
                 label="Nội dung chuyển khoản"

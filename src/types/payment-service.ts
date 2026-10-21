@@ -44,6 +44,7 @@ export type PaymentProvider =
   | 'acb'
   | 'bidv'
   | 'mbbank'
+  | 'vietinbank'
   | 'mockbank'
   | 'apipay'
   | (string & {});

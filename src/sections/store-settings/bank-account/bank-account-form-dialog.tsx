@@ -65,7 +65,8 @@ type Props = {
   banksLoading: boolean;
   banksError: boolean;
   onClose: VoidFunction;
-  onSaved: VoidFunction;
+  /** Thêm mới → id tài khoản vừa tạo (để nơi gọi chọn sẵn) */
+  onSaved: (createdId?: string) => void;
 };
 
 export default function BankAccountFormDialog({
@@ -161,6 +162,7 @@ export default function BankAccountFormDialog({
         accountHolder: normalized.accountHolder,
         description: normalized.description.trim() || null,
       };
+      let createdId: string | undefined;
       if (account) {
         await updateBankAccount(account.id, {
           ...base,
@@ -170,10 +172,14 @@ export default function BankAccountFormDialog({
         enqueueSnackbar('Đã cập nhật tài khoản ngân hàng');
       } else {
         // Không bật "mặc định" → bỏ trống: tài khoản đầu tiên của cửa hàng tự thành mặc định.
-        await createBankAccount({ ...base, isDefault: normalized.isDefault || undefined });
+        const created = await createBankAccount({
+          ...base,
+          isDefault: normalized.isDefault || undefined,
+        });
+        createdId = created?.id;
         enqueueSnackbar('Đã thêm tài khoản ngân hàng');
       }
-      onSaved();
+      onSaved(createdId);
     } catch (err) {
       const fieldErrors = fieldErrorsFromProblem(err);
       setServerErrors(fieldErrors);

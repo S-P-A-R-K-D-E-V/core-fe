@@ -51,7 +51,7 @@ import {
 import {
   ConnectionList,
   ConfirmActionDialog,
-  ConnectionFormDialog,
+  ConnectionWizardDialog,
   ConnectionResultDialog,
   type BankAccountOption,
 } from './payment-connection';
@@ -372,9 +372,8 @@ export default function BankAccountsTab() {
         onClose={() => setQrTarget(null)}
       />
 
-      <ConnectionFormDialog
+      <ConnectionWizardDialog
         open={!!connectTarget}
-        mode="create"
         providers={providers}
         providersLoading={providersLoading}
         providersError={providersError}
@@ -384,6 +383,7 @@ export default function BankAccountsTab() {
                 id: connectTarget.id,
                 label: bankAccountOptionLabel(connectTarget),
                 bin: connectTarget.bin,
+                accountNumber: connectTarget.accountNumber,
               }
             : null
         }

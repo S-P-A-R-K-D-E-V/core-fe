@@ -31,15 +31,16 @@ import { ApiPayBankLinkCard } from './apipay-bank-link';
 import { normalizeBankAccount, bankAccountOptionLabel } from './bank-account/utils';
 import {
   ConnectionList,
-  ConnectionFormDialog,
+  ConnectionWizardDialog,
   ConnectionResultDialog,
   type BankAccountOption,
 } from './payment-connection';
 
 // ----------------------------------------------------------------------
-// Kết nối thanh toán (chỉ Admin): mọi kết nối của cửa hàng — SePay / Casso đọc biến động số dư, payOS / VNPay là cổng
-// thanh toán, ACB / BIDV / MB là ngân hàng trực tiếp. Form tạo / cập nhật dựng từ danh mục nhà cung cấp
-// (GET payment/settings/providers); thao tác trên từng kết nối dùng chung với tab Tài khoản ngân hàng.
+// Kết nối thanh toán qua S Payment (chỉ Admin): mọi kết nối của cửa hàng — ngân hàng trực tiếp (ACB / BIDV / MB /
+// VietinBank), bên thứ ba đọc biến động số dư (ApiPay / SePay / Casso), cổng thanh toán (payOS / VNPay). Thêm kết nối
+// theo trình hướng dẫn 3 bước (dịch vụ → tài khoản nhận → thông tin kết nối); cập nhật dùng form dựng từ danh mục
+// (GET payment/settings/providers). Thu ngân chọn "tài khoản · dịch vụ" ở quầy để đối soát.
 // ----------------------------------------------------------------------
 
 export default function PaymentConnectionsTab() {
@@ -67,7 +68,12 @@ export default function PaymentConnectionsTab() {
         setBankAccounts(
           accounts.map((raw) => {
             const a = normalizeBankAccount(raw);
-            return { id: a.id, label: bankAccountOptionLabel(a), bin: a.bin };
+            return {
+              id: a.id,
+              label: bankAccountOptionLabel(a),
+              bin: a.bin,
+              accountNumber: a.accountNumber,
+            };
           })
         );
       }
@@ -111,9 +117,10 @@ export default function PaymentConnectionsTab() {
   if (!enabled) {
     return (
       <Alert severity="info">
-        Dịch vụ thanh toán chưa được bật trên máy chủ. Khi được bật, cửa hàng có thể kết nối SePay,
-        Casso, payOS, VNPay hoặc ngân hàng trực tiếp để tự xác nhận tiền chuyển khoản và đối soát
-        giao dịch. Trong lúc chờ, thanh toán QR vẫn chạy như cũ.
+        Dịch vụ thanh toán S Payment chưa được bật trên máy chủ. Khi được bật, cửa hàng có thể kết
+        nối ngân hàng trực tiếp (ACB, BIDV, MB, VietinBank), ApiPay, SePay, Casso, payOS hoặc VNPay
+        để tự xác nhận tiền chuyển khoản và đối soát giao dịch. Trong lúc chờ, thanh toán QR vẫn
+        chạy như cũ.
       </Alert>
     );
   }
@@ -129,12 +136,13 @@ export default function PaymentConnectionsTab() {
             spacing={2}
           >
             <Stack spacing={0.5}>
-              <Typography variant="h6">Kết nối thanh toán</Typography>
+              <Typography variant="h6">Kết nối thanh toán qua S Payment</Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                SePay / Casso và ngân hàng trực tiếp báo tiền vào tài khoản ngân hàng của cửa hàng;
-                payOS / VNPay là cổng thanh toán cho đơn online. Tiền chỉ tự khớp khi nội dung
-                chuyển khoản có mã thanh toán (bắt đầu bằng &quot;{prefix}&quot;) — giao dịch không
-                có mã nằm ở màn Đối soát thanh toán chờ khớp tay.
+                Chọn dịch vụ (ngân hàng trực tiếp, ApiPay / SePay / Casso, cổng thanh toán), gắn tài
+                khoản nhận và điền thông tin kết nối — S Payment báo tiền về và tự đối soát. Khi bán ở
+                quầy, thu ngân chọn &quot;tài khoản · dịch vụ&quot; để xác nhận chuyển khoản. Tiền chỉ
+                tự khớp khi nội dung chuyển khoản có mã thanh toán (bắt đầu bằng &quot;{prefix}&quot;)
+                — giao dịch không có mã nằm ở màn Đối soát thanh toán chờ khớp tay.
               </Typography>
             </Stack>
             <Button
@@ -166,13 +174,13 @@ export default function PaymentConnectionsTab() {
 
       <ApiPayBankLinkCard connections={connections} onChanged={load} />
 
-      <ConnectionFormDialog
+      <ConnectionWizardDialog
         open={addOpen}
-        mode="create"
         providers={providers}
         providersLoading={providersLoading}
         providersError={providersError}
         bankAccounts={bankAccounts}
+        onBankAccountsChanged={load}
         onClose={() => setAddOpen(false)}
         onSaved={(c) => {
           setAddOpen(false);

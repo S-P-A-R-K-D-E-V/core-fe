@@ -27,10 +27,75 @@ export const BANK_DIRECT_BINS: Readonly<Record<string, string>> = {
   acb: '970416',
   mbbank: '970422',
   bidv: '970418',
+  vietinbank: '970415',
 };
 
 export function visibleProviders(providers: IPaymentProviderInfo[]): IPaymentProviderInfo[] {
   return providers.filter((p) => !HIDDEN_PROVIDER_KEYS.includes(p.key));
+}
+
+// ---------------------------------------------------------------------- Trình hướng dẫn kết nối qua S Payment
+
+export type ProviderGroup = {
+  kind: string;
+  title: string;
+  description: string;
+  providers: IPaymentProviderInfo[];
+};
+
+const PROVIDER_GROUPS: ReadonlyArray<Omit<ProviderGroup, 'providers'>> = [
+  {
+    kind: 'bank_direct',
+    title: 'Ngân hàng trực tiếp',
+    description:
+      'S Payment nối thẳng Open API của ngân hàng — ngân hàng báo tiền về, không qua bên thứ ba.',
+  },
+  {
+    kind: 'bank_feed',
+    title: 'Biến động số dư qua bên thứ ba',
+    description: 'ApiPay / SePay / Casso đọc biến động số dư tài khoản rồi báo về S Payment.',
+  },
+  {
+    kind: 'gateway',
+    title: 'Cổng thanh toán',
+    description: 'Trang thanh toán cho đơn online (thẻ, ví, QR của cổng).',
+  },
+];
+
+/** Dịch vụ cho cửa hàng chọn, gom theo nhóm (ngân hàng trực tiếp → bên thứ ba → cổng → khác); nhóm rỗng bỏ đi. */
+export function groupProviders(providers: IPaymentProviderInfo[]): ProviderGroup[] {
+  const selectable = visibleProviders(providers);
+  const known = PROVIDER_GROUPS.map((g) => g.kind);
+  const groups: ProviderGroup[] = PROVIDER_GROUPS.map((g) => ({
+    ...g,
+    providers: selectable.filter((p) => p.kind === g.kind),
+  }));
+  groups.push({
+    kind: 'other',
+    title: 'Khác',
+    description: '',
+    providers: selectable.filter((p) => !known.includes(p.kind)),
+  });
+  return groups.filter((g) => g.providers.length > 0);
+}
+
+/** Cổng thanh toán không nhận chuyển khoản vào tài khoản cửa hàng → bỏ bước chọn tài khoản nhận. */
+export function needsReceivingAccount(provider: Pick<IPaymentProviderInfo, 'kind'>): boolean {
+  return provider.kind !== 'gateway';
+}
+
+/** Ngân hàng trực tiếp: tên ngân hàng (ACB, VietinBank…) để ghi "mọi tài khoản VietinBank". */
+export function bankDirectName(provider: Pick<IPaymentProviderInfo, 'key' | 'displayName'>): string {
+  return provider.displayName.split(/\s+[—-]\s+/)[0];
+}
+
+/** Tên kết nối gợi ý: "VietinBank · 103885549137" (có tài khoản) hoặc tên nhà cung cấp. */
+export function suggestedConnectionName(
+  provider: Pick<IPaymentProviderInfo, 'key' | 'displayName'>,
+  accountNumber?: string | null
+): string {
+  const name = bankDirectName(provider);
+  return accountNumber ? `${name} · ${accountNumber}` : name;
 }
 
 /**

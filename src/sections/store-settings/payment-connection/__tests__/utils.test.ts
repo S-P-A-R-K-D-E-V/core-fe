@@ -5,6 +5,7 @@ import type { IPaymentProviderInfo, IPaymentProviderField } from 'src/types/paym
 import {
   canSync,
   isBankDirect,
+  groupProviders,
   isSecretField,
   credentialLabel,
   settingToBoolean,
@@ -15,6 +16,8 @@ import {
   buildCreateCredentials,
   buildUpdateCredentials,
   initialCredentialValues,
+  needsReceivingAccount,
+  suggestedConnectionName,
   providerUnavailableReason,
 } from '../utils';
 
@@ -304,5 +307,49 @@ describe('credentialLabel / hasGeneratedSecrets / canSync / isBankDirect', () =>
     expect(canSync({ kind: 'bank_direct', provider: 'acb' })).toBe(false);
     expect(isBankDirect({ kind: 'bank_direct' })).toBe(true);
     expect(isBankDirect({ kind: 'bank_feed' })).toBe(false);
+  });
+});
+
+describe('trình hướng dẫn S Payment', () => {
+  const p = (key: string, kind: string, displayName = key): IPaymentProviderInfo => ({
+    key,
+    kind,
+    displayName,
+    summary: '',
+    free: true,
+    fields: [],
+    setupSteps: [],
+    hasCertificationSuite: false,
+  });
+
+  it('gom nhóm: ngân hàng trực tiếp → bên thứ ba → cổng → khác; ẩn giả lập, bỏ nhóm rỗng', () => {
+    const groups = groupProviders([
+      p('payos', 'gateway'),
+      p('apipay', 'bank_feed'),
+      p('mockbank', 'bank_direct'),
+      p('vietinbank', 'bank_direct'),
+      p('newthing', 'wallet'),
+    ]);
+    expect(groups.map((g) => g.kind)).toEqual(['bank_direct', 'bank_feed', 'gateway', 'other']);
+    expect(groups[0].providers.map((x) => x.key)).toEqual(['vietinbank']);
+    expect(groupProviders([p('apipay', 'bank_feed')]).map((g) => g.kind)).toEqual(['bank_feed']);
+  });
+
+  it('cổng thanh toán không cần tài khoản nhận', () => {
+    expect(needsReceivingAccount({ kind: 'gateway' })).toBe(false);
+    expect(needsReceivingAccount({ kind: 'bank_direct' })).toBe(true);
+    expect(needsReceivingAccount({ kind: 'bank_feed' })).toBe(true);
+  });
+
+  it('VietinBank chỉ dùng cho tài khoản VietinBank (BIN 970415)', () => {
+    const vtb = p('vietinbank', 'bank_direct', 'VietinBank — VietQR Pay');
+    expect(providerUnavailableReason(vtb, '970415')).toBeNull();
+    expect(providerUnavailableReason(vtb, '970422')).not.toBeNull();
+  });
+
+  it('gợi ý tên kết nối theo tên ngắn của dịch vụ + số tài khoản', () => {
+    const vtb = p('vietinbank', 'bank_direct', 'VietinBank — VietQR Pay / Thông báo biến động số dư (Open API)');
+    expect(suggestedConnectionName(vtb, '103885549137')).toBe('VietinBank · 103885549137');
+    expect(suggestedConnectionName(vtb)).toBe('VietinBank');
   });
 });

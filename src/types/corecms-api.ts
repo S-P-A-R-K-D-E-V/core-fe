@@ -3265,6 +3265,11 @@ export interface IPosPaymentConnection {
   environment: 'test' | 'live' | (string & {});
   /** Tài khoản ngân hàng của cửa hàng cùng số (null khi là VA). */
   bankAccountId?: string | null;
+  /**
+   * Khoá lựa chọn: = id; kết nối ngân hàng trực tiếp chưa gắn tài khoản tách thành một lựa chọn cho mỗi tài khoản cùng
+   * ngân hàng ("{id}:{bankAccountId}") — tạo QR gửi id + bankAccountId của lựa chọn. BE cũ không có → dùng id.
+   */
+  key?: string | null;
   bankName?: string | null;
 }
 

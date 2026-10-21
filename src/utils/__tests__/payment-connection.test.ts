@@ -4,6 +4,7 @@ import type { IPosPaymentConnection } from 'src/types/corecms-api';
 
 import {
   qrTarget,
+  posConnectionKey,
   saveConnectionId,
   posConnectionLabel,
   readSavedConnectionId,
@@ -71,5 +72,30 @@ describe('ghi nhớ lựa chọn theo máy', () => {
 
     saveConnectionId('');
     expect(readSavedConnectionId()).toBeNull();
+  });
+});
+
+describe('posConnectionKey — kết nối chưa gắn tài khoản tách theo tài khoản', () => {
+  const vtb: IPosPaymentConnection = {
+    ...apiPay,
+    id: 'conn-vtb',
+    provider: 'vietinbank',
+    kind: 'bank_direct',
+    bin: '970415',
+    accountNumber: '103885549137',
+    bankAccountId: 'acc-vtb',
+    bankName: 'VietinBank',
+    key: 'conn-vtb:acc-vtb',
+  };
+
+  it('dùng key của BE, BE cũ không có key thì dùng id', () => {
+    expect(posConnectionKey(vtb)).toBe('conn-vtb:acc-vtb');
+    expect(posConnectionKey(apiPay)).toBe('conn-apipay');
+  });
+
+  it('nhớ lựa chọn theo key: hai tài khoản cùng một kết nối là hai lựa chọn khác nhau', () => {
+    const other = { ...vtb, bankAccountId: 'acc-vtb-2', key: 'conn-vtb:acc-vtb-2' };
+    expect(resolveSavedConnectionId('conn-vtb:acc-vtb-2', [vtb, other])).toBe('conn-vtb:acc-vtb-2');
+    expect(resolveSavedConnectionId('conn-vtb', [vtb, other])).toBe('');
   });
 });

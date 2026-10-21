@@ -94,6 +94,7 @@ export const PAYMENT_PROVIDER_LABEL: Record<string, string> = {
   acb: 'ACB',
   bidv: 'BIDV',
   mbbank: 'MB Bank',
+  vietinbank: 'VietinBank',
   mockbank: 'Ngân hàng giả lập',
   apipay: 'ApiPay',
 };

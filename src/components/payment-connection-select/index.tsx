@@ -10,6 +10,7 @@ import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 
 import {
+  posConnectionKey,
   saveConnectionId,
   posConnectionLabel,
   readSavedConnectionId,
@@ -19,23 +20,26 @@ import {
 import { getPosPaymentConnections } from 'src/api/payment-qr';
 
 // ----------------------------------------------------------------------
-// Chọn nguồn xác nhận chuyển khoản khi tạo QR (Bán hàng, F&B): mặc định theo tài khoản ngân hàng như cũ; chọn một kết nối
-// (vd ApiPay — VA) thì QR vào tài khoản của kết nối và kết nối đó báo tiền về. Lựa chọn nhớ theo máy.
+// Chọn nguồn xác nhận chuyển khoản khi tạo QR (Bán hàng, F&B): mặc định theo tài khoản ngân hàng như cũ; chọn một lựa
+// chọn "tài khoản · dịch vụ S Payment" (vd ApiPay — VA, VietinBank VietQR Pay — tài khoản VietinBank) thì QR vào tài khoản
+// đó và dịch vụ đó báo tiền về. Lựa chọn (khoá) nhớ theo máy.
 // ----------------------------------------------------------------------
 
 export type PosPaymentConnectionsState = {
   connections: IPosPaymentConnection[];
-  /** '' = theo tài khoản ngân hàng */
+  /** Khoá lựa chọn đang chọn — '' = theo tài khoản ngân hàng */
+  selectionKey: string;
+  /** Id kết nối của lựa chọn (gửi khi tạo QR) — '' = theo tài khoản ngân hàng */
   connectionId: string;
   connection: IPosPaymentConnection | null;
-  setConnectionId: (id: string) => void;
+  setSelectionKey: (key: string) => void;
   /** Đã tải xong (kể cả lỗi) — POS chờ cờ này rồi mới tự tạo QR, tránh tạo mã theo tài khoản rồi lại đổi sang kết nối. */
   loaded: boolean;
 };
 
 export function usePosPaymentConnections(): PosPaymentConnectionsState {
   const [connections, setConnections] = useState<IPosPaymentConnection[]>([]);
-  const [connectionId, setConnectionIdState] = useState('');
+  const [selectionKey, setSelectionKeyState] = useState('');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -45,7 +49,7 @@ export function usePosPaymentConnections(): PosPaymentConnectionsState {
         if (!alive) return;
         const list = res.enabled ? (res.connections ?? []) : [];
         setConnections(list);
-        setConnectionIdState(resolveSavedConnectionId(readSavedConnectionId(), list));
+        setSelectionKeyState(resolveSavedConnectionId(readSavedConnectionId(), list));
       })
       .catch(() => {
         // Không lấy được kết nối → theo tài khoản như cũ.
@@ -58,24 +62,27 @@ export function usePosPaymentConnections(): PosPaymentConnectionsState {
     };
   }, []);
 
-  const setConnectionId = useCallback((id: string) => {
-    setConnectionIdState(id);
-    saveConnectionId(id);
+  const setSelectionKey = useCallback((key: string) => {
+    setSelectionKeyState(key);
+    saveConnectionId(key);
   }, []);
 
+  const connection = connections.find((c) => posConnectionKey(c) === selectionKey) ?? null;
   return {
     connections,
-    connectionId,
-    connection: connections.find((c) => c.id === connectionId) ?? null,
-    setConnectionId,
+    selectionKey,
+    connectionId: connection?.id ?? '',
+    connection,
+    setSelectionKey,
     loaded,
   };
 }
 
 type Props = {
   connections: IPosPaymentConnection[];
+  /** Khoá lựa chọn ('' = theo tài khoản) */
   value: string;
-  onChange: (connectionId: string) => void;
+  onChange: (selectionKey: string) => void;
   disabled?: boolean;
   size?: 'small' | 'medium';
 };
@@ -102,7 +109,7 @@ export default function PaymentConnectionSelect({
     >
       <MenuItem value="">Theo tài khoản ngân hàng (mặc định)</MenuItem>
       {connections.map((c) => (
-        <MenuItem key={c.id} value={c.id}>
+        <MenuItem key={posConnectionKey(c)} value={posConnectionKey(c)}>
           <Stack direction="row" alignItems="center" spacing={1}>
             <span>{posConnectionLabel(c)}</span>
             {c.environment === 'test' && (
