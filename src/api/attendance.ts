@@ -300,24 +300,28 @@ export async function checkIn(data: ICheckInRequest): Promise<IAttendanceLog> {
   return response.data;
 }
 
-/** Thiết lập chấm công của cửa hàng. Máy chủ cũ chưa có endpoint → coi như tắt bắt buộc khuôn mặt. */
+/**
+ * Thiết lập chấm công của cửa hàng. requireFaceVerification = "Chấm công bằng khuôn mặt" — mỗi lúc chỉ một luồng: bật thì
+ * chỉ quét khuôn mặt, tắt thì chỉ chụp ảnh gửi nhóm (máy chủ chặn luồng còn lại). Lỗi thì ném ra (không đoán luồng).
+ */
 export type AttendanceSettings = { requireFaceVerification: boolean; requireFaceEnrollmentApproval: boolean };
 
 export async function getAttendanceSettings(): Promise<AttendanceSettings> {
-  try {
-    const response = await axios.get<Partial<AttendanceSettings>>(endpoints.attendance.settings);
-    return {
-      requireFaceVerification: !!response.data?.requireFaceVerification,
-      // Máy chủ cũ chưa có công tắc này → coi như bật (mặc định của máy chủ mới).
-      requireFaceEnrollmentApproval: response.data?.requireFaceEnrollmentApproval ?? true,
-    };
-  } catch {
-    return { requireFaceVerification: false, requireFaceEnrollmentApproval: true };
-  }
+  const response = await axios.get<Partial<AttendanceSettings>>(endpoints.attendance.settings);
+  return {
+    requireFaceVerification: !!response.data?.requireFaceVerification,
+    // Máy chủ cũ chưa có công tắc này → coi như bật (mặc định của máy chủ mới).
+    requireFaceEnrollmentApproval: response.data?.requireFaceEnrollmentApproval ?? true,
+  };
 }
 
-/** Bật / tắt "Bắt buộc xác minh khuôn mặt" (quyền attendance.adjust). */
-/** Chỉ đổi công tắc được gửi. */
+/** Ping vị trí ngay trước khi gửi chấm công — lấy vị trí MỚI sau khi có mã rồi gửi kèm (xem attendance/fresh-location). */
+export async function locationPing(): Promise<{ token: string; issuedAt: string; expiresInSeconds: number }> {
+  const response = await axios.post(endpoints.attendance.locationPing);
+  return response.data;
+}
+
+/** Chỉ đổi công tắc được gửi (quyền attendance.adjust). */
 export async function updateAttendanceSettings(data: Partial<AttendanceSettings>): Promise<AttendanceSettings> {
   const response = await axios.put<AttendanceSettings>(endpoints.attendance.settings, data);
   return response.data;

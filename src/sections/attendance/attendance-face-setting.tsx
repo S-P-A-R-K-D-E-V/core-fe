@@ -24,8 +24,9 @@ import { useSnackbar } from 'src/components/snackbar';
 
 // ----------------------------------------------------------------------
 // Thiết lập khuôn mặt của cửa hàng (PUT /attendance/settings — quyền attendance.adjust):
-// - "Bắt buộc xác minh khuôn mặt": bật thì check-in / check-out trên app và web chỉ qua quét khuôn mặt (máy chủ so với
-//   khuôn mặt đã đăng ký); chụp ảnh gửi nhóm chấm công bị chặn. Tắt: chưa đăng ký vẫn chấm công bằng ảnh, ghi "chưa xác minh".
+// - "Chấm công bằng khuôn mặt" — mỗi lúc chỉ MỘT luồng cho cả cửa hàng: bật thì check-in / check-out trên app và web
+//   chỉ qua quét khuôn mặt (máy chủ so với khuôn mặt đã đăng ký); tắt thì chỉ chụp ảnh gửi nhóm chấm công (không quét
+//   khuôn mặt, kể cả người đã đăng ký). Máy chủ chặn luồng còn lại.
 // - "Duyệt đăng ký khuôn mặt" (mặc định bật): nhân viên đăng ký lần đầu / đăng ký lại khác khuôn mặt đang dùng thì chờ quản
 //   lý duyệt (Duyệt khuôn mặt) — chặn đăng ký hộ mặt người khác để chấm công thay.
 // ----------------------------------------------------------------------
@@ -39,7 +40,10 @@ export default function AttendanceFaceSetting() {
   const [saving, setSaving] = useState<Key | null>(null);
 
   useEffect(() => {
-    getAttendanceSettings().then(setSettings);
+    getAttendanceSettings()
+      .then(setSettings)
+      .catch((error) => enqueueSnackbar(apiErrorMessage(error, 'Không tải được thiết lập chấm công'), { variant: 'error' }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const save = async (key: Key, next: boolean, onMsg: string, offMsg: string) => {
@@ -58,14 +62,30 @@ export default function AttendanceFaceSetting() {
     if (
       next &&
       !(await confirm({
-        title: 'Bắt buộc xác minh khuôn mặt',
+        title: 'Chấm công bằng khuôn mặt',
         content:
-          'Nhân viên chỉ chấm công được bằng quét khuôn mặt. Ai chưa đăng ký khuôn mặt sẽ phải đăng ký trước mới chấm công được.\nBật?',
+          'Cả cửa hàng chuyển sang chấm công bằng quét khuôn mặt — chụp ảnh gửi nhóm sẽ bị tắt. Ai chưa đăng ký khuôn mặt phải đăng ký trước mới chấm công được.\nBật?',
         confirmText: 'Bật',
       }))
     )
       return;
-    await save('requireFaceVerification', next, 'Đã bật bắt buộc khuôn mặt', 'Đã tắt bắt buộc khuôn mặt');
+    if (
+      !next &&
+      !(await confirm({
+        title: 'Tắt chấm công bằng khuôn mặt',
+        content:
+          'Cả cửa hàng chuyển sang chụp ảnh gửi nhóm chấm công — không quét khuôn mặt nữa, kể cả người đã đăng ký (lượt chấm công ghi "chưa xác minh").\nTắt?',
+        confirmText: 'Tắt',
+        destructive: true,
+      }))
+    )
+      return;
+    await save(
+      'requireFaceVerification',
+      next,
+      'Đã chuyển sang chấm công bằng khuôn mặt',
+      'Đã chuyển sang chấm công bằng chụp ảnh gửi nhóm'
+    );
   };
 
   const toggleApproval = async (next: boolean) => {
@@ -120,10 +140,10 @@ export default function AttendanceFaceSetting() {
         {row(
           'requireFaceVerification',
           'mdi:face-recognition',
-          'Bắt buộc xác minh khuôn mặt khi chấm công',
+          'Chấm công bằng khuôn mặt',
           <>
-            Tắt: nhân viên chưa đăng ký khuôn mặt vẫn chấm công bằng ảnh chụp (ghi &quot;chưa xác minh&quot;). Bật: chỉ chấm
-            công bằng quét khuôn mặt, máy chủ so với khuôn mặt đã đăng ký.
+            Mỗi lúc cả cửa hàng chỉ dùng một cách chấm công. Bật: chỉ quét khuôn mặt, máy chủ so với khuôn mặt đã đăng ký.
+            Tắt: chỉ chụp ảnh gửi nhóm chấm công (không quét khuôn mặt, ghi &quot;chưa xác minh&quot;).
           </>,
           toggleRequireFace
         )}

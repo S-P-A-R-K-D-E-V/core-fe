@@ -56,6 +56,7 @@ import { checkinFace } from 'src/api/checkinFace';
 import { completeCleaningTask, getMyCleaningChecklist } from 'src/api/cleaning';
 import { TaskRow } from 'src/sections/cleaning/cleaning-task-row';
 import { FaceCheckinDialog } from 'src/sections/attendance/face-checkin-dialog';
+import { locationFields, locateForAttendance, sendWithFreshLocation } from 'src/sections/attendance/fresh-location';
 import { toDateStr } from 'src/utils/format-time';
 
 // ----------------------------------------------------------------------
@@ -133,14 +134,24 @@ export default function AttendanceCheckinView() {
   const { enqueueSnackbar } = useSnackbar();
   const { user, refreshUser } = useAuthContext();
   const hasFaceEmbedding = !!user?.hasFaceEmbedding;
-  // Cửa hàng bật "Bắt buộc khuôn mặt": chưa đăng ký khuôn mặt thì không chấm công bằng ảnh chụp được nữa.
-  const [requireFace, setRequireFace] = useState(false);
-  useEffect(() => {
-    getAttendanceSettings().then((s) => setRequireFace(s.requireFaceVerification));
+  // Mỗi lúc cửa hàng chỉ dùng MỘT luồng (thiết lập "Chấm công bằng khuôn mặt"), áp cho mọi người như nhau: bật → chỉ quét
+  // khuôn mặt (chưa đăng ký thì phải đăng ký trước); tắt → chỉ chụp ảnh gửi nhóm, kể cả người đã đăng ký khuôn mặt.
+  // Máy chủ chặn luồng còn lại. null = chưa tải được thiết lập (bấm nút sẽ tải lại).
+  const [faceMode, setFaceMode] = useState<boolean | null>(null);
+  const loadMode = useCallback(async (): Promise<boolean | null> => {
+    try {
+      const s = await getAttendanceSettings();
+      setFaceMode(s.requireFaceVerification);
+      return s.requireFaceVerification;
+    } catch {
+      return null;
+    }
   }, []);
-  // Đã đăng ký khuôn mặt → check-in / check-out chính qua quét mặt (máy chủ so khuôn mặt). Chưa → ảnh chụp gửi nhóm
-  // chấm công như cũ, máy chủ ghi "chưa xác minh" (trừ khi cửa hàng bắt buộc khuôn mặt).
-  const photoOnly = !hasFaceEmbedding && !requireFace;
+  useEffect(() => {
+    loadMode();
+  }, [loadMode]);
+  /** Chế độ khuôn mặt mà chưa đăng ký khuôn mặt → các nút dẫn sang đăng ký. */
+  const needsEnroll = !!faceMode && !hasFaceEmbedding;
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -165,8 +176,7 @@ export default function AttendanceCheckinView() {
   const watchIdRef = useRef<number | null>(null);
 
   const [faceDialogOpen, setFaceDialogOpen] = useState(false);
-  // null = đóng. 'overtime' THAY THẾ hẳn dialog chụp ảnh cũ cho action check-in ngoài giờ;
-  // 'checkin'/'checkout' vẫn chạy song song với luồng chụp ảnh cũ (xem face-checkin-dialog.tsx).
+  // Dialog quét khuôn mặt (chế độ khuôn mặt): null = đóng.
   const [faceCheckinMode, setFaceCheckinMode] = useState<'checkin' | 'checkout' | 'overtime' | null>(null);
   const [overtimeConfirmOpen, setOvertimeConfirmOpen] = useState(false);
   const [pendingCheckin, setPendingCheckin] = useState<{
@@ -581,6 +591,42 @@ export default function AttendanceCheckinView() {
     setCapturedImage(null);
   }, [stopCamera]);
 
+  /** Mở đúng luồng chấm công của cửa hàng: quét khuôn mặt hoặc chụp ảnh gửi nhóm (mỗi lúc một luồng). */
+  const startAttendance = useCallback(
+    async (action: 'checkin' | 'overtime' | 'checkout', shiftName?: string) => {
+      const mode = faceMode ?? (await loadMode());
+      if (mode === null) {
+        enqueueSnackbar('Không tải được thiết lập chấm công của cửa hàng. Vui lòng thử lại.', { variant: 'error' });
+        return;
+      }
+      if (mode && !hasFaceEmbedding) {
+        router.push(paths.dashboard.attendance.faceEnrollment);
+        return;
+      }
+      if (mode) setFaceCheckinMode(action);
+      else openFaceDialog(action === 'checkin' ? 'smart' : action, shiftName);
+    },
+    [faceMode, loadMode, hasFaceEmbedding, router, openFaceDialog, enqueueSnackbar]
+  );
+
+  /**
+   * Vị trí cho lần GỬI chấm công (sau khi chụp ảnh / quét mặt): ping máy chủ rồi lấy điểm GPS mới — không gửi vị trí
+   * theo dõi từ lúc mở trang. Cập nhật luôn vị trí trên trang.
+   */
+  const locateForSubmit = useCallback(async () => {
+    const fix = await locateForAttendance();
+    if (fix.coords) {
+      setGeoLocation({ lat: fix.coords.latitude, lng: fix.coords.longitude });
+      setGeoAccuracy(fix.coords.accuracy ?? null);
+      setGeoError(null);
+    } else {
+      enqueueSnackbar('Không lấy được GPS sau 5 giây — vẫn chấm công, lần này được ghi là không có vị trí.', {
+        variant: 'warning',
+      });
+    }
+    return fix;
+  }, [enqueueSnackbar]);
+
   // ── Submit ──
   const handleFaceCheckin = useCallback(async () => {
     if (!capturedImage || !pendingCheckin) return;
@@ -592,18 +638,15 @@ export default function AttendanceCheckinView() {
       // Check-out dùng chung dialog chụp ảnh này (BE bắt buộc ảnh khi checkout cho
       // người đang làm hộ 1 phần ca — LateArrive/EarlyLeave/MidShift).
       if (pendingCheckin.mode === 'checkout') {
-        await smartCheckOut({
-          latitude: geoLocation?.lat,
-          longitude: geoLocation?.lng,
-          accuracy: geoAccuracy ?? undefined,
-          faceVerified: true,
-          locationUnavailable: !geoLocation && gpsErrorFallbackEnabled,
-        });
+        // Vị trí lấy mới ngay lúc gửi (ping máy chủ trước).
+        const { fix } = await sendWithFreshLocation(locateForSubmit, (f) =>
+          smartCheckOut({ faceVerified: true, ...locationFields(f) })
+        );
         await checkinFace({
           candidateName: staffName,
           imageBase64: capturedImage,
-          lat: geoLocation?.lat,
-          lng: geoLocation?.lng,
+          lat: fix.coords?.latitude,
+          lng: fix.coords?.longitude,
           deviceName: navigator.userAgent.slice(0, 80),
           time: new Date().toISOString(),
           branchName: isWithinGeofence ? nearestBranch?.name : undefined,
@@ -621,31 +664,21 @@ export default function AttendanceCheckinView() {
           ? `${activeSmartShift.shiftName || activeSmartShift.scheduleName} (${activeSmartShift.startTime}–${activeSmartShift.endTime})`
           : pendingCheckin.shiftName;
 
-      // 1. Create attendance log first — if rejected (no shift window, geofence, etc.), abort before sending Telegram
-      if (pendingCheckin.mode === 'overtime') {
-        await checkIn({
-          isOvertime: true,
-          latitude: geoLocation?.lat,
-          longitude: geoLocation?.lng,
-          accuracy: geoAccuracy ?? undefined,
-          faceVerified: true,
-        });
-      } else {
-        await smartCheckIn({
-          latitude: geoLocation?.lat,
-          longitude: geoLocation?.lng,
-          accuracy: geoAccuracy ?? undefined,
-          faceVerified: true,
-          locationUnavailable: !geoLocation && gpsErrorFallbackEnabled,
-        });
-      }
+      // 1. Create attendance log first — if rejected (no shift window, geofence, etc.), abort before sending Telegram.
+      // Vị trí lấy mới ngay lúc gửi (ping máy chủ trước).
+      const mode = pendingCheckin.mode;
+      const { fix } = await sendWithFreshLocation(locateForSubmit, (f) =>
+        mode === 'overtime'
+          ? checkIn({ isOvertime: true, faceVerified: true, ...locationFields(f) })
+          : smartCheckIn({ faceVerified: true, ...locationFields(f) })
+      );
 
       // 2. Attendance log created — now fire Telegram notification
       await checkinFace({
         candidateName: staffName,
         imageBase64: capturedImage,
-        lat: geoLocation?.lat,
-        lng: geoLocation?.lng,
+        lat: fix.coords?.latitude,
+        lng: fix.coords?.longitude,
         deviceName: navigator.userAgent.slice(0, 80),
         time: new Date().toISOString(),
         branchName: isWithinGeofence ? nearestBranch?.name : undefined,
@@ -671,7 +704,7 @@ export default function AttendanceCheckinView() {
       setSubmitting(false);
       setActionLoading(null);
     }
-  }, [capturedImage, pendingCheckin, activeSmartShift, user, geoLocation, geoAccuracy, gpsErrorFallbackEnabled, isWithinGeofence, nearestBranch, enqueueSnackbar, closeFaceDialog, fetchData, refreshUser]);
+  }, [capturedImage, pendingCheckin, activeSmartShift, user, locateForSubmit, isWithinGeofence, nearestBranch, enqueueSnackbar, closeFaceDialog, fetchData, refreshUser]);
 
 
   useEffect(
@@ -1037,15 +1070,12 @@ export default function AttendanceCheckinView() {
                   variant="contained"
                   size="large"
                   fullWidth
-                  onClick={() => {
-                    if (hasFaceEmbedding) setFaceCheckinMode('checkout');
-                    else if (requireFace) router.push(paths.dashboard.attendance.faceEnrollment);
-                    else
-                      openFaceDialog(
-                        'checkout',
-                        currentShiftDisplay.currentShift.shiftName || currentShiftDisplay.currentShift.scheduleName
-                      );
-                  }}
+                  onClick={() =>
+                    startAttendance(
+                      'checkout',
+                      currentShiftDisplay.currentShift.shiftName || currentShiftDisplay.currentShift.scheduleName
+                    )
+                  }
                   disabled={!!actionLoading}
                   startIcon={
                     actionLoading === 'checkout' ? (
@@ -1066,22 +1096,8 @@ export default function AttendanceCheckinView() {
                     color: '#fff',
                   }}
                 >
-                  {hasFaceEmbedding || photoOnly ? 'Kết thúc làm việc' : 'Đăng ký khuôn mặt để check-out'}
+                  {needsEnroll ? 'Đăng ký khuôn mặt để check-out' : 'Kết thúc làm việc'}
                 </Button>
-
-                {photoOnly && (
-                  <Button
-                    variant="text"
-                    size="small"
-                    fullWidth
-                    onClick={() => router.push(paths.dashboard.attendance.faceEnrollment)}
-                    disabled={!!actionLoading}
-                    startIcon={<Iconify icon="mdi:face-recognition" />}
-                    sx={{ mt: 1, color: 'rgba(255,255,255,0.85)' }}
-                  >
-                    Chưa xác minh khuôn mặt — đăng ký ngay
-                  </Button>
-                )}
 
                 {currentShiftCleaning && currentShiftCleaning.tasks.length > 0 && (
                   <Button
@@ -1200,15 +1216,8 @@ export default function AttendanceCheckinView() {
                       size="large"
                       fullWidth
                       onClick={() => {
-                        if (todayAssignments.length === 0) {
-                          setOvertimeConfirmOpen(true);
-                        } else if (hasFaceEmbedding) {
-                          setFaceCheckinMode('checkin');
-                        } else if (requireFace) {
-                          router.push(paths.dashboard.attendance.faceEnrollment);
-                        } else {
-                          openFaceDialog('smart');
-                        }
+                        if (todayAssignments.length === 0) setOvertimeConfirmOpen(true);
+                        else startAttendance('checkin');
                       }}
                       disabled={
                         !!actionLoading ||
@@ -1221,7 +1230,7 @@ export default function AttendanceCheckinView() {
                         ) : todayAssignments.length > 0 && !activeSmartShift ? (
                           <Iconify icon="mdi:clock-outline" />
                         ) : (
-                          <Iconify icon={photoOnly ? 'mdi:camera' : 'mdi:face-recognition'} />
+                          <Iconify icon={faceMode ? 'mdi:face-recognition' : 'mdi:camera'} />
                         )
                       }
                       sx={{
@@ -1238,33 +1247,21 @@ export default function AttendanceCheckinView() {
                       }}
                     >
                       {todayAssignments.length === 0
-                        ? hasFaceEmbedding
+                        ? needsEnroll
+                          ? 'Đăng ký khuôn mặt để check-in ngoài giờ'
+                          : faceMode
                           ? 'Quét khuôn mặt & Check-in ngoài giờ'
-                          : 'Đăng ký khuôn mặt để check-in ngoài giờ'
+                          : 'Chụp ảnh & Check-in ngoài giờ'
                         : !activeSmartShift
                         ? 'Chưa đến giờ check-in'
-                        : hasFaceEmbedding
+                        : needsEnroll
+                        ? 'Đăng ký khuôn mặt để check-in'
+                        : faceMode
                         ? 'Quét khuôn mặt & Bắt đầu làm việc'
-                        : photoOnly
-                        ? 'Chụp ảnh & Bắt đầu làm việc'
-                        : 'Đăng ký khuôn mặt để check-in'}
+                        : 'Chụp ảnh & Bắt đầu làm việc'}
                     </Button>
                   </span>
                 </Tooltip>
-
-                {activeSmartShift && photoOnly && (
-                  <Button
-                    variant="text"
-                    size="small"
-                    fullWidth
-                    onClick={() => router.push(paths.dashboard.attendance.faceEnrollment)}
-                    disabled={!!actionLoading}
-                    startIcon={<Iconify icon="mdi:face-recognition" />}
-                    sx={{ mt: 1, color: 'rgba(255,255,255,0.75)' }}
-                  >
-                    Chưa xác minh khuôn mặt — đăng ký ngay
-                  </Button>
-                )}
               </Box>
             </Card>
           )}
@@ -1471,16 +1468,18 @@ export default function AttendanceCheckinView() {
                   actionLoading === 'overtime' ? (
                     <CircularProgress size={16} color="inherit" />
                   ) : (
-                    <Iconify icon="mdi:face-recognition" />
+                    <Iconify icon={faceMode ? 'mdi:face-recognition' : 'mdi:camera'} />
                   )
                 }
-                onClick={() =>
-                  hasFaceEmbedding ? setFaceCheckinMode('overtime') : router.push(paths.dashboard.attendance.faceEnrollment)
-                }
+                onClick={() => startAttendance('overtime')}
                 disabled={!!actionLoading || (branches.length > 0 && !gpsReadyForCheckin && !gpsErrorFallbackEnabled)}
                 sx={{ borderRadius: 2, fontWeight: 600 }}
               >
-                {hasFaceEmbedding ? 'Check In bằng khuôn mặt' : 'Đăng ký khuôn mặt để check-in'}
+                {needsEnroll
+                  ? 'Đăng ký khuôn mặt để check-in'
+                  : faceMode
+                  ? 'Check In bằng khuôn mặt'
+                  : 'Chụp ảnh & check-in ngoài giờ'}
               </Button>
             </Stack>
           </Card>
@@ -1552,18 +1551,14 @@ export default function AttendanceCheckinView() {
             color="warning"
             size="large"
             fullWidth
-            startIcon={<Iconify icon="mdi:face-recognition" />}
+            startIcon={<Iconify icon={faceMode ? 'mdi:face-recognition' : 'mdi:camera'} />}
             onClick={() => {
               setOvertimeConfirmOpen(false);
-              if (hasFaceEmbedding) {
-                setFaceCheckinMode('overtime');
-              } else {
-                router.push(paths.dashboard.attendance.faceEnrollment);
-              }
+              startAttendance('overtime');
             }}
             sx={{ borderRadius: 2, py: 1.25, fontWeight: 700 }}
           >
-            {hasFaceEmbedding ? 'Xác nhận — Check-in ngoài giờ' : 'Đăng ký khuôn mặt để check-in'}
+            {needsEnroll ? 'Đăng ký khuôn mặt để check-in' : 'Xác nhận — Check-in ngoài giờ'}
           </Button>
           <Button
             variant="text"
@@ -1873,9 +1868,7 @@ export default function AttendanceCheckinView() {
       <FaceCheckinDialog
         open={faceCheckinMode !== null}
         mode={faceCheckinMode ?? 'checkin'}
-        geoLocation={geoLocation}
-        geoAccuracy={geoAccuracy}
-        locationUnavailable={gpsErrorFallbackEnabled}
+        locate={locateForSubmit}
         staffName={user?.displayName || user?.name || user?.email || 'N/A'}
         onClose={() => setFaceCheckinMode(null)}
         onSuccess={() => {

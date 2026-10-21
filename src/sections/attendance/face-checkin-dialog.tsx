@@ -16,6 +16,8 @@ import { useRouter } from 'src/routes/hooks';
 import { checkEnrollQuality } from 'src/api/faceEnrollment';
 import { smartCheckInFace, smartCheckOutFace, checkInFace } from 'src/api/attendance';
 import { checkinFace } from 'src/api/checkinFace';
+
+import { locationFields, sendWithFreshLocation, type LocationFix } from './fresh-location';
 import type { IEnrollQualityResponse } from 'src/types/corecms-api';
 
 // ----------------------------------------------------------------------
@@ -61,10 +63,11 @@ type Phase = 'opening' | 'scanning' | 'submitting' | 'success' | 'error';
 type Props = {
   open: boolean;
   mode: 'checkin' | 'checkout' | 'overtime';
-  geoLocation?: { lat: number; lng: number } | null;
-  geoAccuracy?: number | null;
-  /** GPS lỗi đã quá ~5 giây — gửi kèm để máy chủ vẫn nhận, đánh dấu log không có vị trí. */
-  locationUnavailable?: boolean;
+  /**
+   * Vị trí cho lần gửi — gọi lúc gửi (sau khi quét khớp): ping máy chủ rồi lấy điểm GPS mới. GPS lỗi sau ~5 giây thì máy
+   * chủ vẫn nhận, đánh dấu log không có vị trí.
+   */
+  locate: () => Promise<LocationFix>;
   /** Tên hiển thị của nhân viên — dùng cho thông báo Telegram (checkinFace), không ảnh
    *  hưởng tới xác thực khuôn mặt (BE tự xác định staff qua token). */
   staffName: string;
@@ -73,7 +76,7 @@ type Props = {
   onSuccess: () => void;
 };
 
-export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, locationUnavailable, staffName, onClose, onSuccess }: Props) {
+export function FaceCheckinDialog({ open, mode, locate, staffName, onClose, onSuccess }: Props) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -141,29 +144,20 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, locati
     async (imageBase64: string) => {
       setPhase('submitting');
       try {
-        const payload = {
-          imageBase64,
-          latitude: geoLocation?.lat,
-          longitude: geoLocation?.lng,
-          accuracy: geoAccuracy ?? undefined,
-          locationUnavailable: !geoLocation && !!locationUnavailable,
-        };
         // faceMatchConfidence (%) do RequireFaceMatchAsync tính ngay khi verify — đưa vào nội
-        // dung Telegram để biết đúng người với độ tin cậy bao nhiêu, không phải đoán mò.
-        let matchConfidence: number | undefined;
-        if (mode === 'checkin') {
-          matchConfidence = (await smartCheckInFace(payload)).faceMatchConfidence;
-        } else if (mode === 'checkout') {
-          matchConfidence = (await smartCheckOutFace(payload))[0]?.faceMatchConfidence;
-        } else {
-          matchConfidence = (await checkInFace({ ...payload, isOvertime: true })).faceMatchConfidence;
-        }
+        // dung Telegram để biết đúng người với độ tin cậy bao nhiêu, không phải đoán mò. Vị trí lấy mới ngay lúc gửi.
+        const { result: matchConfidence, fix } = await sendWithFreshLocation(locate, async (f) => {
+          const payload = { imageBase64, ...locationFields(f) };
+          if (mode === 'checkin') return (await smartCheckInFace(payload)).faceMatchConfidence;
+          if (mode === 'checkout') return (await smartCheckOutFace(payload))[0]?.faceMatchConfidence;
+          return (await checkInFace({ ...payload, isOvertime: true })).faceMatchConfidence;
+        });
         // Đẩy ảnh lên Telegram — không chặn kết quả check-in/out nếu lỗi (chỉ là thông báo phụ).
         checkinFace({
           candidateName: staffName,
           imageBase64: `data:image/jpeg;base64,${imageBase64}`,
-          lat: geoLocation?.lat,
-          lng: geoLocation?.lng,
+          lat: fix.coords?.latitude,
+          lng: fix.coords?.longitude,
           deviceName: navigator.userAgent.slice(0, 80),
           time: new Date().toISOString(),
           checkInType: mode,
@@ -183,7 +177,7 @@ export function FaceCheckinDialog({ open, mode, geoLocation, geoAccuracy, locati
         setPhase('error');
       }
     },
-    [mode, geoLocation, geoAccuracy, locationUnavailable, staffName, onSuccess, onClose]
+    [mode, locate, staffName, onSuccess, onClose]
   );
 
   // ── Auto-detect: lấy mẫu frame nền, tự chụp khi đạt "nhìn thẳng" — KHÔNG cần bấm nút. ──

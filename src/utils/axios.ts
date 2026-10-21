@@ -223,6 +223,7 @@ export const endpoints = {
   attendance: {
     checkIn: '/attendance/check-in',
     checkInFace: '/attendance/check-in-face',
+    locationPing: '/attendance/location-ping',
     checkOut: '/attendance/check-out',
     smartCheckIn: '/attendance/smart-check-in',
     smartCheckOut: '/attendance/smart-check-out',
