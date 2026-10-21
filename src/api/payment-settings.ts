@@ -1,6 +1,9 @@
 import axios, { endpoints } from 'src/utils/axios';
 
 import type {
+  IBankLink,
+  IBankLinkBank,
+  IRegisterBankLinkRequest,
   IApiPayLinkResult,
   IApiPayLinkRequest,
   IApiPayBanksResponse,
@@ -135,6 +138,44 @@ export async function confirmApiPayBankOtp(
     endpoints.paymentSettings.apipayConfirmOtp(connectionId),
     data
   );
+  return res.data;
+}
+
+// ---- Đăng ký báo có qua S Payment (kiểu KiotViet) ----
+
+export async function getBankLinkBanks(): Promise<IBankLinkBank[]> {
+  const res = await axios.get<IBankLinkBank[]>(endpoints.paymentSettings.bankLinkBanks);
+  return res.data;
+}
+
+export async function getBankLinks(): Promise<IBankLink[]> {
+  const res = await axios.get<IBankLink[]>(endpoints.paymentSettings.bankLinks);
+  return res.data;
+}
+
+/** → otp_required (ngân hàng gửi OTP tới SĐT chủ TK). Gửi lại OTP = gọi lại hàm này. */
+export async function registerBankLink(data: IRegisterBankLinkRequest): Promise<IBankLink> {
+  const res = await axios.post<IBankLink>(endpoints.paymentSettings.bankLinks, data);
+  return res.data;
+}
+
+/** OTP cho bước đang chờ: đăng ký → active, huỷ → revoked. */
+export async function confirmBankLink(id: string, otp: string): Promise<IBankLink> {
+  const res = await axios.post<IBankLink>(endpoints.paymentSettings.bankLinkConfirm(id), { otp });
+  return res.data;
+}
+
+/** Huỷ đăng ký: ngân hàng đòi lại CCCD/MST + SĐT rồi gửi OTP (→ revoking). */
+export async function revokeBankLink(
+  id: string,
+  data: { identity: string; mobile: string }
+): Promise<IBankLink> {
+  const res = await axios.post<IBankLink>(endpoints.paymentSettings.bankLinkRevoke(id), data);
+  return res.data;
+}
+
+export async function cancelBankLinkRevoke(id: string): Promise<IBankLink> {
+  const res = await axios.post<IBankLink>(endpoints.paymentSettings.bankLinkCancelRevoke(id));
   return res.data;
 }
 

@@ -33,7 +33,7 @@ const field = (key: string, label: string, required = false, secret = false) => 
   label,
   required,
   secret,
-  type: 'text',
+  type: 'text' as const,
 });
 
 const PROVIDERS: IPaymentProviderInfo[] = [

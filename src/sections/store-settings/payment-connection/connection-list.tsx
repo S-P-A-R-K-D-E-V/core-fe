@@ -55,9 +55,12 @@ import type { BankAccountOption } from './connection-form-dialog';
 // ----------------------------------------------------------------------
 // Danh sách kết nối đối soát kèm thao tác — dùng chung cho tab "Tài khoản ngân hàng" (theo từng tài khoản, kết nối
 // chưa gắn tài khoản) và tab "Thanh toán" (mọi kết nối):
-//   Cập nhật · Kiểm tra kết nối (ngân hàng trực tiếp) · Tạo lại khoá webhook (ngân hàng trực tiếp) · Đồng bộ (SePay /
-//   Casso) · Tắt / Bật lại.
+//   Kiểm tra kết nối (ngân hàng trực tiếp) · Đồng bộ (SePay / Casso) · Tắt / Bật lại; manageKeys thêm Cập nhật (form
+//   khoá), Tạo lại khoá webhook và webhook URL — chủ cửa hàng không dùng (khoá ngân hàng do SPARK giữ ở S Payment).
+// Kết nối tạo từ đăng ký báo có (publicSettings.bankLinkId) quản lý ở thẻ Đăng ký báo có — không tắt / kiểm tra ở đây.
 // ----------------------------------------------------------------------
+
+const isBankLinked = (c: IPaymentConnection) => !!c.publicSettings?.bankLinkId;
 
 type Props = {
   connections: IPaymentConnection[];
@@ -72,6 +75,8 @@ type Props = {
   bankAccounts?: BankAccountOption[];
   /** Webhook URL thu gọn, bấm mới hiện (thẻ tài khoản có nhiều kết nối) */
   collapseWebhooks?: boolean;
+  /** Hiện form khoá (Cập nhật), Tạo lại khoá webhook, webhook URL — mặc định ẩn */
+  manageKeys?: boolean;
   paymentCodePrefix?: string;
   emptyText?: string;
   /** Có thay đổi trên máy chủ → tải lại danh sách */
@@ -87,6 +92,7 @@ export default function ConnectionList({
   allowBankAccountChange,
   bankAccounts,
   collapseWebhooks,
+  manageKeys,
   paymentCodePrefix,
   emptyText,
   onChanged,
@@ -199,6 +205,7 @@ export default function ConnectionList({
             provider={findProvider(providers, c.provider)}
             showBankAccount={showBankAccount}
             collapseWebhooks={collapseWebhooks}
+            manageKeys={!!manageKeys}
             busyAction={busy?.id === c.id ? busy.action : null}
             disabled={!!busy && busy.id !== c.id}
             onEdit={() => setEditTarget(c)}
@@ -295,6 +302,7 @@ type ItemProps = {
   provider?: IPaymentProviderInfo;
   showBankAccount?: boolean;
   collapseWebhooks?: boolean;
+  manageKeys: boolean;
   busyAction: 'test' | 'sync' | 'enable' | null;
   disabled: boolean;
   onEdit: VoidFunction;
@@ -310,6 +318,7 @@ function ConnectionItem({
   provider,
   showBankAccount,
   collapseWebhooks,
+  manageKeys,
   busyAction,
   disabled,
   onEdit,
@@ -321,8 +330,9 @@ function ConnectionItem({
 }: ItemProps) {
   const [webhooksOpen, setWebhooksOpen] = useState(!collapseWebhooks);
   const active = c.status === 'active';
-  const urls = webhookUrlEntries(c);
-  const missing = c.missingSettings ?? [];
+  const linked = isBankLinked(c);
+  const urls = manageKeys ? webhookUrlEntries(c) : [];
+  const missing = manageKeys ? (c.missingSettings ?? []) : [];
   const anyBusy = !!busyAction || disabled;
 
   return (
@@ -332,6 +342,7 @@ function ConnectionItem({
         <Label color="info">{paymentProviderLabel(c.provider)}</Label>
         {c.kind && <Label variant="soft">{connectionKindLabel(c.kind)}</Label>}
         <Label color={active ? 'success' : 'default'}>{active ? 'Đang dùng' : 'Đã tắt'}</Label>
+        {linked && <Label variant="soft">Đăng ký báo có</Label>}
       </Stack>
 
       <Typography variant="body2" sx={{ color: 'text.secondary' }}>
@@ -360,7 +371,9 @@ function ConnectionItem({
 
       {!!c.lastError && <Alert severity="error">{c.lastError}</Alert>}
 
-      {hasQuota(c) && <ApiPayQuotaUsage connection={c} onEdit={anyBusy ? undefined : onEdit} />}
+      {hasQuota(c) && (
+        <ApiPayQuotaUsage connection={c} onEdit={anyBusy || !manageKeys ? undefined : onEdit} />
+      )}
 
       {urls.length > 0 && (
         <>
@@ -397,75 +410,83 @@ function ConnectionItem({
         </>
       )}
 
-      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<Iconify icon="solar:pen-bold" />}
-          onClick={onEdit}
-          disabled={anyBusy}
-        >
-          Cập nhật
-        </Button>
-        {isBankDirect(c) && active && (
-          <LoadingButton
-            size="small"
-            variant="outlined"
-            loading={busyAction === 'test'}
-            disabled={anyBusy && busyAction !== 'test'}
-            startIcon={<Iconify icon="solar:shield-check-bold" />}
-            onClick={onTest}
-          >
-            Kiểm tra kết nối
-          </LoadingButton>
-        )}
-        {isBankDirect(c) && (
-          <Button
-            size="small"
-            variant="outlined"
-            color="warning"
-            startIcon={<Iconify icon="solar:key-bold" />}
-            onClick={onRotate}
-            disabled={anyBusy}
-          >
-            Tạo lại khoá webhook
-          </Button>
-        )}
-        {canSync(c) && active && (
-          <LoadingButton
-            size="small"
-            variant="outlined"
-            loading={busyAction === 'sync'}
-            disabled={anyBusy && busyAction !== 'sync'}
-            startIcon={<Iconify icon="solar:refresh-bold" />}
-            onClick={onSync}
-          >
-            Đồng bộ
-          </LoadingButton>
-        )}
-        {active ? (
-          <Button
-            size="small"
-            color="error"
-            startIcon={<Iconify icon="solar:close-circle-bold" />}
-            onClick={onDisable}
-            disabled={anyBusy}
-          >
-            Tắt
-          </Button>
-        ) : (
-          <LoadingButton
-            size="small"
-            color="success"
-            loading={busyAction === 'enable'}
-            disabled={anyBusy && busyAction !== 'enable'}
-            startIcon={<Iconify icon="solar:restart-bold" />}
-            onClick={onEnable}
-          >
-            Bật lại
-          </LoadingButton>
-        )}
-      </Stack>
+      {linked ? (
+        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+          Huỷ hoặc đăng ký lại ở mục Đăng ký dịch vụ thông báo thanh toán QR (tab Thanh toán).
+        </Typography>
+      ) : (
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          {manageKeys && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<Iconify icon="solar:pen-bold" />}
+              onClick={onEdit}
+              disabled={anyBusy}
+            >
+              Cập nhật
+            </Button>
+          )}
+          {isBankDirect(c) && active && (
+            <LoadingButton
+              size="small"
+              variant="outlined"
+              loading={busyAction === 'test'}
+              disabled={anyBusy && busyAction !== 'test'}
+              startIcon={<Iconify icon="solar:shield-check-bold" />}
+              onClick={onTest}
+            >
+              Kiểm tra kết nối
+            </LoadingButton>
+          )}
+          {manageKeys && isBankDirect(c) && (
+            <Button
+              size="small"
+              variant="outlined"
+              color="warning"
+              startIcon={<Iconify icon="solar:key-bold" />}
+              onClick={onRotate}
+              disabled={anyBusy}
+            >
+              Tạo lại khoá webhook
+            </Button>
+          )}
+          {canSync(c) && active && (
+            <LoadingButton
+              size="small"
+              variant="outlined"
+              loading={busyAction === 'sync'}
+              disabled={anyBusy && busyAction !== 'sync'}
+              startIcon={<Iconify icon="solar:refresh-bold" />}
+              onClick={onSync}
+            >
+              Đồng bộ
+            </LoadingButton>
+          )}
+          {active ? (
+            <Button
+              size="small"
+              color="error"
+              startIcon={<Iconify icon="solar:close-circle-bold" />}
+              onClick={onDisable}
+              disabled={anyBusy}
+            >
+              Tắt
+            </Button>
+          ) : (
+            <LoadingButton
+              size="small"
+              color="success"
+              loading={busyAction === 'enable'}
+              disabled={anyBusy && busyAction !== 'enable'}
+              startIcon={<Iconify icon="solar:restart-bold" />}
+              onClick={onEnable}
+            >
+              Bật lại
+            </LoadingButton>
+          )}
+        </Stack>
+      )}
     </Stack>
   );
 }

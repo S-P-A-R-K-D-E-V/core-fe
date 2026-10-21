@@ -24,6 +24,9 @@ vi.mock('src/api/payment-settings', () => ({
   syncPaymentConnection: vi.fn(),
   testPaymentConnection: vi.fn(),
   rotatePaymentWebhookSecret: vi.fn(),
+  getBankLinkBanks: vi.fn().mockResolvedValue([]),
+  registerBankLink: vi.fn(),
+  confirmBankLink: vi.fn(),
 }));
 
 const getBankAccounts = vi.fn();
@@ -130,7 +133,7 @@ describe('BankAccountsTab — dịch vụ thanh toán tắt', () => {
     expect(within(own).getByRole('button', { name: 'Bật lại' })).toBeInTheDocument();
 
     expect(screen.getByText(/Dịch vụ thanh toán chưa bật/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Kết nối đối soát' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Đăng ký báo có' })).not.toBeInTheDocument();
     expect(screen.queryByText('VietQR')).not.toBeInTheDocument();
   });
 });
@@ -158,6 +161,19 @@ describe('BankAccountsTab — dịch vụ thanh toán bật', () => {
       status: 'active',
       webhookUrl: 'https://pay/webhooks/sepay/t2',
       createdAt: '2026-10-15T00:00:00Z',
+    };
+    // Kết nối tạo từ đăng ký báo có: không có khoá, huỷ ở thẻ Đăng ký báo có.
+    const vtbLinked: IPaymentConnection = {
+      id: 'c3',
+      provider: 'vietinbank',
+      kind: 'bank_direct',
+      displayName: 'VietinBank 116002680669',
+      status: 'active',
+      webhookUrl: 'https://pay/webhooks/bank/vietinbank/t3/notify-bill',
+      bankAccount: { bin: '970415', accountNumber: '116002680669', accountName: 'CUA HANG A' },
+      createdAt: '2026-10-21T00:00:00Z',
+      publicSettings: { bankLinkId: 'l-1', accountNumber: '116002680669' },
+      missingSettings: [],
     };
     getPaymentSettings.mockResolvedValue({
       enabled: true,
@@ -193,6 +209,29 @@ describe('BankAccountsTab — dịch vụ thanh toán bật', () => {
           qrMode: 'vietqr',
           connections: [],
         },
+        {
+          id: 'vtb',
+          bankName: 'VietinBank',
+          bin: '970415',
+          accountNumber: '103885549137',
+          accountHolder: 'HO KINH DOANH CICI',
+          isDefault: false,
+          isActive: true,
+          isManagedByKiotViet: false,
+          qrMode: 'vietqr',
+          connections: [],
+        },
+        {
+          id: 'vtb-linked',
+          bankName: 'VietinBank',
+          bin: '970415',
+          accountNumber: '116002680669',
+          isDefault: false,
+          isActive: true,
+          isManagedByKiotViet: false,
+          qrMode: 'bank_direct',
+          connections: [vtbLinked],
+        },
       ],
       unassignedConnections: [sepayUnassigned],
     });
@@ -205,13 +244,26 @@ describe('BankAccountsTab — dịch vụ thanh toán bật', () => {
     expect(within(acb).getByText('QR qua ngân hàng')).toBeInTheDocument();
     expect(within(acb).getByText('ACB QR động')).toBeInTheDocument();
     expect(within(acb).getByRole('button', { name: 'Kiểm tra kết nối' })).toBeInTheDocument();
-    expect(within(acb).getByRole('button', { name: 'Tạo lại khoá webhook' })).toBeInTheDocument();
     expect(within(acb).queryByRole('button', { name: 'Đồng bộ' })).not.toBeInTheDocument();
+    // Khoá ngân hàng do SPARK giữ ở S Payment: không có form khoá, khoá webhook, webhook URL.
+    expect(within(acb).queryByRole('button', { name: 'Cập nhật' })).not.toBeInTheDocument();
+    expect(within(acb).queryByRole('button', { name: 'Tạo lại khoá webhook' })).not.toBeInTheDocument();
+    expect(within(acb).queryByText('https://pay/webhooks/bank/acb/t/status')).not.toBeInTheDocument();
 
     const vcb = await cardOf('0011223344');
     expect(within(vcb).getByText('VietQR')).toBeInTheDocument();
-    expect(within(vcb).getByText(/Chưa kết nối/)).toBeInTheDocument();
-    expect(within(vcb).getByRole('button', { name: 'Kết nối đối soát' })).toBeInTheDocument();
+    expect(within(vcb).getByText(/hỗ trợ tài khoản VietinBank và MB/)).toBeInTheDocument();
+    expect(within(vcb).queryByRole('button', { name: 'Đăng ký báo có' })).not.toBeInTheDocument();
+
+    const vtb = await cardOf('103885549137');
+    expect(within(vtb).getByRole('button', { name: 'Đăng ký báo có' })).toBeInTheDocument();
+
+    const linked = await cardOf('116002680669');
+    expect(within(linked).getByText('Đăng ký báo có')).toBeInTheDocument();
+    // Chỉ còn nút Tắt của chính tài khoản — kết nối báo có không tắt ở đây.
+    expect(within(linked).getAllByRole('button', { name: 'Tắt' })).toHaveLength(1);
+    expect(within(linked).queryByRole('button', { name: 'Kiểm tra kết nối' })).not.toBeInTheDocument();
+    expect(within(linked).queryByRole('button', { name: 'Đăng ký báo có' })).not.toBeInTheDocument();
 
     const unassigned = (await screen.findByText('Kết nối chưa gắn tài khoản')).closest(
       '.MuiCard-root'

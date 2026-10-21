@@ -40,25 +40,21 @@ import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 
 import { ApiPayBankLinkCard } from './apipay-bank-link';
+import { ConnectionList, ConfirmActionDialog } from './payment-connection';
 import BankAccountFormDialog from './bank-account/bank-account-form-dialog';
 import BankAccountVietQrDialog from './bank-account/bank-account-vietqr-dialog';
+import { bankLinkCodeOf, BankLinkRegisterDialog, type BankLinkPreset } from './bank-link';
 import {
   findVietQRBank,
   normalizeBankAccount,
   bankAccountBankLabel,
   bankAccountOptionLabel,
 } from './bank-account/utils';
-import {
-  ConnectionList,
-  ConfirmActionDialog,
-  ConnectionWizardDialog,
-  ConnectionResultDialog,
-  type BankAccountOption,
-} from './payment-connection';
 
 // ----------------------------------------------------------------------
 // Tài khoản ngân hàng của cửa hàng (chỉ Admin, mục 7c): danh sách tài khoản nhận tiền, thêm / sửa / tắt dòng cửa hàng
-// tự khai (dòng KiotViet chỉ đọc), mã VietQR (in dán quầy / tải ảnh) và kết nối đối soát theo từng tài khoản.
+// tự khai (dòng KiotViet chỉ đọc), mã VietQR (in dán quầy / tải ảnh) và kết nối đối soát theo từng tài khoản — tài
+// khoản VietinBank / MB "Đăng ký báo có" (số TK + CCCD / MST + SĐT + OTP), không nhập khoá ngân hàng.
 // Dịch vụ thanh toán bật → GET payment/bank-accounts (kèm kết nối); tắt → GET /bank-accounts?includeInactive=true.
 // ----------------------------------------------------------------------
 
@@ -84,8 +80,7 @@ export default function BankAccountsTab() {
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<IBankAccountWithConnections | null>(null);
   const [qrTarget, setQrTarget] = useState<IBankAccountWithConnections | null>(null);
-  const [connectTarget, setConnectTarget] = useState<IBankAccountWithConnections | null>(null);
-  const [created, setCreated] = useState<IPaymentConnection | null>(null);
+  const [registerPreset, setRegisterPreset] = useState<BankLinkPreset | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<IBankAccountWithConnections | null>(
     null
   );
@@ -155,14 +150,6 @@ export default function BankAccountsTab() {
   }, [enabled, providers.length]);
 
   const bankOf = useCallback((a: IBankAccountWithConnections) => findVietQRBank(banks, a), [banks]);
-
-  const accountOptions: BankAccountOption[] = useMemo(
-    () =>
-      accounts
-        .filter((a) => a.isActive)
-        .map((a) => ({ id: a.id, label: bankAccountOptionLabel(a), bin: a.bin })),
-    [accounts]
-  );
 
   const handleDeactivate = async () => {
     if (!deactivateTarget) return;
@@ -308,7 +295,13 @@ export default function BankAccountsTab() {
           paymentCodePrefix={paymentCodePrefix}
           reactivating={reactivatingId === a.id}
           onQr={() => setQrTarget(a)}
-          onConnect={() => setConnectTarget(a)}
+          onRegister={() =>
+            setRegisterPreset({
+              bank: bankLinkCodeOf(a.bin),
+              accountNumber: a.accountNumber,
+              accountName: a.accountHolder,
+            })
+          }
           onEdit={() => {
             setEditTarget(a);
             setFormOpen(true);
@@ -334,7 +327,7 @@ export default function BankAccountsTab() {
               <Typography variant="h6">Kết nối chưa gắn tài khoản</Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                 Kết nối đối soát không gắn tài khoản nhận nào. Ngân hàng trực tiếp chưa gắn tài
-                khoản chỉ dùng cho tài khoản cùng ngân hàng — bấm Cập nhật để gắn tài khoản nhận.
+                khoản chỉ dùng cho tài khoản cùng ngân hàng.
               </Typography>
             </Stack>
             <ConnectionList
@@ -343,8 +336,6 @@ export default function BankAccountsTab() {
               providersLoading={providersLoading}
               providersError={providersError}
               showBankAccount
-              allowBankAccountChange
-              bankAccounts={accountOptions}
               paymentCodePrefix={paymentCodePrefix}
               onChanged={load}
             />
@@ -372,35 +363,11 @@ export default function BankAccountsTab() {
         onClose={() => setQrTarget(null)}
       />
 
-      <ConnectionWizardDialog
-        open={!!connectTarget}
-        providers={providers}
-        providersLoading={providersLoading}
-        providersError={providersError}
-        presetBankAccount={
-          connectTarget
-            ? {
-                id: connectTarget.id,
-                label: bankAccountOptionLabel(connectTarget),
-                bin: connectTarget.bin,
-                accountNumber: connectTarget.accountNumber,
-              }
-            : null
-        }
-        onClose={() => setConnectTarget(null)}
-        onSaved={(c) => {
-          setConnectTarget(null);
-          setCreated(c);
-          load();
-        }}
-      />
-
-      <ConnectionResultDialog
-        connection={created}
-        providers={providers}
-        reason="created"
-        paymentCodePrefix={paymentCodePrefix}
-        onClose={() => setCreated(null)}
+      <BankLinkRegisterDialog
+        open={!!registerPreset}
+        preset={registerPreset}
+        onClose={() => setRegisterPreset(null)}
+        onChanged={load}
       />
 
       <ConfirmActionDialog
@@ -435,7 +402,7 @@ type CardProps = {
   paymentCodePrefix: string;
   reactivating: boolean;
   onQr: VoidFunction;
-  onConnect: VoidFunction;
+  onRegister: VoidFunction;
   onEdit: VoidFunction;
   onDeactivate: VoidFunction;
   onReactivate: VoidFunction;
@@ -452,7 +419,7 @@ function BankAccountCard({
   paymentCodePrefix,
   reactivating,
   onQr,
-  onConnect,
+  onRegister,
   onEdit,
   onDeactivate,
   onReactivate,
@@ -460,6 +427,8 @@ function BankAccountCard({
 }: CardProps) {
   const label = bankAccountBankLabel(a, bank);
   const editable = !a.isManagedByKiotViet;
+  // Đăng ký báo có qua S Payment: VietinBank / MB, tài khoản chưa có kết nối nào.
+  const canRegister = !!bankLinkCodeOf(a.bin) && a.connections.length === 0;
 
   return (
     <Card sx={{ p: 3, ...(a.isActive ? {} : { bgcolor: 'background.neutral' }) }}>
@@ -535,15 +504,15 @@ function BankAccountCard({
             >
               Mã VietQR
             </Button>
-            {enabled && a.isActive && (
+            {enabled && a.isActive && canRegister && (
               <Button
                 size="small"
                 variant="outlined"
                 startIcon={<Iconify icon="solar:link-bold" />}
-                onClick={onConnect}
+                onClick={onRegister}
                 disabled={!a.accountNumber}
               >
-                Kết nối đối soát
+                Đăng ký báo có
               </Button>
             )}
             {editable && (
@@ -591,7 +560,11 @@ function BankAccountCard({
                 <Box>
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                     Chưa kết nối — tiền vào tài khoản này chưa được tự xác nhận
-                    {a.isActive ? '. Bấm "Kết nối đối soát" để thêm.' : '.'}
+                    {!a.isActive
+                      ? '.'
+                      : canRegister
+                        ? '. Bấm "Đăng ký báo có" để ngân hàng báo tiền về (cần CCCD / MST, SĐT chủ tài khoản và OTP).'
+                        : '. Đăng ký báo có hiện hỗ trợ tài khoản VietinBank và MB.'}
                   </Typography>
                 </Box>
               ) : (

@@ -684,6 +684,12 @@ export const endpoints = {
       `/payment/settings/connections/${id}/apipay/banks/${encodeURIComponent(publicId)}/use`,
     // Tài khoản ngân hàng kèm kết nối đối soát của từng tài khoản (Admin)
     bankAccounts: '/payment/bank-accounts',
+    // Đăng ký báo có qua S Payment (số TK + CCCD/MST + SĐT + OTP, khoá ngân hàng ở phía SPARK)
+    bankLinks: '/payment/settings/bank-links',
+    bankLinkBanks: '/payment/settings/bank-links/banks',
+    bankLinkConfirm: (id: string) => `/payment/settings/bank-links/${id}/confirm`,
+    bankLinkRevoke: (id: string) => `/payment/settings/bank-links/${id}/revoke`,
+    bankLinkCancelRevoke: (id: string) => `/payment/settings/bank-links/${id}/cancel-revoke`,
   },
   paymentReconciliation: {
     summary: '/payment/reconciliation/summary',

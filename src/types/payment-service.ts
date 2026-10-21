@@ -321,6 +321,57 @@ export type IApiPayConfirmOtpRequest = {
   otp: string;
 };
 
+// ---------------------------------------------------------------------- Đăng ký báo có (kiểu KiotViet, Admin)
+
+export type BankLinkAccountType = 'individual' | 'household' | 'business';
+
+/** otp_required = chờ OTP đăng ký; revoking = chờ OTP huỷ; revoked chỉ có ở response huỷ xong. */
+export type BankLinkStatus = 'otp_required' | 'active' | 'revoking' | 'revoked';
+
+/** GET payment/settings/bank-links/banks — ngân hàng S Payment đăng ký báo có được (hoặc lý do chưa). */
+export type IBankLinkBank = {
+  code: string;
+  bin: string;
+  name: string;
+  available: boolean;
+  unavailableReason?: string | null;
+  accountTypes: BankLinkAccountType[];
+  /** Câu đồng ý chủ tài khoản phải tick */
+  consent: string;
+};
+
+export type IBankLink = {
+  id: string;
+  bank: string;
+  bin: string;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  accountType: BankLinkAccountType;
+  status: BankLinkStatus;
+  /** SĐT nhận OTP đã che, vd 037*****15 */
+  maskedMobile?: string | null;
+  otpSentAt?: string | null;
+  activatedAt?: string | null;
+  revokedAt?: string | null;
+  lastError?: string | null;
+  connectionId?: string | null;
+  createdAt: string;
+  /** Chỉ khi vừa active: tài khoản ngân hàng của cửa hàng core-be đã thêm / bật lại */
+  coreBankAccount?: IApiPayCoreBankAccount | null;
+};
+
+/** POST payment/settings/bank-links. CCCD / MST và SĐT chỉ chuyển thẳng sang ngân hàng — máy chủ không lưu. */
+export type IRegisterBankLinkRequest = {
+  bank: string;
+  accountNumber: string;
+  accountName: string;
+  accountType: BankLinkAccountType;
+  identity: string;
+  mobile: string;
+  policyAgree: boolean;
+};
+
 // ---------------------------------------------------------------------- Đối soát (Admin, Manager)
 
 export type BankTxnStatus = 'matched' | 'unmatched' | 'ignored';
