@@ -39,6 +39,11 @@ const BACKEND_API_PREFIXES = [
 
 const nextConfig = {
   trailingSlash: true,
+  // Tắt bộ tối ưu ảnh (/_next/image trả 404): Next 14.2 dính lỗ hổng RCE của Image Optimization API (vá ở 15.5.24+).
+  // Ảnh dùng thẳng file gốc. Bật lại khi đã nâng Next.
+  images: { unoptimized: true },
+  // Không lộ "X-Powered-By: Next.js".
+  poweredByHeader: false,
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
   env: {
