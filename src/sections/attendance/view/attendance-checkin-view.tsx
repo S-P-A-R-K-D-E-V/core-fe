@@ -164,6 +164,8 @@ export default function AttendanceCheckinView() {
   const [geoAccuracy, setGeoAccuracy] = useState<number | null>(null);
   const [geoAddress, setGeoAddress] = useState<string | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
+  /** Trình duyệt chặn quyền vị trí → không chấm công được (khác GPS lỗi: sau 5 giây vẫn cho, máy chủ đánh dấu). */
+  const [geoDenied, setGeoDenied] = useState(false);
   const [gpsErrorCountdown, setGpsErrorCountdown] = useState<number | null>(null);
   const [gpsErrorFallbackEnabled, setGpsErrorFallbackEnabled] = useState(false);
 
@@ -217,9 +219,15 @@ export default function AttendanceCheckinView() {
         setGeoLocation({ lat: latitude, lng: longitude });
         setGeoAccuracy(accuracy);
         setGeoError(null);
+        setGeoDenied(false);
       },
       (error) => {
-        setGeoError('Không lấy được vị trí GPS. Kiểm tra quyền trình duyệt.');
+        if (error.code === error.PERMISSION_DENIED) {
+          setGeoDenied(true);
+          setGeoError('Trình duyệt chưa cho phép vị trí — bật quyền vị trí cho trang này rồi tải lại để chấm công.');
+        } else {
+          setGeoError('Không lấy được vị trí GPS. Kiểm tra quyền trình duyệt.');
+        }
         console.error('Geolocation error:', error);
       },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
@@ -277,16 +285,17 @@ export default function AttendanceCheckinView() {
     return () => clearTimeout(timer);
   }, [gpsStableAt]);
 
-  // GPS error fallback: start 5-second countdown, then enable photo-only check-in
+  // GPS lỗi (đã cho phép vị trí): đếm 5 giây rồi vẫn cho chấm công, máy chủ đánh dấu "không có vị trí". Chặn quyền vị
+  // trí thì KHÔNG cho (bắt buộc có vị trí ở trang này — chủ 2026-10-21).
   useEffect(() => {
-    if (geoError) {
+    if (geoError && !geoDenied) {
       setGpsErrorCountdown(5);
       setGpsErrorFallbackEnabled(false);
     } else {
       setGpsErrorCountdown(null);
       setGpsErrorFallbackEnabled(false);
     }
-  }, [geoError]);
+  }, [geoError, geoDenied]);
 
   useEffect(() => {
     if (gpsErrorCountdown === null || gpsErrorCountdown <= 0) {
@@ -615,6 +624,10 @@ export default function AttendanceCheckinView() {
    */
   const locateForSubmit = useCallback(async () => {
     const fix = await locateForAttendance();
+    if (fix.blocked) {
+      setGeoDenied(true);
+      throw new Error('Trình duyệt chưa cho phép vị trí — bật quyền vị trí cho trang này để chấm công.');
+    }
     if (fix.coords) {
       setGeoLocation({ lat: fix.coords.latitude, lng: fix.coords.longitude });
       setGeoAccuracy(fix.coords.accuracy ?? null);
@@ -935,10 +948,17 @@ export default function AttendanceCheckinView() {
         <Alert severity="warning" sx={{ mb: 2 }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" spacing={1}>
             <Typography variant="body2">{geoError}</Typography>
-            {gpsErrorFallbackEnabled ? (
+            {geoDenied ? (
               <Chip
                 size="small"
-                label="Chụp ảnh check-in đã được bật"
+                label="Cần cho phép vị trí để chấm công"
+                color="error"
+                icon={<Iconify icon="mdi:map-marker-off" width={14} />}
+              />
+            ) : gpsErrorFallbackEnabled ? (
+              <Chip
+                size="small"
+                label="Chấm công không vị trí đã được bật"
                 color="success"
                 icon={<Iconify icon="mdi:camera-check" width={14} />}
               />
@@ -951,7 +971,7 @@ export default function AttendanceCheckinView() {
               />
             )}
           </Stack>
-          {!gpsErrorFallbackEnabled && (
+          {!gpsErrorFallbackEnabled && !geoDenied && (
             <LinearProgress
               variant="determinate"
               value={gpsErrorCountdown !== null ? ((5 - gpsErrorCountdown) / 5) * 100 : 100}
@@ -1076,7 +1096,8 @@ export default function AttendanceCheckinView() {
                       currentShiftDisplay.currentShift.shiftName || currentShiftDisplay.currentShift.scheduleName
                     )
                   }
-                  disabled={!!actionLoading}
+                  // Bắt buộc có vị trí ở trang này như check-in (GPS lỗi đã cho phép thì sau 5 giây vẫn cho).
+                  disabled={!!actionLoading || (branches.length > 0 && !gpsReadyForCheckin && !gpsErrorFallbackEnabled)}
                   startIcon={
                     actionLoading === 'checkout' ? (
                       <CircularProgress size={20} color="inherit" />

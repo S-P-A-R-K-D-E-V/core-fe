@@ -27,6 +27,8 @@ export type LocationFix = {
   token: string | null;
   /** Thời điểm của điểm GPS (ms) — tuổi điểm GPS tính lúc gửi. */
   fixAt: number | null;
+  /** Trình duyệt chặn quyền vị trí → không chấm công (khác GPS lỗi: vẫn cho, máy chủ đánh dấu). */
+  blocked?: 'permission' | null;
 };
 
 const defaultSleep = (ms: number) => new Promise<void>((r) => { setTimeout(r, ms); });
@@ -84,13 +86,25 @@ export async function locateForAttendance(): Promise<LocationFix> {
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
     return { coords: null, unavailable: true, token: null, fixAt: null };
   }
-  return acquireFreshFix(
+  const blocked: LocationFix = { coords: null, unavailable: false, token: null, fixAt: null, blocked: 'permission' };
+  const state = await navigator.permissions
+    ?.query({ name: 'geolocation' as PermissionName })
+    .then((s) => s.state)
+    .catch(() => null);
+  if (state === 'denied') return blocked;
+  let denied = false;
+  const fix = await acquireFreshFix(
     () =>
       locationPing()
         .then((r) => r.token)
         .catch(() => null),
-    browserPosition
+    (ms) =>
+      browserPosition(ms).catch((e) => {
+        if (e?.code === 1) denied = true; // PERMISSION_DENIED
+        throw e;
+      })
   );
+  return !fix.coords && denied ? blocked : fix;
 }
 
 /** Trường vị trí gửi kèm request chấm công — tuổi điểm GPS tính NGAY lúc gửi. */
