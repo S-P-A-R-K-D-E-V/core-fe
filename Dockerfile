@@ -35,6 +35,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 USER nextjs
 
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
+# `next start` đọc next.config.mjs lúc chạy (images.unoptimized, poweredByHeader…) — thiếu file thì chạy cấu hình mặc định.
+COPY --from=builder --chown=nextjs:nodejs /app/next.config.mjs ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
