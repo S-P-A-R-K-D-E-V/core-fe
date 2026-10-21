@@ -54,7 +54,7 @@ import type { BankAccountOption } from './connection-form-dialog';
 
 // ----------------------------------------------------------------------
 // Danh sách kết nối đối soát kèm thao tác — dùng chung cho tab "Tài khoản ngân hàng" (theo từng tài khoản, kết nối
-// chưa gắn tài khoản) và tab "Thanh toán" (mọi kết nối):
+// chưa gắn tài khoản) và tab "Báo có & kết nối" (mọi kết nối) của mục Thanh toán:
 //   Kiểm tra kết nối (ngân hàng trực tiếp) · Đồng bộ (SePay / Casso) · Tắt / Bật lại; manageKeys thêm Cập nhật (form
 //   khoá), Tạo lại khoá webhook và webhook URL — chủ cửa hàng không dùng (khoá ngân hàng do SPARK giữ ở S Payment).
 // Kết nối tạo từ đăng ký báo có (publicSettings.bankLinkId) quản lý ở thẻ Đăng ký báo có — không tắt / kiểm tra ở đây.
@@ -412,7 +412,7 @@ function ConnectionItem({
 
       {linked ? (
         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-          Huỷ hoặc đăng ký lại ở mục Đăng ký dịch vụ thông báo thanh toán QR (tab Thanh toán).
+          Huỷ hoặc đăng ký lại ở mục Đăng ký dịch vụ thông báo thanh toán QR (Thanh toán → Báo có & kết nối).
         </Typography>
       ) : (
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>

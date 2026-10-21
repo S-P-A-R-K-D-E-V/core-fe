@@ -14,14 +14,11 @@ import Button from '@mui/material/Button';
 import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
-import Container from '@mui/material/Container';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
 import InputAdornment from '@mui/material/InputAdornment';
 import CircularProgress from '@mui/material/CircularProgress';
-
-import { paths } from 'src/routes/paths';
 
 import { useDebounce } from 'src/hooks/use-debounce';
 
@@ -36,15 +33,13 @@ import { getOnlineOrders } from 'src/api/online-orders';
 import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
 import { useSnackbar } from 'src/components/snackbar';
-import { useSettingsContext } from 'src/components/settings';
-import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import { TableNoData, TableHeadCustom, TablePaginationCustom } from 'src/components/table';
 
 import OnlineOrderDetailDialog from '../online-order-detail-dialog';
 
 // ----------------------------------------------------------------------
-// Đơn khách đặt trên storefront. Đơn chỉ sinh hoá đơn bán hàng (và trừ kho) khi đã thanh toán; đơn chờ thanh toán
-// quản lý có thể huỷ.
+// Thanh toán → Đơn online: đơn khách đặt trên storefront. Đơn chỉ sinh hoá đơn bán hàng (và trừ kho) khi đã thanh toán;
+// đơn chờ thanh toán quản lý có thể huỷ. Tiêu đề + tab ở layout của mục Thanh toán.
 // ----------------------------------------------------------------------
 
 const STATUS_TABS: { value: '' | OnlineOrderStatus; label: string }[] = [
@@ -66,7 +61,6 @@ const TABLE_HEAD = [
 ];
 
 export default function OnlineOrderListView() {
-  const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
   const [status, setStatus] = useState<'' | OnlineOrderStatus>('');
   const [search, setSearch] = useState('');
@@ -112,18 +106,7 @@ export default function OnlineOrderListView() {
 
   return (
     <RoleBasedGuard hasContent roles={['Admin', 'Manager']}>
-      <Container maxWidth={settings.themeStretch ? false : 'xl'}>
-        <CustomBreadcrumbs
-          heading="Đơn online"
-          links={[{ name: 'Dashboard', href: paths.dashboard.root }, { name: 'Đơn online' }]}
-          action={
-            <Button variant="outlined" startIcon={<Iconify icon="solar:restart-bold" />} onClick={fetchData}>
-              Làm mới
-            </Button>
-          }
-          sx={{ mb: 3 }}
-        />
-
+      <>
         <Card>
           <Tabs value={status} onChange={(_, v) => setStatus(v)} sx={{ px: 2.5 }}>
             {STATUS_TABS.map((t) => (
@@ -131,7 +114,7 @@ export default function OnlineOrderListView() {
             ))}
           </Tabs>
 
-          <Stack sx={{ p: 2.5 }}>
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ p: 2.5 }}>
             <TextField
               size="small"
               fullWidth
@@ -146,6 +129,14 @@ export default function OnlineOrderListView() {
                 ),
               }}
             />
+            <Button
+              variant="outlined"
+              startIcon={<Iconify icon="solar:restart-bold" />}
+              onClick={fetchData}
+              sx={{ flexShrink: 0 }}
+            >
+              Làm mới
+            </Button>
           </Stack>
 
           <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
@@ -217,7 +208,7 @@ export default function OnlineOrderListView() {
           onClose={() => setSelected(null)}
           onChanged={(updated) => setItems((prev) => prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o)))}
         />
-      </Container>
+      </>
     </RoleBasedGuard>
   );
 }

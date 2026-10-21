@@ -216,5 +216,5 @@ export function coreBankAccountText(
     : 'Tài khoản đã có trong Tài khoản ngân hàng của cửa hàng (đã bật lại)';
   return sync.isDefault
     ? `${base} — là tài khoản mặc định khi thu chuyển khoản.`
-    : `${base} — chọn ở màn bán hàng, hoặc đặt làm mặc định ở tab Tài khoản ngân hàng.`;
+    : `${base} — chọn ở màn bán hàng, hoặc đặt làm mặc định ở Thanh toán → Tài khoản ngân hàng.`;
 }

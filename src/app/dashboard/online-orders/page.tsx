@@ -1,11 +1,8 @@
-import OnlineOrderListView from 'src/sections/online-orders/view/online-order-list-view';
+import { redirect } from 'next/navigation';
 
-// ----------------------------------------------------------------------
+import { paths } from 'src/routes/paths';
 
-export const metadata = {
-  title: 'Đơn online',
-};
-
+// Trang cũ — đã gộp vào mục Thanh toán → Đơn online.
 export default function OnlineOrdersPage() {
-  return <OnlineOrderListView />;
+  redirect(paths.dashboard.payment.onlineOrders);
 }

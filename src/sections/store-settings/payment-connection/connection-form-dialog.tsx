@@ -269,7 +269,7 @@ export default function ConnectionFormDialog({
                   disabled={saving}
                   helperText={
                     bankAccounts.length === 0
-                      ? 'Chưa có tài khoản ngân hàng — thêm ở tab Tài khoản ngân hàng.'
+                      ? 'Chưa có tài khoản ngân hàng — thêm ở Thanh toán → Tài khoản ngân hàng.'
                       : 'Gắn tài khoản thì chỉ tiền vào đúng tài khoản này mới được khớp.'
                   }
                 >

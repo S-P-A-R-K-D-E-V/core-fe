@@ -230,7 +230,7 @@ export default function OnlineOrderDetailDialog({ order, onClose, onChanged }: P
         open={confirmCancel}
         onClose={() => setConfirmCancel(false)}
         title="Huỷ đơn online?"
-        content={`Huỷ đơn ${detail?.code ?? ''} và mã thanh toán của đơn. Khách vẫn chuyển khoản theo mã cũ thì tiền được ghi là "về trễ" ở màn Đối soát thanh toán.`}
+        content={`Huỷ đơn ${detail?.code ?? ''} và mã thanh toán của đơn. Khách vẫn chuyển khoản theo mã cũ thì tiền được ghi là "về trễ" ở Thanh toán → Đối soát.`}
         action={
           <LoadingButton variant="contained" color="error" loading={cancelling} onClick={handleCancel}>
             Huỷ đơn

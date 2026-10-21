@@ -14,9 +14,7 @@ import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
 import AgentKeysTab from './agent-keys-tab';
-import BankAccountsTab from './bank-accounts-tab';
 import StoreBrandingTab from './store-branding-tab';
-import PaymentConnectionsTab from './payment-connections-tab';
 import KiotVietConnectionTab from './kiotviet-connection-tab';
 import CustomerDisplayTab from './customer-display-tab';
 import PlatformFeaturesTab from './platform-features-tab';
@@ -26,7 +24,7 @@ import PlatformFeaturesTab from './platform-features-tab';
 const TABS = [
   { value: 'branding', label: 'Thông tin cửa hàng', icon: 'solar:shop-bold' },
   { value: 'kiotviet', label: 'Kết nối KiotViet', icon: 'solar:link-round-bold' },
-  { value: 'bank-accounts', label: 'Tài khoản ngân hàng', icon: 'solar:wallet-money-bold' },
+  // Mở mục Thanh toán (tài khoản ngân hàng, báo có & kết nối, đối soát, đơn online).
   { value: 'payment', label: 'Thanh toán', icon: 'solar:card-transfer-bold' },
   { value: 'customer-display', label: 'Màn hình khách', icon: 'solar:monitor-bold' },
   // Mở trang riêng Thiết bị cửa hàng (máy quầy, kiosk, camera — quản lý cũng vào được).
@@ -37,6 +35,12 @@ const TABS = [
 ] as const;
 
 type TabValue = (typeof TABS)[number]['value'];
+
+/** Tab mở trang riêng thay vì hiện nội dung tại chỗ. */
+const LINKED_TABS: Partial<Record<TabValue, string>> = {
+  payment: paths.dashboard.payment.notifications,
+  devices: paths.dashboard.storeSettings.devices,
+};
 
 export default function StoreSettingsView() {
   const settings = useSettingsContext();
@@ -53,7 +57,11 @@ export default function StoreSettingsView() {
 
       <Tabs
         value={tab}
-        onChange={(_, v) => (v === 'devices' ? router.push(paths.dashboard.storeSettings.devices) : setTab(v))}
+        onChange={(_, v: TabValue) => {
+          const linked = LINKED_TABS[v];
+          if (linked) router.push(linked);
+          else setTab(v);
+        }}
         variant="scrollable"
         allowScrollButtonsMobile
         sx={{ mb: { xs: 3, md: 5 } }}
@@ -65,8 +73,6 @@ export default function StoreSettingsView() {
 
       {tab === 'branding' && <StoreBrandingTab />}
       {tab === 'kiotviet' && <KiotVietConnectionTab />}
-      {tab === 'bank-accounts' && <BankAccountsTab />}
-      {tab === 'payment' && <PaymentConnectionsTab />}
       {tab === 'customer-display' && <CustomerDisplayTab />}
       {tab === 'platform-features' && <PlatformFeaturesTab />}
       {tab === 'agent-keys' && <AgentKeysTab />}

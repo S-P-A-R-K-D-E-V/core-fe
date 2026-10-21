@@ -105,7 +105,7 @@ export default function PaymentConnectionsTab() {
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               Kết nối S Payment dùng để xác nhận chuyển khoản. Tiền chỉ tự khớp khi nội dung chuyển
               khoản có mã thanh toán (bắt đầu bằng &quot;{prefix}&quot;) — giao dịch không có mã nằm
-              ở màn Đối soát thanh toán chờ khớp tay. Khi bán ở quầy, thu ngân chọn &quot;tài khoản
+              ở tab Đối soát chờ khớp tay. Khi bán ở quầy, thu ngân chọn &quot;tài khoản
               · dịch vụ&quot;.
             </Typography>
           </Stack>

@@ -181,6 +181,27 @@ describe('useNavData — camera, giám sát, báo cáo chỉ Admin', () => {
   });
 });
 
+// Mục Thanh toán gom đối soát, đơn online, tài khoản ngân hàng, báo có & kết nối — mỗi trang theo vai trò của nó.
+describe('useNavData — Thanh toán', () => {
+  const p = paths.dashboard.payment;
+
+  it('chủ cửa hàng thấy cả bốn trang trong một mục', () => {
+    const visible = navPaths('Admin');
+    [p.root, p.reconciliation, p.onlineOrders, p.bankAccounts, p.notifications].forEach((path) =>
+      expect(visible).toContain(path)
+    );
+    expect(visible).not.toContain(paths.dashboard.onlineOrders.root);
+  });
+
+  it('quản lý chỉ thấy đối soát và đơn online, nhân viên không thấy mục', () => {
+    const manager = navPaths('Manager');
+    expect(manager).toEqual(expect.arrayContaining([p.root, p.reconciliation, p.onlineOrders]));
+    expect(manager).not.toContain(p.bankAccounts);
+    expect(manager).not.toContain(p.notifications);
+    expect(navPaths('Staff')).not.toContain(p.root);
+  });
+});
+
 // Người kiêm nhiều vai trò (vd Staff kiêm Admin, vai trò chính "Staff") thấy menu của MỌI vai trò — như guard và API.
 // Trước đây menu chỉ xét vai trò chính nên ẩn hết mục Admin dù trang/API vẫn cho vào.
 describe('useNavData — nhiều vai trò', () => {

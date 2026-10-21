@@ -18,6 +18,12 @@ describe('requiredRolesFor', () => {
     // Thiết bị cửa hàng nằm dưới Cài đặt cửa hàng nhưng quản lý cũng vào (máy quầy / kiosk chi nhánh mình).
     [paths.dashboard.storeSettings.devices, MANAGER_ROLES],
     [paths.dashboard.notificationConfig.root, ADMIN_ROLES],
+    // Mục Thanh toán: đối soát + đơn online cho chủ và quản lý; tài khoản ngân hàng, báo có & kết nối chỉ chủ.
+    [paths.dashboard.payment.root, MANAGER_ROLES],
+    [paths.dashboard.payment.reconciliation, MANAGER_ROLES],
+    [paths.dashboard.payment.onlineOrders, MANAGER_ROLES],
+    [paths.dashboard.payment.bankAccounts, ADMIN_ROLES],
+    [paths.dashboard.payment.notifications, ADMIN_ROLES],
   ])('%s → chỉ %j', (path, roles) => {
     expect(requiredRolesFor(path)).toEqual(roles);
   });

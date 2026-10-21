@@ -15,6 +15,7 @@ import { hasAnyRole, normalizeRoles } from 'src/auth/roles';
 import { PERMISSIONS, hasAnyPermission, hasAllPermissions } from 'src/auth/permissions';
 import { PLATFORM_FEATURES } from 'src/auth/platform-features';
 
+import { PAYMENT_PAGES } from 'src/sections/payment/payment-pages';
 import { REPORT_PAGES, REPORT_VIEW_PERMISSIONS } from 'src/sections/pos/report/report-access';
 
 import { BranchType, menuBranchTypes, useWorkingBranch } from 'src/store/working-branch-store';
@@ -703,19 +704,18 @@ export function useNavData(
               { title: 'Tạo đơn', path: paths.dashboard.pos.salesOrder.new, platformFeature: PLATFORM_FEATURES.posSale },
             ],
           },
-          // ĐƠN ONLINE (storefront): chỉ sinh hoá đơn khi khách đã thanh toán.
+          // THANH TOÁN (một mục): đối soát, đơn online (chủ + quản lý); tài khoản ngân hàng, báo có & kết nối S Payment
+          // (chủ cửa hàng).
           {
-            title: 'Đơn online',
-            path: paths.dashboard.onlineOrders.root,
-            icon: ICONS.order,
-            roles: ['Admin', 'Manager'],
-          },
-          // ĐỐI SOÁT THANH TOÁN: giao dịch ngân hàng / cổng ↔ thanh toán, khớp tay, bỏ qua.
-          {
-            title: 'Đối soát thanh toán',
-            path: paths.dashboard.payment.reconciliation,
+            title: 'Thanh toán',
+            path: paths.dashboard.payment.root,
             icon: ICONS.banking,
             roles: ['Admin', 'Manager'],
+            children: PAYMENT_PAGES.map((page) => ({
+              title: page.title,
+              path: page.path,
+              roles: [...page.roles],
+            })),
           },
           {
             title: 'Chi phí & Công nợ',

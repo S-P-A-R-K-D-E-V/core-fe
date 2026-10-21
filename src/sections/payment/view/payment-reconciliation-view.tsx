@@ -10,10 +10,7 @@ import Tabs from '@mui/material/Tabs';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Grid from '@mui/material/Grid2';
-import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
-
-import { paths } from 'src/routes/paths';
 
 import { toDateStr } from 'src/utils/format-time';
 import { fCurrency } from 'src/utils/format-number';
@@ -24,16 +21,14 @@ import { getReconciliationSummary } from 'src/api/payment-reconciliation';
 
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
-import { useSettingsContext } from 'src/components/settings';
 import { AppDatePicker } from 'src/components/date-time-picker';
-import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
 import BankTxnPanel from '../bank-txn-panel';
 import PaymentIntentPanel from '../payment-intent-panel';
 
 // ----------------------------------------------------------------------
-// Đối soát thanh toán: giao dịch tiền vào (SePay/Casso/cổng) ↔ thanh toán (mã QR, đơn online). Giao dịch không có mã
-// thanh toán không tự khớp theo số tiền — nằm ở "Chưa khớp" chờ khớp tay hoặc bỏ qua.
+// Thanh toán → Đối soát: giao dịch tiền vào (SePay/Casso/cổng) ↔ thanh toán (mã QR, đơn online). Giao dịch không có mã
+// thanh toán không tự khớp theo số tiền — nằm ở "Chưa khớp" chờ khớp tay hoặc bỏ qua. Tiêu đề + tab ở layout của mục.
 // ----------------------------------------------------------------------
 
 type SummaryCardProps = {
@@ -70,7 +65,6 @@ function SummaryCard({ title, value, caption, icon, color }: SummaryCardProps) {
 // ----------------------------------------------------------------------
 
 export default function PaymentReconciliationView() {
-  const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
   const today = toDateStr(new Date());
 
@@ -99,26 +93,19 @@ export default function PaymentReconciliationView() {
 
   return (
     <RoleBasedGuard hasContent roles={['Admin', 'Manager']}>
-      <Container maxWidth={settings.themeStretch ? false : 'xl'}>
-        <CustomBreadcrumbs
-          heading="Đối soát thanh toán"
-          links={[{ name: 'Dashboard', href: paths.dashboard.root }, { name: 'Đối soát thanh toán' }]}
-          action={
+      <>
+        <Card sx={{ p: 2.5, mb: 3 }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
+            <AppDatePicker label="Từ ngày" value={from} onChange={setFrom} maxDate={to} size="small" />
+            <AppDatePicker label="Đến ngày" value={to} onChange={setTo} minDate={from} size="small" />
             <Button
               variant="outlined"
               startIcon={<Iconify icon="solar:restart-bold" />}
               onClick={() => setRefreshKey((k) => k + 1)}
+              sx={{ ml: { sm: 'auto' }, flexShrink: 0 }}
             >
               Làm mới
             </Button>
-          }
-          sx={{ mb: 3 }}
-        />
-
-        <Card sx={{ p: 2.5, mb: 3 }}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <AppDatePicker label="Từ ngày" value={from} onChange={setFrom} maxDate={to} size="small" />
-            <AppDatePicker label="Đến ngày" value={to} onChange={setTo} minDate={from} size="small" />
           </Stack>
         </Card>
 
@@ -181,7 +168,7 @@ export default function PaymentReconciliationView() {
         ) : (
           <PaymentIntentPanel from={from} to={to} refreshKey={refreshKey} />
         )}
-      </Container>
+      </>
     </RoleBasedGuard>
   );
 }

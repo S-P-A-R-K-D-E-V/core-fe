@@ -10,6 +10,7 @@ import { ADMIN_ROLES, MANAGER_ROLES } from './roles';
 // Mỗi dòng khớp với menu (config-navigation) VÀ không rộng hơn API (Core-be):
 //   - role               : RolesController (sửa danh mục/gán vai trò chỉ Admin)
 //   - store-settings     : StoreSettingsController — Admin
+//   - payment            : đối soát / đơn online Admin, Manager; payment/bank-accounts, payment/notifications — Admin
 //   - notification-config: NotificationConfigController — Admin
 //   - shift, shift-audit, shift-pool/pending, shift-swap/pending, attendance/*: theo quyền shift.* / attendance.*
 //     (Core-be; mặc định Admin, Manager — nhắc ca chỉ Admin)
@@ -46,6 +47,11 @@ export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   // Thiết bị cửa hàng: quản lý xem / ghép / thu hồi máy quầy, kiosk của chi nhánh mình (server lọc theo chi nhánh).
   { prefix: paths.dashboard.storeSettings.devices, roles: MANAGER_ROLES },
   { prefix: paths.dashboard.notificationConfig.root, roles: ADMIN_ROLES },
+  // Thanh toán: đối soát + đơn online cho chủ và quản lý; tài khoản ngân hàng, báo có & kết nối chỉ chủ cửa hàng
+  // (PaymentSettingsController / PaymentBankLinksController — Admin).
+  { prefix: paths.dashboard.payment.root, roles: MANAGER_ROLES },
+  { prefix: paths.dashboard.payment.bankAccounts, roles: ADMIN_ROLES },
+  { prefix: paths.dashboard.payment.notifications, roles: ADMIN_ROLES },
 
   { prefix: paths.dashboard.shift.root, roles: null, permissions: [SHIFT.templateManage, SHIFT.scheduleManage] },
   { prefix: paths.dashboard.shift.templates.root, roles: null, permissions: [SHIFT.templateManage] },
