@@ -23,6 +23,9 @@ import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/paths';
 
+import { toDateStr } from 'src/utils/format-time';
+import { apiErrorMessage } from 'src/utils/api-error';
+
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
@@ -68,14 +71,15 @@ const SALARY_TYPES = [
   { value: 'Monthly', label: 'Theo tháng' },
 ];
 
-const EMPTY_FORM = {
+// Ngày dạng yyyy-MM-dd theo giờ máy, tính lúc mở form (không cố định lúc tải trang; API đọc ngày, không nhận ISO kèm giờ).
+const emptyForm = () => ({
   userId: '',
   salaryType: 'Monthly',
   amount: '',
-  effectiveFrom: new Date().toISOString(),
+  effectiveFrom: toDateStr(new Date()),
   effectiveTo: '',
   note: '',
-};
+});
 
 // ----------------------------------------------------------------------
 
@@ -96,7 +100,7 @@ export default function SalaryConfigurationView() {
 
   // Create dialog
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [formData, setFormData] = useState(emptyForm);
   const [userInputValue, setUserInputValue] = useState('');
 
   // Edit dialog
@@ -142,7 +146,7 @@ export default function SalaryConfigurationView() {
 
   const handleCloseCreateDialog = () => {
     setOpenCreateDialog(false);
-    setFormData(EMPTY_FORM);
+    setFormData(emptyForm());
     setUserInputValue('');
   };
 
@@ -151,14 +155,15 @@ export default function SalaryConfigurationView() {
       await createSalaryConfiguration({
         ...formData,
         amount: parseFloat(formData.amount),
-        effectiveTo: formData.effectiveTo || undefined,
+        effectiveFrom: formData.effectiveFrom.split('T')[0],
+        effectiveTo: formData.effectiveTo ? formData.effectiveTo.split('T')[0] : undefined,
       });
       enqueueSnackbar('Tạo cấu hình lương thành công!', { variant: 'success' });
       handleCloseCreateDialog();
       fetchSalaries(pageNumber, pageSize);
     } catch (error: any) {
       console.error(error);
-      const msg = error?.title || error?.message || 'Tạo cấu hình lương thất bại!';
+      const msg = apiErrorMessage(error, 'Tạo cấu hình lương thất bại!');
       enqueueSnackbar(msg, { variant: 'error' });
     }
   };
@@ -194,7 +199,7 @@ export default function SalaryConfigurationView() {
       fetchSalaries(pageNumber, pageSize);
     } catch (error: any) {
       console.error(error);
-      const msg = error?.title || error?.message || 'Cập nhật cấu hình lương thất bại!';
+      const msg = apiErrorMessage(error, 'Cập nhật cấu hình lương thất bại!');
       enqueueSnackbar(msg, { variant: 'error' });
     }
   };
@@ -218,7 +223,7 @@ export default function SalaryConfigurationView() {
       fetchSalaries(pageNumber, pageSize);
     } catch (error: any) {
       console.error(error);
-      const msg = error?.title || error?.message || 'Xóa cấu hình lương thất bại!';
+      const msg = apiErrorMessage(error, 'Xóa cấu hình lương thất bại!');
       enqueueSnackbar(msg, { variant: 'error' });
     } finally {
       setDeleting(false);
