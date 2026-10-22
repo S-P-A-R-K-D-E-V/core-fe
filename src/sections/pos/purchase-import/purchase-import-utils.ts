@@ -36,15 +36,18 @@ const ISSUE_LABELS: Record<string, string> = {
   missing_numbers: 'Thiếu số lượng / tiền',
   unit_converted: 'Đã đổi tá / lố / chục ra cái',
   pack_guess: 'Giá có thể theo tá / chục — kiểm số lượng',
+  pack_unit: 'Toa ghi túi N cái — đã tính giá mỗi chiếc, kiểm số chiếc khi nhận',
 };
 
 export function issueLabel(code: string): string {
   return ISSUE_LABELS[code] ?? code;
 }
 
-/** Vấn đề về số cần người duyệt nhìn (đổi đơn vị chỉ là thông tin). */
+/** Vấn đề về số cần người duyệt nhìn (đổi đơn vị / chia giá túi N cái chỉ là thông tin). */
 export function hasNumberIssue(line: IPurchaseImportLine): boolean {
-  return line.issues.some((i) => i !== 'unit_converted' && i !== 'number_corrected');
+  return line.issues.some(
+    (i) => i !== 'unit_converted' && i !== 'number_corrected' && i !== 'pack_unit'
+  );
 }
 
 /** Thành tiền dòng: số trên hoá đơn, không có thì SL × đơn giá. */

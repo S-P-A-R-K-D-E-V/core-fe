@@ -83,6 +83,7 @@ describe('purchase-import utils', () => {
 
   it('unit conversion alone is not a number problem', () => {
     expect(hasNumberIssue(line({ issues: ['unit_converted'] }))).toBe(false);
+    expect(hasNumberIssue(line({ issues: ['pack_unit'] }))).toBe(false);
     expect(hasNumberIssue(line({ issues: ['ambiguous_reading'] }))).toBe(true);
   });
 });
