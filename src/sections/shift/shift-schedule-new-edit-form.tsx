@@ -19,6 +19,9 @@ import Typography from '@mui/material/Typography';
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
+import { toDateStr } from 'src/utils/format-time';
+import { apiErrorMessage } from 'src/utils/api-error';
+
 import { useSnackbar } from 'src/components/snackbar';
 import FormProvider, { RHFTextField, RHFSelect, RHFTimePicker } from 'src/components/hook-form';
 import { AppDatePicker } from 'src/components/date-time-picker';
@@ -90,7 +93,8 @@ export default function ShiftScheduleNewEditForm({ currentSchedule }: Props) {
       shiftTemplateId: currentSchedule?.shiftTemplateId || '',
       startTime: currentSchedule?.startTime || '08:00',
       endTime: currentSchedule?.endTime || '17:00',
-      fromDate: currentSchedule?.fromDate || new Date().toISOString(),
+      // yyyy-MM-dd theo giờ máy: BE đọc ngày, không nhận chuỗi ISO kèm giờ (toISOString còn lệch ngày trước 7h sáng).
+      fromDate: currentSchedule?.fromDate || toDateStr(new Date()),
       toDate: currentSchedule?.toDate || '',
       checkInAllowedMinutesBefore: currentSchedule?.checkInAllowedMinutesBefore ?? 15,
     }),
@@ -114,15 +118,18 @@ export default function ShiftScheduleNewEditForm({ currentSchedule }: Props) {
   };
 
   const onSubmit = handleSubmit(async (data) => {
+    const repeatDays = selectedDays.reduce((acc, day) => acc | day, 0);
+    if (!repeatDays) {
+      enqueueSnackbar('Chọn ít nhất một ngày lặp', { variant: 'error' });
+      return;
+    }
     try {
-      const repeatDays = selectedDays.reduce((acc, day) => acc | day, 0);
-
       const payload = {
         shiftTemplateId: data.shiftTemplateId,
         startTime: data.startTime,
         endTime: data.endTime,
-        fromDate: data.fromDate,
-        toDate: data.toDate || undefined,
+        fromDate: data.fromDate.split('T')[0],
+        toDate: data.toDate ? data.toDate.split('T')[0] : undefined,
         repeatDays,
         checkInAllowedMinutesBefore: data.checkInAllowedMinutesBefore,
       };
@@ -137,9 +144,10 @@ export default function ShiftScheduleNewEditForm({ currentSchedule }: Props) {
       router.push(paths.dashboard.shift.schedules.list);
     } catch (error) {
       console.error(error);
-      enqueueSnackbar(currentSchedule ? 'Update failed!' : 'Create failed!', {
-        variant: 'error',
-      });
+      enqueueSnackbar(
+        apiErrorMessage(error, currentSchedule ? 'Không lưu được lịch ca' : 'Không tạo được lịch ca'),
+        { variant: 'error' }
+      );
     }
   });
 
