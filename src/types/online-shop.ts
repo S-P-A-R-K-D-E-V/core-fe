@@ -78,6 +78,14 @@ export type IOnlineShopSettings = IOnlineShopSettingsInput & {
 export type IShippingCredentialField = { key: string; label: string; secret: boolean; required: boolean; help?: string | null };
 export type IShippingSettingField = { key: string; label: string; required: boolean; help?: string | null };
 
+/** Trang của hãng: tạo tài khoản, lấy token, cấu hình webhook, tài liệu. environment null = mọi môi trường. */
+export type IShippingCarrierLink = {
+  kind: 'signup' | 'token' | 'webhook' | 'docs' | string;
+  label: string;
+  url: string;
+  environment?: string | null;
+};
+
 export type IShippingCarrier = {
   code: string;
   label: string;
@@ -86,6 +94,23 @@ export type IShippingCarrier = {
   environments: string[];
   help: string;
   webhookHelp: string;
+  links?: IShippingCarrierLink[] | null;
+  /** "form" = điền các ô; "otp" = liên kết shop của hãng bằng SĐT chủ shop + OTP (khoá do nền tảng giữ) */
+  connect?: 'form' | 'otp' | string;
+  /** Hãng gửi trạng thái về URL chung của nền tảng — cửa hàng không cấu hình webhook */
+  platformWebhook?: boolean;
+};
+
+/** Shop của hãng mà cửa hàng đã liên kết bằng OTP ("otp") hoặc được nền tảng gán ("assigned"). */
+export type ILinkedCarrierAccount = {
+  accountRef: string;
+  name: string;
+  address?: string | null;
+  source: 'otp' | 'assigned' | string;
+  /** false = tài khoản nền tảng không còn thấy shop (chủ shop gỡ liên kết) */
+  available: boolean;
+  /** Kết nối của cửa hàng đang dùng shop này */
+  connectionIds: string[];
 };
 
 export type IShippingConnection = {
@@ -97,8 +122,8 @@ export type IShippingConnection = {
   settings: Record<string, string>;
   /** Tên các khoá đã lưu (không có giá trị) */
   credentialKeys: string[];
-  /** Dán vào trang cấu hình webhook của hãng */
-  webhookUrl: string;
+  /** Dán vào trang cấu hình webhook của hãng; null = hãng gửi về URL chung của nền tảng */
+  webhookUrl?: string | null;
   lastError?: string | null;
   lastWebhookAt?: string | null;
   createdAt: string;

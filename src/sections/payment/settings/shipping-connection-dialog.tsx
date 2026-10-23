@@ -20,12 +20,46 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import { createShippingConnection, updateShippingConnection } from 'src/api/online-shop';
 
+import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 
+import CarrierOtpConnect from './carrier-otp-connect';
+
 // ----------------------------------------------------------------------
-// Thêm / sửa kết nối hãng vận chuyển. Ô khoá (token) không bao giờ hiện lại giá trị cũ: sửa mà để trống = giữ nguyên.
-// spark-shipping thử khoá với hãng trước khi lưu — khoá sai báo lỗi ngay.
+// Thêm / sửa kết nối hãng vận chuyển. Khoá API của hãng do nền tảng (spark-shipping) giữ — cửa hàng không nhập token:
+//   - connect "otp" (GHN): chọn shop đã liên kết / được gán, hoặc liên kết shop bằng SĐT chủ shop + OTP (CarrierOtpConnect).
+//   - connect "form" (Ahamove): điền ô không bí mật (SĐT tài khoản) + điểm lấy hàng; spark-shipping thử với hãng trước khi lưu.
+// Nút mở trang của hãng (tạo tài khoản, tài liệu) mở tab mới.
 // ----------------------------------------------------------------------
+
+export function carrierLinksFor(carrier: IShippingCarrier, environment: string, kinds: string[]) {
+  return (carrier.links ?? []).filter(
+    (l) => kinds.includes(l.kind) && (!l.environment || l.environment === environment)
+  );
+}
+
+function CarrierLinks({ carrier, environment, kinds }: { carrier: IShippingCarrier; environment: string; kinds: string[] }) {
+  const links = carrierLinksFor(carrier, environment, kinds);
+  if (links.length === 0) return null;
+  return (
+    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+      {links.map((l) => (
+        <Button
+          key={l.url}
+          size="small"
+          variant="soft"
+          color={l.kind === 'token' ? 'primary' : 'inherit'}
+          href={l.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          endIcon={<Iconify icon="eva:external-link-fill" width={16} />}
+        >
+          {l.label}
+        </Button>
+      ))}
+    </Stack>
+  );
+}
 
 type Props = {
   open: boolean;
@@ -58,8 +92,10 @@ export default function ShippingConnectionDialog({ open, connection, carriers, o
 
   const carrier = carriers.find((c) => c.code === carrierCode);
   const editing = !!connection;
+  /** Liên kết shop bằng OTP: thêm mới làm trong CarrierOtpConnect; sửa thì không đổi shop (tắt rồi thêm kết nối khác). */
+  const otpFlow = carrier?.connect === 'otp';
 
-  const missing = !editing && carrier
+  const missing = !editing && carrier && !otpFlow
     ? carrier.credentials.filter((f) => f.required && !credentials[f.key]?.trim()).map((f) => f.label)
     : [];
 
@@ -111,6 +147,9 @@ export default function ShippingConnectionDialog({ open, connection, carriers, o
               {carrier.help}
             </Typography>
           )}
+          {carrier && (
+            <CarrierLinks carrier={carrier} environment={environment} kinds={editing ? ['token', 'webhook'] : ['signup', 'token', 'docs']} />
+          )}
           <TextField
             select
             label="Môi trường"
@@ -127,18 +166,24 @@ export default function ShippingConnectionDialog({ open, connection, carriers, o
           </TextField>
           <TextField label="Tên hiển thị" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={carrier?.label} />
 
-          {carrier?.credentials.map((f) => (
-            <TextField
-              key={f.key}
-              label={f.label + (f.required && !editing ? ' *' : '')}
-              type={f.secret ? 'password' : 'text'}
-              autoComplete="off"
-              value={credentials[f.key] ?? ''}
-              onChange={(e) => setCredentials((c) => ({ ...c, [f.key]: e.target.value }))}
-              placeholder={editing && connection?.credentialKeys.includes(f.key) ? 'Đã lưu — để trống để giữ nguyên' : undefined}
-              helperText={f.help}
-            />
-          ))}
+          {!otpFlow &&
+            carrier?.credentials.map((f) => (
+              <TextField
+                key={f.key}
+                label={f.label + (f.required && !editing ? ' *' : '')}
+                type={f.secret ? 'password' : 'text'}
+                autoComplete="off"
+                value={credentials[f.key] ?? ''}
+                onChange={(e) => setCredentials((c) => ({ ...c, [f.key]: e.target.value }))}
+                placeholder={editing && connection?.credentialKeys.includes(f.key) ? 'Đã lưu — để trống để giữ nguyên' : undefined}
+                helperText={f.help}
+              />
+            ))}
+          {otpFlow && editing && (
+            <Typography variant="body2" color="text.secondary">
+              Đổi shop: tắt kết nối này rồi thêm kết nối mới với shop khác.
+            </Typography>
+          )}
 
           {carrier && carrier.settings.length > 0 && (
             <>
@@ -156,16 +201,29 @@ export default function ShippingConnectionDialog({ open, connection, carriers, o
             </>
           )}
 
+          {carrier && otpFlow && !editing && (
+            <CarrierOtpConnect
+              key={`${carrier.code}:${environment}`}
+              carrier={carrier}
+              environment={environment}
+              displayName={displayName}
+              settings={settings}
+              onSaved={onSaved}
+            />
+          )}
+
           {error && <Alert severity="error">{error}</Alert>}
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button color="inherit" onClick={onClose} disabled={saving}>
-          Huỷ
+          {otpFlow && !editing ? 'Đóng' : 'Huỷ'}
         </Button>
-        <LoadingButton variant="contained" loading={saving} onClick={save} disabled={!carrier || missing.length > 0}>
-          {editing ? 'Lưu' : 'Kiểm tra & kết nối'}
-        </LoadingButton>
+        {!(otpFlow && !editing) && (
+          <LoadingButton variant="contained" loading={saving} onClick={save} disabled={!carrier || missing.length > 0}>
+            {editing ? 'Lưu' : 'Kiểm tra & kết nối'}
+          </LoadingButton>
+        )}
       </DialogActions>
     </Dialog>
   );

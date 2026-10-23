@@ -162,6 +162,7 @@ export const SHIPPING_STATUS_LABEL: Record<string, string> = {
 export const CARRIER_LABEL: Record<string, string> = {
   ghn: 'Giao Hàng Nhanh',
   ghtk: 'Giao Hàng Tiết Kiệm',
+  ahamove: 'Ahamove (giao trong ngày)',
 };
 
 export const PAYMENT_ORDER_TYPE_LABEL: Record<string, string> = {

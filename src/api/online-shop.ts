@@ -14,6 +14,7 @@ import type {
   IOnlineShopSettingsInput,
   IStorefrontCheckoutRequest,
   IStorefrontAddress,
+  ILinkedCarrierAccount,
 } from 'src/types/online-shop';
 
 import axios, { endpoints } from 'src/utils/axios';
@@ -71,6 +72,27 @@ export async function disableShippingConnection(id: string): Promise<void> {
 
 export async function testShippingConnection(id: string): Promise<IShippingTestResult> {
   const res = await axios.post<IShippingTestResult>(endpoints.shippingSettings.test(id));
+  return res.data;
+}
+
+/** Shop của hãng cửa hàng đã liên kết bằng OTP / được nền tảng gán (GHN). */
+export async function getCarrierAccounts(carrier: string, environment: string): Promise<ILinkedCarrierAccount[]> {
+  const res = await axios.get<ILinkedCarrierAccount[]>(endpoints.shippingSettings.accounts(carrier), { params: { environment } });
+  return res.data;
+}
+
+/** Hãng gửi OTP tới SĐT chủ shop; trả số giây OTP còn hiệu lực. */
+export async function sendCarrierOtp(carrier: string, data: { environment: string; phone: string }): Promise<{ ttlSeconds: number }> {
+  const res = await axios.post<{ ttlSeconds: number }>(endpoints.shippingSettings.otp(carrier), data);
+  return res.data;
+}
+
+/** OTP + mã shop → nền tảng được thêm vào shop, shop thuộc cửa hàng này. */
+export async function linkCarrierAccount(
+  carrier: string,
+  data: { environment: string; phone: string; otp: string; accountRef: string }
+): Promise<ILinkedCarrierAccount> {
+  const res = await axios.post<ILinkedCarrierAccount>(endpoints.shippingSettings.link(carrier), data);
   return res.data;
 }
 

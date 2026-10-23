@@ -719,6 +719,9 @@ export const endpoints = {
     connections: '/shipping/settings/connections',
     connection: (id: string) => `/shipping/settings/connections/${id}`,
     test: (id: string) => `/shipping/settings/connections/${id}/test`,
+    accounts: (carrier: string) => `/shipping/settings/carriers/${carrier}/accounts`,
+    otp: (carrier: string) => `/shipping/settings/carriers/${carrier}/otp`,
+    link: (carrier: string) => `/shipping/settings/carriers/${carrier}/link`,
   },
   // Trang bán online công khai (không cần đăng nhập)
   storefront: {

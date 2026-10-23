@@ -48,7 +48,7 @@ import { useSnackbar } from 'src/components/snackbar';
 
 import CopyField from 'src/sections/store-settings/payment-connection/copy-field';
 
-import ShippingConnectionDialog from './shipping-connection-dialog';
+import ShippingConnectionDialog, { carrierLinksFor } from './shipping-connection-dialog';
 
 // ----------------------------------------------------------------------
 // Bán online & giao hàng: khách nhận hàng thế nào (nhận tại cửa hàng / giao tận nơi), hãng vận chuyển nào báo giá (tài
@@ -241,7 +241,7 @@ export default function OnlineShopSettingsCard() {
         <Card>
           <CardHeader
             title="Hãng vận chuyển"
-            subheader="Tài khoản hãng của cửa hàng (cước trừ vào tài khoản hãng). Khoá chỉ gửi một chiều, không xem lại được."
+            subheader="Shop / tài khoản hãng của cửa hàng (cước trừ vào tài khoản hãng). Khoá API của hãng do nền tảng giữ — cửa hàng chỉ liên kết bằng SĐT."
             action={
               <Button
                 variant="contained"
@@ -255,7 +255,7 @@ export default function OnlineShopSettingsCard() {
           <Stack spacing={2} sx={{ p: 3, pt: 2 }}>
             {settings.connectionsError && <Alert severity="warning">{settings.connectionsError}</Alert>}
             {connections.length === 0 && (
-              <Alert severity="info">Chưa kết nối hãng nào. Thêm tài khoản GHN hoặc GHTK của cửa hàng để báo phí ship.</Alert>
+              <Alert severity="info">Chưa kết nối hãng nào. Liên kết shop GHN (hoặc tài khoản Ahamove) của cửa hàng để báo phí ship.</Alert>
             )}
 
             {connections.map((c) => {
@@ -293,11 +293,35 @@ export default function OnlineShopSettingsCard() {
                     </Button>
                   </Stack>
                   <Box sx={{ mt: 2 }}>
-                    <CopyField
-                      label="URL webhook (dán vào trang cấu hình webhook của hãng)"
-                      value={c.webhookUrl}
-                      helperText={carrier?.webhookHelp}
-                    />
+                    {c.webhookUrl ? (
+                      <CopyField
+                        label="URL webhook (dán vào trang cấu hình webhook của hãng)"
+                        value={c.webhookUrl}
+                        helperText={carrier?.webhookHelp}
+                      />
+                    ) : (
+                      carrier?.webhookHelp && (
+                        <Typography variant="caption" color="text.secondary">
+                          {carrier.webhookHelp}
+                        </Typography>
+                      )
+                    )}
+                    {carrier && c.webhookUrl && carrierLinksFor(carrier, c.environment, ['webhook', 'token']).length > 0 && (
+                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+                        {carrierLinksFor(carrier, c.environment, ['webhook', 'token']).map((l) => (
+                          <Button
+                            key={l.url}
+                            size="small"
+                            href={l.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            endIcon={<Iconify icon="eva:external-link-fill" width={16} />}
+                          >
+                            {l.label}
+                          </Button>
+                        ))}
+                      </Stack>
+                    )}
                   </Box>
                 </Box>
               );
