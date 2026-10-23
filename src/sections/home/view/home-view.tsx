@@ -12,6 +12,7 @@ import ScrollProgress from 'src/components/scroll-progress';
 import Iconify from 'src/components/iconify';
 
 import { CICI_TENANT } from 'src/lib/store-seo';
+import type { SeasonKey } from 'src/lib/store-season';
 import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding';
 
 import HomeHero from '../home-hero';
@@ -22,6 +23,8 @@ import HomeCleanInterfaces from '../home-clean-interfaces';
 import HomeTestimonials from '../home-testimonials';
 import HomeFAQs from '../home-faqs';
 import HomeAdvertisement from '../home-advertisement';
+import { Snowfall } from '../components/snowfall';
+import { SeasonProvider } from '../components/season-context';
 
 // ----------------------------------------------------------------------
 
@@ -34,6 +37,8 @@ type Props = {
   categories: string[];
   /** Mô tả cửa hàng đã dựng cho thẻ meta — dùng lại làm câu giới thiệu khi chủ cửa hàng chưa viết mô tả. */
   description: string;
+  /** Mùa lễ đang hiện (src/lib/store-season.ts) — null ngoài mùa hoặc cửa hàng đã tắt. */
+  season?: SeasonKey | null;
 };
 
 export default function HomeView({
@@ -42,6 +47,7 @@ export default function HomeView({
   productTotal,
   categories,
   description,
+  season = null,
 }: Props) {
   const { scrollYProgress } = useScroll();
 
@@ -63,57 +69,61 @@ export default function HomeView({
   ].slice(0, 4);
 
   return (
-    <MainLayout hasProducts={products.length > 0} logoUrl={branding?.logoUrl} branding={branding}>
-      <ScrollProgress scrollYProgress={scrollYProgress} />
+    <SeasonProvider value={season}>
+      <MainLayout hasProducts={products.length > 0} logoUrl={branding?.logoUrl} branding={branding}>
+        <ScrollProgress scrollYProgress={scrollYProgress} />
 
-      <HomeHero products={featured} branding={branding} categories={categories} />
+        <HomeHero products={featured} branding={branding} categories={categories} />
 
-      {/* overflow "clip" thay "hidden": vẫn cắt phần tràn ngang nhưng không tạo khung cuộn riêng (không làm hỏng
+        {/* overflow "clip" thay "hidden": vẫn cắt phần tràn ngang nhưng không tạo khung cuộn riêng (không làm hỏng
           position: sticky nếu sau này có mục dùng). */}
-      <Box
-        sx={{
-          overflow: 'clip',
-          position: 'relative',
-          bgcolor: 'background.default',
-        }}
-      >
-        <HomeAiAssistant branding={branding} />
-
-        <HomeMinimal
-          products={products}
-          productTotal={productTotal}
-          categories={categories}
-          branding={branding}
-          description={description}
-        />
-
-        <HomeFeatures products={products} categories={categories} branding={branding} />
-
-        {isCiCi && <HomeCleanInterfaces branding={branding} />}
-
-        {isCiCi && <HomeTestimonials />}
-
-        <HomeFAQs branding={branding} categories={categories} isCiCi={isCiCi} />
-
-        <HomeAdvertisement branding={branding} productTotal={productTotal} />
-      </Box>
-
-      {showBackToTop && (
-        <Fab
-          size="small"
-          color="primary"
-          aria-label="Lên đầu trang"
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        <Box
           sx={{
-            position: 'fixed',
-            bottom: { xs: 24, md: 32 },
-            right: { xs: 24, md: 32 },
-            zIndex: (theme) => theme.zIndex.speedDial,
+            overflow: 'clip',
+            position: 'relative',
+            bgcolor: 'background.default',
           }}
         >
-          <Iconify icon="eva:arrow-up-fill" width={20} />
-        </Fab>
-      )}
-    </MainLayout>
+          <HomeAiAssistant branding={branding} />
+
+          <HomeMinimal
+            products={products}
+            productTotal={productTotal}
+            categories={categories}
+            branding={branding}
+            description={description}
+          />
+
+          <HomeFeatures products={products} categories={categories} branding={branding} />
+
+          {isCiCi && <HomeCleanInterfaces branding={branding} />}
+
+          {isCiCi && <HomeTestimonials />}
+
+          <HomeFAQs branding={branding} categories={categories} isCiCi={isCiCi} />
+
+          <HomeAdvertisement branding={branding} productTotal={productTotal} />
+        </Box>
+
+        {showBackToTop && (
+          <Fab
+            size="small"
+            color="primary"
+            aria-label="Lên đầu trang"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            sx={{
+              position: 'fixed',
+              bottom: { xs: 24, md: 32 },
+              right: { xs: 24, md: 32 },
+              zIndex: (theme) => theme.zIndex.speedDial,
+            }}
+          >
+            <Iconify icon="eva:arrow-up-fill" width={20} />
+          </Fab>
+        )}
+
+        {season === 'christmas' && <Snowfall />}
+      </MainLayout>
+    </SeasonProvider>
   );
 }

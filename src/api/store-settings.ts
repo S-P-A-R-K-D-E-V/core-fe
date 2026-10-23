@@ -23,6 +23,8 @@ export interface IStoreBranding {
   seoDescription?: string | null;
   /** Ngành hàng (src/lib/store-industry.ts) — trang chủ đổi câu chữ, màu, biểu tượng theo ngành. */
   industry?: string | null;
+  /** Giao diện theo mùa lễ (Giáng Sinh…) trên trang chủ — core-be mặc định true; core-be cũ không trả. */
+  seasonalTheme?: boolean;
 }
 
 export interface IKiotVietConnection {

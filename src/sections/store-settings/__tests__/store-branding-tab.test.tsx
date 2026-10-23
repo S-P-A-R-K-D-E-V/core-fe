@@ -113,8 +113,25 @@ describe('StoreBrandingTab — thông tin in trên phiếu thanh toán', () => {
       seoTitle: null,
       seoDescription: null,
       industry: null,
+      seasonalTheme: true,
     });
     expect(snackbar.enqueueSnackbar).toHaveBeenCalledWith('Đã lưu thông tin cửa hàng');
+  });
+
+  it('tắt giao diện mùa lễ rồi lưu: gửi seasonalTheme false', async () => {
+    const user = userEvent.setup({ delay: null });
+    getStoreBranding.mockResolvedValue({ ...OLDER_FIELDS, seasonalTheme: true });
+    saveStoreBranding.mockResolvedValue(undefined);
+    renderTab();
+    await loaded();
+
+    const toggle = screen.getByRole('checkbox', { name: /Giao diện mùa lễ/ });
+    expect(toggle).toBeChecked();
+    await user.click(toggle);
+    await user.click(saveButton());
+
+    await waitFor(() => expect(saveStoreBranding).toHaveBeenCalledTimes(1));
+    expect(saveStoreBranding).toHaveBeenCalledWith(expect.objectContaining({ seasonalTheme: false }));
   });
 
   it('xoá trắng một ô đang có giá trị: gửi null để core-be xoá (không bỏ key)', async () => {

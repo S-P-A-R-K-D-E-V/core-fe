@@ -25,6 +25,8 @@ import { varFade, MotionViewport } from 'src/components/animate';
 import { storeIndustry } from 'src/lib/store-industry';
 import type { TenantBranding } from 'src/lib/tenant-branding';
 
+import { useSeason } from './components/season-context';
+
 // ----------------------------------------------------------------------
 
 type Props = BoxProps & {
@@ -39,21 +41,42 @@ export default function HomeAdvertisement({ sx, branding, productTotal = 0, ...o
   const contactLink = branding?.messengerLink ?? branding?.zaloLink ?? null;
   const industry = storeIndustry(branding);
   const { words } = industry;
-  const [outroLine1, outroLine2] = industry.outro(storeName);
+  // Mùa lễ: lời chào và nền của mùa (Giáng Sinh an lành…) thay câu kết theo ngành.
+  const season = useSeason();
+  const [outroLine1, outroLine2] = season
+    ? season.outro.lines(storeName)
+    : industry.outro(storeName);
   // Số mặt hàng thật thay cho "Hàng trăm mẫu sản phẩm mới" cố định.
   const lead = productTotal > 0 ? `${productTotal} ${words.item} đang bán.` : '';
   const contact = contactLink || branding?.phone ? ' hoặc liên hệ để được tư vấn' : '';
 
   const renderImg = (
     <Stack component={m.div} variants={varFade('inUp', { distance: 24 })} alignItems="center">
-      <Box
-        component={m.img}
-        animate={motion ? { y: [-16, 0, -16] } : undefined}
-        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-        alt=""
-        src="/assets/images/home/rocket.webp"
-        sx={{ maxWidth: { xs: 260, md: 380 } }}
-      />
+      {season ? (
+        <Box
+          component={m.div}
+          aria-hidden
+          animate={motion ? { y: [-12, 0, -12], rotate: [-4, 4, -4] } : undefined}
+          transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+          sx={{
+            lineHeight: 1,
+            py: { xs: 4, md: 6 },
+            px: { md: 6 },
+            fontSize: { xs: 120, md: 180 },
+          }}
+        >
+          {season.emoji}
+        </Box>
+      ) : (
+        <Box
+          component={m.img}
+          animate={motion ? { y: [-16, 0, -16] } : undefined}
+          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          alt=""
+          src="/assets/images/home/rocket.webp"
+          sx={{ maxWidth: { xs: 260, md: 380 } }}
+        />
+      )}
     </Stack>
   );
 
@@ -160,7 +183,11 @@ export default function HomeAdvertisement({ sx, branding, productTotal = 0, ...o
   );
 
   return (
-    <Box component="section" sx={[{ py: { xs: 5, md: 10 } }, ...(Array.isArray(sx) ? sx : [sx])]} {...other}>
+    <Box
+      component="section"
+      sx={[{ py: { xs: 5, md: 10 } }, ...(Array.isArray(sx) ? sx : [sx])]}
+      {...other}
+    >
       <Container component={MotionViewport}>
         <Stack
           alignItems="center"
@@ -168,8 +195,8 @@ export default function HomeAdvertisement({ sx, branding, productTotal = 0, ...o
           sx={{
             ...bgGradient({
               direction: '135deg',
-              startColor: theme.palette.primary.main,
-              endColor: theme.palette.primary.dark,
+              startColor: season?.outro.from ?? theme.palette.primary.main,
+              endColor: season?.outro.to ?? theme.palette.primary.dark,
             }),
             borderRadius: 3,
             overflow: 'hidden',

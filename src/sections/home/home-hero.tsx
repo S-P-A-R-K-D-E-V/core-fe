@@ -33,6 +33,9 @@ import { storeIndustry, type IndustryPreset } from 'src/lib/store-industry';
 
 import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding';
 
+import { useSeason } from './components/season-context';
+import { StringLights } from './components/string-lights';
+
 // ----------------------------------------------------------------------
 
 const smKey: Breakpoint = 'sm';
@@ -46,7 +49,16 @@ const motionProps: MotionProps = {
 // ----------------------------------------------------------------------
 
 // Màu nền đầu trang theo ngành của cửa hàng (src/lib/store-industry.ts).
-function HeroBg({ palette, motion }: { palette: IndustryPreset['palette']; motion: boolean }) {
+function HeroBg({
+  palette,
+  motion,
+  lights,
+}: {
+  palette: IndustryPreset['palette'];
+  motion: boolean;
+  /** Màu dây đèn mùa lễ — không có thì không treo đèn. */
+  lights?: string[];
+}) {
   return (
     <Box
       sx={{
@@ -81,6 +93,12 @@ function HeroBg({ palette, motion }: { palette: IndustryPreset['palette']; motio
         </defs>
         <rect width="100%" height="100%" fill="url(#shopGrid)" />
       </Box>
+
+      {lights && (
+        <Box sx={{ top: { xs: 64, md: 80 }, left: 0, right: 0, position: 'absolute' }}>
+          <StringLights colors={lights} />
+        </Box>
+      )}
 
       {/* Blur glow top-right — animates slowly */}
       <Box
@@ -133,7 +151,13 @@ function ProductCard({ product, index, placeholder, cards, motion }: ProductCard
   const handleImgError = useCallback(() => setImgError(true), []);
 
   if (!product) {
-    return <Skeleton variant="rectangular" animation={false} sx={{ borderRadius: 2, width: '100%', height: 200 }} />;
+    return (
+      <Skeleton
+        variant="rectangular"
+        animation={false}
+        sx={{ borderRadius: 2, width: '100%', height: 200 }}
+      />
+    );
   }
 
   const card = cards[index % cards.length];
@@ -178,7 +202,13 @@ function ProductCard({ product, index, placeholder, cards, motion }: ProductCard
               alt={product.name}
               loading="lazy"
               onError={handleImgError}
-              sx={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }}
+              sx={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                position: 'absolute',
+                inset: 0,
+              }}
             />
           ) : (
             <m.div
@@ -249,11 +279,27 @@ type Props = BoxProps & {
   categories?: string[];
 };
 
-export default function HomeHero({ sx, products = [], branding, categories = [], ...other }: Props) {
+export default function HomeHero({
+  sx,
+  products = [],
+  branding,
+  categories = [],
+  ...other
+}: Props) {
   const storeName = branding?.storeName ?? 'CiCi Accessories';
   const industry = storeIndustry(branding);
   const motion = useDecorativeMotion();
-  const { words, palette } = industry;
+  // Mùa lễ (Giáng Sinh…) thay màu chữ tiêu đề, nền và quầng sáng của ngành; thẻ sản phẩm giữ màu ngành.
+  const season = useSeason();
+  const palette = season
+    ? {
+        ...industry.palette,
+        headline: season.headline,
+        heroTint: season.heroTint,
+        glow: season.glow,
+      }
+    : industry.palette;
+  const { words } = industry;
   const [h1, h2, h3] = palette.headline;
   // Câu dưới tiêu đề: mô tả của cửa hàng; chưa viết thì kể nhóm hàng thật đang bán.
   const tagline =
@@ -292,6 +338,28 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
 
   const renderHeading = () => (
     <m.div {...motionProps}>
+      {season && (
+        <Box
+          sx={{
+            mb: 2,
+            px: 2,
+            py: 0.75,
+            gap: 1,
+            mx: 'auto',
+            width: 'fit-content',
+            display: 'flex',
+            alignItems: 'center',
+            borderRadius: 99,
+            typography: 'subtitle2',
+            color: season.outro.from,
+            bgcolor: alpha(season.headline[0], 0.08),
+            border: `1px solid ${alpha(season.headline[0], 0.24)}`,
+          }}
+        >
+          <span aria-hidden>{season.emoji}</span>
+          {season.badge}
+        </Box>
+      )}
       <Box
         component="h1"
         sx={{
@@ -350,35 +418,37 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
         ? [{ icon: 'solar:map-point-bold-duotone', label: branding.address }]
         : []),
       ...(branding?.phone ? [{ icon: 'solar:phone-bold-duotone', label: branding.phone }] : []),
-      ...(hasContact || !branding ? [{ icon: 'solar:chat-round-bold-duotone', label: 'Tư vấn miễn phí' }] : []),
+      ...(hasContact || !branding
+        ? [{ icon: 'solar:chat-round-bold-duotone', label: 'Tư vấn miễn phí' }]
+        : []),
     ];
     if (badges.length === 0) return null;
 
     return (
-    <m.div {...motionProps}>
-      <Stack
-        direction="row"
-        spacing={1.5}
-        flexWrap="wrap"
-        justifyContent="center"
-        sx={{ gap: 1 }}
-      >
-        {badges.map((b) => (
-          <Chip
-            key={b.label}
-            icon={<Iconify icon={b.icon} width={16} />}
-            label={b.label}
-            size="small"
-            sx={{
-              bgcolor: alpha(theme.palette.primary.main, 0.08),
-              color: 'text.primary',
-              fontWeight: 600,
-              '& .MuiChip-icon': { color: 'primary.main' },
-            }}
-          />
-        ))}
-      </Stack>
-    </m.div>
+      <m.div {...motionProps}>
+        <Stack
+          direction="row"
+          spacing={1.5}
+          flexWrap="wrap"
+          justifyContent="center"
+          sx={{ gap: 1 }}
+        >
+          {badges.map((b) => (
+            <Chip
+              key={b.label}
+              icon={<Iconify icon={b.icon} width={16} />}
+              label={b.label}
+              size="small"
+              sx={{
+                bgcolor: alpha(theme.palette.primary.main, 0.08),
+                color: 'text.primary',
+                fontWeight: 600,
+                '& .MuiChip-icon': { color: 'primary.main' },
+              }}
+            />
+          ))}
+        </Stack>
+      </m.div>
     );
   };
 
@@ -486,7 +556,13 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
       <m.div variants={varFade('inDown', { distance: 16 })}>
         <Typography
           variant="overline"
-          sx={{ display: 'block', textAlign: 'center', color: 'text.secondary', mb: 2, letterSpacing: 2 }}
+          sx={{
+            display: 'block',
+            textAlign: 'center',
+            color: 'text.secondary',
+            mb: 2,
+            letterSpacing: 2,
+          }}
         >
           {`${words.items} nổi bật`}
         </Typography>
@@ -515,7 +591,10 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
 
       {products.length === 0 && (
         <m.div variants={varFade('in')}>
-          <Typography variant="caption" sx={{ color: 'text.secondary', mt: 1.5, display: 'block', textAlign: 'center' }}>
+          <Typography
+            variant="caption"
+            sx={{ color: 'text.secondary', mt: 1.5, display: 'block', textAlign: 'center' }}
+          >
             Đang cập nhật {words.item}...
           </Typography>
         </m.div>
@@ -561,7 +640,7 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
         }}
       >
         {/* Background */}
-        <HeroBg palette={palette} motion={motion} />
+        <HeroBg palette={palette} motion={motion} lights={season?.lights} />
 
         <Container
           component={MotionContainer}
@@ -569,6 +648,8 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
           initial={false}
           sx={{
             py: 3,
+            // Chừa chỗ cho dây đèn mùa lễ treo dưới đầu trang (màn hình lớn đã có khoảng trống do căn giữa).
+            ...(season && { pt: 13 }),
             zIndex: 9,
             position: 'relative',
             display: 'flex',
@@ -589,11 +670,7 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
             }}
           >
             {/* Left: text content */}
-            <Stack
-              spacing={4}
-              alignItems="center"
-              sx={{ flex: 1, minWidth: 0 }}
-            >
+            <Stack spacing={4} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
               <Stack spacing={3} alignItems="center" sx={{ textAlign: 'center' }}>
                 <m.div style={{ y: y1 }}>{renderHeading()}</m.div>
                 <m.div style={{ y: y2 }}>{renderText()}</m.div>
@@ -606,7 +683,14 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
 
             {/* Right: product cards (desktop only) */}
             {/* Luôn có trong HTML (công cụ tìm kiếm đọc được tên + link sản phẩm), chỉ ẩn bằng CSS trên màn hình nhỏ. */}
-            <Box sx={{ flexShrink: 0, width: 360, height: '100%', display: { xs: 'none', md: 'block' } }}>
+            <Box
+              sx={{
+                flexShrink: 0,
+                width: 360,
+                height: '100%',
+                display: { xs: 'none', md: 'block' },
+              }}
+            >
               {renderProductGrid()}
             </Box>
           </Box>

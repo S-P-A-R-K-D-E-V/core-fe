@@ -4,7 +4,11 @@ import { headers } from 'next/headers';
 import { HomeView } from 'src/sections/home/view';
 import { isAuthHost } from 'src/auth/utils/saas-host';
 import HubLoginPage from 'src/sections/auth/hub/hub-login-page';
-import { getRequestOrigin, getTenantBranding, getStorefrontProducts } from 'src/lib/tenant-branding';
+import {
+  getRequestOrigin,
+  getTenantBranding,
+  getStorefrontProducts,
+} from 'src/lib/tenant-branding';
 import {
   absoluteUrl,
   storeJsonLd,
@@ -14,6 +18,7 @@ import {
   storeDisplayName,
   storeHomeDescription,
 } from 'src/lib/store-seo';
+import { activeSeason } from 'src/lib/store-season';
 
 /** Trang đăng nhập chung (auth.devbyspark.com): không phải cửa hàng nào — hiện đăng nhập Spark Store. */
 function onAuthHost(): boolean {
@@ -25,7 +30,10 @@ function onAuthHost(): boolean {
  * tìm kiếm đọc được, không chờ JavaScript). fetch() trong generateMetadata và trang dùng chung bộ nhớ đệm của Next.
  */
 async function loadHome() {
-  const [branding, products] = await Promise.all([getTenantBranding(), getStorefrontProducts(1, 60)]);
+  const [branding, products] = await Promise.all([
+    getTenantBranding(),
+    getStorefrontProducts(1, 60),
+  ]);
   const categories = topCategories(products.items, 6);
   return {
     branding,
@@ -46,7 +54,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
   const origin = getRequestOrigin();
   const image =
-    absoluteUrl(branding.logoUrl, origin) ?? absoluteUrl(products.items.find((p) => p.imageUrl)?.imageUrl, origin);
+    absoluteUrl(branding.logoUrl, origin) ??
+    absoluteUrl(products.items.find((p) => p.imageUrl)?.imageUrl, origin);
 
   return {
     title: { absolute: title },
@@ -65,17 +74,26 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function HomePage() {
+type HomePageProps = { searchParams?: Record<string, string | string[] | undefined> };
+
+export default async function HomePage({ searchParams }: HomePageProps) {
   if (onAuthHost()) return <HubLoginPage />;
 
   const { branding, products, categories, description } = await loadHome();
-  const jsonLd = branding && storeJsonLd({ branding, origin: getRequestOrigin(), description, products: products.items });
+  // Giao diện mùa lễ (Giáng Sinh 1/12–26/12) — ?season=christmas để xem trước, ?season=off để tắt.
+  const season = activeSeason({ branding, preview: searchParams?.season });
+  const jsonLd =
+    branding &&
+    storeJsonLd({ branding, origin: getRequestOrigin(), description, products: products.items });
 
   return (
     <>
       {jsonLd && (
         // eslint-disable-next-line react/no-danger
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }}
+        />
       )}
       <HomeView
         branding={branding}
@@ -83,6 +101,7 @@ export default async function HomePage() {
         productTotal={products.total}
         categories={categories}
         description={description}
+        season={season}
       />
     </>
   );

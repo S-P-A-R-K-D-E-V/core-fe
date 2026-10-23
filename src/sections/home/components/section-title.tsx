@@ -13,6 +13,8 @@ import { textGradient } from 'src/theme/css';
 import { varFade } from 'src/components/animate';
 import { GradientText } from 'src/components/react-bits';
 
+import { useSeason } from './season-context';
+
 // ----------------------------------------------------------------------
 
 type TextProps = {
@@ -47,6 +49,9 @@ export function SectionTitle({
 }: SectionTitleProps) {
   // Màu chỉ trôi trên màn hình lớn (vòng rAF chạy suốt lúc chữ còn trên màn hình); điện thoại giữ chữ chuyển sắc đứng yên.
   const motion = useDecorativeMotion();
+  // Mùa lễ (Giáng Sinh…) đổi màu chữ nhấn của mọi mục cho đồng bộ với đầu trang.
+  const season = useSeason();
+  const colors = gradientColors && (season?.headline ?? gradientColors);
 
   return (
     <Box
@@ -75,8 +80,8 @@ export function SectionTitle({
         sx={slotProps?.title?.sx}
       >
         {`${title} `}
-        {gradientColors && txtGradient ? (
-          <GradientText colors={gradientColors} animationSpeed={6} paused={!motion}>
+        {colors && txtGradient ? (
+          <GradientText colors={colors} animationSpeed={6} paused={!motion}>
             {txtGradient}
           </GradientText>
         ) : (

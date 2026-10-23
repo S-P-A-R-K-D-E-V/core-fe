@@ -7,10 +7,12 @@ import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
+import Switch from '@mui/material/Switch';
 import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import LoadingButton from '@mui/lab/LoadingButton';
 
 import { apiErrorMessage } from 'src/utils/api-error';
@@ -18,8 +20,18 @@ import { apiErrorMessage } from 'src/utils/api-error';
 import { useSnackbar } from 'src/components/snackbar';
 
 import { INDUSTRY_OPTIONS } from 'src/lib/store-industry';
-import { TITLE_MAX, DESCRIPTION_MAX, storeHomeTitle, storeHomeDescription } from 'src/lib/store-seo';
-import { uploadStoreLogo, type IStoreBranding, getStoreBranding, saveStoreBranding } from 'src/api/store-settings';
+import {
+  TITLE_MAX,
+  DESCRIPTION_MAX,
+  storeHomeTitle,
+  storeHomeDescription,
+} from 'src/lib/store-seo';
+import {
+  uploadStoreLogo,
+  type IStoreBranding,
+  getStoreBranding,
+  saveStoreBranding,
+} from 'src/api/store-settings';
 
 // Độ dài cột của core-be (TenantBranding.SeoTitleMaxLength / SeoDescriptionMaxLength).
 const SEO_TITLE_LIMIT = 70;
@@ -86,13 +98,18 @@ export default function StoreBrandingTab() {
         setForm({ ...EMPTY, ...data });
         setLoaded(true);
       })
-      .catch((err) => enqueueSnackbar(apiErrorMessage(err, 'Không tải được thông tin cửa hàng'), { variant: 'error' }))
+      .catch((err) =>
+        enqueueSnackbar(apiErrorMessage(err, 'Không tải được thông tin cửa hàng'), {
+          variant: 'error',
+        })
+      )
       .finally(() => setLoading(false));
   }, [enqueueSnackbar]);
 
   const field = (key: keyof IStoreBranding) => ({
     value: form[key] ?? '',
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [key]: e.target.value || null })),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((f) => ({ ...f, [key]: e.target.value || null })),
     disabled: loading,
     fullWidth: true,
   });
@@ -104,7 +121,16 @@ export default function StoreBrandingTab() {
     try {
       // Ba field của phiếu thanh toán, hai field SEO và ngành hàng: không gửi key = core-be giữ nguyên giá trị đang lưu.
       // Chưa tải được dữ liệu thì không biết đang lưu gì → chỉ gửi khi người dùng đã nhập, để không xoá nhầm.
-      const { phone, taxCode, receiptFooter, seoTitle, seoDescription, industry, ...olderFields } = form;
+      const {
+        phone,
+        taxCode,
+        receiptFooter,
+        seoTitle,
+        seoDescription,
+        industry,
+        seasonalTheme,
+        ...olderFields
+      } = form;
       const sendReceiptFields = loaded || !!phone || !!taxCode || !!receiptFooter;
       const sendSeoFields = loaded || !!seoTitle || !!seoDescription;
       await saveStoreBranding({
@@ -112,6 +138,8 @@ export default function StoreBrandingTab() {
         ...(sendReceiptFields && { phone, taxCode, receiptFooter }),
         ...(sendSeoFields && { seoTitle, seoDescription }),
         ...((loaded || !!industry) && { industry }),
+        // Giao diện mùa lễ: core-be mặc định bật — chưa tải được thì chỉ gửi khi người dùng tắt.
+        ...((loaded || seasonalTheme === false) && { seasonalTheme: seasonalTheme !== false }),
       });
       enqueueSnackbar('Đã lưu thông tin cửa hàng');
     } catch (err) {
@@ -128,7 +156,11 @@ export default function StoreBrandingTab() {
           <Avatar
             src={form.logoUrl ?? undefined}
             variant="rounded"
-            sx={{ width: 64, height: 64, bgcolor: form.primaryColor && !colorInvalid ? form.primaryColor : 'grey.300' }}
+            sx={{
+              width: 64,
+              height: 64,
+              bgcolor: form.primaryColor && !colorInvalid ? form.primaryColor : 'grey.300',
+            }}
           >
             {(form.storeName ?? '?').slice(0, 1).toUpperCase()}
           </Avatar>
@@ -163,7 +195,13 @@ export default function StoreBrandingTab() {
             inputProps={{ maxLength: 500 }}
             {...field('logoUrl')}
           />
-          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={handleLogoFile} />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            hidden
+            onChange={handleLogoFile}
+          />
           <LoadingButton
             variant="outlined"
             loading={uploading}
@@ -174,7 +212,11 @@ export default function StoreBrandingTab() {
             Tải ảnh lên
           </LoadingButton>
           {!!form.logoUrl && (
-            <Button color="inherit" sx={{ flexShrink: 0, height: 56 }} onClick={() => setForm((f) => ({ ...f, logoUrl: null }))}>
+            <Button
+              color="inherit"
+              sx={{ flexShrink: 0, height: 56 }}
+              onClick={() => setForm((f) => ({ ...f, logoUrl: null }))}
+            >
               Bỏ logo
             </Button>
           )}
@@ -186,7 +228,13 @@ export default function StoreBrandingTab() {
           helperText={colorInvalid ? 'Nhập mã màu dạng #RRGGBB' : ' '}
           {...field('primaryColor')}
         />
-        <TextField label="Giới thiệu ngắn" multiline minRows={2} inputProps={{ maxLength: 500 }} {...field('shortDescription')} />
+        <TextField
+          label="Giới thiệu ngắn"
+          multiline
+          minRows={2}
+          inputProps={{ maxLength: 500 }}
+          {...field('shortDescription')}
+        />
         <TextField label="Địa chỉ" inputProps={{ maxLength: 300 }} {...field('address')} />
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
           <TextField label="Link Messenger" {...field('messengerLink')} />
@@ -198,8 +246,8 @@ export default function StoreBrandingTab() {
         <Stack spacing={0.5}>
           <Typography variant="subtitle1">Phiếu thanh toán (in hoá đơn)</Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            In ở đầu phiếu cùng với tên cửa hàng và địa chỉ ở trên; lời chào in ở cuối phiếu. Số điện thoại cũng hiện
-            trên trang chủ.
+            In ở đầu phiếu cùng với tên cửa hàng và địa chỉ ở trên; lời chào in ở cuối phiếu. Số
+            điện thoại cũng hiện trên trang chủ.
           </Typography>
         </Stack>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
@@ -221,8 +269,8 @@ export default function StoreBrandingTab() {
         <Stack spacing={0.5}>
           <Typography variant="subtitle1">Trang chủ trên Google</Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Tiêu đề và mô tả hiện trong kết quả tìm kiếm và khi chia sẻ link trang chủ. Để trống thì hệ thống tự viết từ
-            tên, giới thiệu, địa chỉ và nhóm hàng đang bán của cửa hàng.
+            Tiêu đề và mô tả hiện trong kết quả tìm kiếm và khi chia sẻ link trang chủ. Để trống thì
+            hệ thống tự viết từ tên, giới thiệu, địa chỉ và nhóm hàng đang bán của cửa hàng.
           </Typography>
         </Stack>
         <TextField
@@ -246,8 +294,47 @@ export default function StoreBrandingTab() {
           description={storeHomeDescription({ ...form, tenantCode: '' })}
         />
 
+        <Divider sx={{ borderStyle: 'dashed' }} />
+
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
+          <FormControlLabel
+            sx={{ flex: 1, mx: 0, alignItems: 'flex-start' }}
+            control={
+              <Switch
+                checked={form.seasonalTheme !== false}
+                disabled={loading}
+                onChange={(e) => setForm((f) => ({ ...f, seasonalTheme: e.target.checked }))}
+                sx={{ mt: -0.5 }}
+              />
+            }
+            label={
+              <Stack spacing={0.5}>
+                <Typography variant="subtitle1">Giao diện mùa lễ trên trang chủ</Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  Tự đổi sang giao diện Giáng Sinh (tuyết rơi, dây đèn, lời chúc) từ 1/12 đến 26/12.
+                  Tắt nếu cửa hàng không muốn trang trí.
+                </Typography>
+              </Stack>
+            }
+          />
+          <Button
+            href="/?season=christmas"
+            target="_blank"
+            rel="noopener"
+            variant="outlined"
+            size="small"
+          >
+            Xem trước
+          </Button>
+        </Stack>
+
         <Stack direction="row" justifyContent="flex-end">
-          <LoadingButton variant="contained" loading={saving} disabled={loading || colorInvalid} onClick={handleSave}>
+          <LoadingButton
+            variant="contained"
+            loading={saving}
+            disabled={loading || colorInvalid}
+            onClick={handleSave}
+          >
             Lưu thay đổi
           </LoadingButton>
         </Stack>
@@ -274,7 +361,9 @@ function SearchPreview({ title, description }: { title: string; description: str
         {title.length > TITLE_MAX ? `${title.slice(0, TITLE_MAX - 1)}…` : title}
       </Typography>
       <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-        {description.length > DESCRIPTION_MAX ? `${description.slice(0, DESCRIPTION_MAX - 1)}…` : description}
+        {description.length > DESCRIPTION_MAX
+          ? `${description.slice(0, DESCRIPTION_MAX - 1)}…`
+          : description}
       </Typography>
     </Box>
   );
