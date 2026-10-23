@@ -15,6 +15,8 @@ import type {
   IStorefrontCheckoutRequest,
   IStorefrontAddress,
   ILinkedCarrierAccount,
+  IPickupBranch,
+  ISaveBranchPickupAddress,
 } from 'src/types/online-shop';
 
 import axios, { endpoints } from 'src/utils/axios';
@@ -41,6 +43,12 @@ export async function getOnlineShopSettings(): Promise<IOnlineShopSettings> {
 
 export async function updateOnlineShopSettings(data: IOnlineShopSettingsInput): Promise<IOnlineShopSettings> {
   const res = await axios.put<IOnlineShopSettings>(endpoints.paymentChannels.onlineShop, data);
+  return res.data;
+}
+
+/** Địa chỉ gửi hàng của chi nhánh (điểm lấy của hãng). Tỉnh, phường, số nhà đều trống = xoá. */
+export async function updateBranchPickupAddress(branchId: string, data: ISaveBranchPickupAddress): Promise<IPickupBranch> {
+  const res = await axios.put<IPickupBranch>(endpoints.paymentChannels.branchPickupAddress(branchId), data);
   return res.data;
 }
 

@@ -711,6 +711,7 @@ export const endpoints = {
   paymentChannels: {
     channels: '/payment/settings/channels',
     onlineShop: '/payment/settings/online-shop',
+    branchPickupAddress: (branchId: string) => `/payment/settings/online-shop/branches/${branchId}/pickup-address`,
   },
   // Kết nối hãng vận chuyển (GHN, GHTK...) — chuyển tiếp tới spark-shipping (chủ cửa hàng)
   shippingSettings: {

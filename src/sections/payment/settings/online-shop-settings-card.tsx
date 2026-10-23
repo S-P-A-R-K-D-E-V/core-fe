@@ -48,6 +48,7 @@ import { useSnackbar } from 'src/components/snackbar';
 
 import CopyField from 'src/sections/store-settings/payment-connection/copy-field';
 
+import PickupBranchCard from './pickup-branch-card';
 import ShippingConnectionDialog, { carrierLinksFor } from './shipping-connection-dialog';
 
 // ----------------------------------------------------------------------
@@ -71,6 +72,7 @@ function inputOf(s: IOnlineShopSettings): IOnlineShopSettingsInput {
     declareInsurance: s.declareInsurance,
     freeShippingThreshold: s.freeShippingThreshold ?? null,
     inspectionPolicy: s.inspectionPolicy,
+    pickupBranchId: s.pickupBranchId ?? null,
   };
 }
 
@@ -113,6 +115,15 @@ export default function OnlineShopSettingsCard() {
   useEffect(() => {
     load();
   }, [load]);
+
+  /** Sau khi sửa địa chỉ gửi hàng: lấy lại danh sách chi nhánh, giữ nguyên các ô đang sửa chưa lưu. */
+  const refreshBranches = useCallback(async () => {
+    try {
+      setSettings(await getOnlineShopSettings());
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không tải lại được chi nhánh'), { variant: 'error' });
+    }
+  }, [enqueueSnackbar]);
 
   if (loading) {
     return (
@@ -236,6 +247,15 @@ export default function OnlineShopSettingsCard() {
           )}
         </Stack>
       </Card>
+
+      {settings.shippingServiceEnabled && (
+        <PickupBranchCard
+          settings={settings}
+          value={form.pickupBranchId ?? null}
+          onChange={(id) => set('pickupBranchId', id)}
+          onRefresh={refreshBranches}
+        />
+      )}
 
       {settings.shippingServiceEnabled && (
         <Card>

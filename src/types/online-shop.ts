@@ -64,6 +64,39 @@ export type IOnlineShopSettingsInput = {
   declareInsurance: boolean;
   freeShippingThreshold?: number | null;
   inspectionPolicy: InspectionPolicy;
+  /** Chi nhánh gửi hàng; null = chi nhánh đang hoạt động đầu tiên có địa chỉ gửi hàng */
+  pickupBranchId?: string | null;
+};
+
+/** Địa chỉ gửi hàng của chi nhánh (danh mục 2 cấp) — điểm lấy của hãng vận chuyển. */
+export type IBranchPickupAddress = {
+  senderName: string;
+  phone?: string | null;
+  provinceCode: string;
+  provinceName: string;
+  wardCode: string;
+  wardName: string;
+  street: string;
+};
+
+export type IPickupBranch = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  /** Địa chỉ chữ của chi nhánh (KiotViet / console) — gợi ý khi nhập địa chỉ gửi hàng */
+  address?: string | null;
+  contactNumber?: string | null;
+  hasLocation: boolean;
+  /** null = chưa nhập địa chỉ gửi hàng */
+  pickup?: IBranchPickupAddress | null;
+};
+
+export type ISaveBranchPickupAddress = {
+  senderName?: string | null;
+  phone?: string | null;
+  provinceCode?: string | null;
+  wardCode?: string | null;
+  street?: string | null;
 };
 
 export type IOnlineShopSettings = IOnlineShopSettingsInput & {
@@ -71,6 +104,9 @@ export type IOnlineShopSettings = IOnlineShopSettingsInput & {
   shippingServiceEnabled: boolean;
   connections: IShippingConnectionInfo[];
   connectionsError?: string | null;
+  /** Chi nhánh hãng đến lấy hàng thực tế (đã chọn hoặc tự động); null = chưa có chi nhánh nào có địa chỉ gửi hàng */
+  effectivePickupBranchId?: string | null;
+  branches?: IPickupBranch[] | null;
 };
 
 // ---- Kết nối hãng vận chuyển (spark-shipping) ----
