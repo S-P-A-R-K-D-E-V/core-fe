@@ -5,7 +5,6 @@ import type { BoxProps } from '@mui/material/Box';
 import { m } from 'framer-motion';
 import { alpha } from '@mui/material/styles';
 
-
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid2';
 import Stack from '@mui/material/Stack';
@@ -15,6 +14,7 @@ import Typography from '@mui/material/Typography';
 import { varFade, MotionViewport } from 'src/components/animate';
 import Iconify from 'src/components/iconify';
 
+import { storeIndustry } from 'src/lib/store-industry';
 import type { TenantBranding } from 'src/lib/tenant-branding';
 
 import { SectionTitle } from './components/section-title';
@@ -83,6 +83,7 @@ export default function HomeCleanInterfaces({ sx, branding, ...other }: Props) {
             caption={`Tại sao chọn ${storeName}`}
             title="Cam kết"
             txtGradient="từ chúng tôi"
+            gradientColors={storeIndustry(branding).palette.headline}
             sx={{ mb: { xs: 6, md: 10 }, textAlign: 'center', alignItems: 'center' }}
           />
 

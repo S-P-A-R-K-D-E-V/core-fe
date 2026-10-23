@@ -9,6 +9,9 @@ import { alpha } from '@mui/material/styles';
 
 import { textGradient } from 'src/theme/css';
 import { varFade } from 'src/components/animate';
+import { GradientText } from 'src/components/react-bits';
+
+import { useDecorativeMotion } from './use-decorative-motion';
 
 // ----------------------------------------------------------------------
 
@@ -20,6 +23,8 @@ type TextProps = {
 
 type SectionTitleProps = BoxProps & {
   txtGradient?: string;
+  /** Màu ngành hàng (palette.headline) cho chữ txtGradient — chữ chuyển sắc của React Bits thay vì chữ xám mờ. */
+  gradientColors?: string[];
   title: React.ReactNode;
   caption?: React.ReactNode;
   description?: React.ReactNode;
@@ -36,9 +41,13 @@ export function SectionTitle({
   caption,
   slotProps,
   txtGradient,
+  gradientColors,
   description,
   ...other
 }: SectionTitleProps) {
+  // Màu chỉ trôi trên màn hình lớn (vòng rAF chạy suốt lúc chữ còn trên màn hình); điện thoại giữ chữ chuyển sắc đứng yên.
+  const motion = useDecorativeMotion();
+
   return (
     <Box
       sx={[
@@ -66,18 +75,24 @@ export function SectionTitle({
         sx={slotProps?.title?.sx}
       >
         {`${title} `}
-        <Box
-          component="span"
-          sx={(theme) => ({
-            opacity: 0.4,
-            display: 'inline-block',
-            ...textGradient(
-              `to right, ${theme.palette.text.primary}, ${alpha(theme.palette.text.primary, 0.2)}`
-            ),
-          })}
-        >
-          {txtGradient}
-        </Box>
+        {gradientColors && txtGradient ? (
+          <GradientText colors={gradientColors} animationSpeed={6} paused={!motion}>
+            {txtGradient}
+          </GradientText>
+        ) : (
+          <Box
+            component="span"
+            sx={(theme) => ({
+              opacity: 0.4,
+              display: 'inline-block',
+              ...textGradient(
+                `to right, ${theme.palette.text.primary}, ${alpha(theme.palette.text.primary, 0.2)}`
+              ),
+            })}
+          >
+            {txtGradient}
+          </Box>
+        )}
       </Typography>
 
       {description && (

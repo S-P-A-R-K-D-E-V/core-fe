@@ -5,7 +5,6 @@ import type { BoxProps } from '@mui/material/Box';
 import { m } from 'framer-motion';
 import { alpha } from '@mui/material/styles';
 
-
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid2';
 import Stack from '@mui/material/Stack';
@@ -18,6 +17,8 @@ import Typography from '@mui/material/Typography';
 import { fToNow } from 'src/utils/format-time';
 
 import { varFade, MotionViewport } from 'src/components/animate';
+
+import { storeIndustry } from 'src/lib/store-industry';
 
 import { SectionTitle } from './components/section-title';
 import { FloatLine, FloatTriangleDownIcon } from './components/svg-elements';
@@ -153,6 +154,7 @@ export default function HomeTestimonials({ sx, ...other }: BoxProps) {
             caption="Khách hàng nói gì"
             title="Yêu thích từ"
             txtGradient="cộng đồng"
+            gradientColors={storeIndustry(null).palette.headline}
             sx={{ mb: { xs: 5, md: 8 }, textAlign: 'center', alignItems: 'center' }}
           />
 
@@ -256,11 +258,16 @@ function ReviewCard({ item }: ReviewCardProps) {
 
       <Box sx={{ gap: 1.5, display: 'flex', alignItems: 'center' }}>
         {/* Chữ cái đầu của tên thay ảnh mẫu (ảnh avatar của template không có trên máy chủ → 404). */}
-        <Avatar alt={item.name} sx={{ width: 40, height: 40, bgcolor: 'primary.lighter', color: 'primary.dark' }}>
+        <Avatar
+          alt={item.name}
+          sx={{ width: 40, height: 40, bgcolor: 'primary.lighter', color: 'primary.dark' }}
+        >
           {item.name.split(' ').pop()?.charAt(0)}
         </Avatar>
         <Stack>
-          <Typography variant="subtitle2" component="p">{item.name}</Typography>
+          <Typography variant="subtitle2" component="p">
+            {item.name}
+          </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             {fToNow(new Date(item.postedAt))}
           </Typography>

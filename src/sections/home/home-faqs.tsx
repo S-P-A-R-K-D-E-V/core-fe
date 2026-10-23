@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { m } from 'framer-motion';
 import { alpha } from '@mui/material/styles';
 
-
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
@@ -34,9 +33,15 @@ type Props = BoxProps & {
   isCiCi?: boolean;
 };
 
-export default function HomeFAQs({ sx, branding, categories = [], isCiCi = false, ...other }: Props) {
+export default function HomeFAQs({
+  sx,
+  branding,
+  categories = [],
+  isCiCi = false,
+  ...other
+}: Props) {
   const storeName = branding?.storeName ?? 'CiCi Accessories';
-  const { words } = storeIndustry(branding);
+  const { words, palette } = storeIndustry(branding);
   const chatChannel = branding?.messengerLink ? 'Messenger' : branding?.zaloLink ? 'Zalo' : null;
   const contactChannel = chatChannel ?? 'Messenger / Zalo';
   const contactLink = branding?.messengerLink ?? branding?.zaloLink ?? null;
@@ -63,7 +68,9 @@ export default function HomeFAQs({ sx, branding, categories = [], isCiCi = false
           {
             question: `Làm thế nào để ${words.order}?`,
             answer: [
-              orderWays.length ? `Bạn có thể ${orderWays.join(' hoặc ')} để chọn ${words.item}` : '',
+              orderWays.length
+                ? `Bạn có thể ${orderWays.join(' hoặc ')} để chọn ${words.item}`
+                : '',
               branding?.address
                 ? `${orderWays.length ? ' và hẹn giờ đến nhận' : 'Bạn có thể ghé trực tiếp cửa hàng'} tại ${branding.address}.`
                 : orderWays.length
@@ -85,7 +92,8 @@ export default function HomeFAQs({ sx, branding, categories = [], isCiCi = false
       ? [
           {
             question: 'Phương thức thanh toán nào được chấp nhận?',
-            answer: 'Shop chấp nhận: tiền mặt tại cửa hàng, chuyển khoản ngân hàng và các ví điện tử phổ biến.',
+            answer:
+              'Shop chấp nhận: tiền mặt tại cửa hàng, chuyển khoản ngân hàng và các ví điện tử phổ biến.',
           },
         ]
       : []),
@@ -108,13 +116,11 @@ export default function HomeFAQs({ sx, branding, categories = [], isCiCi = false
             caption="Câu hỏi thường gặp"
             title="Bạn cần"
             txtGradient="hỗ trợ?"
+            gradientColors={palette.headline}
             sx={{ textAlign: 'center', alignItems: 'center' }}
           />
 
-          <Stack
-            spacing={1}
-            sx={{ mt: 8, mx: 'auto', maxWidth: 720, mb: { xs: 5, md: 8 } }}
-          >
+          <Stack spacing={1} sx={{ mt: 8, mx: 'auto', maxWidth: 720, mb: { xs: 5, md: 8 } }}>
             {faqs.map((item, index) => (
               <Accordion
                 key={item.question}
@@ -152,11 +158,15 @@ export default function HomeFAQs({ sx, branding, categories = [], isCiCi = false
                   expandIcon={
                     <Iconify
                       width={20}
-                      icon={expanded === item.question ? 'mingcute:minimize-line' : 'mingcute:add-line'}
+                      icon={
+                        expanded === item.question ? 'mingcute:minimize-line' : 'mingcute:add-line'
+                      }
                     />
                   }
                 >
-                  <Typography variant="h6" component="span">{item.question}</Typography>
+                  <Typography variant="h6" component="span">
+                    {item.question}
+                  </Typography>
                 </AccordionSummary>
                 <AccordionDetails>
                   <Typography sx={{ color: 'text.secondary' }}>{item.answer}</Typography>

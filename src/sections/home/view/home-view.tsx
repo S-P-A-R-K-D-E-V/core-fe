@@ -36,7 +36,13 @@ type Props = {
   description: string;
 };
 
-export default function HomeView({ branding, products, productTotal, categories, description }: Props) {
+export default function HomeView({
+  branding,
+  products,
+  productTotal,
+  categories,
+  description,
+}: Props) {
   const { scrollYProgress } = useScroll();
 
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -51,7 +57,10 @@ export default function HomeView({ branding, products, productTotal, categories,
   // không phải của mình. Không đọc được branding (máy dev) thì coi như CiCi như trước.
   const isCiCi = !branding || branding.tenantCode === CICI_TENANT;
   // Hero ưu tiên sản phẩm có ảnh.
-  const featured = [...products.filter((p) => !!p.imageUrl), ...products.filter((p) => !p.imageUrl)].slice(0, 4);
+  const featured = [
+    ...products.filter((p) => !!p.imageUrl),
+    ...products.filter((p) => !p.imageUrl),
+  ].slice(0, 4);
 
   return (
     <MainLayout hasProducts={products.length > 0} logoUrl={branding?.logoUrl} branding={branding}>
@@ -59,8 +68,8 @@ export default function HomeView({ branding, products, productTotal, categories,
 
       <HomeHero products={featured} branding={branding} categories={categories} />
 
-      {/* overflow "clip" thay "hidden": vẫn cắt phần tràn ngang nhưng không tạo khung cuộn riêng, nên khối danh mục
-          (position: sticky, cuộn ngang theo trang) giữ được vị trí thay vì trôi mất. */}
+      {/* overflow "clip" thay "hidden": vẫn cắt phần tràn ngang nhưng không tạo khung cuộn riêng (không làm hỏng
+          position: sticky nếu sau này có mục dùng). */}
       <Box
         sx={{
           overflow: 'clip',

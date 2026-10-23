@@ -1,9 +1,10 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import type { BoxProps } from '@mui/material/Box';
 
 import { m } from 'framer-motion';
-import { alpha } from '@mui/material/styles';
+import { alpha, styled, useTheme } from '@mui/material/styles';
 
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid2';
@@ -13,6 +14,7 @@ import Typography from '@mui/material/Typography';
 
 import { varFade, MotionViewport } from 'src/components/animate';
 import Iconify from 'src/components/iconify';
+import { SpotlightCard } from 'src/components/react-bits';
 import { OPEN_CHATBOT_EVENT } from 'src/components/chatbot/chatbot-events';
 
 import { storeIndustry } from 'src/lib/store-industry';
@@ -31,11 +33,32 @@ const renderLines = () => (
   </>
 );
 
+/** Thẻ SpotlightCard (React Bits): quầng sáng màu tính năng theo con trỏ, không chạy khi đứng yên. */
+const CapabilityCard = styled(SpotlightCard)(({ theme }) => ({
+  height: '100%',
+  display: 'flex',
+  textAlign: 'center',
+  alignItems: 'center',
+  flexDirection: 'column',
+  padding: theme.spacing(4),
+  borderRadius: Number(theme.shape.borderRadius) * 2,
+  transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+  '&:hover': {
+    transform: 'translateY(-6px)',
+    boxShadow: 'var(--capability-shadow)',
+  },
+  '@media (prefers-reduced-motion: reduce)': {
+    transition: 'none',
+    '&:hover': { transform: 'none' },
+  },
+}));
+
 type Props = BoxProps & {
   branding?: TenantBranding | null;
 };
 
 export default function HomeAiAssistant({ sx, branding, ...other }: Props) {
+  const theme = useTheme();
   const aiName = `${branding?.storeName ?? 'CiCi'} AI`;
   const { ai, words, palette } = storeIndustry(branding);
 
@@ -86,6 +109,7 @@ export default function HomeAiAssistant({ sx, branding, ...other }: Props) {
             caption="Trợ lý AI"
             title="Tư vấn tức thì cùng"
             txtGradient={aiName}
+            gradientColors={palette.headline}
             description={`Không cần chờ nhân viên — hỏi ${aiName} bất cứ lúc nào về ${words.collection}, giá cả hay thông tin cửa hàng. Trả lời ngay trong vài giây, ngay tại góc màn hình.`}
             sx={{ mb: { xs: 6, md: 10 }, textAlign: 'center', alignItems: 'center' }}
           />
@@ -96,47 +120,45 @@ export default function HomeAiAssistant({ sx, branding, ...other }: Props) {
                 <Box
                   component={m.div}
                   variants={varFade('inUp', { distance: 24 })}
-                  sx={[
-                    (theme) => ({
-                      p: 4,
-                      height: 1,
-                      borderRadius: 2,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      textAlign: 'center',
-                      bgcolor: alpha(theme.palette.grey[500], 0.04),
-                      border: `1px solid ${alpha(theme.palette.grey[500], 0.08)}`,
-                      transition: 'transform 0.25s ease, box-shadow 0.25s ease',
-                      '&:hover': {
-                        transform: 'translateY(-6px)',
-                        boxShadow: `0 20px 40px ${alpha(item.color, 0.12)}`,
-                        bgcolor: alpha(theme.palette.grey[500], 0.07),
-                      },
-                    }),
-                  ]}
+                  sx={{ height: 1 }}
                 >
-                  <Box
-                    sx={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      mb: 2.5,
-                      bgcolor: `${item.color}18`,
-                    }}
+                  <CapabilityCard
+                    tone={theme.palette.mode}
+                    spotlightColor={item.color}
+                    spotlightSize={300}
+                    intensity={0.8}
+                    borderGlow={0.9}
+                    style={
+                      {
+                        '--spotlight-card-surface': alpha(theme.palette.grey[500], 0.04),
+                        '--spotlight-card-border': alpha(theme.palette.grey[500], 0.12),
+                        '--spotlight-card-shadow': 'none',
+                        '--capability-shadow': `0 20px 40px ${alpha(item.color, 0.12)}`,
+                      } as CSSProperties
+                    }
                   >
-                    <Iconify icon={item.icon} width={32} sx={{ color: item.color }} />
-                  </Box>
+                    <Box
+                      sx={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        mb: 2.5,
+                        bgcolor: `${item.color}18`,
+                      }}
+                    >
+                      <Iconify icon={item.icon} width={32} sx={{ color: item.color }} />
+                    </Box>
 
-                  <Typography variant="h6" component="h3" sx={{ mb: 1.5 }}>
-                    {item.title}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    {item.desc}
-                  </Typography>
+                    <Typography variant="h6" component="h3" sx={{ mb: 1.5 }}>
+                      {item.title}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      {item.desc}
+                    </Typography>
+                  </CapabilityCard>
                 </Box>
               </Grid>
             ))}
