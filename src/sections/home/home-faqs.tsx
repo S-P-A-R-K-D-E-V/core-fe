@@ -19,7 +19,7 @@ import AccordionSummary, { accordionSummaryClasses } from '@mui/material/Accordi
 import Iconify from 'src/components/iconify';
 import { varFade, MotionViewport } from 'src/components/animate';
 
-import { storeKind, storeWords } from 'src/lib/store-seo';
+import { storeIndustry } from 'src/lib/store-industry';
 import type { TenantBranding } from 'src/lib/tenant-branding';
 
 import { SectionTitle } from './components/section-title';
@@ -36,8 +36,7 @@ type Props = BoxProps & {
 
 export default function HomeFAQs({ sx, branding, categories = [], isCiCi = false, ...other }: Props) {
   const storeName = branding?.storeName ?? 'CiCi Accessories';
-  const kind = storeKind(branding);
-  const words = storeWords(kind);
+  const { words } = storeIndustry(branding);
   const chatChannel = branding?.messengerLink ? 'Messenger' : branding?.zaloLink ? 'Zalo' : null;
   const contactChannel = chatChannel ?? 'Messenger / Zalo';
   const contactLink = branding?.messengerLink ?? branding?.zaloLink ?? null;
@@ -62,7 +61,7 @@ export default function HomeFAQs({ sx, branding, categories = [], isCiCi = false
     ...(orderWays.length || branding?.address
       ? [
           {
-            question: kind === 'fnb' ? 'Làm thế nào để đặt món?' : 'Làm thế nào để đặt hàng?',
+            question: `Làm thế nào để ${words.order}?`,
             answer: [
               orderWays.length ? `Bạn có thể ${orderWays.join(' hoặc ')} để chọn ${words.item}` : '',
               branding?.address

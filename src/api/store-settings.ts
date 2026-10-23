@@ -21,6 +21,8 @@ export interface IStoreBranding {
   // Thẻ title / meta description của trang chủ. Core-be cũ không trả và bỏ qua.
   seoTitle?: string | null;
   seoDescription?: string | null;
+  /** Ngành hàng (src/lib/store-industry.ts) — trang chủ đổi câu chữ, màu, biểu tượng theo ngành. */
+  industry?: string | null;
 }
 
 export interface IKiotVietConnection {

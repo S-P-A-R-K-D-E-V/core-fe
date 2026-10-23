@@ -15,7 +15,7 @@ import { varFade, MotionViewport } from 'src/components/animate';
 import Iconify from 'src/components/iconify';
 import { OPEN_CHATBOT_EVENT } from 'src/components/chatbot';
 
-import { storeKind } from 'src/lib/store-seo';
+import { storeIndustry } from 'src/lib/store-industry';
 import type { TenantBranding } from 'src/lib/tenant-branding';
 
 import { SectionTitle } from './components/section-title';
@@ -37,30 +37,26 @@ type Props = BoxProps & {
 
 export default function HomeAiAssistant({ sx, branding, ...other }: Props) {
   const aiName = `${branding?.storeName ?? 'CiCi'} AI`;
-  const fnb = storeKind(branding) === 'fnb';
+  const { ai, words, palette } = storeIndustry(branding);
 
   const capabilities = [
     {
       icon: 'solar:magnifer-bold-duotone',
-      title: fnb ? 'Tra cứu thực đơn tức thì' : 'Tra cứu sản phẩm tức thì',
-      desc: fnb
-        ? `Hỏi tên món — ${aiName} trả lời ngay về giá và các lựa chọn mà không cần lật thực đơn.`
-        : `Hỏi tên hoặc mã sản phẩm — ${aiName} trả lời ngay về giá, mẫu mã, biến thể mà không cần tìm thủ công.`,
-      color: '#EC4899',
+      title: ai.lookupTitle,
+      desc: ai.lookup(aiName),
+      color: palette.headline[0],
     },
     {
       icon: 'solar:box-bold-duotone',
-      title: fnb ? 'Món nào đang có' : 'Kiểm tra tồn kho',
-      desc: fnb
-        ? `Muốn biết món còn không trước khi ghé quán? Chỉ cần hỏi ${aiName}.`
-        : `Muốn biết còn hàng không trước khi ghé cửa hàng? Chỉ cần hỏi ${aiName}, biết ngay không cần chờ nhân viên.`,
-      color: '#8B5CF6',
+      title: ai.secondTitle,
+      desc: ai.second(aiName),
+      color: palette.headline[1],
     },
     {
       icon: 'solar:chat-round-dots-bold-duotone',
       title: 'Hỏi đáp 24/7',
-      desc: `Giờ mở cửa, địa chỉ, chính sách đổi trả... ${aiName} trực sẵn sàng trả lời mọi lúc, kể cả ngoài giờ hành chính.`,
-      color: '#F59E0B',
+      desc: `Giờ mở cửa, địa chỉ, cách liên hệ... ${aiName} sẵn sàng trả lời mọi lúc, kể cả ngoài giờ hành chính.`,
+      color: palette.headline[2],
     },
   ];
 
@@ -88,7 +84,7 @@ export default function HomeAiAssistant({ sx, branding, ...other }: Props) {
             caption="Trợ lý AI"
             title="Tư vấn tức thì cùng"
             txtGradient={aiName}
-            description={`Không cần chờ nhân viên — hỏi ${aiName} bất cứ lúc nào về ${fnb ? 'thực đơn' : 'sản phẩm'}, giá cả${fnb ? '' : ', tồn kho'} hay thông tin cửa hàng. Trả lời ngay trong vài giây, ngay tại góc màn hình.`}
+            description={`Không cần chờ nhân viên — hỏi ${aiName} bất cứ lúc nào về ${words.collection}, giá cả hay thông tin cửa hàng. Trả lời ngay trong vài giây, ngay tại góc màn hình.`}
             sx={{ mb: { xs: 6, md: 10 }, textAlign: 'center', alignItems: 'center' }}
           />
 

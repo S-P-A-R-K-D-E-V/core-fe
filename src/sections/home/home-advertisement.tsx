@@ -20,7 +20,7 @@ import { bgGradient } from 'src/theme/css';
 import Iconify from 'src/components/iconify';
 import { varFade, MotionViewport } from 'src/components/animate';
 
-import { storeKind, storeWords } from 'src/lib/store-seo';
+import { storeIndustry } from 'src/lib/store-industry';
 import type { TenantBranding } from 'src/lib/tenant-branding';
 
 // ----------------------------------------------------------------------
@@ -34,8 +34,9 @@ export default function HomeAdvertisement({ sx, branding, productTotal = 0, ...o
   const theme = useTheme();
   const storeName = branding?.storeName ?? 'CiCi Accessories';
   const contactLink = branding?.messengerLink ?? branding?.zaloLink ?? null;
-  const kind = storeKind(branding);
-  const words = storeWords(kind);
+  const industry = storeIndustry(branding);
+  const { words } = industry;
+  const [outroLine1, outroLine2] = industry.outro(storeName);
   // Số mặt hàng thật thay cho "Hàng trăm mẫu sản phẩm mới" cố định.
   const lead = productTotal > 0 ? `${productTotal} ${words.item} đang bán.` : '';
   const contact = contactLink || branding?.phone ? ' hoặc liên hệ để được tư vấn' : '';
@@ -67,9 +68,9 @@ export default function HomeAdvertisement({ sx, branding, productTotal = 0, ...o
         variants={varFade('inDown', { distance: 24 })}
         sx={{ color: 'common.white', mb: 2, typography: 'h2' }}
       >
-        {kind === 'fnb' ? 'Ghé thưởng thức' : 'Bắt đầu mua sắm'}
+        {outroLine1}
         <br />
-        tại {storeName}
+        {outroLine2}
       </Box>
 
       <Box
@@ -98,7 +99,7 @@ export default function HomeAdvertisement({ sx, branding, productTotal = 0, ...o
               color="inherit"
               size="large"
               variant="contained"
-              startIcon={<Iconify icon={kind === 'fnb' ? 'solar:cup-hot-bold' : 'solar:bag-smile-bold'} width={20} />}
+              startIcon={<Iconify icon={industry.icon} width={20} />}
               sx={{
                 color: 'grey.800',
                 bgcolor: 'common.white',

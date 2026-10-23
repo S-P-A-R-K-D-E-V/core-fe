@@ -27,7 +27,7 @@ import { bgGradient, textGradient } from 'src/theme/css';
 import Iconify from 'src/components/iconify';
 import { varFade, MotionContainer } from 'src/components/animate';
 
-import { storeKind, storeWords } from 'src/lib/store-seo';
+import { storeIndustry, type IndustryPreset } from 'src/lib/store-industry';
 import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding';
 
 // ----------------------------------------------------------------------
@@ -40,16 +40,10 @@ const motionProps: MotionProps = {
   variants: varFade('inUp', { distance: 24 }),
 };
 
-const CARD_GRADIENTS = [
-  'linear-gradient(135deg, #FADADD 0%, #F4A0C0 100%)',
-  'linear-gradient(135deg, #FDE8D8 0%, #FBBFA0 100%)',
-  'linear-gradient(135deg, #E8D5F5 0%, #C4A0E8 100%)',
-  'linear-gradient(135deg, #D4F0E8 0%, #A0D4C4 100%)',
-];
-
 // ----------------------------------------------------------------------
 
-function HeroBg() {
+// Màu nền đầu trang theo ngành của cửa hàng (src/lib/store-industry.ts).
+function HeroBg({ palette }: { palette: IndustryPreset['palette'] }) {
   return (
     <Box
       sx={{
@@ -65,7 +59,7 @@ function HeroBg() {
       <Box
         sx={() => ({
           ...bgGradient({
-            color: 'rgba(255, 245, 248, 0.94)',
+            color: palette.heroTint,
             imgUrl: '/assets/background/overlay_3.jpg',
           }),
           width: '100%',
@@ -81,7 +75,7 @@ function HeroBg() {
       >
         <defs>
           <pattern id="shopGrid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#F472B6" strokeWidth="1" />
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke={palette.grid} strokeWidth="1" />
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#shopGrid)" />
@@ -100,7 +94,7 @@ function HeroBg() {
           borderRadius: '50%',
           position: 'absolute',
           filter: 'blur(120px)',
-          backgroundColor: 'rgba(248, 200, 220, 0.35)',
+          backgroundColor: palette.glow[0],
         }}
       />
       {/* Blur glow bottom-left — animates offset */}
@@ -116,7 +110,7 @@ function HeroBg() {
           borderRadius: '50%',
           position: 'absolute',
           filter: 'blur(100px)',
-          backgroundColor: 'rgba(200, 220, 255, 0.2)',
+          backgroundColor: palette.glow[1],
         }}
       />
     </Box>
@@ -129,9 +123,10 @@ type ProductCardProps = {
   product?: StorefrontProduct;
   index: number;
   placeholder: string;
+  cards: IndustryPreset['palette']['cards'];
 };
 
-function ProductCard({ product, index, placeholder }: ProductCardProps) {
+function ProductCard({ product, index, placeholder, cards }: ProductCardProps) {
   const [imgError, setImgError] = useState(false);
   const handleImgError = useCallback(() => setImgError(true), []);
 
@@ -139,7 +134,8 @@ function ProductCard({ product, index, placeholder }: ProductCardProps) {
     return <Skeleton variant="rectangular" animation={false} sx={{ borderRadius: 2, width: '100%', height: 200 }} />;
   }
 
-  const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
+  const card = cards[index % cards.length];
+  const gradient = `linear-gradient(135deg, ${card.from} 0%, ${card.to} 100%)`;
   const showImage = !!product.imageUrl && !imgError;
 
   return (
@@ -253,8 +249,9 @@ type Props = BoxProps & {
 
 export default function HomeHero({ sx, products = [], branding, categories = [], ...other }: Props) {
   const storeName = branding?.storeName ?? 'CiCi Accessories';
-  const kind = storeKind(branding);
-  const words = storeWords(kind);
+  const industry = storeIndustry(branding);
+  const { words, palette } = industry;
+  const [h1, h2, h3] = palette.headline;
   // Câu dưới tiêu đề: mô tả của cửa hàng; chưa viết thì kể nhóm hàng thật đang bán.
   const tagline =
     branding?.shortDescription ??
@@ -264,7 +261,6 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
         ? `Chào mừng bạn đến với ${storeName}.`
         : 'Phụ kiện thời trang nữ — trang sức, kẹp tóc, túi mini và hơn thế nữa. Phong cách, cá tính, giá cả hợp lý.');
   const hasContact = !!(branding?.messengerLink || branding?.zaloLink || branding?.phone);
-  const placeholderIcon = kind === 'fnb' ? 'solar:cup-hot-bold-duotone' : 'solar:bag-heart-bold-duotone';
   const scrollProgress = useScrollPercent();
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up(mdKey));
@@ -310,14 +306,14 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
         }}
       >
         <Box component="span" sx={{ width: 1, opacity: 0.45, textAlign: 'center' }}>
-          {kind === 'fnb' ? 'Chào mừng đến' : 'Khám phá thế giới'}
+          {industry.heroLead}
         </Box>
         <Box
           component={m.span}
           animate={{ backgroundPosition: '200% center' }}
           transition={{ duration: 20, ease: 'linear', repeat: Infinity, repeatType: 'reverse' }}
           sx={{
-            ...textGradient(`300deg, #F43F5E 0%, #EC4899 30%, #A855F7 60%, #EC4899 80%, #F43F5E 100%`),
+            ...textGradient(`300deg, ${h1} 0%, ${h2} 30%, ${h3} 60%, ${h2} 80%, ${h1} 100%`),
             backgroundSize: '400%',
             ml: { xs: 0.5, md: 1 },
           }}
@@ -400,7 +396,7 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
             color="primary"
             size="large"
             variant="contained"
-            startIcon={<Iconify width={20} icon={kind === 'fnb' ? 'solar:cup-hot-bold-duotone' : 'solar:bag-smile-bold-duotone'} />}
+            startIcon={<Iconify width={20} icon={industry.icon} />}
           >
             {words.cta}
           </Button>
@@ -487,7 +483,7 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
           variant="overline"
           sx={{ display: 'block', textAlign: 'center', color: 'text.disabled', mb: 2, letterSpacing: 2 }}
         >
-          {kind === 'fnb' ? 'Món nổi bật' : 'Sản phẩm nổi bật'}
+          {`${words.items} nổi bật`}
         </Typography>
       </m.div>
 
@@ -505,7 +501,8 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
             key={product?.id ?? `slot-${idx}`}
             product={product ?? undefined}
             index={idx}
-            placeholder={placeholderIcon}
+            placeholder={industry.icon}
+            cards={palette.cards}
           />
         ))}
       </Box>
@@ -558,7 +555,7 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
         }}
       >
         {/* Background */}
-        <HeroBg />
+        <HeroBg palette={palette} />
 
         <Container
           component={MotionContainer}

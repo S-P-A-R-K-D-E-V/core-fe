@@ -2,13 +2,14 @@ import type { Metadata } from 'next';
 
 import { ProductShopView } from 'src/sections/product/view';
 import { getTenantBranding, getStorefrontProducts } from 'src/lib/tenant-branding';
-import { storeKind, storeWords, topCategories, storeDisplayName } from 'src/lib/store-seo';
+import { storeIndustry } from 'src/lib/store-industry';
+import { topCategories, storeDisplayName } from 'src/lib/store-seo';
 
 // ----------------------------------------------------------------------
 
 export async function generateMetadata(): Promise<Metadata> {
   const [branding, products] = await Promise.all([getTenantBranding(), getStorefrontProducts(1, 60)]);
-  const words = storeWords(storeKind(branding));
+  const { words } = storeIndustry(branding);
   const name = storeDisplayName(branding);
   const categories = topCategories(products.items, 4);
 

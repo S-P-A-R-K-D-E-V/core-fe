@@ -19,6 +19,8 @@ export interface TenantBranding {
   /** Tiêu đề / mô tả SEO chủ cửa hàng tự đặt — trống thì src/lib/store-seo.ts tự dựng. */
   seoTitle?: string | null;
   seoDescription?: string | null;
+  /** Ngành hàng (src/lib/store-industry.ts) — trang chủ đổi câu chữ, màu, biểu tượng theo ngành. */
+  industry?: string | null;
 }
 
 /** Sản phẩm đang bán của cửa hàng (GET /public/storefront/products — không cần đăng nhập). */

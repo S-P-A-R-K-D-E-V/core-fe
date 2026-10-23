@@ -1,5 +1,7 @@
 import type { TenantBranding, StorefrontProduct, StorefrontProductDetail } from './tenant-branding';
 
+import { storeIndustry } from './store-industry';
+
 // ----------------------------------------------------------------------
 // SEO trang chủ công khai của từng cửa hàng: tiêu đề, mô tả, dữ liệu có cấu trúc (schema.org) dựng từ dữ liệu
 // thật của cửa hàng (tên, mô tả, địa chỉ, số điện thoại, nhóm hàng đang bán) — mỗi tên miền một nội dung riêng,
@@ -14,19 +16,6 @@ export const DEMO_TENANTS = ['demo'];
 
 export const TITLE_MAX = 65;
 export const DESCRIPTION_MAX = 160;
-
-export type StoreKind = 'retail' | 'fnb';
-
-export function storeKind(branding: Pick<TenantBranding, 'businessType'> | null | undefined): StoreKind {
-  return branding?.businessType === 'fnb' ? 'fnb' : 'retail';
-}
-
-/** Từ ngữ theo loại hình: cửa hàng ăn uống nói "món / thực đơn", bán lẻ nói "sản phẩm". */
-export function storeWords(kind: StoreKind) {
-  return kind === 'fnb'
-    ? { item: 'món', items: 'Thực đơn', collection: 'thực đơn', cta: 'Xem thực đơn' }
-    : { item: 'sản phẩm', items: 'Sản phẩm', collection: 'sản phẩm', cta: 'Xem sản phẩm' };
-}
 
 export function storeDisplayName(branding: Pick<TenantBranding, 'storeName' | 'tenantCode'> | null | undefined): string {
   return branding?.storeName?.trim() || branding?.tenantCode || 'Cửa hàng';
@@ -99,7 +88,7 @@ export function storeHomeDescription(
   if (branding?.shortDescription?.trim()) return clip(branding.shortDescription, DESCRIPTION_MAX);
 
   const name = storeDisplayName(branding);
-  const words = storeWords(storeKind(branding));
+  const { words } = storeIndustry(branding);
   const address = branding?.address?.trim();
   const phone = branding?.phone?.trim();
 
@@ -121,7 +110,7 @@ export function absoluteUrl(url: string | null | undefined, origin: string): str
   }
 }
 
-/** Dữ liệu có cấu trúc schema.org cho trang chủ: WebSite + Store (bán lẻ) / FoodEstablishment (ăn uống). */
+/** Dữ liệu có cấu trúc schema.org cho trang chủ: WebSite + loại cửa hàng theo ngành (ClothingStore, CafeOrCoffeeShop…). */
 export function storeJsonLd(params: {
   branding: TenantBranding;
   origin: string;
@@ -148,7 +137,7 @@ export function storeJsonLd(params: {
         publisher: { '@id': `${origin}/#store` },
       },
       {
-        '@type': storeKind(branding) === 'fnb' ? 'FoodEstablishment' : 'Store',
+        '@type': storeIndustry(branding).schemaType,
         '@id': `${origin}/#store`,
         name,
         url,
@@ -242,13 +231,5 @@ export const ROBOTS_DISALLOW = [
   '/customer-display',
   '/payment',
   '/product/checkout',
-  '/components',
-  '/post',
-  '/pricing',
-  '/about-us',
-  '/contact-us',
-  '/faqs',
-  '/coming-soon',
-  '/maintenance',
   '/error',
 ];

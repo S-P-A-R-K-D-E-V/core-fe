@@ -30,6 +30,9 @@ vi.mock('src/components/snackbar', () => ({
 // Imported after the mocks above so the tab picks up the mocked modules.
 import StoreBrandingTab from '../store-branding-tab';
 
+// Form dài (gõ nhiều ô, ô chọn ngành): khi cả bộ test chạy song song, 5 giây mặc định đôi khi không đủ.
+vi.setConfig({ testTimeout: 20_000 });
+
 // Đúng tám field mà core-be cũ trả về
 const OLDER_FIELDS = {
   storeName: 'CiCi Accessories',
@@ -109,6 +112,7 @@ describe('StoreBrandingTab — thông tin in trên phiếu thanh toán', () => {
       receiptFooter: 'Cảm ơn quý khách, hẹn gặp lại!',
       seoTitle: null,
       seoDescription: null,
+      industry: null,
     });
     expect(snackbar.enqueueSnackbar).toHaveBeenCalledWith('Đã lưu thông tin cửa hàng');
   });
@@ -181,6 +185,7 @@ describe('StoreBrandingTab — thông tin in trên phiếu thanh toán', () => {
     expect(first).not.toHaveProperty('receiptFooter');
     expect(first).not.toHaveProperty('seoTitle');
     expect(first).not.toHaveProperty('seoDescription');
+    expect(first).not.toHaveProperty('industry');
 
     await user.type(phoneInput(), '0901234567');
     await user.click(saveButton());
@@ -218,6 +223,24 @@ describe('StoreBrandingTab — thông tin in trên phiếu thanh toán', () => {
       seoTitle: 'CiCi — Phụ kiện tóc Quận 1',
       seoDescription: null,
     });
+  });
+
+  it('ngành hàng: hiện ngành đang lưu, chọn ngành khác rồi lưu cùng PUT', async () => {
+    const user = userEvent.setup({ delay: null });
+    getStoreBranding.mockResolvedValue({ ...OLDER_FIELDS, phone: null, taxCode: null, receiptFooter: null, industry: 'fashion' });
+    saveStoreBranding.mockResolvedValue(undefined);
+    renderTab();
+    await loaded();
+
+    const select = screen.getByRole('combobox', { name: 'Ngành hàng' });
+    expect(select).toHaveTextContent('Thời trang & phụ kiện');
+
+    await user.click(select);
+    await user.click(await screen.findByRole('option', { name: 'Cà phê & trà sữa' }));
+    await user.click(saveButton());
+
+    await waitFor(() => expect(saveStoreBranding).toHaveBeenCalledTimes(1));
+    expect(saveStoreBranding.mock.calls[0][0]).toMatchObject({ ...OLDER_FIELDS, industry: 'cafe' });
   });
 
   it('core-be từ chối (400): hiện đúng câu lỗi của field', async () => {

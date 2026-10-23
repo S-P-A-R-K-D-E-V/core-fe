@@ -16,7 +16,8 @@ import SvgColor from 'src/components/svg-color';
 import Iconify from 'src/components/iconify';
 import { varFade, MotionViewport } from 'src/components/animate';
 
-import { storeKind, storeWords, CICI_TENANT } from 'src/lib/store-seo';
+import { CICI_TENANT } from 'src/lib/store-seo';
+import { storeIndustry } from 'src/lib/store-industry';
 import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding';
 
 import { SectionTitle } from './components/section-title';
@@ -55,8 +56,8 @@ export default function HomeMinimal({
   const [imageError, setImageError] = useState(false);
   const featuredImage = products.find((p) => !!p.imageUrl);
   const storeName = branding?.storeName ?? 'CiCi Accessories';
-  const kind = storeKind(branding);
-  const words = storeWords(kind);
+  const industry = storeIndustry(branding);
+  const { words } = industry;
   const isCiCi = !branding || branding.tenantCode === CICI_TENANT;
   const chat = branding?.messengerLink || branding?.zaloLink;
 
@@ -96,7 +97,7 @@ export default function HomeMinimal({
       ? [
           {
             icon: `/assets/icons/home/ic_design.svg`,
-            title: kind === 'fnb' ? 'Đặt món' : 'Liên hệ đặt hàng',
+            title: `Liên hệ ${words.order}`,
             description: branding?.phone
               ? `Gọi ${branding.phone}${chat ? ' hoặc nhắn tin qua Messenger / Zalo' : ''}.`
               : 'Nhắn tin qua Messenger / Zalo để được tư vấn.',
@@ -183,7 +184,7 @@ export default function HomeMinimal({
             }}
           >
             <Iconify
-              icon={kind === 'fnb' ? 'solar:cup-hot-bold-duotone' : 'solar:bag-heart-bold-duotone'}
+              icon={industry.icon}
               width={96}
               sx={{ color: 'primary.main', opacity: 0.5 }}
             />

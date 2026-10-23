@@ -21,24 +21,13 @@ import { RouterLink } from 'src/routes/components';
 import Iconify from 'src/components/iconify';
 import { varFade, MotionViewport } from 'src/components/animate';
 
-import { storeKind, storeWords, displayCategory, type StoreKind } from 'src/lib/store-seo';
+import { displayCategory } from 'src/lib/store-seo';
+import { storeIndustry, type IndustryPreset } from 'src/lib/store-industry';
 
 import { SectionTitle } from './components/section-title';
 import { FloatLine, FloatPlusIcon } from './components/svg-elements';
 
 // ----------------------------------------------------------------------
-
-const GRADIENTS = [
-  { from: '#FADADD', to: '#F9A8D4' },
-  { from: '#FDE8D8', to: '#FBB99B' },
-  { from: '#E8D5F5', to: '#C4A0E8' },
-  { from: '#D4F0E8', to: '#A0D4C4' },
-];
-
-const ICONS: Record<StoreKind, string[]> = {
-  retail: ['solar:bag-smile-bold-duotone', 'solar:star-bold-duotone', 'solar:diamond-bold-duotone', 'solar:bag-heart-bold-duotone'],
-  fnb: ['solar:cup-hot-bold-duotone', 'solar:tea-cup-bold', 'solar:cup-star-bold', 'solar:bottle-bold'],
-};
 
 type CategoryCard = {
   title: string;
@@ -51,18 +40,19 @@ type CategoryCard = {
 };
 
 /** Thẻ danh mục từ nhóm hàng THẬT của cửa hàng (thay ba danh mục trang sức / kẹp tóc / túi cố định của CiCi). */
-function buildCategoryCards(categories: string[], products: StorefrontProduct[], kind: StoreKind): CategoryCard[] {
+function buildCategoryCards(categories: string[], products: StorefrontProduct[], industry: IndustryPreset): CategoryCard[] {
+  const { cards } = industry.palette;
   return categories.slice(0, 4).map((title, i) => {
     const key = title.toLocaleLowerCase('vi');
     const inCategory = products.filter(
       (p) => !!p.categoryName && displayCategory(p.categoryName).toLocaleLowerCase('vi') === key
     );
     const names = inCategory.slice(0, 3).map((p) => p.name);
-    const gradient = GRADIENTS[i % GRADIENTS.length];
+    const gradient = cards[i % cards.length];
     return {
       title,
       subtitle: names.length ? `${names.join(', ')}${inCategory.length > 3 ? '…' : ''}` : '',
-      icon: ICONS[kind][i % ICONS[kind].length],
+      icon: industry.categoryIcons[i % industry.categoryIcons.length],
       gradientFrom: gradient.from,
       gradientTo: gradient.to,
       product: inCategory.find((p) => !!p.imageUrl),
@@ -88,9 +78,9 @@ type Props = BoxProps & {
 
 export default function HomeFeatures({ sx, products = [], categories = [], branding, ...other }: Props) {
   const containerRoot = useClientRect();
-  const kind = storeKind(branding);
-  const words = storeWords(kind);
-  const cards = buildCategoryCards(categories, products, kind);
+  const industry = storeIndustry(branding);
+  const { words } = industry;
+  const cards = buildCategoryCards(categories, products, industry);
 
   // Chưa có nhóm hàng nào → bỏ cả mục, không hiện danh mục mẫu.
   if (cards.length === 0) return null;
@@ -115,7 +105,7 @@ export default function HomeFeatures({ sx, products = [], categories = [], brand
             sx={{ textAlign: { xs: 'center', md: 'left' }, alignItems: { xs: 'center', md: 'flex-start' } }}
           >
             <SectionTitle
-              caption={kind === 'fnb' ? 'Thực đơn' : 'Bộ sưu tập'}
+              caption={industry.key === 'fashion' ? 'Bộ sưu tập' : words.items}
               title="Danh mục"
               txtGradient={words.item}
             />
@@ -132,16 +122,20 @@ export default function HomeFeatures({ sx, products = [], categories = [], brand
         </Container>
       </MotionViewport>
 
-      <ScrollableContent containerRoot={containerRoot} cards={cards} />
+      <ScrollableContent containerRoot={containerRoot} cards={cards} palette={industry.palette.cards} />
     </Box>
   );
 }
 
 // ----------------------------------------------------------------------
 
-type ScrollContentProps = { containerRoot: UseClientRectReturn; cards: CategoryCard[] };
+type ScrollContentProps = {
+  containerRoot: UseClientRectReturn;
+  cards: CategoryCard[];
+  palette: IndustryPreset['palette']['cards'];
+};
 
-function ScrollableContent({ containerRoot, cards }: ScrollContentProps) {
+function ScrollableContent({ containerRoot, cards, palette }: ScrollContentProps) {
   const theme = useTheme();
   const isRtl = theme.direction === 'rtl';
 
@@ -163,9 +157,9 @@ function ScrollableContent({ containerRoot, cards }: ScrollContentProps) {
     [0, 0.2, 0.5, 0.8, 1],
     [
       `transparent`,
-      `linear-gradient(180deg, ${GRADIENTS[0].from}, ${GRADIENTS[0].to})`,
-      `linear-gradient(180deg, ${GRADIENTS[1].from}, ${GRADIENTS[1].to})`,
-      `linear-gradient(180deg, ${GRADIENTS[2].from}, ${GRADIENTS[2].to})`,
+      `linear-gradient(180deg, ${palette[0].from}, ${palette[0].to})`,
+      `linear-gradient(180deg, ${palette[1].from}, ${palette[1].to})`,
+      `linear-gradient(180deg, ${palette[2].from}, ${palette[2].to})`,
       `linear-gradient(180deg, ${alpha(theme.palette.background.default, 1)}, ${alpha(theme.palette.background.default, 1)})`,
     ]
   );

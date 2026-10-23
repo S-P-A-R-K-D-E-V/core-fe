@@ -8,6 +8,7 @@ import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
+import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
@@ -16,6 +17,7 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import { useSnackbar } from 'src/components/snackbar';
 
+import { INDUSTRY_OPTIONS } from 'src/lib/store-industry';
 import { TITLE_MAX, DESCRIPTION_MAX, storeHomeTitle, storeHomeDescription } from 'src/lib/store-seo';
 import { uploadStoreLogo, type IStoreBranding, getStoreBranding, saveStoreBranding } from 'src/api/store-settings';
 
@@ -39,6 +41,7 @@ const EMPTY: IStoreBranding = {
   receiptFooter: null,
   seoTitle: null,
   seoDescription: null,
+  industry: null,
 };
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
@@ -99,15 +102,16 @@ export default function StoreBrandingTab() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Ba field của phiếu thanh toán và hai field SEO: không gửi key = core-be giữ nguyên giá trị đang lưu. Chưa
-      // tải được dữ liệu thì không biết đang lưu gì → chỉ gửi khi người dùng đã nhập, để không xoá nhầm.
-      const { phone, taxCode, receiptFooter, seoTitle, seoDescription, ...olderFields } = form;
+      // Ba field của phiếu thanh toán, hai field SEO và ngành hàng: không gửi key = core-be giữ nguyên giá trị đang lưu.
+      // Chưa tải được dữ liệu thì không biết đang lưu gì → chỉ gửi khi người dùng đã nhập, để không xoá nhầm.
+      const { phone, taxCode, receiptFooter, seoTitle, seoDescription, industry, ...olderFields } = form;
       const sendReceiptFields = loaded || !!phone || !!taxCode || !!receiptFooter;
       const sendSeoFields = loaded || !!seoTitle || !!seoDescription;
       await saveStoreBranding({
         ...olderFields,
         ...(sendReceiptFields && { phone, taxCode, receiptFooter }),
         ...(sendSeoFields && { seoTitle, seoDescription }),
+        ...((loaded || !!industry) && { industry }),
       });
       enqueueSnackbar('Đã lưu thông tin cửa hàng');
     } catch (err) {
@@ -137,6 +141,21 @@ export default function StoreBrandingTab() {
         </Stack>
 
         <TextField label="Tên cửa hàng" inputProps={{ maxLength: 200 }} {...field('storeName')} />
+        <TextField
+          select
+          label="Ngành hàng"
+          helperText="Trang chủ đổi câu chữ, màu và biểu tượng theo ngành"
+          {...field('industry')}
+        >
+          <MenuItem value="">
+            <em>Chưa chọn</em>
+          </MenuItem>
+          {INDUSTRY_OPTIONS.map((o) => (
+            <MenuItem key={o.value} value={o.value}>
+              {o.label}
+            </MenuItem>
+          ))}
+        </TextField>
         <Stack direction="row" spacing={1.5} alignItems="flex-start">
           <TextField
             label="Link logo"
