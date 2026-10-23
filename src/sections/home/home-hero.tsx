@@ -5,6 +5,7 @@ import type { Breakpoint } from '@mui/material/styles';
 import type { MotionProps, MotionValue, SpringOptions } from 'framer-motion';
 
 import { useRef, useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { m, useScroll, useSpring, useTransform, useMotionValueEvent } from 'framer-motion';
 
 import Box from '@mui/material/Box';
@@ -35,6 +36,10 @@ import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding'
 
 import { useSeason } from './components/season-context';
 import { StringLights } from './components/string-lights';
+import { HalloweenScene } from './components/halloween-scene';
+
+// Khói ma theo con trỏ (React Bits, WebGL) — chỉ màn hình lớn mùa Halloween; nạp riêng, không vào bundle chính.
+const GhostCursor = dynamic(() => import('src/components/react-bits/ghost-cursor'), { ssr: false });
 
 // ----------------------------------------------------------------------
 
@@ -641,6 +646,11 @@ export default function HomeHero({
       >
         {/* Background */}
         <HeroBg palette={palette} motion={motion} lights={season?.lights} />
+        {/* Halloween: cảnh trăng, dơi, đồi bí ngô (mọi màn hình) + khói ma theo chuột (màn hình lớn, không giảm chuyển động). */}
+        {season?.key === 'halloween' && <HalloweenScene />}
+        {season?.key === 'halloween' && motion && (
+          <GhostCursor color="#9333EA" theme="light" zIndex={8} />
+        )}
 
         <Container
           component={MotionContainer}

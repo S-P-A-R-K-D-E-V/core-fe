@@ -20,7 +20,9 @@ export type SeasonPreset = {
   glow: [string, string];
   /** Màu dây đèn. */
   lights: string[];
-  /** Thứ bay trên màn hình: không ghi = tuyết (chấm + ❄); có = các ký tự này (emoji) rơi chậm. */
+  /** Tuyết rơi (chấm + ❄) trên cả trang. */
+  snow?: boolean;
+  /** Ký tự (emoji) rơi chậm trên cả trang thay cho tuyết — hiện chưa mùa nào dùng. */
   particles?: string[];
   /** Khối cuối trang: nền chuyển sắc và hai dòng chào. */
   outro: { from: string; to: string; lines: (storeName: string) => [string, string] };
@@ -35,7 +37,6 @@ export const SEASONS: Record<SeasonKey, SeasonPreset> = {
     heroTint: 'rgba(255, 247, 237, 0.94)',
     glow: ['rgba(251, 146, 60, 0.35)', 'rgba(167, 139, 250, 0.3)'],
     lights: ['#F97316', '#A855F7', '#84CC16', '#F59E0B'],
-    particles: ['🦇', '🍂', '🍁'],
     outro: {
       from: '#C2410C',
       to: '#3B0764',
@@ -45,6 +46,7 @@ export const SEASONS: Record<SeasonKey, SeasonPreset> = {
   christmas: {
     key: 'christmas',
     badge: 'Mùa Giáng Sinh',
+    snow: true,
     emoji: '🎄',
     headline: ['#DC2626', '#D97706', '#15803D'],
     heroTint: 'rgba(255, 246, 243, 0.94)',

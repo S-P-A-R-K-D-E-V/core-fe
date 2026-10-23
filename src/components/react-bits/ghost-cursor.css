@@ -1,0 +1,16 @@
+/* Từ React Bits (https://reactbits.dev) — Copyright (c) 2026 David Haz. Giấy phép MIT + Commons Clause, xem ./LICENSE.md. */
+
+.ghost-cursor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ghost-cursor__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}

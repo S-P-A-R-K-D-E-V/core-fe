@@ -122,7 +122,9 @@ export default function HomeView({
           </Fab>
         )}
 
-        {season && <Snowfall glyphs={SEASONS[season].particles} />}
+        {season && (SEASONS[season].snow || SEASONS[season].particles) && (
+          <Snowfall glyphs={SEASONS[season].particles} />
+        )}
       </MainLayout>
     </SeasonProvider>
   );
