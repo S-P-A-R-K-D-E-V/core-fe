@@ -23,7 +23,7 @@ import { RouterLink } from 'src/routes/components';
 
 import { fCurrency } from 'src/utils/format-number';
 
-import { bgGradient, textGradient } from 'src/theme/css';
+import { textGradient } from 'src/theme/css';
 import Iconify from 'src/components/iconify';
 import { varFade, MotionContainer } from 'src/components/animate';
 
@@ -56,16 +56,14 @@ function HeroBg({ palette }: { palette: IndustryPreset['palette'] }) {
         overflow: 'hidden',
       }}
     >
+      {/* Chỉ màu nền: ảnh overlay_3.jpg cũ bị phủ 94% gần như không thấy, nhưng lại là phần tử LCP tải muộn ~2 giây. */}
       <Box
-        sx={() => ({
-          ...bgGradient({
-            color: palette.heroTint,
-            imgUrl: '/assets/background/overlay_3.jpg',
-          }),
+        sx={{
+          bgcolor: palette.heroTint,
           width: '100%',
           height: '100%',
           position: 'absolute',
-        })}
+        }}
       />
 
       {/* Subtle grid pattern */}
@@ -397,6 +395,8 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
             size="large"
             variant="contained"
             startIcon={<Iconify width={20} icon={industry.icon} />}
+            // Nền primary.main + chữ trắng chỉ đạt tương phản ~3:1; primary.dark đạt chuẩn 4.5:1.
+            sx={{ bgcolor: 'primary.dark', '&:hover': { bgcolor: 'primary.darker' } }}
           >
             {words.cta}
           </Button>
@@ -481,7 +481,7 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
       <m.div variants={varFade('inDown', { distance: 16 })}>
         <Typography
           variant="overline"
-          sx={{ display: 'block', textAlign: 'center', color: 'text.disabled', mb: 2, letterSpacing: 2 }}
+          sx={{ display: 'block', textAlign: 'center', color: 'text.secondary', mb: 2, letterSpacing: 2 }}
         >
           {`${words.items} nổi bật`}
         </Typography>
@@ -509,7 +509,7 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
 
       {products.length === 0 && (
         <m.div variants={varFade('in')}>
-          <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1.5, display: 'block', textAlign: 'center' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', mt: 1.5, display: 'block', textAlign: 'center' }}>
             Đang cập nhật {words.item}...
           </Typography>
         </m.div>
@@ -559,6 +559,8 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
 
         <Container
           component={MotionContainer}
+          // Hiện ngay từ HTML (không chờ JS chạy hiệu ứng) — tiêu đề đầu trang là phần tử LCP.
+          initial={false}
           sx={{
             py: 3,
             zIndex: 9,

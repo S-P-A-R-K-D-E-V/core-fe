@@ -27,6 +27,20 @@ import { storeIndustry, type IndustryPreset } from 'src/lib/store-industry';
 import { SectionTitle } from './components/section-title';
 import { FloatLine, FloatPlusIcon } from './components/svg-elements';
 
+// Chữ chỉ dành cho trình đọc màn hình: link "XEM TẤT CẢ" đọc thành "XEM TẤT CẢ <tên nhóm>" (tên đọc được chứa đúng chữ hiển thị).
+// (Kích thước ghi "1px": trong sx của MUI số 1 nghĩa là 100%.)
+const VISUALLY_HIDDEN = {
+  border: 0,
+  clip: 'rect(0 0 0 0)',
+  height: '1px',
+  margin: '-1px',
+  overflow: 'hidden',
+  padding: 0,
+  position: 'absolute',
+  whiteSpace: 'nowrap',
+  width: '1px',
+} as const;
+
 // ----------------------------------------------------------------------
 
 type CategoryCard = {
@@ -252,7 +266,6 @@ function CategoryItem({ item, sx, ...other }: CategoryItemProps) {
       <Box
         component={RouterLink}
         href={paths.product.root}
-        aria-label={`Xem ${item.title}`}
         sx={{
           textDecoration: 'none',
           width: { xs: 280, sm: 380, md: 480 },
@@ -293,10 +306,13 @@ function CategoryItem({ item, sx, ...other }: CategoryItemProps) {
                 px: 1.5,
                 py: 0.5,
                 borderRadius: 1,
-                bgcolor: 'rgba(0,0,0,0.35)',
+                bgcolor: 'rgba(0,0,0,0.6)',
               }}
             >
               XEM TẤT CẢ
+              <Box component="span" sx={VISUALLY_HIDDEN}>
+                {` ${item.title}`}
+              </Box>
             </Typography>
           </>
         ) : (
@@ -307,8 +323,14 @@ function CategoryItem({ item, sx, ...other }: CategoryItemProps) {
             >
               <Iconify width={72} icon={item.icon} sx={{ color: 'rgba(255,255,255,0.3)' }} />
             </m.div>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 2 }}>
+            <Typography
+              variant="caption"
+              sx={{ color: 'common.white', letterSpacing: 2, px: 1.5, py: 0.5, borderRadius: 1, bgcolor: 'rgba(0,0,0,0.6)' }}
+            >
               XEM TẤT CẢ
+              <Box component="span" sx={VISUALLY_HIDDEN}>
+                {` ${item.title}`}
+              </Box>
             </Typography>
           </>
         )}

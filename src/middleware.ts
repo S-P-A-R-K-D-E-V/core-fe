@@ -23,6 +23,8 @@ export function middleware(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('X-Tenant-Domain', request.headers.get('host') ?? '');
+  // Cho app/layout.tsx generateViewport biết trang nào (trang công khai cho phóng to, màn hình quản trị / quầy thì khoá).
+  requestHeaders.set('X-Pathname', request.nextUrl.pathname);
 
   return NextResponse.next({
     request: { headers: requestHeaders },

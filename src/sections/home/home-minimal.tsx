@@ -131,7 +131,7 @@ export default function HomeMinimal({
           >
             <SvgColor src={item.icon} sx={{ width: 40, height: 40, flexShrink: 0, color: 'primary.main' }} />
             <Stack spacing={1}>
-              <Typography variant="h5" component="h6">
+              <Typography variant="h5" component="h3">
                 {item.title}
               </Typography>
               <Typography sx={{ color: 'text.secondary' }}>{item.description}</Typography>

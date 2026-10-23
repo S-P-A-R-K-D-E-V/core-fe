@@ -36,7 +36,7 @@ export default function NavMobile({ data }: NavProps) {
 
   return (
     <>
-      <IconButton onClick={handleOpenMenu} sx={{ ml: 1 }}>
+      <IconButton aria-label="Mở menu" onClick={handleOpenMenu} sx={{ ml: 1 }}>
         <SvgColor src="/assets/icons/navbar/ic_menu_item.svg" />
       </IconButton>
 

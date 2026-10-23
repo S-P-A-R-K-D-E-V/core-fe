@@ -8,6 +8,8 @@ import 'src/locales/i18n';
 
 import type { Metadata, Viewport } from 'next';
 
+import { headers } from 'next/headers';
+
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter';
 
 import ThemeProvider from 'src/theme';
@@ -50,11 +52,14 @@ export async function generateViewport(): Promise<Viewport> {
     branding?.tenantCode !== CICI_TENANT && branding?.primaryColor && HEX_COLOR.test(branding.primaryColor)
       ? branding.primaryColor
       : '#00A76F';
+  // Trang công khai cho người dùng phóng to (Lighthouse / WCAG); màn hình quản trị, quầy, kiosk giữ khoá zoom như ứng dụng.
+  const path = headers().get('x-pathname') ?? '';
+  const appScreen = /^\/(dashboard|counter|customer-display|kiosk-checkin|auth|sso)(\/|$)/.test(path);
   return {
     themeColor: color,
     width: 'device-width',
     initialScale: 1,
-    maximumScale: 1,
+    ...(appScreen && { maximumScale: 1 }),
   };
 }
 

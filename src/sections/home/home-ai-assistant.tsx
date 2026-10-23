@@ -13,7 +13,7 @@ import Typography from '@mui/material/Typography';
 
 import { varFade, MotionViewport } from 'src/components/animate';
 import Iconify from 'src/components/iconify';
-import { OPEN_CHATBOT_EVENT } from 'src/components/chatbot';
+import { OPEN_CHATBOT_EVENT } from 'src/components/chatbot/chatbot-events';
 
 import { storeIndustry } from 'src/lib/store-industry';
 import type { TenantBranding } from 'src/lib/tenant-branding';
@@ -76,7 +76,9 @@ export default function HomeAiAssistant({ sx, branding, ...other }: Props) {
       ]}
       {...other}
     >
-      <MotionViewport>
+      {/* Ngay dưới đầu trang trên điện thoại (phần tử LCP): hiện ngay từ HTML, không chờ JS chạy hiệu ứng; giữ cùng một
+          kiểu khung ở máy chủ và điện thoại (disableAnimatedMobile đổi sang div thường sau khi tải → React dựng lại cả mục). */}
+      <MotionViewport initial={false} disableAnimatedMobile={false}>
         {renderLines()}
 
         <Container sx={{ position: 'relative' }}>
@@ -129,7 +131,7 @@ export default function HomeAiAssistant({ sx, branding, ...other }: Props) {
                     <Iconify icon={item.icon} width={32} sx={{ color: item.color }} />
                   </Box>
 
-                  <Typography variant="h6" sx={{ mb: 1.5 }}>
+                  <Typography variant="h6" component="h3" sx={{ mb: 1.5 }}>
                     {item.title}
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>

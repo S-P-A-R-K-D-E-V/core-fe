@@ -197,7 +197,7 @@ export default function HomeTestimonials({ sx, ...other }: BoxProps) {
                   </m.div>
 
                   <m.div variants={varFade('inUp', { distance: 24 })}>
-                    <Box component="span" sx={{ opacity: 0.48, typography: 'h6', color: 'text.primary' }}>
+                    <Box component="span" sx={{ typography: 'h6', color: 'text.secondary' }}>
                       {item.label}
                     </Box>
                   </m.div>
@@ -237,7 +237,7 @@ function ReviewCard({ item }: ReviewCardProps) {
     >
       <Stack spacing={0.5}>
         <Rating size="small" name="read-only" value={item.rating} precision={0.5} readOnly />
-        <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 600 }}>
+        <Typography variant="caption" sx={{ color: 'primary.dark', fontWeight: 600 }}>
           {item.category}
         </Typography>
       </Stack>
@@ -260,8 +260,8 @@ function ReviewCard({ item }: ReviewCardProps) {
           {item.name.split(' ').pop()?.charAt(0)}
         </Avatar>
         <Stack>
-          <Typography variant="subtitle2">{item.name}</Typography>
-          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+          <Typography variant="subtitle2" component="p">{item.name}</Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             {fToNow(new Date(item.postedAt))}
           </Typography>
         </Stack>

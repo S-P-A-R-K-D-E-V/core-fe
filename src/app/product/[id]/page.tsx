@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 import axios, { endpoints } from 'src/utils/axios';
 
-import { ProductShopDetailsView } from 'src/sections/product/view';
+import ProductShopDetailsView from 'src/sections/product/view/product-shop-details-view';
 import { getRequestOrigin, getTenantBranding, getStorefrontProduct } from 'src/lib/tenant-branding';
 import {
   absoluteUrl,

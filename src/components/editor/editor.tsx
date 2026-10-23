@@ -1,4 +1,5 @@
 /* eslint-disable perfectionist/sort-imports */
+import 'react-quill/dist/quill.snow.css';
 import 'src/utils/highlight';
 
 import dynamic from 'next/dynamic';

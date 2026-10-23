@@ -1,13 +1,16 @@
+import dynamic from 'next/dynamic';
+
 import Box from '@mui/material/Box';
 
 import { usePathname } from 'src/routes/hooks';
-
-import { ChatbotWidget } from 'src/components/chatbot';
 
 import type { TenantBranding } from 'src/lib/tenant-branding';
 
 import Footer from './footer';
 import Header from './header';
+
+// Trợ lý chat tải sau khi trang đã hiện (không nằm trong JS ban đầu của trang công khai — đỡ chặn luồng chính).
+const ChatbotWidget = dynamic(() => import('src/components/chatbot/chatbot-widget'), { ssr: false });
 
 // ----------------------------------------------------------------------
 

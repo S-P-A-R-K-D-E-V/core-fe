@@ -65,7 +65,7 @@ export default function Footer({ branding }: Props) {
           ))}
         </Stack>
 
-        <Typography variant="caption" component="div" sx={{ mt: 2, color: 'text.disabled' }}>
+        <Typography variant="caption" component="div" sx={{ mt: 2, color: 'text.secondary' }}>
           © {year} {storeName}
         </Typography>
       </Container>

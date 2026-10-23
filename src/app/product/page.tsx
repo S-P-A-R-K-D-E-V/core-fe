@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 import { SWRConfig } from 'swr';
 
-import { ProductShopView } from 'src/sections/product/view';
+import ProductShopView from 'src/sections/product/view/product-shop-view';
 import { productListKey } from 'src/api/product-keys';
 import { getShopFirstPage, getTenantBranding, getStorefrontProducts } from 'src/lib/tenant-branding';
 import { storeIndustry } from 'src/lib/store-industry';

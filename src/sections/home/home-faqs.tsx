@@ -156,7 +156,7 @@ export default function HomeFAQs({ sx, branding, categories = [], isCiCi = false
                     />
                   }
                 >
-                  <Typography variant="h6">{item.question}</Typography>
+                  <Typography variant="h6" component="span">{item.question}</Typography>
                 </AccordionSummary>
                 <AccordionDetails>
                   <Typography sx={{ color: 'text.secondary' }}>{item.answer}</Typography>
@@ -206,6 +206,7 @@ export default function HomeFAQs({ sx, branding, categories = [], isCiCi = false
                       width={20}
                     />
                   }
+                  sx={{ bgcolor: 'primary.dark', '&:hover': { bgcolor: 'primary.darker' } }}
                 >
                   Nhắn tin ngay
                 </Button>

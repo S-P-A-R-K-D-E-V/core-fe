@@ -3,7 +3,6 @@ import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
-import Tooltip from '@mui/material/Tooltip';
 
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
@@ -23,9 +22,11 @@ import { useCheckoutContext } from '../checkout/context';
 
 type Props = {
   product: IProductItem;
+  /** Ảnh tải ngay, không lazy-load (các thẻ hàng đầu). */
+  eager?: boolean;
 };
 
-export default function ProductItem({ product }: Props) {
+export default function ProductItem({ product, eager = false }: Props) {
   const { onAddToCart } = useCheckoutContext();
 
   const { id, name, coverUrl, price, colors, available, sizes, priceSale, newLabel, saleLabel } =
@@ -78,6 +79,7 @@ export default function ProductItem({ product }: Props) {
           color="warning"
           size="medium"
           className="add-cart-btn"
+          aria-label={`Thêm ${name} vào giỏ`}
           onClick={handleAddCart}
           sx={{
             right: 16,
@@ -96,20 +98,27 @@ export default function ProductItem({ product }: Props) {
         </Fab>
       )}
 
-      <Tooltip title={!available && 'Out of stock'} placement="bottom-end">
-        <Image
-          alt={name}
-          src={coverUrl}
-          ratio="1/1"
-          sx={{
-            borderRadius: 1.5,
-            ...(!available && {
-              opacity: 0.48,
-              filter: 'grayscale(1)',
-            }),
-          }}
-        />
-      </Tooltip>
+      {/* Nhãn "Hết hàng" hiện luôn (thay Tooltip "Out of stock" — Tooltip gắn aria-label lên span, sai ARIA). */}
+      {!available && (
+        <Label variant="filled" color="default" sx={{ position: 'absolute', zIndex: 9, left: 16, bottom: 16 }}>
+          Hết hàng
+        </Label>
+      )}
+      <Image
+        alt={name}
+        src={coverUrl}
+        ratio="1/1"
+        // Hàng đầu (thấy ngay khi mở trang) tải luôn, không chờ JS của lazy-load — ảnh lớn đầu tiên là LCP.
+        visibleByDefault={eager}
+        disabledEffect={eager}
+        sx={{
+          borderRadius: 1.5,
+          ...(!available && {
+            opacity: 0.48,
+            filter: 'grayscale(1)',
+          }),
+        }}
+      />
     </Box>
   );
 

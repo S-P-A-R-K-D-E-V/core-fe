@@ -27,8 +27,8 @@ export default function ProductList({ products, loading, totalPages, page, onPag
 
   const renderList = (
     <>
-      {products.map((product) => (
-        <ProductItem key={product.id} product={product} />
+      {products.map((product, index) => (
+        <ProductItem key={product.id} product={product} eager={index < 4} />
       ))}
     </>
   );

@@ -1,3 +1,5 @@
+import 'mapbox-gl/dist/mapbox-gl.css';
+
 import Map from 'react-map-gl';
 import { useState } from 'react';
 

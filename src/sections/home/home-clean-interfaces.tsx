@@ -127,7 +127,7 @@ export default function HomeCleanInterfaces({ sx, branding, ...other }: Props) {
                     <Iconify icon={item.icon} width={32} sx={{ color: item.color }} />
                   </Box>
 
-                  <Typography variant="h6" sx={{ mb: 1.5 }}>
+                  <Typography variant="h6" component="h3" sx={{ mb: 1.5 }}>
                     {item.title}
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>

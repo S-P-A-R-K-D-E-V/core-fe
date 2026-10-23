@@ -42,6 +42,8 @@ import {
 import type { ChatbotRouteUser } from './chatbot-routes';
 import type { ChatbotLocalCommandId } from './chatbot-commands';
 
+import { OPEN_CHATBOT_EVENT } from './chatbot-events';
+
 // ----------------------------------------------------------------------
 // Khung chat trợ lý AI nổi ở góc phải dưới (mọi trang dashboard + trang công khai).
 //
@@ -56,9 +58,7 @@ import type { ChatbotLocalCommandId } from './chatbot-commands';
 // về thì tạm theo vai trò đăng nhập.
 // ----------------------------------------------------------------------
 
-// Cho phép các section khác (vd CTA "Chat ngay với CiCi AI" ở trang chủ) mở widget từ xa —
-// widget là component global độc lập, không có context/store dùng chung nên dùng custom event.
-export const OPEN_CHATBOT_EVENT = 'cici:open-chat';
+export { OPEN_CHATBOT_EVENT };
 
 const GUEST_INFO_KEY = 'chatbot.guestInfo';
 const EXPANDED_KEY = 'chatbot.expanded';

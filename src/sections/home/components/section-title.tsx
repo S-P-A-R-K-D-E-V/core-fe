@@ -106,7 +106,7 @@ export function SectionCaption({ title, variants, sx, ...other }: TextProps) {
       component={m.span}
       variants={variants ?? varFade('inUp', { distance: 24 })}
       sx={[
-        () => ({ typography: 'overline', color: 'text.disabled' }),
+        () => ({ typography: 'overline', color: 'text.secondary' }),
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
       {...other}
