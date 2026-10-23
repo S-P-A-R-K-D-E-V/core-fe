@@ -21,6 +21,8 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
+import { useDecorativeMotion } from 'src/hooks/use-decorative-motion';
+
 import { fCurrency } from 'src/utils/format-number';
 
 import { textGradient } from 'src/theme/css';
@@ -29,7 +31,6 @@ import { varFade, MotionContainer } from 'src/components/animate';
 
 import { storeIndustry, type IndustryPreset } from 'src/lib/store-industry';
 
-import { useDecorativeMotion } from './components/use-decorative-motion';
 import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding';
 
 // ----------------------------------------------------------------------

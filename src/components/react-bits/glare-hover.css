@@ -1,4 +1,6 @@
 /* Từ React Bits (https://reactbits.dev) — Copyright (c) 2026 David Haz. Giấy phép MIT + Commons Clause, xem ./LICENSE.md. */
+/* Đã chỉnh: will-change chỉ khi rê chuột, ẩn vệt sáng trên màn hình cảm ứng — mỗi lớp will-change / blend là một lớp
+   composite trình duyệt phải xếp lại mỗi lần vẽ (Lighthouse điện thoại: Layerize tăng mạnh). */
 
 .glare-hover {
   position: relative;
@@ -29,7 +31,16 @@
   top: 50%;
   left: 50%;
   background: var(--gh-glare);
+}
+
+.glare-hover:hover .glare-hover__band {
   will-change: transform;
+}
+
+@media (hover: none) {
+  .glare-hover__glare {
+    display: none;
+  }
 }
 
 .glare-hover__rim {

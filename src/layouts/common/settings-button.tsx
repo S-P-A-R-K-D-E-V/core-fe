@@ -5,6 +5,8 @@ import IconButton from '@mui/material/IconButton';
 import { Theme, SxProps } from '@mui/material/styles';
 import Badge, { badgeClasses } from '@mui/material/Badge';
 
+import { useDecorativeMotion } from 'src/hooks/use-decorative-motion';
+
 import Iconify from 'src/components/iconify';
 import { varHover } from 'src/components/animate';
 import { useSettingsContext } from 'src/components/settings';
@@ -17,6 +19,9 @@ type Props = {
 
 export default function SettingsButton({ sx }: Props) {
   const settings = useSettingsContext();
+  // Bánh răng xoay vô hạn bắt trình duyệt vẽ lại cả trang mỗi khung hình — điện thoại (Lighthouse: Layerize ~60 lần/giây)
+  // và người chọn giảm chuyển động thì để đứng yên.
+  const motion = useDecorativeMotion();
 
   return (
     <Badge
@@ -33,9 +38,7 @@ export default function SettingsButton({ sx }: Props) {
     >
       <Box
         component={m.div}
-        animate={{
-          rotate: [0, settings.open ? 0 : 360],
-        }}
+        animate={motion ? { rotate: [0, settings.open ? 0 : 360] } : undefined}
         transition={{
           duration: 12,
           ease: 'linear',

@@ -15,6 +15,8 @@ import { useTheme } from '@mui/material/styles';
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
+import { useDecorativeMotion } from 'src/hooks/use-decorative-motion';
+
 import { bgGradient } from 'src/theme/css';
 
 import Iconify from 'src/components/iconify';
@@ -22,8 +24,6 @@ import { varFade, MotionViewport } from 'src/components/animate';
 
 import { storeIndustry } from 'src/lib/store-industry';
 import type { TenantBranding } from 'src/lib/tenant-branding';
-
-import { useDecorativeMotion } from './components/use-decorative-motion';
 
 // ----------------------------------------------------------------------
 

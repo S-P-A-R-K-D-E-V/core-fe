@@ -17,6 +17,8 @@ import { styled, useTheme, alpha } from '@mui/material/styles';
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
+import { useDecorativeMotion } from 'src/hooks/use-decorative-motion';
+
 import Iconify from 'src/components/iconify';
 import { varFade, MotionViewport } from 'src/components/animate';
 import { GlareHover, SpotlightCard } from 'src/components/react-bits';
@@ -25,7 +27,6 @@ import { displayCategory } from 'src/lib/store-seo';
 import { storeIndustry, type IndustryPreset } from 'src/lib/store-industry';
 
 import { SectionTitle } from './components/section-title';
-import { useDecorativeMotion } from './components/use-decorative-motion';
 import { FloatLine, FloatPlusIcon } from './components/svg-elements';
 
 /** Parallax: số px mỗi cột (trái / giữa / phải) trôi lên trong lúc cả mục đi qua màn hình — cột giữa nhanh nhất. */

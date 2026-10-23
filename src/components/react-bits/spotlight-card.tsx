@@ -2,7 +2,8 @@
 
 // Từ React Bits (https://reactbits.dev, github.com/DavidHDev/react-bits) — Copyright (c) 2026 David Haz.
 // Giấy phép MIT + Commons Clause, xem ./LICENSE.md: được dùng trong website này, không bán / phát hành lại riêng component.
-// Đã chỉnh: prop theme → tone (styled() của MUI giữ lại prop tên theme).
+// Đã chỉnh: prop theme → tone (styled() của MUI giữ lại prop tên theme); lớp hạt nhiễu (mix-blend-mode) chỉ dựng khi
+// grain > 0 — mỗi lớp blend thêm một lớp composite cho trình duyệt.
 
 import React, { useEffect, useRef } from 'react';
 
@@ -134,7 +135,7 @@ const SpotlightCard = ({
     const light = lightRef.current;
     const noise = grainRef.current;
     const edge = edgeRef.current;
-    if (!root || !light || !noise || !edge) return undefined;
+    if (!root || !light || !edge) return undefined;
 
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     const state = { x: 0, y: 0, presence: 0, flare: 0, time: Math.random() * 60, pressed: false, visible: true };
@@ -168,6 +169,7 @@ const SpotlightCard = ({
       }
       light.style.opacity = String(Math.min(1, state.presence * s.intensity * boost));
       edge.style.opacity = String(Math.min(1, state.presence * s.borderGlow * boost));
+      if (!noise) return;
       const grainy = s.grain > 0 ? gradient(s, size, state.x, state.y, '#000 0%, transparent 100%') : 'none';
       if (grainy !== drawn.noise) {
         drawn.noise = grainy;
@@ -316,7 +318,9 @@ const SpotlightCard = ({
       {...rest}
     >
       <span ref={lightRef} className="spotlight-card__light" aria-hidden="true" />
-      <span ref={grainRef} className="spotlight-card__grain" style={{ backgroundImage: NOISE }} aria-hidden="true" />
+      {grain > 0 ? (
+        <span ref={grainRef} className="spotlight-card__grain" style={{ backgroundImage: NOISE }} aria-hidden="true" />
+      ) : null}
       {children}
       <span className="spotlight-card__border" aria-hidden="true" />
       <span ref={edgeRef} className="spotlight-card__edge" aria-hidden="true" />

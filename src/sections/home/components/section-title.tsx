@@ -7,11 +7,11 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 
+import { useDecorativeMotion } from 'src/hooks/use-decorative-motion';
+
 import { textGradient } from 'src/theme/css';
 import { varFade } from 'src/components/animate';
 import { GradientText } from 'src/components/react-bits';
-
-import { useDecorativeMotion } from './use-decorative-motion';
 
 // ----------------------------------------------------------------------
 
