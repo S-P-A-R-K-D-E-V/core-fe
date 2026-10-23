@@ -5,6 +5,8 @@ import { fetcher, endpoints } from 'src/utils/axios';
 
 import { IProductItem } from 'src/types/product';
 
+import { SHOP_PAGE_SIZE, productListKey, type ProductListParams } from './product-keys';
+
 // ----------------------------------------------------------------------
 
 /** Map backend ProductListItemResponse → IProductItem for shop list */
@@ -21,7 +23,7 @@ function mapListItem(item: any): IProductItem {
     sku: item.code,
     price: item.basePrice ?? 0,
     priceSale: 0,
-    coverUrl: item.coverImageUrl || '/assets/images/product/product_placeholder.jpg',
+    coverUrl: item.coverImageUrl || '/assets/placeholder.svg',
     images: item.coverImageUrl ? [item.coverImageUrl] : [],
     category: item.categoryName ?? '',
     available: onHand,
@@ -66,7 +68,7 @@ function mapDetailItem(item: any): IProductItem {
     sku: item.code,
     price: item.basePrice ?? 0,
     priceSale: 0,
-    coverUrl: images[0] || '/assets/images/product/product_placeholder.jpg',
+    coverUrl: images[0] || '/assets/placeholder.svg',
     images,
     category: item.categoryName ?? '',
     available: onHand,
@@ -93,24 +95,14 @@ function mapDetailItem(item: any): IProductItem {
 
 // ----------------------------------------------------------------------
 
-export type ProductListParams = {
-  keyword?: string;
-  page?: number;
-  pageSize?: number;
-};
+export type { ProductListParams };
 
 export function useGetProducts(params?: ProductListParams) {
   const page = params?.page ?? 1;
-  const pageSize = params?.pageSize ?? 24;
+  const pageSize = params?.pageSize ?? SHOP_PAGE_SIZE;
 
-  const searchParams = new URLSearchParams({
-    isActive: 'true',
-    page: String(page),
-    pageSize: String(pageSize),
-  });
-  if (params?.keyword) searchParams.set('keyword', params.keyword);
-
-  const URL = `${endpoints.product.list}?${searchParams.toString()}`;
+  // Trang đầu có thể đã được app/product/page.tsx đọc sẵn phía server (SWRConfig fallback cùng khoá).
+  const URL = productListKey({ ...params, page, pageSize });
 
   const { data, isLoading, error, isValidating } = useSWR(URL, fetcher);
 
@@ -120,7 +112,8 @@ export function useGetProducts(params?: ProductListParams) {
       totalCount: (data?.totalCount as number) ?? 0,
       page: (data?.page as number) ?? page,
       pageSize: (data?.pageSize as number) ?? pageSize,
-      productsLoading: isLoading,
+      // SWR coi dữ liệu fallback (trang đầu render sẵn phía server) là "chưa tải" — có dữ liệu thì hiện luôn, không khung chờ.
+      productsLoading: isLoading && !data,
       productsError: error,
       productsValidating: isValidating,
       productsEmpty: !isLoading && !data?.items?.length,

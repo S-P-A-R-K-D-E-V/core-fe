@@ -13,6 +13,7 @@ import { useDebounce } from 'src/hooks/use-debounce';
 import { useBoolean } from 'src/hooks/use-boolean';
 
 import { useGetProducts, useSearchProducts } from 'src/api/product';
+import { SHOP_PAGE_SIZE } from 'src/api/product-keys';
 
 import EmptyContent from 'src/components/empty-content';
 import { useSettingsContext } from 'src/components/settings';
@@ -33,11 +34,17 @@ const SORT_OPTIONS = [
   { value: 'priceDesc', label: 'Giá: Cao → Thấp' },
 ];
 
-const PAGE_SIZE = 24;
+// Khớp trang đầu app/product/page.tsx đọc sẵn phía server (src/api/product-keys.ts).
+const PAGE_SIZE = SHOP_PAGE_SIZE;
 
 // ----------------------------------------------------------------------
 
-export default function ProductShopView() {
+type Props = {
+  /** Tiêu đề trang (thẻ h1), vd "Sản phẩm của CiCi 21 Chùa Láng" / "Thực đơn của Huang coffee". */
+  title?: string;
+};
+
+export default function ProductShopView({ title = 'Sản phẩm' }: Props) {
   const settings = useSettingsContext();
   const checkout = useCheckoutContext();
   const openFilters = useBoolean();
@@ -119,8 +126,8 @@ export default function ProductShopView() {
     >
       <CartIcon totalItems={checkout.totalItems} />
 
-      <Typography variant="h4" sx={{ my: { xs: 3, md: 5 } }}>
-        Sản phẩm
+      <Typography variant="h4" component="h1" sx={{ my: { xs: 3, md: 5 } }}>
+        {title}
       </Typography>
 
       <Stack spacing={2.5} sx={{ mb: { xs: 3, md: 5 } }}>

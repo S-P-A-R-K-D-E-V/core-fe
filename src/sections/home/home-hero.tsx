@@ -597,11 +597,10 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
             </Stack>
 
             {/* Right: product cards (desktop only) */}
-            {mdUp && (
-              <Box sx={{ flexShrink: 0, width: 360, height: '100%' }}>
-                {renderProductGrid()}
-              </Box>
-            )}
+            {/* Luôn có trong HTML (công cụ tìm kiếm đọc được tên + link sản phẩm), chỉ ẩn bằng CSS trên màn hình nhỏ. */}
+            <Box sx={{ flexShrink: 0, width: 360, height: '100%', display: { xs: 'none', md: 'block' } }}>
+              {renderProductGrid()}
+            </Box>
           </Box>
         </Container>
       </Box>

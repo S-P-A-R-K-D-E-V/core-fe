@@ -36,6 +36,7 @@ export default function ProductList({ products, loading, totalPages, page, onPag
   return (
     <>
       <Box
+        component="section"
         gap={3}
         display="grid"
         gridTemplateColumns={{

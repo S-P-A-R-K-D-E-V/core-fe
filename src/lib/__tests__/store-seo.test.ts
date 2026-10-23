@@ -8,6 +8,7 @@ import {
   firstClause,
   jsonLdString,
   storeJsonLd,
+  storeLlmsTxt,
   topCategories,
   storeHomeTitle,
   displayCategory,
@@ -127,6 +128,23 @@ describe('store-seo', () => {
       expect(isIndexable({ isAuthHost: true, tenantCode: null })).toBe(false);
       expect(isIndexable({ isAuthHost: false, tenantCode: 'demo' })).toBe(false);
       expect(isIndexable({ isAuthHost: false, tenantCode: 'huangcf' })).toBe(true);
+    });
+  });
+
+  describe('llms.txt', () => {
+    it('summarises the store with contacts and linked products, without breaking markdown', () => {
+      const text = storeLlmsTxt({
+        branding: brand({ industry: 'cafe', address: '12 Cầu Giấy', phone: '0901 234 567' }),
+        origin: 'https://huangcf.store.devbyspark.com',
+        products: [{ id: 'p1', name: 'Bạc xỉu [size M]', price: 35000, categoryName: 'CÀ PHÊ' }],
+        total: 18,
+      });
+
+      expect(text.startsWith('# Huang coffee\n')).toBe(true);
+      expect(text).toContain('- Ngành: Cà phê & trà sữa');
+      expect(text).toContain('- Điện thoại: 0901 234 567');
+      expect(text).toContain('- [Tất cả thực đơn](https://huangcf.store.devbyspark.com/product/): 18 món đang bán');
+      expect(text).toContain('- [Bạc xỉu size M](https://huangcf.store.devbyspark.com/product/p1/): 35.000 đ — Cà phê');
     });
   });
 

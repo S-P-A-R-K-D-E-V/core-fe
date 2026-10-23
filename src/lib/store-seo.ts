@@ -197,6 +197,57 @@ export function productJsonLd(params: {
   };
 }
 
+/** Chữ đưa vào link Markdown: bỏ ngoặc vuông / xuống dòng để không vỡ cú pháp. */
+function mdText(text: string): string {
+  return text.replace(/[[\]]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * /llms.txt của cửa hàng (llmstxt.org): tên, mô tả, thông tin liên hệ và danh sách sản phẩm có link — để trợ lý AI /
+ * công cụ tìm kiếm AI hiểu cửa hàng mà không phải chạy JavaScript.
+ */
+export function storeLlmsTxt(params: {
+  branding: TenantBranding;
+  origin: string;
+  products: Pick<StorefrontProduct, 'id' | 'name' | 'price' | 'categoryName'>[];
+  total: number;
+}): string {
+  const { branding, origin, products, total } = params;
+  const industry = storeIndustry(branding);
+  const name = storeDisplayName(branding);
+  const categories = topCategories(products, 6);
+  const contact = [
+    branding.address?.trim() && `- Địa chỉ: ${branding.address.trim()}`,
+    branding.phone?.trim() && `- Điện thoại: ${branding.phone.trim()}`,
+    branding.messengerLink && `- Messenger: ${branding.messengerLink}`,
+    branding.zaloLink && `- Zalo: ${branding.zaloLink}`,
+  ].filter(Boolean) as string[];
+
+  return [
+    `# ${mdText(name)}`,
+    '',
+    `> ${mdText(storeHomeDescription(branding, categories, total))}`,
+    '',
+    '## Thông tin',
+    `- Ngành: ${industry.label}`,
+    ...contact,
+    `- [Trang chủ](${origin}/)`,
+    '',
+    `## ${industry.words.items}`,
+    `- [Tất cả ${industry.words.collection}](${origin}/product/)${total ? `: ${total} ${industry.words.item} đang bán` : ''}`,
+    ...products.map(
+      (p) =>
+        `- [${mdText(p.name)}](${origin}/product/${p.id}/): ${formatVnd(p.price)}` +
+        (p.categoryName ? ` — ${displayCategory(p.categoryName)}` : '')
+    ),
+    '',
+    '## Khác',
+    `- [Hỗ trợ](${origin}/support/)`,
+    `- [Chính sách quyền riêng tư](${origin}/privacy-policy/)`,
+    '',
+  ].join('\n');
+}
+
 const LINE_SEPARATOR = new RegExp(String.fromCharCode(0x2028), 'g');
 const PARAGRAPH_SEPARATOR = new RegExp(String.fromCharCode(0x2029), 'g');
 

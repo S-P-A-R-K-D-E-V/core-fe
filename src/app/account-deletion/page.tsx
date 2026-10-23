@@ -41,10 +41,10 @@ export default function AccountDeletionPage() {
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 6, md: 10 } }}>
       <Container maxWidth="md">
         <Box sx={{ mb: 5, textAlign: 'center' }}>
-          <Typography variant="overline" sx={{ color: 'primary.main' }}>
+          <Typography variant="overline" component="a" href="/" sx={{ color: 'primary.main', textDecoration: 'none' }}>
             {product}
           </Typography>
-          <Typography variant="h3" sx={{ fontWeight: 700, mb: 1.5 }}>
+          <Typography variant="h3" component="h1" sx={{ fontWeight: 700, mb: 1.5 }}>
             Delete your account
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>

@@ -123,7 +123,7 @@ export default function ProductItem({ product }: Props) {
         <ColorPreview colors={colors} />
 
         <Stack direction="row" spacing={0.5} sx={{ typography: 'subtitle1' }}>
-          {priceSale && (
+          {!!priceSale && (
             <Box component="span" sx={{ color: 'text.disabled', textDecoration: 'line-through' }}>
               {fCurrency(priceSale)}
             </Box>
@@ -137,6 +137,7 @@ export default function ProductItem({ product }: Props) {
 
   return (
     <Card
+      component="article"
       sx={{
         '&:hover .add-cart-btn': {
           opacity: 1,

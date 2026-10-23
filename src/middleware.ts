@@ -10,8 +10,17 @@ import { NextRequest, NextResponse } from 'next/server';
  *
  * Nhờ vậy 1 build core-fe duy nhất phục vụ được nhiều domain tenant khác nhau
  * (cici21chualang.vn, cici.shop.devbyspark.com, huang.shop.devbyspark.com, ...).
+ *
+ * www.<tên miền> (vd www.cici21chualang.vn — ingress tạo tay cho cả hai tên) chuyển hẳn về tên miền gốc: trước đây
+ * hai tên trả cùng một trang, công cụ tìm kiếm coi mọi trang là nội dung trùng. Chỉ GET/HEAD; /api đi thẳng core-api.
  */
 export function middleware(request: NextRequest) {
+  const host = request.headers.get('host') ?? '';
+  if (/^www\./i.test(host) && (request.method === 'GET' || request.method === 'HEAD')) {
+    const proto = (request.headers.get('x-forwarded-proto') ?? request.nextUrl.protocol.replace(':', '')).split(',')[0].trim();
+    return NextResponse.redirect(`${proto}://${host.slice(4)}${request.nextUrl.pathname}${request.nextUrl.search}`, 308);
+  }
+
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('X-Tenant-Domain', request.headers.get('host') ?? '');
 

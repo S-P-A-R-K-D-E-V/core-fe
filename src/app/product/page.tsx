@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 
+import { SWRConfig } from 'swr';
+
 import { ProductShopView } from 'src/sections/product/view';
-import { getTenantBranding, getStorefrontProducts } from 'src/lib/tenant-branding';
+import { productListKey } from 'src/api/product-keys';
+import { getShopFirstPage, getTenantBranding, getStorefrontProducts } from 'src/lib/tenant-branding';
 import { storeIndustry } from 'src/lib/store-industry';
 import { topCategories, storeDisplayName } from 'src/lib/store-seo';
 
@@ -22,6 +25,15 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function ShopPage() {
-  return <ProductShopView />;
+// Trang đầu danh sách đọc sẵn phía server làm dữ liệu ban đầu của SWR (cùng khoá với useGetProducts): HTML trả về đã có
+// tiêu đề h1, tên, giá và link từng sản phẩm — công cụ tìm kiếm không chạy JavaScript vẫn đọc được.
+export default async function ShopPage() {
+  const [branding, firstPage] = await Promise.all([getTenantBranding(), getShopFirstPage()]);
+  const { words } = storeIndustry(branding);
+
+  return (
+    <SWRConfig value={{ fallback: firstPage ? { [productListKey()]: firstPage } : {} }}>
+      <ProductShopView title={`${words.items} của ${storeDisplayName(branding)}`} />
+    </SWRConfig>
+  );
 }

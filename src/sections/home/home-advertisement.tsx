@@ -94,7 +94,7 @@ export default function HomeAdvertisement({ sx, branding, productTotal = 0, ...o
         {(productTotal > 0 || !branding) && (
           <m.div variants={varFade('inRight', { distance: 24 })}>
             <Button
-              component="a"
+              component={RouterLink}
               href={paths.product.root}
               color="inherit"
               size="large"

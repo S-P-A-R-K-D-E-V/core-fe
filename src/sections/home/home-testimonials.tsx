@@ -17,8 +17,6 @@ import Typography from '@mui/material/Typography';
 
 import { fToNow } from 'src/utils/format-time';
 
-import { _mock } from 'src/_mock';
-
 import { varFade, MotionViewport } from 'src/components/animate';
 
 import { SectionTitle } from './components/section-title';
@@ -30,7 +28,6 @@ const REVIEWS = [
   {
     id: '1',
     name: 'Trần Thị Lan',
-    avatar: _mock.image.avatar(1),
     rating: 5,
     category: 'Trang sức',
     content:
@@ -40,7 +37,6 @@ const REVIEWS = [
   {
     id: '2',
     name: 'Nguyễn Thùy Linh',
-    avatar: _mock.image.avatar(2),
     rating: 5,
     category: 'Kẹp tóc',
     content:
@@ -50,7 +46,6 @@ const REVIEWS = [
   {
     id: '3',
     name: 'Lê Phương Anh',
-    avatar: _mock.image.avatar(3),
     rating: 5,
     category: 'Túi xách',
     content:
@@ -60,7 +55,6 @@ const REVIEWS = [
   {
     id: '4',
     name: 'Phạm Minh Châu',
-    avatar: _mock.image.avatar(4),
     rating: 5,
     category: 'Vòng tay',
     content:
@@ -70,7 +64,6 @@ const REVIEWS = [
   {
     id: '5',
     name: 'Hoàng Yến Nhi',
-    avatar: _mock.image.avatar(5),
     rating: 5,
     category: 'Phụ kiện',
     content:
@@ -80,7 +73,6 @@ const REVIEWS = [
   {
     id: '6',
     name: 'Võ Khánh Ngân',
-    avatar: _mock.image.avatar(6),
     rating: 5,
     category: 'Trang sức',
     content:
@@ -263,7 +255,10 @@ function ReviewCard({ item }: ReviewCardProps) {
       </Typography>
 
       <Box sx={{ gap: 1.5, display: 'flex', alignItems: 'center' }}>
-        <Avatar alt={item.name} src={item.avatar} sx={{ width: 40, height: 40 }} />
+        {/* Chữ cái đầu của tên thay ảnh mẫu (ảnh avatar của template không có trên máy chủ → 404). */}
+        <Avatar alt={item.name} sx={{ width: 40, height: 40, bgcolor: 'primary.lighter', color: 'primary.dark' }}>
+          {item.name.split(' ').pop()?.charAt(0)}
+        </Avatar>
         <Stack>
           <Typography variant="subtitle2">{item.name}</Typography>
           <Typography variant="caption" sx={{ color: 'text.disabled' }}>
