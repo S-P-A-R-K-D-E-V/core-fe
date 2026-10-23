@@ -20,18 +20,25 @@ import { bgGradient } from 'src/theme/css';
 import Iconify from 'src/components/iconify';
 import { varFade, MotionViewport } from 'src/components/animate';
 
+import { storeKind, storeWords } from 'src/lib/store-seo';
 import type { TenantBranding } from 'src/lib/tenant-branding';
 
 // ----------------------------------------------------------------------
 
 type Props = BoxProps & {
   branding?: TenantBranding | null;
+  productTotal?: number;
 };
 
-export default function HomeAdvertisement({ sx, branding, ...other }: Props) {
+export default function HomeAdvertisement({ sx, branding, productTotal = 0, ...other }: Props) {
   const theme = useTheme();
   const storeName = branding?.storeName ?? 'CiCi Accessories';
   const contactLink = branding?.messengerLink ?? branding?.zaloLink ?? null;
+  const kind = storeKind(branding);
+  const words = storeWords(kind);
+  // Số mặt hàng thật thay cho "Hàng trăm mẫu sản phẩm mới" cố định.
+  const lead = productTotal > 0 ? `${productTotal} ${words.item} đang bán.` : '';
+  const contact = contactLink || branding?.phone ? ' hoặc liên hệ để được tư vấn' : '';
 
   const renderImg = (
     <Stack component={m.div} variants={varFade('inUp', { distance: 24 })} alignItems="center">
@@ -39,7 +46,7 @@ export default function HomeAdvertisement({ sx, branding, ...other }: Props) {
         component={m.img}
         animate={{ y: [-16, 0, -16] }}
         transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-        alt="shopping bag"
+        alt=""
         src="/assets/images/home/rocket.webp"
         sx={{ maxWidth: { xs: 260, md: 380 } }}
       />
@@ -60,7 +67,7 @@ export default function HomeAdvertisement({ sx, branding, ...other }: Props) {
         variants={varFade('inDown', { distance: 24 })}
         sx={{ color: 'common.white', mb: 2, typography: 'h2' }}
       >
-        Bắt đầu mua sắm
+        {kind === 'fnb' ? 'Ghé thưởng thức' : 'Bắt đầu mua sắm'}
         <br />
         tại {storeName}
       </Box>
@@ -71,8 +78,10 @@ export default function HomeAdvertisement({ sx, branding, ...other }: Props) {
         sx={{ color: 'rgba(255,255,255,0.72)', mb: 5, typography: 'body1' }}
       >
         {branding?.address
-          ? `Hàng trăm mẫu sản phẩm mới. Ghé thăm cửa hàng tại ${branding.address} hoặc nhắn tin để được tư vấn.`
-          : 'Hàng trăm mẫu sản phẩm mới. Nhắn tin để được tư vấn ngay.'}
+          ? `${lead} Ghé thăm cửa hàng tại ${branding.address}${contact}.`.trim()
+          : productTotal > 0 || !branding
+            ? `${lead} ${words.cta} và giá ngay trên trang${contact}.`.trim()
+            : `Liên hệ ${storeName} để được tư vấn.`}
       </Box>
 
       <Stack
@@ -81,23 +90,25 @@ export default function HomeAdvertisement({ sx, branding, ...other }: Props) {
         spacing={2}
         sx={{ mb: 4 }}
       >
-        <m.div variants={varFade('inRight', { distance: 24 })}>
-          <Button
-            component="a"
-            href="#san-pham"
-            color="inherit"
-            size="large"
-            variant="contained"
-            startIcon={<Iconify icon="solar:bag-smile-bold" width={20} />}
-            sx={{
-              color: 'grey.800',
-              bgcolor: 'common.white',
-              '&:hover': { bgcolor: 'grey.100' },
-            }}
-          >
-            Xem sản phẩm
-          </Button>
-        </m.div>
+        {(productTotal > 0 || !branding) && (
+          <m.div variants={varFade('inRight', { distance: 24 })}>
+            <Button
+              component="a"
+              href={paths.product.root}
+              color="inherit"
+              size="large"
+              variant="contained"
+              startIcon={<Iconify icon={kind === 'fnb' ? 'solar:cup-hot-bold' : 'solar:bag-smile-bold'} width={20} />}
+              sx={{
+                color: 'grey.800',
+                bgcolor: 'common.white',
+                '&:hover': { bgcolor: 'grey.100' },
+              }}
+            >
+              {words.cta}
+            </Button>
+          </m.div>
+        )}
 
         {contactLink && (
           <m.div variants={varFade('inRight', { distance: 24 })}>

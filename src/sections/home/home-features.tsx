@@ -2,7 +2,7 @@
 
 import type { BoxProps } from '@mui/material/Box';
 import type { UseClientRectReturn } from 'minimal-shared/hooks';
-import type { IProductListItem } from 'src/types/corecms-api';
+import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding';
 
 import { useRef, useState } from 'react';
 import { useClientRect } from 'minimal-shared/hooks';
@@ -15,37 +15,60 @@ import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import { styled, useTheme, alpha } from '@mui/material/styles';
 
+import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
+
 import Iconify from 'src/components/iconify';
 import { varFade, MotionViewport } from 'src/components/animate';
+
+import { storeKind, storeWords, displayCategory, type StoreKind } from 'src/lib/store-seo';
 
 import { SectionTitle } from './components/section-title';
 import { FloatLine, FloatPlusIcon } from './components/svg-elements';
 
 // ----------------------------------------------------------------------
 
-const CATEGORIES = [
-  {
-    title: 'Trang sức & Nhẫn',
-    subtitle: 'Nhẫn bạc, vòng tay, dây chuyền — tinh tế và sang trọng cho mọi dịp.',
-    icon: 'solar:diamond-bold-duotone',
-    gradientFrom: '#FADADD',
-    gradientTo: '#F9A8D4',
-  },
-  {
-    title: 'Kẹp tóc & Phụ kiện tóc',
-    subtitle: 'Kẹp cua, kẹp bướm, băng đô, nơ tóc — từ dịu dàng đến cá tính.',
-    icon: 'solar:star-bold-duotone',
-    gradientFrom: '#FDE8D8',
-    gradientTo: '#FBB99B',
-  },
-  {
-    title: 'Túi & Phụ kiện thời trang',
-    subtitle: 'Túi xách mini, ví da, kính mát, thắt lưng — mix match phong cách mọi outfit.',
-    icon: 'solar:bag-smile-bold-duotone',
-    gradientFrom: '#E8D5F5',
-    gradientTo: '#C4A0E8',
-  },
+const GRADIENTS = [
+  { from: '#FADADD', to: '#F9A8D4' },
+  { from: '#FDE8D8', to: '#FBB99B' },
+  { from: '#E8D5F5', to: '#C4A0E8' },
+  { from: '#D4F0E8', to: '#A0D4C4' },
 ];
+
+const ICONS: Record<StoreKind, string[]> = {
+  retail: ['solar:bag-smile-bold-duotone', 'solar:star-bold-duotone', 'solar:diamond-bold-duotone', 'solar:bag-heart-bold-duotone'],
+  fnb: ['solar:cup-hot-bold-duotone', 'solar:tea-cup-bold', 'solar:cup-star-bold', 'solar:bottle-bold'],
+};
+
+type CategoryCard = {
+  title: string;
+  subtitle: string;
+  icon: string;
+  gradientFrom: string;
+  gradientTo: string;
+  /** Sản phẩm có ảnh trong nhóm — ảnh minh hoạ của thẻ. */
+  product?: StorefrontProduct;
+};
+
+/** Thẻ danh mục từ nhóm hàng THẬT của cửa hàng (thay ba danh mục trang sức / kẹp tóc / túi cố định của CiCi). */
+function buildCategoryCards(categories: string[], products: StorefrontProduct[], kind: StoreKind): CategoryCard[] {
+  return categories.slice(0, 4).map((title, i) => {
+    const key = title.toLocaleLowerCase('vi');
+    const inCategory = products.filter(
+      (p) => !!p.categoryName && displayCategory(p.categoryName).toLocaleLowerCase('vi') === key
+    );
+    const names = inCategory.slice(0, 3).map((p) => p.name);
+    const gradient = GRADIENTS[i % GRADIENTS.length];
+    return {
+      title,
+      subtitle: names.length ? `${names.join(', ')}${inCategory.length > 3 ? '…' : ''}` : '',
+      icon: ICONS[kind][i % ICONS[kind].length],
+      gradientFrom: gradient.from,
+      gradientTo: gradient.to,
+      product: inCategory.find((p) => !!p.imageUrl),
+    };
+  });
+}
 
 // ----------------------------------------------------------------------
 
@@ -58,11 +81,19 @@ const renderLines = () => (
 );
 
 type Props = BoxProps & {
-  products?: IProductListItem[];
+  products?: StorefrontProduct[];
+  categories?: string[];
+  branding?: TenantBranding | null;
 };
 
-export default function HomeFeatures({ sx, products = [], ...other }: Props) {
+export default function HomeFeatures({ sx, products = [], categories = [], branding, ...other }: Props) {
   const containerRoot = useClientRect();
+  const kind = storeKind(branding);
+  const words = storeWords(kind);
+  const cards = buildCategoryCards(categories, products, kind);
+
+  // Chưa có nhóm hàng nào → bỏ cả mục, không hiện danh mục mẫu.
+  if (cards.length === 0) return null;
 
   return (
     <Box
@@ -84,9 +115,9 @@ export default function HomeFeatures({ sx, products = [], ...other }: Props) {
             sx={{ textAlign: { xs: 'center', md: 'left' }, alignItems: { xs: 'center', md: 'flex-start' } }}
           >
             <SectionTitle
-              caption="Bộ sưu tập"
+              caption={kind === 'fnb' ? 'Thực đơn' : 'Bộ sưu tập'}
               title="Danh mục"
-              txtGradient="sản phẩm"
+              txtGradient={words.item}
             />
 
             <SvgIcon
@@ -101,16 +132,16 @@ export default function HomeFeatures({ sx, products = [], ...other }: Props) {
         </Container>
       </MotionViewport>
 
-      <ScrollableContent containerRoot={containerRoot} products={products} />
+      <ScrollableContent containerRoot={containerRoot} cards={cards} />
     </Box>
   );
 }
 
 // ----------------------------------------------------------------------
 
-type ScrollContentProps = { containerRoot: UseClientRectReturn; products: IProductListItem[] };
+type ScrollContentProps = { containerRoot: UseClientRectReturn; cards: CategoryCard[] };
 
-function ScrollableContent({ containerRoot, products }: ScrollContentProps) {
+function ScrollableContent({ containerRoot, cards }: ScrollContentProps) {
   const theme = useTheme();
   const isRtl = theme.direction === 'rtl';
 
@@ -132,9 +163,9 @@ function ScrollableContent({ containerRoot, products }: ScrollContentProps) {
     [0, 0.2, 0.5, 0.8, 1],
     [
       `transparent`,
-      `linear-gradient(180deg, ${CATEGORIES[0].gradientFrom}, ${CATEGORIES[0].gradientTo})`,
-      `linear-gradient(180deg, ${CATEGORIES[1].gradientFrom}, ${CATEGORIES[1].gradientTo})`,
-      `linear-gradient(180deg, ${CATEGORIES[2].gradientFrom}, ${CATEGORIES[2].gradientTo})`,
+      `linear-gradient(180deg, ${GRADIENTS[0].from}, ${GRADIENTS[0].to})`,
+      `linear-gradient(180deg, ${GRADIENTS[1].from}, ${GRADIENTS[1].to})`,
+      `linear-gradient(180deg, ${GRADIENTS[2].from}, ${GRADIENTS[2].to})`,
       `linear-gradient(180deg, ${alpha(theme.palette.background.default, 1)}, ${alpha(theme.palette.background.default, 1)})`,
     ]
   );
@@ -153,8 +184,8 @@ function ScrollableContent({ containerRoot, products }: ScrollContentProps) {
           sx={{ ml: `${containerRoot.left}px` }}
           transition={{ ease: 'linear', duration: 0.25 }}
         >
-          {CATEGORIES.map((item) => (
-            <CategoryItem key={item.title} item={item} product={findMatchingProduct(item.title, products)} />
+          {cards.map((item) => (
+            <CategoryItem key={item.title} item={item} />
           ))}
         </ScrollContent>
       </ScrollContainer>
@@ -194,25 +225,12 @@ const ScrollContent = styled(m.div)(({ theme }) => ({
 
 // ----------------------------------------------------------------------
 
-/** So khớp lỏng theo tên danh mục hiển thị (không phải categoryId thật) — chỉ để minh hoạ trực
- * quan hơn khung placeholder cũ, không phải điều hướng chính xác theo danh mục. */
-function findMatchingProduct(categoryTitle: string, products: IProductListItem[]): IProductListItem | undefined {
-  const keyword = categoryTitle.split('&')[0].trim().toLowerCase();
-  return products.find(
-    (p) =>
-      !!p.imageUrl &&
-      (p.categoryName?.toLowerCase().includes(keyword) || keyword.includes(p.categoryName?.toLowerCase() ?? ''))
-  );
-}
-
-// ----------------------------------------------------------------------
-
 type CategoryItemProps = BoxProps & {
-  item: (typeof CATEGORIES)[number];
-  product?: IProductListItem;
+  item: CategoryCard;
 };
 
-function CategoryItem({ item, product, sx, ...other }: CategoryItemProps) {
+function CategoryItem({ item, sx, ...other }: CategoryItemProps) {
+  const { product } = item;
   const [imageError, setImageError] = useState(false);
   const showImage = !!product?.imageUrl && !imageError;
   return (
@@ -236,9 +254,13 @@ function CategoryItem({ item, product, sx, ...other }: CategoryItemProps) {
         </Stack>
       </Box>
 
-      {/* Category showcase — ảnh sản phẩm thật nếu khớp được danh mục, không thì dùng icon minh hoạ */}
+      {/* Category showcase — ảnh một sản phẩm thật của nhóm, không có ảnh thì dùng icon minh hoạ */}
       <Box
+        component={RouterLink}
+        href={paths.product.root}
+        aria-label={`Xem ${item.title}`}
         sx={{
+          textDecoration: 'none',
           width: { xs: 280, sm: 380, md: 480 },
           height: { xs: 200, md: 280 },
           borderRadius: 3,
@@ -262,8 +284,9 @@ function CategoryItem({ item, product, sx, ...other }: CategoryItemProps) {
           <>
             <Box
               component="img"
-              src={product!.imageUrl}
+              src={product!.imageUrl!}
               alt={product!.name}
+              loading="lazy"
               onError={() => setImageError(true)}
               sx={{ position: 'absolute', inset: 0, width: 1, height: 1, objectFit: 'cover' }}
             />

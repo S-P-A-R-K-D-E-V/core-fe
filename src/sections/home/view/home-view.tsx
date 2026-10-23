@@ -11,9 +11,8 @@ import MainLayout from 'src/layouts/main';
 import ScrollProgress from 'src/components/scroll-progress';
 import Iconify from 'src/components/iconify';
 
-import { getAllProducts } from 'src/api/products';
-import type { IProductListItem } from 'src/types/corecms-api';
-import type { TenantBranding } from 'src/lib/tenant-branding';
+import { CICI_TENANT } from 'src/lib/store-seo';
+import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding';
 
 import HomeHero from '../home-hero';
 import HomeMinimal from '../home-minimal';
@@ -28,14 +27,19 @@ import HomeAdvertisement from '../home-advertisement';
 
 type Props = {
   branding: TenantBranding | null;
+  /** Sản phẩm đang bán của cửa hàng — app/page.tsx đọc sẵn phía server (HTML đã có tên, giá, nhóm hàng). */
+  products: StorefrontProduct[];
+  productTotal: number;
+  /** Nhóm hàng có nhiều sản phẩm nhất (src/lib/store-seo.ts topCategories). */
+  categories: string[];
+  /** Mô tả cửa hàng đã dựng cho thẻ meta — dùng lại làm câu giới thiệu khi chủ cửa hàng chưa viết mô tả. */
+  description: string;
 };
 
-export default function HomeView({ branding }: Props) {
+export default function HomeView({ branding, products, productTotal, categories, description }: Props) {
   const { scrollYProgress } = useScroll();
 
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [products, setProducts] = useState<IProductListItem[]>([]);
-  const [productsLoading, setProductsLoading] = useState(true);
 
   useEffect(() => {
     const handleScroll = () => setShowBackToTop(window.scrollY > 300);
@@ -43,39 +47,46 @@ export default function HomeView({ branding }: Props) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  useEffect(() => {
-    getAllProducts({ page: 1, pageSize: 4, isActive: true })
-      .then((res) => setProducts(res.items.slice(0, 4)))
-      .catch(() => setProducts([]))
-      .finally(() => setProductsLoading(false));
-  }, []);
+  // Đánh giá khách hàng và "Tại sao chọn…" là câu chữ viết riêng cho CiCi — cửa hàng khác không hiện nội dung
+  // không phải của mình. Không đọc được branding (máy dev) thì coi như CiCi như trước.
+  const isCiCi = !branding || branding.tenantCode === CICI_TENANT;
+  // Hero ưu tiên sản phẩm có ảnh.
+  const featured = [...products.filter((p) => !!p.imageUrl), ...products.filter((p) => !p.imageUrl)].slice(0, 4);
 
   return (
-    <MainLayout hasProducts={productsLoading || products.length > 0} logoUrl={branding?.logoUrl}>
+    <MainLayout hasProducts={products.length > 0} logoUrl={branding?.logoUrl} branding={branding}>
       <ScrollProgress scrollYProgress={scrollYProgress} />
 
-      <HomeHero products={products} productsLoading={productsLoading} branding={branding} />
+      <HomeHero products={featured} branding={branding} categories={categories} />
 
+      {/* overflow "clip" thay "hidden": vẫn cắt phần tràn ngang nhưng không tạo khung cuộn riêng, nên khối danh mục
+          (position: sticky, cuộn ngang theo trang) giữ được vị trí thay vì trôi mất. */}
       <Box
         sx={{
-          overflow: 'hidden',
+          overflow: 'clip',
           position: 'relative',
           bgcolor: 'background.default',
         }}
       >
         <HomeAiAssistant branding={branding} />
 
-        <HomeMinimal products={products} branding={branding} />
+        <HomeMinimal
+          products={products}
+          productTotal={productTotal}
+          categories={categories}
+          branding={branding}
+          description={description}
+        />
 
-        <HomeFeatures products={products} />
+        <HomeFeatures products={products} categories={categories} branding={branding} />
 
-        <HomeCleanInterfaces branding={branding} />
+        {isCiCi && <HomeCleanInterfaces branding={branding} />}
 
-        <HomeTestimonials />
+        {isCiCi && <HomeTestimonials />}
 
-        <HomeFAQs branding={branding} />
+        <HomeFAQs branding={branding} categories={categories} isCiCi={isCiCi} />
 
-        <HomeAdvertisement branding={branding} />
+        <HomeAdvertisement branding={branding} productTotal={productTotal} />
       </Box>
 
       {showBackToTop && (

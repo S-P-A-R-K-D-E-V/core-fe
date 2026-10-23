@@ -1,7 +1,6 @@
 'use client';
 
 import type { BoxProps } from '@mui/material/Box';
-import type { IProductListItem } from 'src/types/corecms-api';
 
 import { useState } from 'react';
 import { m } from 'framer-motion';
@@ -17,7 +16,8 @@ import SvgColor from 'src/components/svg-color';
 import Iconify from 'src/components/iconify';
 import { varFade, MotionViewport } from 'src/components/animate';
 
-import type { TenantBranding } from 'src/lib/tenant-branding';
+import { storeKind, storeWords, CICI_TENANT } from 'src/lib/store-seo';
+import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding';
 
 import { SectionTitle } from './components/section-title';
 import { CircleSvg, FloatLine, FloatPlusIcon } from './components/svg-elements';
@@ -35,33 +35,71 @@ const renderLines = () => (
 );
 
 type Props = BoxProps & {
-  products?: IProductListItem[];
+  products?: StorefrontProduct[];
+  productTotal?: number;
+  categories?: string[];
   branding?: TenantBranding | null;
+  /** Mô tả đã dựng cho thẻ meta (app/page.tsx) — câu giới thiệu khi chủ cửa hàng chưa viết mô tả ngắn. */
+  description?: string;
 };
 
-export default function HomeMinimal({ sx, products = [], branding, ...other }: Props) {
+export default function HomeMinimal({
+  sx,
+  products = [],
+  productTotal = 0,
+  categories = [],
+  branding,
+  description,
+  ...other
+}: Props) {
   const [imageError, setImageError] = useState(false);
   const featuredImage = products.find((p) => !!p.imageUrl);
   const storeName = branding?.storeName ?? 'CiCi Accessories';
+  const kind = storeKind(branding);
+  const words = storeWords(kind);
+  const isCiCi = !branding || branding.tenantCode === CICI_TENANT;
+  const chat = branding?.messengerLink || branding?.zaloLink;
 
+  // Chỉ nêu điều có thật từ dữ liệu cửa hàng: số mặt hàng / nhóm hàng đang bán, địa chỉ, cách liên hệ.
   const items = [
-    {
-      icon: `/assets/icons/home/ic-make-brand.svg`,
-      title: 'Đa dạng mẫu mã',
-      description: 'Hàng trăm mẫu sản phẩm mới nhất — cập nhật liên tục theo xu hướng.',
-    },
-    {
-      icon: `/assets/icons/home/ic-design.svg`,
-      title: 'Chất lượng đảm bảo',
-      description:
-        'Sản phẩm được tuyển chọn kỹ lưỡng, chất liệu an toàn, bền đẹp. Đội ngũ kiểm định kỹ trước khi đến tay khách hàng.',
-    },
+    ...(productTotal > 0
+      ? [
+          {
+            icon: `/assets/icons/home/ic_make_brand.svg`,
+            title: `${productTotal} ${words.item} đang bán`,
+            description: categories.length
+              ? `Gồm ${categories.slice(0, 4).join(', ')}${categories.length > 4 ? '…' : ''}. Xem giá ngay trên trang.`
+              : `${words.cta} và giá ngay trên trang.`,
+          },
+        ]
+      : []),
+    ...(isCiCi
+      ? [
+          {
+            icon: `/assets/icons/home/ic_design.svg`,
+            title: 'Chất lượng đảm bảo',
+            description:
+              'Sản phẩm được tuyển chọn kỹ lưỡng, chất liệu an toàn, bền đẹp. Đội ngũ kiểm định kỹ trước khi đến tay khách hàng.',
+          },
+        ]
+      : []),
     ...(branding?.address
       ? [
           {
-            icon: `/assets/icons/home/ic-development.svg`,
+            icon: `/assets/icons/home/ic_development.svg`,
             title: 'Ghé thăm cửa hàng',
-            description: `Ghé thăm trực tiếp tại ${branding.address} để xem và chọn hàng. Tư vấn miễn phí ngay tại cửa hàng.`,
+            description: `Ghé thăm trực tiếp tại ${branding.address} để xem và chọn ${words.item}.`,
+          },
+        ]
+      : []),
+    ...(branding?.phone || chat
+      ? [
+          {
+            icon: `/assets/icons/home/ic_design.svg`,
+            title: kind === 'fnb' ? 'Đặt món' : 'Liên hệ đặt hàng',
+            description: branding?.phone
+              ? `Gọi ${branding.phone}${chat ? ' hoặc nhắn tin qua Messenger / Zalo' : ''}.`
+              : 'Nhắn tin qua Messenger / Zalo để được tư vấn.',
           },
         ]
       : []),
@@ -75,7 +113,9 @@ export default function HomeMinimal({ sx, products = [], branding, ...other }: P
         txtGradient=""
         description={
           branding?.shortDescription ??
-          `${storeName} ra đời với mong muốn mang đến trải nghiệm mua sắm tốt nhất — sản phẩm chọn lọc kỹ, cập nhật liên tục, giá cả hợp lý.`
+          (branding && description
+            ? description
+            : `${storeName} ra đời với mong muốn mang đến trải nghiệm mua sắm tốt nhất — sản phẩm chọn lọc kỹ, cập nhật liên tục, giá cả hợp lý.`)
         }
         sx={{ mb: { xs: 5, md: 8 }, textAlign: { xs: 'center', md: 'left' } }}
       />
@@ -125,7 +165,8 @@ export default function HomeMinimal({ sx, products = [], branding, ...other }: P
           <Box
             component="img"
             alt={featuredImage.name}
-            src={featuredImage.imageUrl}
+            src={featuredImage.imageUrl!}
+            loading="lazy"
             onError={() => setImageError(true)}
             sx={{ width: 1, height: 1, borderRadius: 2, objectFit: 'cover' }}
           />
@@ -141,7 +182,11 @@ export default function HomeMinimal({ sx, products = [], branding, ...other }: P
                 `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.24)}, ${alpha(theme.palette.secondary.light, 0.24)})`,
             }}
           >
-            <Iconify icon="solar:bag-heart-bold-duotone" width={96} sx={{ color: 'primary.main', opacity: 0.5 }} />
+            <Iconify
+              icon={kind === 'fnb' ? 'solar:cup-hot-bold-duotone' : 'solar:bag-heart-bold-duotone'}
+              width={96}
+              sx={{ color: 'primary.main', opacity: 0.5 }}
+            />
           </Box>
         )}
       </Box>

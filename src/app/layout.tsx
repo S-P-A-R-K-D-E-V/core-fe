@@ -23,7 +23,17 @@ import { CheckoutProvider } from 'src/sections/checkout/context';
 
 import { AuthProvider } from 'src/auth/context/jwt';
 import { BrandingProvider } from 'src/components/branding';
-import { getTenantBranding } from 'src/lib/tenant-branding';
+import { isAuthHost, tenantCodeFromHost } from 'src/auth/utils/saas-host';
+import { SAAS_PRODUCT_NAME } from 'src/sections/legal/saas-privacy-content';
+import { getRequestHost, getRequestOrigin, getTenantBranding } from 'src/lib/tenant-branding';
+import {
+  CICI_TENANT,
+  absoluteUrl,
+  isIndexable,
+  storeHomeTitle,
+  storeDisplayName,
+  storeHomeDescription,
+} from 'src/lib/store-seo';
 // import { AuthProvider } from 'src/auth/context/auth0';
 // import { AuthProvider } from 'src/auth/context/amplify';
 // import { AuthProvider } from 'src/auth/context/firebase';
@@ -31,13 +41,31 @@ import { getTenantBranding } from 'src/lib/tenant-branding';
 
 // ----------------------------------------------------------------------
 
-export const viewport: Viewport = {
-  themeColor: '#00A76F', // CiCi primary brand color
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
-};
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
+// Màu thanh địa chỉ trên điện thoại theo màu thương hiệu của cửa hàng; CiCi (và mặc định) giữ màu CiCi như trước.
+export async function generateViewport(): Promise<Viewport> {
+  const branding = await getTenantBranding();
+  const color =
+    branding?.tenantCode !== CICI_TENANT && branding?.primaryColor && HEX_COLOR.test(branding.primaryColor)
+      ? branding.primaryColor
+      : '#00A76F';
+  return {
+    themeColor: color,
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+  };
+}
+
+const DEFAULT_ICONS: Metadata['icons'] = [
+  { rel: 'icon', url: '/favicon/favicon.ico' },
+  { rel: 'icon', type: 'image/png', sizes: '16x16', url: '/favicon/favicon-16x16.png' },
+  { rel: 'icon', type: 'image/png', sizes: '32x32', url: '/favicon/favicon-32x32.png' },
+  { rel: 'apple-touch-icon', sizes: '180x180', url: '/favicon/apple-touch-icon.png' },
+];
+
+// Chỉ dùng khi không đọc được branding trên tên miền CiCi / máy dev (core-api lỗi) — như trước đây.
 const CICI_METADATA: Metadata = {
   title: {
     template: '%s | CiCi Accessories',
@@ -46,7 +74,7 @@ const CICI_METADATA: Metadata = {
   description:
     'CiCi Accessories chuyên cung cấp phụ kiện thời trang nữ: trang sức, kẹp tóc, túi mini, ví da. Hàng trăm mẫu mới, giao hàng toàn quốc, đổi trả miễn phí 7 ngày.',
   keywords: 'cici accessories,phụ kiện thời trang,trang sức nữ,kẹp tóc,túi mini,ví da,đồ trang sức,vòng tay,nhẫn bạc',
-  manifest: '/manifest.json',
+  manifest: '/manifest.webmanifest',
   openGraph: {
     type: 'website',
     locale: 'vi_VN',
@@ -55,31 +83,66 @@ const CICI_METADATA: Metadata = {
     description:
       'Hàng trăm mẫu trang sức, kẹp tóc, túi mini. Giao hàng toàn quốc — đổi trả miễn phí 7 ngày.',
   },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'CiCi Accessories — Phụ kiện thời trang nữ',
-    description: 'Hàng trăm mẫu trang sức, kẹp tóc, túi mini. Giao hàng toàn quốc.',
-  },
-  icons: [
-    { rel: 'icon', url: '/favicon/favicon.ico' },
-    { rel: 'icon', type: 'image/png', sizes: '16x16', url: '/favicon/favicon-16x16.png' },
-    { rel: 'icon', type: 'image/png', sizes: '32x32', url: '/favicon/favicon-32x32.png' },
-    { rel: 'apple-touch-icon', sizes: '180x180', url: '/favicon/apple-touch-icon.png' },
-  ],
+  icons: DEFAULT_ICONS,
 };
 
-// Tiêu đề/mô tả theo cửa hàng của tên miền đang mở; CiCi (hoặc không đọc được) giữ nguyên như cũ.
+/**
+ * Thẻ meta mặc định theo cửa hàng của tên miền đang mở (trang con tự đặt tiêu đề → "Trang | Tên cửa hàng").
+ * Tiêu đề / mô tả dựng từ dữ liệu của chính cửa hàng (src/lib/store-seo.ts), không còn câu chữ cố định dùng chung.
+ * Trang đăng nhập tập trung và cửa hàng mẫu: noindex.
+ */
 export async function generateMetadata(): Promise<Metadata> {
+  const host = getRequestHost();
+  const origin = getRequestOrigin();
   const branding = await getTenantBranding();
-  if (!branding || branding.tenantCode === 'cici68' || !branding.storeName) return CICI_METADATA;
+  const onAuthHost = isAuthHost(host);
+  const robots = isIndexable({ isAuthHost: onAuthHost, tenantCode: branding?.tenantCode })
+    ? undefined
+    : { index: false, follow: false };
+  const metadataBase = new URL(origin);
 
-  const name = branding.storeName;
+  if (!branding) {
+    if (!onAuthHost && !tenantCodeFromHost(host)) return { ...CICI_METADATA, metadataBase };
+    return {
+      metadataBase,
+      title: { template: `%s | ${SAAS_PRODUCT_NAME}`, default: SAAS_PRODUCT_NAME },
+      description: `${SAAS_PRODUCT_NAME} — bán hàng, kho, ca làm, chấm công và lương cho cửa hàng.`,
+      manifest: '/manifest.webmanifest',
+      icons: DEFAULT_ICONS,
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const name = storeDisplayName(branding);
+  const title = storeHomeTitle(branding);
+  const description = storeHomeDescription(branding);
+  const logo = absoluteUrl(branding.logoUrl, origin);
+  // CiCi giữ bộ favicon tĩnh như trước; cửa hàng khác dùng logo của mình làm biểu tượng tab.
+  const icons =
+    branding.tenantCode !== CICI_TENANT && branding.logoUrl
+      ? [
+          { rel: 'icon', url: branding.logoUrl },
+          { rel: 'apple-touch-icon', url: branding.logoUrl },
+        ]
+      : DEFAULT_ICONS;
+
   return {
-    title: { template: `%s | ${name}`, default: name },
-    description: branding.shortDescription ?? name,
-    manifest: '/manifest.json',
-    openGraph: { type: 'website', locale: 'vi_VN', siteName: name, title: name },
-    icons: branding.logoUrl ? [{ rel: 'icon', url: branding.logoUrl }] : CICI_METADATA.icons,
+    metadataBase,
+    applicationName: name,
+    title: { template: `%s | ${name}`, default: title },
+    description,
+    manifest: '/manifest.webmanifest',
+    openGraph: {
+      type: 'website',
+      locale: 'vi_VN',
+      siteName: name,
+      title,
+      description,
+      ...(logo && { images: [{ url: logo, alt: name }] }),
+    },
+    twitter: { card: 'summary', title, description, ...(logo && { images: [logo] }) },
+    icons,
+    robots,
   };
 }
 

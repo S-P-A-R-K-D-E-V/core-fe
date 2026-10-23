@@ -18,6 +18,9 @@ export interface IStoreBranding {
   taxCode?: string | null;
   /** Lời chào cuối phiếu thanh toán */
   receiptFooter?: string | null;
+  // Thẻ title / meta description của trang chủ. Core-be cũ không trả và bỏ qua.
+  seoTitle?: string | null;
+  seoDescription?: string | null;
 }
 
 export interface IKiotVietConnection {
@@ -49,8 +52,9 @@ export async function getStoreBranding(): Promise<IStoreBranding> {
 }
 
 /**
- * Tám field cũ ghi đè toàn bộ. Ba field của phiếu thanh toán (phone, taxCode, receiptFooter): không gửi
- * key = giữ nguyên giá trị đang lưu; gửi null / chuỗi trắng = xoá; có chữ = lưu (core-be tự cắt khoảng trắng).
+ * Tám field cũ ghi đè toàn bộ. Ba field của phiếu thanh toán (phone, taxCode, receiptFooter) và hai field SEO
+ * (seoTitle, seoDescription): không gửi key = giữ nguyên giá trị đang lưu; gửi null / chuỗi trắng = xoá; có chữ =
+ * lưu (core-be tự cắt khoảng trắng).
  */
 export async function saveStoreBranding(data: IStoreBranding): Promise<void> {
   await axios.put('/store-settings/branding', data);

@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
@@ -15,7 +16,12 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import { useSnackbar } from 'src/components/snackbar';
 
+import { TITLE_MAX, DESCRIPTION_MAX, storeHomeTitle, storeHomeDescription } from 'src/lib/store-seo';
 import { uploadStoreLogo, type IStoreBranding, getStoreBranding, saveStoreBranding } from 'src/api/store-settings';
+
+// Độ dài cột của core-be (TenantBranding.SeoTitleMaxLength / SeoDescriptionMaxLength).
+const SEO_TITLE_LIMIT = 70;
+const SEO_DESCRIPTION_LIMIT = 300;
 
 // ----------------------------------------------------------------------
 
@@ -31,6 +37,8 @@ const EMPTY: IStoreBranding = {
   phone: null,
   taxCode: null,
   receiptFooter: null,
+  seoTitle: null,
+  seoDescription: null,
 };
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
@@ -91,11 +99,16 @@ export default function StoreBrandingTab() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Ba field của phiếu thanh toán: không gửi key = core-be giữ nguyên giá trị đang lưu. Chưa tải được
-      // dữ liệu thì không biết đang lưu gì → chỉ gửi khi người dùng đã nhập, để không xoá nhầm.
-      const { phone, taxCode, receiptFooter, ...olderFields } = form;
+      // Ba field của phiếu thanh toán và hai field SEO: không gửi key = core-be giữ nguyên giá trị đang lưu. Chưa
+      // tải được dữ liệu thì không biết đang lưu gì → chỉ gửi khi người dùng đã nhập, để không xoá nhầm.
+      const { phone, taxCode, receiptFooter, seoTitle, seoDescription, ...olderFields } = form;
       const sendReceiptFields = loaded || !!phone || !!taxCode || !!receiptFooter;
-      await saveStoreBranding(sendReceiptFields ? form : olderFields);
+      const sendSeoFields = loaded || !!seoTitle || !!seoDescription;
+      await saveStoreBranding({
+        ...olderFields,
+        ...(sendReceiptFields && { phone, taxCode, receiptFooter }),
+        ...(sendSeoFields && { seoTitle, seoDescription }),
+      });
       enqueueSnackbar('Đã lưu thông tin cửa hàng');
     } catch (err) {
       enqueueSnackbar(apiErrorMessage(err, 'Lưu thất bại'), { variant: 'error' });
@@ -166,7 +179,8 @@ export default function StoreBrandingTab() {
         <Stack spacing={0.5}>
           <Typography variant="subtitle1">Phiếu thanh toán (in hoá đơn)</Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            In ở đầu phiếu cùng với tên cửa hàng và địa chỉ ở trên; lời chào in ở cuối phiếu.
+            In ở đầu phiếu cùng với tên cửa hàng và địa chỉ ở trên; lời chào in ở cuối phiếu. Số điện thoại cũng hiện
+            trên trang chủ.
           </Typography>
         </Stack>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
@@ -183,6 +197,36 @@ export default function StoreBrandingTab() {
           {...field('receiptFooter')}
         />
 
+        <Divider sx={{ borderStyle: 'dashed' }} />
+
+        <Stack spacing={0.5}>
+          <Typography variant="subtitle1">Trang chủ trên Google</Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Tiêu đề và mô tả hiện trong kết quả tìm kiếm và khi chia sẻ link trang chủ. Để trống thì hệ thống tự viết từ
+            tên, giới thiệu, địa chỉ và nhóm hàng đang bán của cửa hàng.
+          </Typography>
+        </Stack>
+        <TextField
+          label="Tiêu đề trang chủ"
+          placeholder={storeHomeTitle({ ...form, tenantCode: '', seoTitle: null })}
+          inputProps={{ maxLength: SEO_TITLE_LIMIT }}
+          helperText={`${(form.seoTitle ?? '').length}/${SEO_TITLE_LIMIT} ký tự — nên dưới ${TITLE_MAX}, có tên cửa hàng và điều khách hay tìm (món / mặt hàng, khu vực)`}
+          {...field('seoTitle')}
+        />
+        <TextField
+          label="Mô tả trang chủ"
+          placeholder={storeHomeDescription({ ...form, tenantCode: '', seoDescription: null })}
+          multiline
+          minRows={2}
+          inputProps={{ maxLength: SEO_DESCRIPTION_LIMIT }}
+          helperText={`${(form.seoDescription ?? '').length}/${SEO_DESCRIPTION_LIMIT} ký tự — Google thường hiện khoảng ${DESCRIPTION_MAX} ký tự đầu`}
+          {...field('seoDescription')}
+        />
+        <SearchPreview
+          title={storeHomeTitle({ ...form, tenantCode: '' })}
+          description={storeHomeDescription({ ...form, tenantCode: '' })}
+        />
+
         <Stack direction="row" justifyContent="flex-end">
           <LoadingButton variant="contained" loading={saving} disabled={loading || colorInvalid} onClick={handleSave}>
             Lưu thay đổi
@@ -190,5 +234,29 @@ export default function StoreBrandingTab() {
         </Stack>
       </Stack>
     </Card>
+  );
+}
+
+// ----------------------------------------------------------------------
+
+/** Xem trước kết quả tìm kiếm (gần đúng — Google có thể tự viết lại). Chưa tính nhóm hàng: trang thật có thêm. */
+function SearchPreview({ title, description }: { title: string; description: string }) {
+  const host = typeof window === 'undefined' ? '' : window.location.host;
+
+  return (
+    <Box
+      aria-label="Xem trước trên Google"
+      sx={{ p: 2, borderRadius: 1.5, border: (theme) => `1px dashed ${theme.palette.divider}` }}
+    >
+      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+        Xem trước trên Google · {host}
+      </Typography>
+      <Typography sx={{ color: '#1a0dab', fontSize: 18, lineHeight: 1.3, mt: 0.5 }}>
+        {title.length > TITLE_MAX ? `${title.slice(0, TITLE_MAX - 1)}…` : title}
+      </Typography>
+      <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+        {description.length > DESCRIPTION_MAX ? `${description.slice(0, DESCRIPTION_MAX - 1)}…` : description}
+      </Typography>
+    </Box>
   );
 }

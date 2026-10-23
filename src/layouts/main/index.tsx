@@ -4,6 +4,8 @@ import { usePathname } from 'src/routes/hooks';
 
 import { ChatbotWidget } from 'src/components/chatbot';
 
+import type { TenantBranding } from 'src/lib/tenant-branding';
+
 import Footer from './footer';
 import Header from './header';
 
@@ -13,9 +15,11 @@ type Props = {
   children: React.ReactNode;
   hasProducts?: boolean;
   logoUrl?: string | null;
+  /** Trang chủ truyền branding đầy đủ để chân trang có địa chỉ / số điện thoại của cửa hàng. */
+  branding?: TenantBranding | null;
 };
 
-export default function MainLayout({ children, hasProducts, logoUrl }: Props) {
+export default function MainLayout({ children, hasProducts, logoUrl, branding }: Props) {
   const pathname = usePathname();
 
   const homePage = pathname === '/';
@@ -36,7 +40,7 @@ export default function MainLayout({ children, hasProducts, logoUrl }: Props) {
         {children}
       </Box>
 
-      <Footer />
+      <Footer branding={branding} />
 
       <ChatbotWidget />
     </Box>

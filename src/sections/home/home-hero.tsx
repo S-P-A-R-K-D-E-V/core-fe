@@ -27,8 +27,8 @@ import { bgGradient, textGradient } from 'src/theme/css';
 import Iconify from 'src/components/iconify';
 import { varFade, MotionContainer } from 'src/components/animate';
 
-import type { IProductListItem } from 'src/types/corecms-api';
-import type { TenantBranding } from 'src/lib/tenant-branding';
+import { storeKind, storeWords } from 'src/lib/store-seo';
+import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding';
 
 // ----------------------------------------------------------------------
 
@@ -126,33 +126,31 @@ function HeroBg() {
 // ----------------------------------------------------------------------
 
 type ProductCardProps = {
-  product?: IProductListItem;
+  product?: StorefrontProduct;
   index: number;
-  loading?: boolean;
+  placeholder: string;
 };
 
-function ProductCard({ product, index, loading }: ProductCardProps) {
+function ProductCard({ product, index, placeholder }: ProductCardProps) {
   const [imgError, setImgError] = useState(false);
   const handleImgError = useCallback(() => setImgError(true), []);
 
-  if (loading) {
-    return (
-      <Skeleton
-        variant="rectangular"
-        animation="wave"
-        sx={{ borderRadius: 2, width: '100%', height: 200 }}
-      />
-    );
+  if (!product) {
+    return <Skeleton variant="rectangular" animation={false} sx={{ borderRadius: 2, width: '100%', height: 200 }} />;
   }
 
   const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
-  const price = product?.sellingPrice ?? product?.basePrice ?? 0;
-  const showImage = !!product?.imageUrl && !imgError;
+  const showImage = !!product.imageUrl && !imgError;
 
   return (
     <m.div variants={varFade('inUp', { distance: 16 })} style={{ width: '100%' }}>
       <Card
+        component={RouterLink}
+        href={paths.product.details(product.id)}
         sx={{
+          display: 'block',
+          textDecoration: 'none',
+          color: 'inherit',
           borderRadius: 2.5,
           overflow: 'hidden',
           cursor: 'pointer',
@@ -178,8 +176,9 @@ function ProductCard({ product, index, loading }: ProductCardProps) {
           {showImage ? (
             <Box
               component="img"
-              src={product!.imageUrl}
-              alt={product!.name}
+              src={product.imageUrl!}
+              alt={product.name}
+              loading="lazy"
               onError={handleImgError}
               sx={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }}
             />
@@ -188,15 +187,11 @@ function ProductCard({ product, index, loading }: ProductCardProps) {
               animate={{ scale: [1, 1.08, 1] }}
               transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
             >
-              <Iconify
-                icon="solar:bag-heart-bold-duotone"
-                width={48}
-                sx={{ color: 'rgba(255,255,255,0.6)' }}
-              />
+              <Iconify icon={placeholder} width={48} sx={{ color: 'rgba(255,255,255,0.6)' }} />
             </m.div>
           )}
 
-          {product?.categoryName && (
+          {product.categoryName && (
             <Chip
               label={product.categoryName}
               size="small"
@@ -213,33 +208,34 @@ function ProductCard({ product, index, loading }: ProductCardProps) {
             />
           )}
 
-          {/* New badge */}
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              bgcolor: 'error.main',
-              color: 'white',
-              borderRadius: 1,
-              px: 0.75,
-              py: 0.25,
-              fontSize: '0.6rem',
-              fontWeight: 700,
-              lineHeight: 1.4,
-            }}
-          >
-            MỚI
-          </Box>
+          {!product.inStock && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                bgcolor: 'grey.700',
+                color: 'white',
+                borderRadius: 1,
+                px: 0.75,
+                py: 0.25,
+                fontSize: '0.6rem',
+                fontWeight: 700,
+                lineHeight: 1.4,
+              }}
+            >
+              Tạm hết
+            </Box>
+          )}
         </Box>
 
         {/* Info */}
         <Box sx={{ p: 1.5, bgcolor: 'background.paper' }}>
           <Typography variant="caption" fontWeight={700} noWrap display="block" sx={{ mb: 0.5 }}>
-            {product?.name ?? 'Sản phẩm nổi bật'}
+            {product.name}
           </Typography>
           <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 700 }}>
-            {price > 0 ? fCurrency(price) : 'Liên hệ'}
+            {product.price > 0 ? fCurrency(product.price) : 'Liên hệ'}
           </Typography>
         </Box>
       </Card>
@@ -250,22 +246,25 @@ function ProductCard({ product, index, loading }: ProductCardProps) {
 // ----------------------------------------------------------------------
 
 type Props = BoxProps & {
-  products?: IProductListItem[];
-  productsLoading?: boolean;
+  products?: StorefrontProduct[];
   branding?: TenantBranding | null;
+  categories?: string[];
 };
 
-export default function HomeHero({
-  sx,
-  products = [],
-  productsLoading = true,
-  branding,
-  ...other
-}: Props) {
+export default function HomeHero({ sx, products = [], branding, categories = [], ...other }: Props) {
   const storeName = branding?.storeName ?? 'CiCi Accessories';
+  const kind = storeKind(branding);
+  const words = storeWords(kind);
+  // Câu dưới tiêu đề: mô tả của cửa hàng; chưa viết thì kể nhóm hàng thật đang bán.
   const tagline =
     branding?.shortDescription ??
-    'Phụ kiện thời trang nữ — trang sức, kẹp tóc, túi mini và hơn thế nữa. Phong cách, cá tính, giá cả hợp lý.';
+    (categories.length
+      ? `${categories.slice(0, 3).join(', ')} và nhiều ${words.item} khác — ${words.cta.toLowerCase()} và giá ngay tại đây.`
+      : branding
+        ? `Chào mừng bạn đến với ${storeName}.`
+        : 'Phụ kiện thời trang nữ — trang sức, kẹp tóc, túi mini và hơn thế nữa. Phong cách, cá tính, giá cả hợp lý.');
+  const hasContact = !!(branding?.messengerLink || branding?.zaloLink || branding?.phone);
+  const placeholderIcon = kind === 'fnb' ? 'solar:cup-hot-bold-duotone' : 'solar:bag-heart-bold-duotone';
   const scrollProgress = useScrollPercent();
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up(mdKey));
@@ -285,11 +284,10 @@ export default function HomeHero({
   );
 
   // Card slots: 4 items
-  const cardSlots: Array<IProductListItem | null> = productsLoading
-    ? [null, null, null, null]
-    : products.length > 0
-      ? [...products.slice(0, 4), ...Array(Math.max(0, 4 - products.length)).fill(null)]
-      : [null, null, null, null];
+  const cardSlots: Array<StorefrontProduct | null> = [
+    ...products.slice(0, 4),
+    ...Array(Math.max(0, 4 - products.length)).fill(null),
+  ];
 
   // ----------------------------------------------------------------------
 
@@ -312,7 +310,7 @@ export default function HomeHero({
         }}
       >
         <Box component="span" sx={{ width: 1, opacity: 0.45, textAlign: 'center' }}>
-          Khám phá thế giới
+          {kind === 'fnb' ? 'Chào mừng đến' : 'Khám phá thế giới'}
         </Box>
         <Box
           component={m.span}
@@ -352,8 +350,10 @@ export default function HomeHero({
       ...(branding?.address
         ? [{ icon: 'solar:map-point-bold-duotone', label: branding.address }]
         : []),
-      { icon: 'solar:chat-round-bold-duotone', label: 'Tư vấn miễn phí' },
+      ...(branding?.phone ? [{ icon: 'solar:phone-bold-duotone', label: branding.phone }] : []),
+      ...(hasContact || !branding ? [{ icon: 'solar:chat-round-bold-duotone', label: 'Tư vấn miễn phí' }] : []),
     ];
+    if (badges.length === 0) return null;
 
     return (
     <m.div {...motionProps}>
@@ -392,18 +392,20 @@ export default function HomeHero({
         gap: { xs: 1.5, sm: 2 },
       }}
     >
-      <m.div {...motionProps}>
-        <Button
-          component={RouterLink}
-          href="#san-pham"
-          color="primary"
-          size="large"
-          variant="contained"
-          startIcon={<Iconify width={20} icon="solar:bag-smile-bold-duotone" />}
-        >
-          Xem bộ sưu tập
-        </Button>
-      </m.div>
+      {products.length > 0 && (
+        <m.div {...motionProps}>
+          <Button
+            component={RouterLink}
+            href={categories.length ? '#san-pham' : paths.product.root}
+            color="primary"
+            size="large"
+            variant="contained"
+            startIcon={<Iconify width={20} icon={kind === 'fnb' ? 'solar:cup-hot-bold-duotone' : 'solar:bag-smile-bold-duotone'} />}
+          >
+            {words.cta}
+          </Button>
+        </m.div>
+      )}
 
       {branding?.messengerLink && (
         <m.div {...motionProps}>
@@ -485,7 +487,7 @@ export default function HomeHero({
           variant="overline"
           sx={{ display: 'block', textAlign: 'center', color: 'text.disabled', mb: 2, letterSpacing: 2 }}
         >
-          Sản phẩm nổi bật
+          {kind === 'fnb' ? 'Món nổi bật' : 'Sản phẩm nổi bật'}
         </Typography>
       </m.div>
 
@@ -503,15 +505,15 @@ export default function HomeHero({
             key={product?.id ?? `slot-${idx}`}
             product={product ?? undefined}
             index={idx}
-            loading={productsLoading}
+            placeholder={placeholderIcon}
           />
         ))}
       </Box>
 
-      {!productsLoading && products.length === 0 && (
+      {products.length === 0 && (
         <m.div variants={varFade('in')}>
           <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1.5, display: 'block', textAlign: 'center' }}>
-            Đang cập nhật sản phẩm...
+            Đang cập nhật {words.item}...
           </Typography>
         </m.div>
       )}

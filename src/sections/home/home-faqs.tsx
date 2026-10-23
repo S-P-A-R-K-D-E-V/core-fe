@@ -19,6 +19,7 @@ import AccordionSummary, { accordionSummaryClasses } from '@mui/material/Accordi
 import Iconify from 'src/components/iconify';
 import { varFade, MotionViewport } from 'src/components/animate';
 
+import { storeKind, storeWords } from 'src/lib/store-seo';
 import type { TenantBranding } from 'src/lib/tenant-branding';
 
 import { SectionTitle } from './components/section-title';
@@ -28,43 +29,71 @@ import { FloatLine, FloatPlusIcon, FloatTriangleDownIcon } from './components/sv
 
 type Props = BoxProps & {
   branding?: TenantBranding | null;
+  categories?: string[];
+  /** Câu chữ viết riêng cho CiCi (thanh toán, "phản hồi trong 30 phút") — cửa hàng khác không hiện. */
+  isCiCi?: boolean;
 };
 
-export default function HomeFAQs({ sx, branding, ...other }: Props) {
+export default function HomeFAQs({ sx, branding, categories = [], isCiCi = false, ...other }: Props) {
   const storeName = branding?.storeName ?? 'CiCi Accessories';
-  const contactChannel = branding?.messengerLink
-    ? 'Messenger'
-    : branding?.zaloLink
-      ? 'Zalo'
-      : 'Messenger / Zalo';
+  const kind = storeKind(branding);
+  const words = storeWords(kind);
+  const chatChannel = branding?.messengerLink ? 'Messenger' : branding?.zaloLink ? 'Zalo' : null;
+  const contactChannel = chatChannel ?? 'Messenger / Zalo';
   const contactLink = branding?.messengerLink ?? branding?.zaloLink ?? null;
+  const phone = branding?.phone ?? null;
+  // Cách đặt hàng chỉ kể kênh cửa hàng thật sự có: gọi điện, nhắn tin, ghé cửa hàng.
+  const orderWays = [
+    phone ? `gọi ${phone}` : '',
+    chatChannel || isCiCi ? `nhắn tin qua ${contactChannel}` : '',
+  ].filter(Boolean);
 
   const faqs = [
-    {
-      question: `${storeName} bán những sản phẩm gì?`,
-      answer: `${storeName} luôn cập nhật mẫu mã mới liên tục, đa dạng lựa chọn cho khách hàng. Nhắn tin để được tư vấn chi tiết về sản phẩm hiện có.`,
-    },
-    {
-      question: 'Làm thế nào để đặt hàng?',
-      answer: branding?.address
-        ? `Bạn có thể nhắn tin trực tiếp qua ${contactChannel} để chọn hàng và hẹn giờ đến nhận tại ${branding.address}. Hoặc ghé thẳng cửa hàng trong giờ mở cửa.`
-        : `Bạn có thể nhắn tin trực tiếp qua ${contactChannel} để chọn hàng và được tư vấn giao nhận.`,
-    },
+    ...(categories.length || isCiCi
+      ? [
+          {
+            question: `${storeName} bán những ${words.item} gì?`,
+            answer: categories.length
+              ? `${storeName} hiện có ${categories.join(', ')}. Xem đầy đủ ${words.collection} kèm giá ở mục ${words.items} trên trang.`
+              : `${storeName} luôn cập nhật mẫu mã mới liên tục, đa dạng lựa chọn cho khách hàng. Nhắn tin để được tư vấn chi tiết về sản phẩm hiện có.`,
+          },
+        ]
+      : []),
+    ...(orderWays.length || branding?.address
+      ? [
+          {
+            question: kind === 'fnb' ? 'Làm thế nào để đặt món?' : 'Làm thế nào để đặt hàng?',
+            answer: [
+              orderWays.length ? `Bạn có thể ${orderWays.join(' hoặc ')} để chọn ${words.item}` : '',
+              branding?.address
+                ? `${orderWays.length ? ' và hẹn giờ đến nhận' : 'Bạn có thể ghé trực tiếp cửa hàng'} tại ${branding.address}.`
+                : orderWays.length
+                  ? ' và được tư vấn giao nhận.'
+                  : '',
+            ].join(''),
+          },
+        ]
+      : []),
     ...(branding?.address
       ? [
           {
             question: `Cửa hàng ${storeName} ở đâu?`,
-            answer: `${storeName} có cửa hàng tại ${branding.address}. Bạn có thể ghé trực tiếp để xem hàng thực tế và được tư vấn miễn phí. Ngoài ra bạn cũng có thể đặt hàng qua ${contactChannel} và đến lấy tại cửa hàng.`,
+            answer: `${storeName} có cửa hàng tại ${branding.address}. Bạn có thể ghé trực tiếp để xem ${words.item} thực tế${orderWays.length ? `, hoặc ${orderWays.join(' hoặc ')} trước khi đến` : ''}.`,
           },
         ]
       : []),
-    {
-      question: 'Phương thức thanh toán nào được chấp nhận?',
-      answer: 'Shop chấp nhận: tiền mặt tại cửa hàng, chuyển khoản ngân hàng và các ví điện tử phổ biến.',
-    },
+    ...(isCiCi
+      ? [
+          {
+            question: 'Phương thức thanh toán nào được chấp nhận?',
+            answer: 'Shop chấp nhận: tiền mặt tại cửa hàng, chuyển khoản ngân hàng và các ví điện tử phổ biến.',
+          },
+        ]
+      : []),
   ];
 
-  const [expanded, setExpanded] = useState<string | false>(faqs[0].question);
+  // Cửa hàng chưa có dữ liệu nào (nhóm hàng, địa chỉ, liên hệ) thì không có câu hỏi nào — chỉ còn khối liên hệ.
+  const [expanded, setExpanded] = useState<string | false>(faqs[0]?.question ?? false);
 
   const handleChange = (panel: string) => (_: React.SyntheticEvent, isExpanded: boolean) => {
     setExpanded(isExpanded ? panel : false);
@@ -75,7 +104,7 @@ export default function HomeFAQs({ sx, branding, ...other }: Props) {
       <MotionViewport sx={{ py: 10, position: 'relative' }}>
         {topLines()}
 
-        <Container>
+        <Container sx={{ display: faqs.length ? undefined : 'none' }}>
           <SectionTitle
             caption="Câu hỏi thường gặp"
             title="Bạn cần"
@@ -157,7 +186,9 @@ export default function HomeFAQs({ sx, branding, ...other }: Props) {
 
             <m.div variants={varFade('in')}>
               <Typography sx={{ mt: 2, mb: 3, color: 'text.secondary' }}>
-                Nhắn tin cho {storeName} — đội ngũ sẽ phản hồi trong vòng 30 phút!
+                {isCiCi
+                  ? `Nhắn tin cho ${storeName} — đội ngũ sẽ phản hồi trong vòng 30 phút!`
+                  : `Liên hệ ${storeName}${phone ? ` qua số ${phone}` : ''} để được tư vấn.`}
               </Typography>
             </m.div>
 

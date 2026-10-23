@@ -107,6 +107,8 @@ describe('StoreBrandingTab — thông tin in trên phiếu thanh toán', () => {
       phone: '0901 234 567',
       taxCode: '0312345678',
       receiptFooter: 'Cảm ơn quý khách, hẹn gặp lại!',
+      seoTitle: null,
+      seoDescription: null,
     });
     expect(snackbar.enqueueSnackbar).toHaveBeenCalledWith('Đã lưu thông tin cửa hàng');
   });
@@ -177,6 +179,8 @@ describe('StoreBrandingTab — thông tin in trên phiếu thanh toán', () => {
     expect(first).not.toHaveProperty('phone');
     expect(first).not.toHaveProperty('taxCode');
     expect(first).not.toHaveProperty('receiptFooter');
+    expect(first).not.toHaveProperty('seoTitle');
+    expect(first).not.toHaveProperty('seoDescription');
 
     await user.type(phoneInput(), '0901234567');
     await user.click(saveButton());
@@ -186,6 +190,33 @@ describe('StoreBrandingTab — thông tin in trên phiếu thanh toán', () => {
       phone: '0901234567',
       taxCode: null,
       receiptFooter: null,
+    });
+  });
+
+  it('tiêu đề / mô tả trang chủ: giới hạn của core-be, xem trước tự dựng khi để trống, lưu cùng PUT', async () => {
+    const user = userEvent.setup({ delay: null });
+    getStoreBranding.mockResolvedValue({ ...OLDER_FIELDS, phone: null, taxCode: null, receiptFooter: null });
+    saveStoreBranding.mockResolvedValue(undefined);
+    renderTab();
+    await loaded();
+
+    const title = screen.getByRole('textbox', { name: 'Tiêu đề trang chủ' });
+    const description = screen.getByRole('textbox', { name: 'Mô tả trang chủ' });
+    expect(title).toHaveAttribute('maxlength', '70');
+    expect(description).toHaveAttribute('maxlength', '300');
+    // Để trống: xem trước dùng bản tự dựng từ tên + vế đầu của giới thiệu ngắn.
+    const preview = screen.getByLabelText('Xem trước trên Google');
+    expect(preview).toHaveTextContent('CiCi Accessories — Phụ kiện thời trang');
+
+    await user.type(title, 'CiCi — Phụ kiện tóc Quận 1');
+    expect(preview).toHaveTextContent('CiCi — Phụ kiện tóc Quận 1');
+    await user.click(saveButton());
+
+    await waitFor(() => expect(saveStoreBranding).toHaveBeenCalledTimes(1));
+    expect(saveStoreBranding.mock.calls[0][0]).toMatchObject({
+      ...OLDER_FIELDS,
+      seoTitle: 'CiCi — Phụ kiện tóc Quận 1',
+      seoDescription: null,
     });
   });
 
