@@ -148,7 +148,7 @@ describe('PosQrPayment — nguồn xác nhận chuyển khoản', () => {
     await user.click(screen.getByRole('combobox', { name: FIELD }));
     const options = (await screen.findAllByRole('option')).map((o) => o.textContent);
     expect(options).toEqual([
-      'Theo tài khoản ngân hàng (mặc định)',
+      'Theo tài khoản ngân hàng',
       'ApiPay — MB 9704229999Thử nghiệm',
     ]);
     await user.click(screen.getByRole('option', { name: /ApiPay — MB 9704229999/ }));

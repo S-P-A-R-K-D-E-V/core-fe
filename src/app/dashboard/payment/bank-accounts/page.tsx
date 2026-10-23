@@ -1,16 +1,8 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import RoleBasedGuard from 'src/auth/guard/role-based-guard';
+import { paymentSettingsHref } from 'src/sections/payment/payment-pages';
 
-import BankAccountsTab from 'src/sections/store-settings/bank-accounts-tab';
-
-// ----------------------------------------------------------------------
-// Thanh toán → Tài khoản ngân hàng (chủ cửa hàng): tài khoản nhận tiền, VietQR, đăng ký báo có theo tài khoản.
-
+// Trang cũ — đã gộp vào Thanh toán → Cài đặt → Tài khoản ngân hàng.
 export default function PaymentBankAccountsPage() {
-  return (
-    <RoleBasedGuard hasContent roles={['Admin']}>
-      <BankAccountsTab />
-    </RoleBasedGuard>
-  );
+  redirect(paymentSettingsHref('accounts'));
 }

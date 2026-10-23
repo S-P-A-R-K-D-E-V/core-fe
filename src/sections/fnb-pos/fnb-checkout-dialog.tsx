@@ -35,12 +35,19 @@ import { cancelQrPayment, createQrPayment, getQrPaymentStatus } from 'src/api/pa
 import PaymentQrInfo, { useQrImageSrc, useExpirySeconds } from 'src/components/payment-qr-info';
 import { customerDisplay } from 'src/sections/customer-display/customer-display-bus';
 import PaymentConnectionSelect, {
+  allowedPosMethods,
   usePosPaymentConnections,
 } from 'src/components/payment-connection-select';
 
 import { changeDue, quickCashOptions } from './lib/checkout';
 
 import type { PaymentInput } from './lib/checkout';
+
+const FNB_METHODS: { value: FnbPaymentMethod; label: string }[] = [
+  { value: 'Cash', label: 'Tiền mặt' },
+  { value: 'Transfer', label: 'Chuyển khoản' },
+  { value: 'Card', label: 'Thẻ' },
+];
 
 // ----------------------------------------------------------------------
 // Chuyển khoản: hiện mã VietQR đúng số tiền + nội dung (dùng chung với Bán hàng). Cửa hàng có đối soát tiền về tự động
@@ -73,8 +80,11 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
   const [qr, setQr] = useState<IQrPaymentResponse | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
-  const { connections, selectionKey, connectionId, connection, setSelectionKey } =
+  const { connections, selectionKey, connectionId, connection, setSelectionKey, allowBankAccount, methods } =
     usePosPaymentConnections();
+  // Phương thức chủ cửa hàng bật cho quầy (Thanh toán → Cài đặt → Phương thức theo kênh).
+  const fnbMethods = allowedPosMethods(FNB_METHODS, methods);
+  const firstMethod = fnbMethods[0].value;
   // Lựa chọn gắn tài khoản của cửa hàng (vd VietinBank VietQR Pay — tài khoản VietinBank) → ô tài khoản theo luôn.
   const selectSource = (key: string) => {
     setSelectionKey(key);
@@ -97,7 +107,7 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
       dropQr();
       return;
     }
-    setMethod('Cash');
+    setMethod(firstMethod);
     setCash('');
     setTransferRef(order ? `${order.tableName ?? 'Mang ve'} #${order.displayNo}` : '');
     getBankAccounts()
@@ -106,7 +116,14 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
         setAccountId((current) => current || list[0]?.id || '');
       })
       .catch(() => setAccounts([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, order]);
+
+  // Cấu hình kênh tải xong sau khi hộp thoại mở: phương thức đang chọn bị tắt → về phương thức đầu tiên được bật.
+  useEffect(() => {
+    if (!fnbMethods.some((m) => m.value === method)) setMethod(firstMethod);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstMethod, fnbMethods.length]);
 
   const cashGiven = cash === '' ? null : Number(cash);
   const tooLow = method === 'Cash' && cashGiven !== null && cashGiven < total;
@@ -224,9 +241,11 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
           {hasDrafts && <Alert severity="info">Món đang chọn sẽ được gửi bar cùng lúc thanh toán.</Alert>}
 
           <ToggleButtonGroup exclusive fullWidth value={method} onChange={(_, v) => v && setMethod(v)}>
-            <ToggleButton value="Cash">Tiền mặt</ToggleButton>
-            <ToggleButton value="Transfer">Chuyển khoản</ToggleButton>
-            <ToggleButton value="Card">Thẻ</ToggleButton>
+            {fnbMethods.map((m) => (
+              <ToggleButton key={m.value} value={m.value}>
+                {m.label}
+              </ToggleButton>
+            ))}
           </ToggleButtonGroup>
 
           {method === 'Cash' && (
@@ -275,6 +294,7 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
                 connections={connections}
                 value={selectionKey}
                 onChange={selectSource}
+                allowBankAccount={allowBankAccount}
               />
               <TextField
                 label="Nội dung chuyển khoản"

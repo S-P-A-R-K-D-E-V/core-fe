@@ -19,6 +19,7 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import { alpha, useTheme } from '@mui/material/styles';
 
 import Iconify from 'src/components/iconify';
+import { allowedPosMethods, usePosPaymentMethods } from 'src/components/payment-connection-select';
 import { fCurrency } from 'src/utils/format-number';
 import { qrTransactionRef } from 'src/utils/payment-status';
 import { ICustomer } from 'src/types/corecms-api';
@@ -89,6 +90,9 @@ export default function PosPaymentDrawer({
   const [qrPaymentCompleted, setQrPaymentCompleted] = useState(false);
   // Chọn duy nhất 1 phương thức thanh toán (giữ dạng mảng để tương thích PaymentLine[])
   const [selectedMethods, setSelectedMethods] = useState<string[]>(['Cash']);
+  // Phương thức chủ cửa hàng bật cho quầy; mở ngăn thì chọn sẵn phương thức đầu tiên.
+  const posMethods = allowedPosMethods(PAYMENT_METHODS, usePosPaymentMethods());
+  const firstPosMethod = posMethods[0]?.value ?? 'Cash';
   const [methodAmounts, setMethodAmounts] = useState<Record<string, number>>({});
   const [methodRefs, setMethodRefs] = useState<Record<string, string>>({});
   const [customerPayment, setCustomerPayment] = useState<number>(0);
@@ -105,15 +109,15 @@ export default function PosPaymentDrawer({
   // Reset on open
   useEffect(() => {
     if (open) {
-      setSelectedMethods(['Cash']);
-      setMethodAmounts({ Cash: totalAmount });
+      setSelectedMethods([firstPosMethod]);
+      setMethodAmounts({ [firstPosMethod]: totalAmount });
       setMethodRefs({});
       setCustomerPayment(totalAmount);
       setLoading(false);
       setQrPaymentCompleted(false);
       setDiscountInput(orderDiscount > 0 ? String(orderDiscount) : '');
     }
-  }, [open, totalAmount, orderDiscount]);
+  }, [open, totalAmount, orderDiscount, firstPosMethod]);
 
   const handleSelectMethod = useCallback(
     (method: string) => {
@@ -396,7 +400,7 @@ export default function PosPaymentDrawer({
           </Typography>
 
           <Stack spacing={1}>
-            {PAYMENT_METHODS.map((pm) => {
+            {posMethods.map((pm) => {
               const isSelected = selectedMethods.includes(pm.value);
               return (
                 <Box key={pm.value}>

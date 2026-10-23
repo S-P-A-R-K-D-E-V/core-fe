@@ -704,13 +704,12 @@ export function useNavData(
               { title: 'Tạo đơn', path: paths.dashboard.pos.salesOrder.new, platformFeature: PLATFORM_FEATURES.posSale },
             ],
           },
-          // THANH TOÁN (một mục): đối soát, đơn online (chủ + quản lý); tài khoản ngân hàng, báo có & kết nối S Payment
-          // (chủ cửa hàng).
+          // THANH TOÁN (một mục): đối soát (chủ + quản lý), đơn online (mọi nhân viên — gói hàng), Cài đặt (chủ cửa hàng).
           {
             title: 'Thanh toán',
             path: paths.dashboard.payment.root,
             icon: ICONS.banking,
-            roles: ['Admin', 'Manager'],
+            roles: ['Admin', 'Manager', 'Staff'],
             children: PAYMENT_PAGES.map((page) => ({
               title: page.title,
               path: page.path,

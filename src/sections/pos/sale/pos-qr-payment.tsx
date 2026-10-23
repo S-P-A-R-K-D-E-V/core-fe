@@ -75,6 +75,7 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     connection,
     setSelectionKey,
     loaded: connectionsLoaded,
+    allowBankAccount,
   } = usePosPaymentConnections();
 
   const [debouncedAmount, setDebouncedAmount] = useState(amount);
@@ -383,8 +384,9 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
         value={selectionKey}
         onChange={setSelectionKey}
         disabled={qrState === 'completed'}
+        allowBankAccount={allowBankAccount}
       />
-      {!connection && bankAccounts.length > 0 && bankSelector}
+      {!connection && allowBankAccount && bankAccounts.length > 0 && bankSelector}
     </>
   );
 
@@ -407,6 +409,15 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     return (
       <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
         Chưa có tài khoản ngân hàng. Vui lòng cấu hình trong KiotViet.
+      </Typography>
+    );
+  }
+
+  // Chủ cửa hàng tắt VietQR theo tài khoản cho quầy mà chưa bật nguồn chuyển khoản nào qua kết nối.
+  if (!allowBankAccount && connections.length === 0) {
+    return (
+      <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+        Chưa bật nguồn chuyển khoản cho quầy — chủ cửa hàng bật ở Thanh toán → Cài đặt → Phương thức theo kênh.
       </Typography>
     );
   }

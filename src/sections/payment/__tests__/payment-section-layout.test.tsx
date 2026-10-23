@@ -50,27 +50,23 @@ afterEach(() => {
 });
 
 describe('PaymentSectionLayout', () => {
-  it('chủ cửa hàng: bốn tab, tab theo đường dẫn, bấm tab mở route con', async () => {
+  it('chủ cửa hàng: ba tab, tab theo đường dẫn, bấm tab mở route con', async () => {
     const user = userEvent.setup();
-    nav.pathname = paths.dashboard.payment.notifications;
+    nav.pathname = paths.dashboard.payment.settings;
     renderLayout();
 
     expect(screen.getByRole('heading', { name: 'Thanh toán' })).toBeInTheDocument();
-    expect(screen.getByText('Dashboard / Thanh toán / Báo có & kết nối')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard / Thanh toán / Cài đặt')).toBeInTheDocument();
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
       'Đối soát',
       'Đơn online',
-      'Tài khoản ngân hàng',
-      'Báo có & kết nối',
+      'Cài đặt',
     ]);
-    expect(screen.getByRole('tab', { name: 'Báo có & kết nối' })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
+    expect(screen.getByRole('tab', { name: 'Cài đặt' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('nội dung trang')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: 'Tài khoản ngân hàng' }));
-    expect(nav.push).toHaveBeenCalledWith(paths.dashboard.payment.bankAccounts);
+    await user.click(screen.getByRole('tab', { name: 'Đơn online' }));
+    expect(nav.push).toHaveBeenCalledWith(paths.dashboard.payment.onlineOrders);
   });
 
   it('quản lý: chỉ đối soát và đơn online', () => {
@@ -81,6 +77,15 @@ describe('PaymentSectionLayout', () => {
       'Đối soát',
       'Đơn online',
     ]);
+  });
+
+  it('nhân viên: chỉ đơn online (không hiện thanh tab một mục)', () => {
+    auth.user = { role: 'Staff', roles: ['Staff'] };
+    nav.pathname = paths.dashboard.payment.onlineOrders;
+    renderLayout();
+
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.getByText('Dashboard / Thanh toán / Đơn online')).toBeInTheDocument();
   });
 
   it('trang con theo tiền tố đường dẫn', () => {

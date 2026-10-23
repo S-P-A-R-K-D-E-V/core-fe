@@ -25,6 +25,8 @@ const BACKEND_API_PREFIXES = [
   'fnb',
   // Đơn online từ storefront (trang quản trị Đơn online).
   'online-orders',
+  // Kết nối hãng vận chuyển (Thanh toán → Cài đặt → Bán online & giao hàng) — chuyển tiếp spark-shipping.
+  'shipping',
   // API công khai của cửa hàng (thương hiệu, sản phẩm) — app mobile bản cửa hàng dùng để kiểm tra mã cửa hàng.
   'public',
   // Màn hình khách ở quầy (quảng cáo theo chi nhánh). Trang /customer-display/ là của Next, API dùng tiền tố khác.

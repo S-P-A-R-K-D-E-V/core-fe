@@ -39,6 +39,7 @@ import DialogActions from '@mui/material/DialogActions';
 import { alpha, useTheme } from '@mui/material/styles';
 
 import Iconify from 'src/components/iconify';
+import { allowedPosMethods, usePosPaymentMethods } from 'src/components/payment-connection-select';
 import { useSnackbar } from 'src/components/snackbar';
 import { fCurrency } from 'src/utils/format-number';
 import { qrTransactionRef } from 'src/utils/payment-status';
@@ -159,6 +160,13 @@ function createEmptyOrder(id: number): DraftOrder {
   };
 }
 
+const POS_SALE_METHODS = [
+  { value: 'Cash', label: 'Tiền mặt', icon: 'solar:wallet-money-bold' },
+  { value: 'BankTransfer', label: 'Chuyển khoản', icon: 'solar:card-transfer-bold' },
+  { value: 'Card', label: 'Thẻ', icon: 'solar:card-bold' },
+  { value: 'EWallet', label: 'Ví', icon: 'solar:smartphone-bold' },
+];
+
 // ======================================================================
 // Main Component
 // ======================================================================
@@ -220,6 +228,15 @@ export default function PosSaleView() {
 
   // Quick sale payment state
   const [quickSelectedMethods, setQuickSelectedMethods] = useState<string[]>(['Cash']);
+  // Phương thức chủ cửa hàng bật cho quầy (Thanh toán → Cài đặt → Phương thức theo kênh); chọn sẵn phương thức đầu tiên.
+  const posMethods = allowedPosMethods(POS_SALE_METHODS, usePosPaymentMethods());
+  const firstPosMethod = posMethods[0]?.value ?? 'Cash';
+  useEffect(() => {
+    setQuickSelectedMethods((current) =>
+      current.every((m) => posMethods.some((p) => p.value === m)) ? current : [firstPosMethod]
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstPosMethod, posMethods.length]);
   const [quickMethodAmounts, setQuickMethodAmounts] = useState<Record<string, number>>({});
   const [quickMethodRefs, setQuickMethodRefs] = useState<Record<string, string>>({});
   const [quickCustomerPayment, setQuickCustomerPayment] = useState<number>(0);
@@ -832,7 +849,7 @@ export default function PosSaleView() {
       // Lỗi tạo hoá đơn: giữ phương thức / số tiền / mã QR đã trả để thử lại, không reset.
       if (!(await handleConfirmPayment(payments))) return;
       // Reset quick payment state
-      setQuickSelectedMethods(['Cash']);
+      setQuickSelectedMethods([firstPosMethod]);
       setQuickMethodAmounts({});
       setQuickMethodRefs({});
       setQuickCustomerPayment(0);
@@ -850,6 +867,7 @@ export default function PosSaleView() {
     grandTotal,
     enqueueSnackbar,
     handleConfirmPayment,
+    firstPosMethod,
   ]);
 
   // Quick discount apply
@@ -882,13 +900,6 @@ export default function PosSaleView() {
   }, [grandTotal]);
 
   // ====== Render ======
-
-  const PAYMENT_METHODS = [
-    { value: 'Cash', label: 'Tiền mặt', icon: 'solar:wallet-money-bold' },
-    { value: 'BankTransfer', label: 'Chuyển khoản', icon: 'solar:card-transfer-bold' },
-    { value: 'Card', label: 'Thẻ', icon: 'solar:card-bold' },
-    { value: 'EWallet', label: 'Ví', icon: 'solar:smartphone-bold' },
-  ];
 
   return (
     <Box
@@ -1589,7 +1600,7 @@ export default function PosSaleView() {
                   Phương thức thanh toán
                 </Typography>
                 <Stack spacing={0.5}>
-                  {PAYMENT_METHODS.map((pm) => {
+                  {posMethods.map((pm) => {
                     const isSelected = quickSelectedMethods.includes(pm.value);
                     return (
                       <Box key={pm.value}>

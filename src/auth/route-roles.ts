@@ -47,9 +47,12 @@ export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   // Thiết bị cửa hàng: quản lý xem / ghép / thu hồi máy quầy, kiosk của chi nhánh mình (server lọc theo chi nhánh).
   { prefix: paths.dashboard.storeSettings.devices, roles: MANAGER_ROLES },
   { prefix: paths.dashboard.notificationConfig.root, roles: ADMIN_ROLES },
-  // Thanh toán: đối soát + đơn online cho chủ và quản lý; tài khoản ngân hàng, báo có & kết nối chỉ chủ cửa hàng
-  // (PaymentSettingsController / PaymentBankLinksController — Admin).
+  // Thanh toán: đối soát cho chủ và quản lý; đơn online cho mọi nhân viên (OnlineOrdersController — StoreStaff: người
+  // đang làm gói hàng); Cài đặt (+ hai trang cũ chuyển về đó) chỉ chủ cửa hàng (PaymentSettingsController,
+  // PaymentChannelSettingsController, ShippingSettingsController — Admin).
   { prefix: paths.dashboard.payment.root, roles: MANAGER_ROLES },
+  { prefix: paths.dashboard.payment.onlineOrders, roles: null },
+  { prefix: paths.dashboard.payment.settings, roles: ADMIN_ROLES },
   { prefix: paths.dashboard.payment.bankAccounts, roles: ADMIN_ROLES },
   { prefix: paths.dashboard.payment.notifications, roles: ADMIN_ROLES },
 

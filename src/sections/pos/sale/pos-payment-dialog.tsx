@@ -20,6 +20,7 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import { alpha, useTheme } from '@mui/material/styles';
 
 import Iconify from 'src/components/iconify';
+import { allowedPosMethods, usePosPaymentMethods } from 'src/components/payment-connection-select';
 import { fCurrency } from 'src/utils/format-number';
 
 // ----------------------------------------------------------------------
@@ -50,14 +51,17 @@ export default function PosPaymentDialog({ open, onClose, totalAmount, onConfirm
   const theme = useTheme();
   const [payments, setPayments] = useState<PaymentLine[]>([{ method: 'Cash', amount: totalAmount }]);
   const [loading, setLoading] = useState(false);
+  // Phương thức chủ cửa hàng bật cho quầy; dòng mới chọn sẵn phương thức đầu tiên.
+  const posMethods = allowedPosMethods(PAYMENT_METHODS, usePosPaymentMethods());
+  const firstPosMethod = posMethods[0]?.value ?? 'Cash';
 
   // Reset when dialog opens
   useEffect(() => {
     if (open) {
-      setPayments([{ method: 'Cash', amount: totalAmount }]);
+      setPayments([{ method: firstPosMethod, amount: totalAmount }]);
       setLoading(false);
     }
-  }, [open, totalAmount]);
+  }, [open, totalAmount, firstPosMethod]);
 
   const paidTotal = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const changeAmount = paidTotal - totalAmount;
@@ -76,8 +80,8 @@ export default function PosPaymentDialog({ open, onClose, totalAmount, onConfirm
 
   const handleAddPayment = useCallback(() => {
     const remaining = totalAmount - payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-    setPayments((prev) => [...prev, { method: 'Cash', amount: remaining > 0 ? remaining : 0 }]);
-  }, [payments, totalAmount]);
+    setPayments((prev) => [...prev, { method: firstPosMethod, amount: remaining > 0 ? remaining : 0 }]);
+  }, [payments, totalAmount, firstPosMethod]);
 
   const handleRemovePayment = useCallback((index: number) => {
     setPayments((prev) => prev.filter((_, i) => i !== index));
@@ -152,7 +156,7 @@ export default function PosPaymentDialog({ open, onClose, totalAmount, onConfirm
               onChange={(_, val) => val && handleMethodChange(index, val)}
               sx={{ mb: 1.5, width: '100%' }}
             >
-              {PAYMENT_METHODS.map((m) => (
+              {posMethods.map((m) => (
                 <ToggleButton
                   key={m.value}
                   value={m.value}

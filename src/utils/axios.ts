@@ -702,6 +702,33 @@ export const endpoints = {
     list: '/online-orders',
     details: (id: string) => `/online-orders/${id}`,
     cancel: (id: string) => `/online-orders/${id}/cancel`,
+    pack: (id: string) => `/online-orders/${id}/pack`,
+    ship: (id: string) => `/online-orders/${id}/ship`,
+    complete: (id: string) => `/online-orders/${id}/complete`,
+    cancelShipment: (id: string) => `/online-orders/${id}/shipment/cancel`,
+  },
+  // Thanh toán → Cài đặt: phương thức theo kênh (POS / Online), chính sách bán online (chủ cửa hàng)
+  paymentChannels: {
+    channels: '/payment/settings/channels',
+    onlineShop: '/payment/settings/online-shop',
+  },
+  // Kết nối hãng vận chuyển (GHN, GHTK...) — chuyển tiếp tới spark-shipping (chủ cửa hàng)
+  shippingSettings: {
+    root: '/shipping/settings',
+    carriers: '/shipping/settings/carriers',
+    connections: '/shipping/settings/connections',
+    connection: (id: string) => `/shipping/settings/connections/${id}`,
+    test: (id: string) => `/shipping/settings/connections/${id}/test`,
+  },
+  // Trang bán online công khai (không cần đăng nhập)
+  storefront: {
+    checkoutConfig: '/public/storefront/checkout-config',
+    provinces: '/public/storefront/address/provinces',
+    wards: '/public/storefront/address/wards',
+    shippingQuote: '/public/storefront/shipping/quote',
+    checkout: '/public/storefront/checkout',
+    order: (code: string) => `/public/storefront/orders/${encodeURIComponent(code)}`,
+    pay: (code: string) => `/public/storefront/orders/${encodeURIComponent(code)}/pay`,
   },
   reports: {
     dashboard: '/reports/dashboard',

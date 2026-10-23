@@ -176,12 +176,14 @@ export const paths = {
       // Thiết bị cửa hàng: máy quầy (app / web), kiosk chấm công, camera — chủ cửa hàng + quản lý.
       devices: `${ROOTS.DASHBOARD}/store-settings/devices`,
     },
-    // Thanh toán (một mục quản lý): đối soát giao dịch ngân hàng / cổng với thanh toán, đơn online từ storefront, tài
-    // khoản ngân hàng nhận tiền, đăng ký báo có & kết nối S Payment.
+    // Thanh toán (một mục quản lý): đối soát giao dịch ngân hàng / cổng với thanh toán, đơn online từ trang bán online,
+    // Cài đặt (phương thức theo kênh, bán online & giao hàng, tài khoản ngân hàng nhận tiền, báo có & kết nối S Payment).
     payment: {
       root: `${ROOTS.DASHBOARD}/payment`,
       reconciliation: `${ROOTS.DASHBOARD}/payment/reconciliation`,
       onlineOrders: `${ROOTS.DASHBOARD}/payment/online-orders`,
+      settings: `${ROOTS.DASHBOARD}/payment/settings`,
+      // Trang cũ — chuyển về Cài đặt (tab tương ứng).
       bankAccounts: `${ROOTS.DASHBOARD}/payment/bank-accounts`,
       notifications: `${ROOTS.DASHBOARD}/payment/notifications`,
     },

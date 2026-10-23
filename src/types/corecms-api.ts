@@ -3286,7 +3286,16 @@ export interface IPosPaymentConnection {
 export interface IPosPaymentConnectionsResponse {
   /** Dịch vụ thanh toán (spark-payment) đang bật */
   enabled: boolean;
+  /** Nguồn chuyển khoản qua kết nối chủ cửa hàng bật cho quầy (Thanh toán → Cài đặt → Phương thức theo kênh). */
   connections: IPosPaymentConnection[];
+  /** Chủ cửa hàng đã lưu cấu hình kênh POS — false / thiếu (BE cũ) = mọi phương thức như trước. */
+  configured?: boolean;
+  /** Phương thức hiện ở quầy: 'Cash' | 'BankTransfer' | 'Card' (khi configured). */
+  methods?: string[] | null;
+  /** Cho tạo VietQR theo tài khoản ngân hàng (không qua kết nối). */
+  allowBankAccount?: boolean;
+  /** Nguồn chuyển khoản mặc định: '' = theo tài khoản, khoá kết nối; null = máy tự nhớ như trước. */
+  defaultKey?: string | null;
 }
 
 /** INIT | PENDING | COMPLETED | CANCELLED | ERRORCORRECTED | EXPIRED (EXPIRED chỉ có khi bật dịch vụ thanh toán). */
