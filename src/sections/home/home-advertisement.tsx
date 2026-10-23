@@ -23,6 +23,8 @@ import { varFade, MotionViewport } from 'src/components/animate';
 import { storeIndustry } from 'src/lib/store-industry';
 import type { TenantBranding } from 'src/lib/tenant-branding';
 
+import { useDecorativeMotion } from './components/use-decorative-motion';
+
 // ----------------------------------------------------------------------
 
 type Props = BoxProps & {
@@ -32,6 +34,7 @@ type Props = BoxProps & {
 
 export default function HomeAdvertisement({ sx, branding, productTotal = 0, ...other }: Props) {
   const theme = useTheme();
+  const motion = useDecorativeMotion();
   const storeName = branding?.storeName ?? 'CiCi Accessories';
   const contactLink = branding?.messengerLink ?? branding?.zaloLink ?? null;
   const industry = storeIndustry(branding);
@@ -45,7 +48,7 @@ export default function HomeAdvertisement({ sx, branding, productTotal = 0, ...o
     <Stack component={m.div} variants={varFade('inUp', { distance: 24 })} alignItems="center">
       <Box
         component={m.img}
-        animate={{ y: [-16, 0, -16] }}
+        animate={motion ? { y: [-16, 0, -16] } : undefined}
         transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
         alt=""
         src="/assets/images/home/rocket.webp"

@@ -92,7 +92,8 @@ const StyledNavItem = styled(ListItemButton, {
         },
       },
       ...(active && {
-        color: theme.palette.primary.main,
+        // primary.dark: chữ primary.main trên nền trắng chỉ đạt tương phản ~3:1.
+        color: theme.palette.primary.dark,
         fontWeight: theme.typography.fontWeightSemiBold,
         '&:before': {
           ...dotStyles,

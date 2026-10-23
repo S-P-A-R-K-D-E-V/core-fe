@@ -28,6 +28,8 @@ import Iconify from 'src/components/iconify';
 import { varFade, MotionContainer } from 'src/components/animate';
 
 import { storeIndustry, type IndustryPreset } from 'src/lib/store-industry';
+
+import { useDecorativeMotion } from './components/use-decorative-motion';
 import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding';
 
 // ----------------------------------------------------------------------
@@ -43,7 +45,7 @@ const motionProps: MotionProps = {
 // ----------------------------------------------------------------------
 
 // Màu nền đầu trang theo ngành của cửa hàng (src/lib/store-industry.ts).
-function HeroBg({ palette }: { palette: IndustryPreset['palette'] }) {
+function HeroBg({ palette, motion }: { palette: IndustryPreset['palette']; motion: boolean }) {
   return (
     <Box
       sx={{
@@ -82,7 +84,7 @@ function HeroBg({ palette }: { palette: IndustryPreset['palette'] }) {
       {/* Blur glow top-right — animates slowly */}
       <Box
         component={m.div}
-        animate={{ scale: [1, 1.15, 1], opacity: [0.35, 0.5, 0.35] }}
+        animate={motion ? { scale: [1, 1.15, 1], opacity: [0.35, 0.5, 0.35] } : undefined}
         transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
         sx={{
           top: -100,
@@ -98,7 +100,7 @@ function HeroBg({ palette }: { palette: IndustryPreset['palette'] }) {
       {/* Blur glow bottom-left — animates offset */}
       <Box
         component={m.div}
-        animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.35, 0.2] }}
+        animate={motion ? { scale: [1, 1.2, 1], opacity: [0.2, 0.35, 0.2] } : undefined}
         transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
         sx={{
           bottom: -150,
@@ -122,9 +124,10 @@ type ProductCardProps = {
   index: number;
   placeholder: string;
   cards: IndustryPreset['palette']['cards'];
+  motion: boolean;
 };
 
-function ProductCard({ product, index, placeholder, cards }: ProductCardProps) {
+function ProductCard({ product, index, placeholder, cards, motion }: ProductCardProps) {
   const [imgError, setImgError] = useState(false);
   const handleImgError = useCallback(() => setImgError(true), []);
 
@@ -178,7 +181,7 @@ function ProductCard({ product, index, placeholder, cards }: ProductCardProps) {
             />
           ) : (
             <m.div
-              animate={{ scale: [1, 1.08, 1] }}
+              animate={motion ? { scale: [1, 1.08, 1] } : undefined}
               transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
             >
               <Iconify icon={placeholder} width={48} sx={{ color: 'rgba(255,255,255,0.6)' }} />
@@ -228,7 +231,7 @@ function ProductCard({ product, index, placeholder, cards }: ProductCardProps) {
           <Typography variant="caption" fontWeight={700} noWrap display="block" sx={{ mb: 0.5 }}>
             {product.name}
           </Typography>
-          <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 700 }}>
+          <Typography variant="caption" sx={{ color: 'error.dark', fontWeight: 700 }}>
             {product.price > 0 ? fCurrency(product.price) : 'Liên hệ'}
           </Typography>
         </Box>
@@ -248,6 +251,7 @@ type Props = BoxProps & {
 export default function HomeHero({ sx, products = [], branding, categories = [], ...other }: Props) {
   const storeName = branding?.storeName ?? 'CiCi Accessories';
   const industry = storeIndustry(branding);
+  const motion = useDecorativeMotion();
   const { words, palette } = industry;
   const [h1, h2, h3] = palette.headline;
   // Câu dưới tiêu đề: mô tả của cửa hàng; chưa viết thì kể nhóm hàng thật đang bán.
@@ -308,7 +312,7 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
         </Box>
         <Box
           component={m.span}
-          animate={{ backgroundPosition: '200% center' }}
+          animate={motion ? { backgroundPosition: '200% center' } : undefined}
           transition={{ duration: 20, ease: 'linear', repeat: Infinity, repeatType: 'reverse' }}
           sx={{
             ...textGradient(`300deg, ${h1} 0%, ${h2} 30%, ${h3} 60%, ${h2} 80%, ${h1} 100%`),
@@ -502,6 +506,7 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
             product={product ?? undefined}
             index={idx}
             placeholder={industry.icon}
+            motion={motion}
             cards={palette.cards}
           />
         ))}
@@ -555,7 +560,7 @@ export default function HomeHero({ sx, products = [], branding, categories = [],
         }}
       >
         {/* Background */}
-        <HeroBg palette={palette} />
+        <HeroBg palette={palette} motion={motion} />
 
         <Container
           component={MotionContainer}

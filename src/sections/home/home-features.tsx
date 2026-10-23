@@ -25,6 +25,7 @@ import { displayCategory } from 'src/lib/store-seo';
 import { storeIndustry, type IndustryPreset } from 'src/lib/store-industry';
 
 import { SectionTitle } from './components/section-title';
+import { useDecorativeMotion } from './components/use-decorative-motion';
 import { FloatLine, FloatPlusIcon } from './components/svg-elements';
 
 // Chữ chỉ dành cho trình đọc màn hình: link "XEM TẤT CẢ" đọc thành "XEM TẤT CẢ <tên nhóm>" (tên đọc được chứa đúng chữ hiển thị).
@@ -239,6 +240,7 @@ type CategoryItemProps = BoxProps & {
 
 function CategoryItem({ item, sx, ...other }: CategoryItemProps) {
   const { product } = item;
+  const motion = useDecorativeMotion();
   const [imageError, setImageError] = useState(false);
   const showImage = !!product?.imageUrl && !imageError;
   return (
@@ -251,7 +253,7 @@ function CategoryItem({ item, sx, ...other }: CategoryItemProps) {
     >
       <Box sx={{ mb: 5, gap: 2.5, display: 'flex', alignItems: 'flex-start' }}>
         <m.div
-          animate={{ rotate: [0, 8, -8, 0] }}
+          animate={motion ? { rotate: [0, 8, -8, 0] } : undefined}
           transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
         >
           <Iconify width={36} icon={item.icon} sx={{ mt: '8px', color: 'rgba(255,255,255,0.9)', flexShrink: 0 }} />
@@ -318,7 +320,7 @@ function CategoryItem({ item, sx, ...other }: CategoryItemProps) {
         ) : (
           <>
             <m.div
-              animate={{ scale: [1, 1.1, 1] }}
+              animate={motion ? { scale: [1, 1.1, 1] } : undefined}
               transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
             >
               <Iconify width={72} icon={item.icon} sx={{ color: 'rgba(255,255,255,0.3)' }} />
