@@ -5,7 +5,7 @@ import type { TenantBranding } from './tenant-branding';
 // TenantBranding.seasonalTheme (Cài đặt cửa hàng). Thêm mùa mới (Tết…) = thêm một preset + khoảng ngày.
 // ----------------------------------------------------------------------
 
-export type SeasonKey = 'christmas';
+export type SeasonKey = 'halloween' | 'christmas';
 
 export type SeasonPreset = {
   key: SeasonKey;
@@ -20,11 +20,28 @@ export type SeasonPreset = {
   glow: [string, string];
   /** Màu dây đèn. */
   lights: string[];
+  /** Thứ bay trên màn hình: không ghi = tuyết (chấm + ❄); có = các ký tự này (emoji) rơi chậm. */
+  particles?: string[];
   /** Khối cuối trang: nền chuyển sắc và hai dòng chào. */
   outro: { from: string; to: string; lines: (storeName: string) => [string, string] };
 };
 
 export const SEASONS: Record<SeasonKey, SeasonPreset> = {
+  halloween: {
+    key: 'halloween',
+    badge: 'Mùa Halloween',
+    emoji: '🎃',
+    headline: ['#EA580C', '#9333EA', '#D97706'],
+    heroTint: 'rgba(255, 247, 237, 0.94)',
+    glow: ['rgba(251, 146, 60, 0.35)', 'rgba(167, 139, 250, 0.3)'],
+    lights: ['#F97316', '#A855F7', '#84CC16', '#F59E0B'],
+    particles: ['🦇', '🍂', '🍁'],
+    outro: {
+      from: '#C2410C',
+      to: '#3B0764',
+      lines: (storeName) => ['Halloween vui vẻ', `cùng ${storeName}`],
+    },
+  },
   christmas: {
     key: 'christmas',
     badge: 'Mùa Giáng Sinh',
@@ -47,16 +64,17 @@ function vietnamDate(now: Date): { month: number; day: number } {
   return { month: local.getUTCMonth() + 1, day: local.getUTCDate() };
 }
 
-/** Mùa lễ theo ngày: Giáng Sinh từ 1/12 đến hết 26/12. */
+/** Mùa lễ theo ngày: Halloween từ 20/10 đến hết 31/10, Giáng Sinh từ 1/12 đến hết 26/12. */
 export function seasonOnDate(now: Date): SeasonKey | null {
   const { month, day } = vietnamDate(now);
+  if (month === 10 && day >= 20) return 'halloween';
   if (month === 12 && day <= 26) return 'christmas';
   return null;
 }
 
 /**
- * Mùa lễ hiện trên trang chủ của cửa hàng. `preview` là tham số ?season= của URL: "christmas" xem trước bất kể ngày và
- * công tắc (để chủ cửa hàng duyệt trước), "off" tắt hẳn.
+ * Mùa lễ hiện trên trang chủ của cửa hàng. `preview` là tham số ?season= của URL: "halloween" / "christmas" xem trước
+ * bất kể ngày và công tắc (để chủ cửa hàng duyệt trước), "off" tắt hẳn.
  */
 export function activeSeason({
   branding,

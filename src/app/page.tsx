@@ -80,7 +80,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   if (onAuthHost()) return <HubLoginPage />;
 
   const { branding, products, categories, description } = await loadHome();
-  // Giao diện mùa lễ (Giáng Sinh 1/12–26/12) — ?season=christmas để xem trước, ?season=off để tắt.
+  // Giao diện mùa lễ (Halloween 20–31/10, Giáng Sinh 1–26/12) — ?season=halloween|christmas để xem trước, ?season=off để tắt.
   const season = activeSeason({ branding, preview: searchParams?.season });
   const jsonLd =
     branding &&

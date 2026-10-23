@@ -311,21 +311,33 @@ export default function StoreBrandingTab() {
               <Stack spacing={0.5}>
                 <Typography variant="subtitle1">Giao diện mùa lễ trên trang chủ</Typography>
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  Tự đổi sang giao diện Giáng Sinh (tuyết rơi, dây đèn, lời chúc) từ 1/12 đến 26/12.
-                  Tắt nếu cửa hàng không muốn trang trí.
+                  Tự đổi giao diện theo dịp: Halloween từ 20/10 đến 31/10, Giáng Sinh từ 1/12 đến
+                  26/12 (dây đèn, màu lễ, lời chúc, hiệu ứng rơi). Tắt nếu cửa hàng không muốn trang
+                  trí.
                 </Typography>
               </Stack>
             }
           />
-          <Button
-            href="/?season=christmas"
-            target="_blank"
-            rel="noopener"
-            variant="outlined"
-            size="small"
-          >
-            Xem trước
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              href="/?season=halloween"
+              target="_blank"
+              rel="noopener"
+              variant="outlined"
+              size="small"
+            >
+              Xem Halloween
+            </Button>
+            <Button
+              href="/?season=christmas"
+              target="_blank"
+              rel="noopener"
+              variant="outlined"
+              size="small"
+            >
+              Xem Giáng Sinh
+            </Button>
+          </Stack>
         </Stack>
 
         <Stack direction="row" justifyContent="flex-end">

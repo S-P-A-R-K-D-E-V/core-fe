@@ -6,6 +6,7 @@ import { keyframes } from '@mui/material/styles';
 // Tuyết rơi chỉ bằng CSS: mỗi bông chỉ đổi transform nên trình duyệt chạy trên luồng compositor — không có JavaScript
 // hay vẽ lại trang mỗi khung hình (khác hiệu ứng framer-motion). Vị trí / tốc độ cố định theo thứ tự bông để HTML phía
 // server và trình duyệt giống nhau. Điện thoại chỉ hiện một nửa số bông; chọn giảm chuyển động thì không hiện.
+// Có `glyphs` (mùa Halloween: dơi, lá thu…) thì mọi bông là các ký tự đó, to hơn và rơi chậm hơn.
 
 const fall = keyframes`
   from { transform: translate3d(0, -10vh, 0); }
@@ -14,7 +15,7 @@ const fall = keyframes`
 
 const FLAKES = 24;
 
-export function Snowfall() {
+export function Snowfall({ glyphs }: { glyphs?: string[] }) {
   return (
     <Box
       aria-hidden
@@ -37,6 +38,7 @@ export function Snowfall() {
         // Cứ ba bông có một bông hình ❄ (chữ, không phải ảnh); còn lại là chấm tuyết có viền xám nhạt để thấy được
         // trên nền sáng.
         const crystal = i % 3 === 0;
+        const glyph = glyphs?.length ? glyphs[i % glyphs.length] : null;
         return (
           <Box
             key={i}
@@ -47,27 +49,29 @@ export function Snowfall() {
               left: `${left}%`,
               position: 'absolute',
               opacity: 0.7 + (i % 3) * 0.1,
-              animation: `${fall} ${duration}s linear ${delay}s infinite`,
-              ...(crystal
-                ? {
-                    lineHeight: 1,
-                    color: '#93C5FD',
-                    fontSize: size * 2,
-                    textShadow: '0 1px 3px rgba(30, 64, 175, 0.35)',
-                  }
-                : {
-                    width: size,
-                    height: size,
-                    borderRadius: '50%',
-                    background: 'radial-gradient(circle at 35% 35%, #FFFFFF 45%, #E0F2FE 100%)',
-                    boxShadow:
-                      '0 0 0 1px rgba(148, 163, 184, 0.35), 0 1px 4px rgba(71, 85, 105, 0.35)',
-                  }),
+              animation: `${fall} ${glyph ? duration + 6 : duration}s linear ${delay}s infinite`,
+              ...(glyph
+                ? { lineHeight: 1, fontSize: size * 2 + 4 }
+                : crystal
+                  ? {
+                      lineHeight: 1,
+                      color: '#93C5FD',
+                      fontSize: size * 2,
+                      textShadow: '0 1px 3px rgba(30, 64, 175, 0.35)',
+                    }
+                  : {
+                      width: size,
+                      height: size,
+                      borderRadius: '50%',
+                      background: 'radial-gradient(circle at 35% 35%, #FFFFFF 45%, #E0F2FE 100%)',
+                      boxShadow:
+                        '0 0 0 1px rgba(148, 163, 184, 0.35), 0 1px 4px rgba(71, 85, 105, 0.35)',
+                    }),
               ...(i % 2 === 1 && { display: { xs: 'none', md: 'block' } }),
             }}
           >
             {/* U+FE0E: hiện dạng chữ, không thành emoji màu. */}
-            {crystal ? '❄︎' : null}
+            {glyph ?? (crystal ? '❄︎' : null)}
           </Box>
         );
       })}

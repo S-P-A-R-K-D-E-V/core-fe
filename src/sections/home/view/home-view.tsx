@@ -12,7 +12,7 @@ import ScrollProgress from 'src/components/scroll-progress';
 import Iconify from 'src/components/iconify';
 
 import { CICI_TENANT } from 'src/lib/store-seo';
-import type { SeasonKey } from 'src/lib/store-season';
+import { SEASONS, type SeasonKey } from 'src/lib/store-season';
 import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding';
 
 import HomeHero from '../home-hero';
@@ -122,7 +122,7 @@ export default function HomeView({
           </Fab>
         )}
 
-        {season === 'christmas' && <Snowfall />}
+        {season && <Snowfall glyphs={SEASONS[season].particles} />}
       </MainLayout>
     </SeasonProvider>
   );
