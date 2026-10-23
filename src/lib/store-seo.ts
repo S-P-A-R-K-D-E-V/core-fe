@@ -282,5 +282,7 @@ export const ROBOTS_DISALLOW = [
   '/customer-display',
   '/payment',
   '/product/checkout',
+  // Trang đơn online của khách (link có khoá bí mật) — không bao giờ lập chỉ mục.
+  '/order',
   '/error',
 ];

@@ -39,7 +39,8 @@ export type CheckoutContextProps = ICheckoutValue & {
   onNextStep: VoidFunction;
   onGotoStep: (step: number) => void;
   //
-  onCreateBilling: (billing: IAddressItem) => Promise<void>;
+  /** Đã đặt đơn online (máy chủ tạo đơn + mã thanh toán): làm trống giỏ, nhớ đơn trên máy này. */
+  onOrderPlaced: (orderCode: string, token: string) => void;
   onApplyDiscount: (discount: number) => void;
   onApplyShipping: (discount: number) => void;
   //

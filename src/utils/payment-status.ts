@@ -3,6 +3,7 @@ import type {
   PaymentProvider,
   OnlineOrderStatus,
   PaymentIntentStatus,
+  OnlineShipmentStatus,
   IPaymentStatusChangedEvent,
 } from 'src/types/payment-service';
 
@@ -84,7 +85,7 @@ export function formatCountdown(totalSeconds: number): string {
 
 // ---------------------------------------------------------------------- Nhãn
 
-type ChipColor = 'default' | 'info' | 'success' | 'warning' | 'error';
+type ChipColor = 'default' | 'primary' | 'info' | 'success' | 'warning' | 'error';
 
 export const PAYMENT_PROVIDER_LABEL: Record<string, string> = {
   sepay: 'SePay',
@@ -133,6 +134,34 @@ export const ONLINE_ORDER_STATUS: Record<OnlineOrderStatus, { label: string; col
   paid: { label: 'Đã thanh toán', color: 'success' },
   cancelled: { label: 'Đã huỷ', color: 'default' },
   expired: { label: 'Hết hạn', color: 'default' },
+};
+
+/** Khâu gói / giao của đơn online đã thanh toán. */
+export const ONLINE_SHIPMENT_STATUS: Record<OnlineShipmentStatus, { label: string; color: ChipColor }> = {
+  to_pack: { label: 'Cần gói', color: 'warning' },
+  packed: { label: 'Đã gói', color: 'info' },
+  shipped: { label: 'Đang giao', color: 'primary' },
+  completed: { label: 'Đã nhận', color: 'success' },
+};
+
+/** Trạng thái vận đơn chuẩn của spark-shipping. */
+export const SHIPPING_STATUS_LABEL: Record<string, string> = {
+  created: 'Chờ lấy hàng',
+  picking: 'Đang lấy hàng',
+  pickup_failed: 'Lấy hàng thất bại',
+  in_transit: 'Đang vận chuyển',
+  delivering: 'Đang giao',
+  delivered: 'Đã giao',
+  delivery_failed: 'Giao thất bại',
+  returning: 'Đang hoàn',
+  returned: 'Đã hoàn',
+  cancelled: 'Đã huỷ vận đơn',
+  exception: 'Có sự cố',
+};
+
+export const CARRIER_LABEL: Record<string, string> = {
+  ghn: 'Giao Hàng Nhanh',
+  ghtk: 'Giao Hàng Tiết Kiệm',
 };
 
 export const PAYMENT_ORDER_TYPE_LABEL: Record<string, string> = {

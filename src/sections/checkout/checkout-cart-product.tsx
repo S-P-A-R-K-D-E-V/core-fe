@@ -39,15 +39,21 @@ export default function CheckoutCartProduct({ row, onDelete, onDecrease, onIncre
             {name}
           </Typography>
 
-          <Stack
-            direction="row"
-            alignItems="center"
-            sx={{ typography: 'body2', color: 'text.secondary' }}
-          >
-            size: <Label sx={{ ml: 0.5 }}> {size} </Label>
-            <Divider orientation="vertical" sx={{ mx: 1, height: 16 }} />
-            <ColorPreview colors={colors} />
-          </Stack>
+          {(!!size || colors.length > 0) && (
+            <Stack
+              direction="row"
+              alignItems="center"
+              sx={{ typography: 'body2', color: 'text.secondary' }}
+            >
+              {!!size && (
+                <>
+                  Cỡ: <Label sx={{ ml: 0.5 }}> {size} </Label>
+                  <Divider orientation="vertical" sx={{ mx: 1, height: 16 }} />
+                </>
+              )}
+              <ColorPreview colors={colors} />
+            </Stack>
+          )}
         </Stack>
       </TableCell>
 
@@ -64,7 +70,7 @@ export default function CheckoutCartProduct({ row, onDelete, onDecrease, onIncre
           />
 
           <Typography variant="caption" component="div" sx={{ color: 'text.secondary', mt: 1 }}>
-            available: {available}
+            Còn {available}
           </Typography>
         </Box>
       </TableCell>

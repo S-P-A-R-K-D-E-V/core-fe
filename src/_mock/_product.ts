@@ -85,4 +85,4 @@ export const PRODUCT_CATEGORY_GROUP_OPTIONS = [
   },
 ];
 
-export const PRODUCT_CHECKOUT_STEPS = ['Giỏ hàng', 'Thông tin nhận hàng'];
+export const PRODUCT_CHECKOUT_STEPS = ['Giỏ hàng', 'Nhận hàng & thanh toán'];

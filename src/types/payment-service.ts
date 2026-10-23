@@ -470,6 +470,47 @@ export type IOnlineOrderLine = {
   quantity: number;
   price: number;
   amount: number;
+  /** Khối lượng một đơn vị dùng tính cước (gram) */
+  weightGrams?: number | null;
+};
+
+/** Khâu gói / giao sau khi đã thanh toán. */
+export type OnlineShipmentStatus = 'to_pack' | 'packed' | 'shipped' | 'completed';
+
+/**
+ * Tiền của đơn: khách trả = tiền hàng + phí ship; cửa hàng chịu cước hãng (shippingCost) và phí đối soát (ApiPay tối đa
+ * 350đ khi đã quá 60 giao dịch miễn phí trong tháng). shippingSubsidy = phần cước cửa hàng bù khi miễn phí ship.
+ */
+export type IOnlineOrderCosts = {
+  subtotal: number;
+  shippingFee: number;
+  total: number;
+  shippingCost: number;
+  shippingSubsidy: number;
+  paymentFeeMax?: number | null;
+  netAfterShipping: number;
+};
+
+export type IOnlineOrderShipping = {
+  method?: 'ship' | 'pickup' | null;
+  addressLine?: string | null;
+  provinceName?: string | null;
+  wardName?: string | null;
+  carrier?: string | null;
+  service?: string | null;
+  connectionId?: string | null;
+  weightGrams?: number | null;
+  insuranceValue?: number | null;
+  expectedDeliveryAt?: string | null;
+  shipmentId?: string | null;
+  trackingCode?: string | null;
+  /** Trạng thái chuẩn của spark-shipping (created, picking, delivering, delivered...) */
+  shippingStatus?: string | null;
+  shipmentStatus: OnlineShipmentStatus;
+  packedAt?: string | null;
+  packedByName?: string | null;
+  shippedAt?: string | null;
+  completedAt?: string | null;
 };
 
 export type IOnlineOrder = {
@@ -491,10 +532,17 @@ export type IOnlineOrder = {
   paidAt?: string | null;
   /** Chỉ có ở GET online-orders/{id} */
   lines?: IOnlineOrderLine[];
+  fulfillmentError?: string | null;
+  costs?: IOnlineOrderCosts | null;
+  shipping?: IOnlineOrderShipping | null;
+  /** Lựa chọn thanh toán khách chọn (vd "transfer:{kết nối ApiPay}") */
+  paymentOptionKey?: string | null;
 };
 
 export type IOnlineOrderQuery = {
   status?: OnlineOrderStatus;
+  /** Lọc khâu gói / giao */
+  shipment?: OnlineShipmentStatus;
   q?: string;
   page?: number;
   pageSize?: number;

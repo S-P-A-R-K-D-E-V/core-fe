@@ -25,7 +25,15 @@ import { useDebounce } from 'src/hooks/use-debounce';
 import { fDateTime } from 'src/utils/format-time';
 import { fCurrency } from 'src/utils/format-number';
 import { apiErrorMessage } from 'src/utils/api-error';
-import { statusChip, ONLINE_ORDER_STATUS, ONLINE_PAYMENT_METHOD_LABEL } from 'src/utils/payment-status';
+import {
+  statusChip,
+  CARRIER_LABEL,
+  ONLINE_ORDER_STATUS,
+  ONLINE_SHIPMENT_STATUS,
+  ONLINE_PAYMENT_METHOD_LABEL,
+} from 'src/utils/payment-status';
+
+import { useSearchParams } from 'src/routes/hooks';
 
 import RoleBasedGuard from 'src/auth/guard/role-based-guard';
 import { getOnlineOrders } from 'src/api/online-orders';
@@ -38,12 +46,16 @@ import { TableNoData, TableHeadCustom, TablePaginationCustom } from 'src/compone
 import OnlineOrderDetailDialog from '../online-order-detail-dialog';
 
 // ----------------------------------------------------------------------
-// Thanh toán → Đơn online: đơn khách đặt trên storefront. Đơn chỉ sinh hoá đơn bán hàng (và trừ kho) khi đã thanh toán;
-// đơn chờ thanh toán quản lý có thể huỷ. Tiêu đề + tab ở layout của mục Thanh toán.
+// Thanh toán → Đơn online: đơn khách đặt trên trang bán online. Đơn chỉ sinh hoá đơn (và trừ kho) khi đã thanh toán; mở trang
+// mặc định ở tab "Cần gói" (việc của người đang làm); thông báo mở thẳng đơn bằng ?code=. Tiêu đề + tab ở layout mục.
 // ----------------------------------------------------------------------
 
-const STATUS_TABS: { value: '' | OnlineOrderStatus; label: string }[] = [
+/** "to_pack" = đã thanh toán, chưa gói (việc của người đang làm). */
+type ListTab = '' | 'to_pack' | OnlineOrderStatus;
+
+const STATUS_TABS: { value: ListTab; label: string }[] = [
   { value: '', label: 'Tất cả' },
+  { value: 'to_pack', label: 'Cần gói' },
   { value: 'pending_payment', label: 'Chờ thanh toán' },
   { value: 'paid', label: 'Đã thanh toán' },
   { value: 'cancelled', label: 'Đã huỷ' },
@@ -56,14 +68,19 @@ const TABLE_HEAD = [
   { id: 'total', label: 'Tổng tiền', align: 'right' },
   { id: 'payment', label: 'Thanh toán' },
   { id: 'status', label: 'Trạng thái' },
+  { id: 'delivery', label: 'Giao hàng' },
   { id: 'salesOrder', label: 'Hoá đơn' },
   { id: 'createdAt', label: 'Đặt lúc' },
 ];
 
 export default function OnlineOrderListView() {
   const { enqueueSnackbar } = useSnackbar();
-  const [status, setStatus] = useState<'' | OnlineOrderStatus>('');
-  const [search, setSearch] = useState('');
+  const searchParams = useSearchParams();
+  // Mở từ thông báo "đơn đã thanh toán — cần gói hàng": ?code=W... → tìm đúng đơn và mở chi tiết.
+  const deepLinkCode = searchParams.get('code')?.trim().toUpperCase() || '';
+  const [status, setStatus] = useState<ListTab>(deepLinkCode ? '' : 'to_pack');
+  const [search, setSearch] = useState(deepLinkCode);
+  const openedCodeRef = useRef<string | null>(null);
   const q = useDebounce(search.trim(), 400);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
@@ -83,7 +100,8 @@ export default function OnlineOrderListView() {
     setLoading(true);
     try {
       const res = await getOnlineOrders({
-        status: status || undefined,
+        status: status === 'to_pack' ? 'paid' : status || undefined,
+        shipment: status === 'to_pack' ? 'to_pack' : undefined,
         q: q || undefined,
         page: page + 1,
         pageSize: rowsPerPage,
@@ -91,6 +109,13 @@ export default function OnlineOrderListView() {
       if (requestId !== requestRef.current) return;
       setItems(res.items);
       setTotal(res.total);
+      if (deepLinkCode && openedCodeRef.current !== deepLinkCode) {
+        const hit = res.items.find((o) => o.code === deepLinkCode);
+        if (hit) {
+          openedCodeRef.current = deepLinkCode;
+          setSelected(hit);
+        }
+      }
     } catch (err) {
       if (requestId === requestRef.current) {
         enqueueSnackbar(apiErrorMessage(err, 'Không tải được đơn online'), { variant: 'error' });
@@ -98,14 +123,14 @@ export default function OnlineOrderListView() {
     } finally {
       if (requestId === requestRef.current) setLoading(false);
     }
-  }, [status, q, page, rowsPerPage, enqueueSnackbar]);
+  }, [status, q, page, rowsPerPage, enqueueSnackbar, deepLinkCode]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   return (
-    <RoleBasedGuard hasContent roles={['Admin', 'Manager']}>
+    <RoleBasedGuard hasContent roles={['Admin', 'Manager', 'Staff']}>
       <>
         <Card>
           <Tabs value={status} onChange={(_, v) => setStatus(v)} sx={{ px: 2.5 }}>
@@ -178,6 +203,9 @@ export default function OnlineOrderListView() {
                           <TableCell>
                             <Chip size="small" color={chip.color} label={chip.label} />
                           </TableCell>
+                          <TableCell>
+                            <DeliveryCell order={o} />
+                          </TableCell>
                           <TableCell>{o.salesOrderCode || '—'}</TableCell>
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>{fDateTime(o.createdAt)}</TableCell>
                         </TableRow>
@@ -210,5 +238,19 @@ export default function OnlineOrderListView() {
         />
       </>
     </RoleBasedGuard>
+  );
+}
+
+function DeliveryCell({ order }: { order: IOnlineOrder }) {
+  const s = order.shipping;
+  if (!s?.method) return <>—</>;
+  const chip = order.status === 'paid' ? statusChip(ONLINE_SHIPMENT_STATUS, s.shipmentStatus) : null;
+  return (
+    <Stack spacing={0.5} alignItems="flex-start">
+      <Typography variant="body2">
+        {s.method === 'pickup' ? 'Nhận tại cửa hàng' : CARRIER_LABEL[s.carrier ?? ''] ?? 'Giao tận nơi'}
+      </Typography>
+      {chip && <Chip size="small" variant="outlined" color={chip.color} label={chip.label} />}
+    </Stack>
   );
 }

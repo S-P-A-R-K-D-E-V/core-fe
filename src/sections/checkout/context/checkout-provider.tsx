@@ -8,10 +8,10 @@ import { useRouter } from 'src/routes/hooks';
 
 import { getStorage, useLocalStorage } from 'src/hooks/use-local-storage';
 
-import { createSalesOrder } from 'src/api/sales-orders';
+import { rememberOrder } from '../online-checkout-utils';
 import { PRODUCT_CHECKOUT_STEPS } from 'src/_mock/_product';
 
-import { IAddressItem } from 'src/types/address';
+
 import { ICheckoutItem } from 'src/types/checkout';
 
 import { CheckoutContext } from './checkout-context';
@@ -156,27 +156,14 @@ export function CheckoutProvider({ children }: Props) {
     [update, state.items]
   );
 
-  const onCreateBilling = useCallback(
-    async (address: IAddressItem) => {
-      update('billing', address);
-
-      const invoiceDetails = state.items.map((item: ICheckoutItem) => ({
-        productId: item.id,
-        productName: item.name,
-        quantity: item.quantity,
-        price: item.price,
-      }));
-
-      const result = await createSalesOrder({
-        totalPayment: state.total,
-        method: 'cash',
-        invoiceDetails,
-      });
-
-      update('orderId', result.id);
-      update('activeStep', PRODUCT_CHECKOUT_STEPS.length);
+  // Đơn online đã tạo (POST /public/storefront/checkout): giá + phí ship máy chủ tính, chưa trừ kho tới khi trả tiền.
+  // Giỏ về trống, đơn nhớ trên máy để khách mở lại trang đơn (QR, trạng thái).
+  const onOrderPlaced = useCallback(
+    (orderCode: string, token: string) => {
+      rememberOrder(orderCode, token);
+      reset();
     },
-    [update, state.items, state.total]
+    [reset]
   );
 
   const onApplyDiscount = useCallback(
@@ -214,7 +201,7 @@ export function CheckoutProvider({ children }: Props) {
       onIncreaseQuantity,
       onDecreaseQuantity,
       //
-      onCreateBilling,
+      onOrderPlaced,
       onApplyDiscount,
       onApplyShipping,
       //
@@ -231,7 +218,7 @@ export function CheckoutProvider({ children }: Props) {
       onApplyDiscount,
       onApplyShipping,
       onBackStep,
-      onCreateBilling,
+      onOrderPlaced,
       onDecreaseQuantity,
       onDeleteCart,
       onGotoStep,

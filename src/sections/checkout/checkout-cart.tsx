@@ -66,10 +66,8 @@ export default function CheckoutCart() {
 
       <Grid size={{ xs: 12, md: 4 }}>
         <CheckoutSummary
-          total={checkout.total}
-          discount={checkout.discount}
           subTotal={checkout.subTotal}
-          onApplyDiscount={checkout.onApplyDiscount}
+          shippingNote="Tính ở bước sau theo địa chỉ nhận hàng"
         />
 
         <Button
