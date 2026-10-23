@@ -181,24 +181,25 @@ describe('useNavData — camera, giám sát, báo cáo chỉ Admin', () => {
   });
 });
 
-// Mục Thanh toán gom đối soát, đơn online, tài khoản ngân hàng, báo có & kết nối — mỗi trang theo vai trò của nó.
+// Mục Thanh toán gom đối soát, đơn online, Cài đặt (phương thức theo kênh, bán online, tài khoản, báo có) — mỗi trang theo
+// vai trò của nó.
 describe('useNavData — Thanh toán', () => {
   const p = paths.dashboard.payment;
 
-  it('chủ cửa hàng thấy cả bốn trang trong một mục', () => {
+  it('chủ cửa hàng thấy cả ba trang trong một mục', () => {
     const visible = navPaths('Admin');
-    [p.root, p.reconciliation, p.onlineOrders, p.bankAccounts, p.notifications].forEach((path) =>
-      expect(visible).toContain(path)
-    );
+    [p.root, p.reconciliation, p.onlineOrders, p.settings].forEach((path) => expect(visible).toContain(path));
     expect(visible).not.toContain(paths.dashboard.onlineOrders.root);
   });
 
-  it('quản lý chỉ thấy đối soát và đơn online, nhân viên không thấy mục', () => {
+  it('quản lý thấy đối soát và đơn online; nhân viên chỉ thấy đơn online (gói hàng)', () => {
     const manager = navPaths('Manager');
     expect(manager).toEqual(expect.arrayContaining([p.root, p.reconciliation, p.onlineOrders]));
-    expect(manager).not.toContain(p.bankAccounts);
-    expect(manager).not.toContain(p.notifications);
-    expect(navPaths('Staff')).not.toContain(p.root);
+    expect(manager).not.toContain(p.settings);
+    const staff = navPaths('Staff');
+    expect(staff).toEqual(expect.arrayContaining([p.root, p.onlineOrders]));
+    expect(staff).not.toContain(p.reconciliation);
+    expect(staff).not.toContain(p.settings);
   });
 });
 
