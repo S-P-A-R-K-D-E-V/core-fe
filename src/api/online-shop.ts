@@ -17,6 +17,7 @@ import type {
   ILinkedCarrierAccount,
   IPickupBranch,
   ISaveBranchPickupAddress,
+  IStorefrontRepayQuote,
 } from 'src/types/online-shop';
 
 import axios, { endpoints } from 'src/utils/axios';
@@ -142,7 +143,23 @@ export async function getOnlineOrderPublic(code: string, token: string): Promise
 }
 
 /** Tạo lại mã thanh toán (hết hạn / đổi phương thức). */
-export async function retryOnlineOrderPayment(code: string, token: string, paymentMethod?: string | null) {
-  const res = await axios.post<IStorefrontCheckoutResult>(endpoints.storefront.pay(code), { paymentMethod }, { params: { token } });
+export async function retryOnlineOrderPayment(code: string, token: string, paymentMethod?: string | null, acceptedTotal?: number | null) {
+  const res = await axios.post<IStorefrontCheckoutResult>(
+    endpoints.storefront.pay(code),
+    { paymentMethod, acceptedTotal },
+    { params: { token } }
+  );
+  return res.data;
+}
+
+/** Giá, phí ship tính lại trước khi tạo lại mã (không đổi đơn) — tổng đổi thì hỏi khách trước. */
+export async function getRepayQuote(code: string, token: string): Promise<IStorefrontRepayQuote> {
+  const res = await axios.get<IStorefrontRepayQuote>(endpoints.storefront.repayQuote(code), { params: { token } });
+  return res.data;
+}
+
+/** Khách huỷ đơn chưa thanh toán. */
+export async function cancelOnlineOrderPublic(code: string, token: string): Promise<IStorefrontOrder> {
+  const res = await axios.post<IStorefrontOrder>(endpoints.storefront.cancel(code), null, { params: { token } });
   return res.data;
 }

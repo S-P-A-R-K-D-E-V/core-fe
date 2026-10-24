@@ -30,3 +30,26 @@ export function deliveryStatusText(order: Pick<IStorefrontOrder, 'delivery'>): s
   if (d.shipmentStatus === 'shipped') return SHIPPING_TEXT.created;
   return 'Cửa hàng đang gói hàng cho bạn.';
 }
+
+// ----------------------------------------------------------------------
+// Đơn chưa thanh toán: giữ đơn tới hạn (payableUntil, theo cài đặt cửa hàng — mặc định 24 giờ từ lúc đặt), trong hạn tạo lại
+// mã được (giá, phí ship tính lại), quá hạn đơn tự huỷ.
+// ----------------------------------------------------------------------
+
+/** Còn tạo lại mã / huỷ được: đơn chờ hoặc hết hạn mã, còn trong hạn giữ đơn. */
+export function canRepay(order: Pick<IStorefrontOrder, 'status' | 'payableUntil'>, now: number = Date.now()): boolean {
+  if (order.status !== 'pending_payment' && order.status !== 'expired') return false;
+  if (!order.payableUntil) return true;
+  return new Date(order.payableUntil).getTime() > now;
+}
+
+const CANCEL_REASON_TEXT: Record<string, string> = {
+  'Khách huỷ': 'bạn đã huỷ đơn',
+  'Cửa hàng huỷ': 'cửa hàng đã huỷ đơn',
+  'Quá hạn thanh toán': 'quá hạn thanh toán',
+};
+
+export function cancelledText(reason?: string | null): string {
+  const why = reason ? CANCEL_REASON_TEXT[reason] ?? reason.toLowerCase() : null;
+  return `Đơn đã huỷ${why ? ` (${why})` : ''}. Muốn mua tiếp, bạn đặt đơn mới. Nếu bạn đã chuyển khoản, cửa hàng sẽ liên hệ lại.`;
+}

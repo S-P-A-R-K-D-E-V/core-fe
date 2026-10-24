@@ -7,4 +7,6 @@ export type ConfirmDialogProps = Omit<DialogProps, 'title' | 'content'> & {
   content?: React.ReactNode;
   action: React.ReactNode;
   onClose: VoidFunction;
+  /** Chữ nút đóng; mặc định "Cancel" (giữ như cũ cho các chỗ đang dùng) */
+  cancelText?: React.ReactNode;
 };

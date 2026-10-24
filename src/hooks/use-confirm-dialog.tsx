@@ -23,6 +23,8 @@ export type ConfirmOptions = {
   /** Nội dung — "\n" được giữ xuống dòng. */
   content?: string;
   confirmText?: string;
+  /** Chữ nút đóng (mặc định của ConfirmDialog) — trang cho khách nên đặt tiếng Việt. */
+  cancelText?: string;
   /** Nút xác nhận màu đỏ (xoá, thu hồi...). */
   destructive?: boolean;
 };
@@ -51,6 +53,7 @@ export function useConfirmDialog() {
       open={!!options}
       onClose={() => close(false)}
       title={options?.title ?? 'Xác nhận'}
+      cancelText={options?.cancelText}
       content={options?.content ? <span style={{ whiteSpace: 'pre-line' }}>{options.content}</span> : undefined}
       action={
         <Button variant="contained" color={options?.destructive ? 'error' : 'primary'} onClick={() => close(true)}>

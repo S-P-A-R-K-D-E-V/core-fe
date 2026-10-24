@@ -20,12 +20,14 @@ import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 import { useRouter, useSearchParams } from 'src/routes/hooks';
 
+import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 import { useCopyToClipboard } from 'src/hooks/use-copy-to-clipboard';
 
+import { fDateTime } from 'src/utils/format-time';
 import { fCurrency } from 'src/utils/format-number';
 import { apiErrorMessage } from 'src/utils/api-error';
 
-import { getOnlineOrderPublic, retryOnlineOrderPayment } from 'src/api/online-shop';
+import { getRepayQuote, getOnlineOrderPublic, cancelOnlineOrderPublic, retryOnlineOrderPayment } from 'src/api/online-shop';
 
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
@@ -34,12 +36,13 @@ import { useQrImageSrc, useExpirySeconds } from 'src/components/payment-qr-info'
 import { useCheckoutContext } from 'src/sections/checkout/context';
 import { orderHref, formatEta } from 'src/sections/checkout/online-checkout-utils';
 
-import { deliveryStatusText } from './online-order-status';
+import { canRepay, cancelledText, deliveryStatusText } from './online-order-status';
 
 // ----------------------------------------------------------------------
 // Trang đơn của khách: chờ thanh toán → mã VietQR (vào số tài khoản / VA của kết nối cửa hàng chọn, nội dung = mã thanh
 // toán) hoặc nút sang cổng payOS / VNPay; hỏi máy chủ 3 giây/lần (máy chủ hỏi lại S Payment phòng callback lỡ). Đã trả →
-// cảm ơn + tình trạng gói / giao. Hết hạn → tạo mã mới.
+// cảm ơn + tình trạng gói / giao. Hết hạn mã → tạo mã mới trong hạn giữ đơn (giá, phí ship tính lại — tổng đổi thì hỏi khách
+// trước); khách tự huỷ được đơn chưa trả; quá hạn giữ đơn thì đơn tự huỷ.
 // ----------------------------------------------------------------------
 
 const POLL_MS = 3_000;
@@ -65,6 +68,8 @@ export default function OnlineOrderView({ code }: Props) {
   const [order, setOrder] = useState<IStorefrontOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [confirm, confirmDialog] = useConfirmDialog();
 
   const load = useCallback(async () => {
     try {
@@ -86,15 +91,51 @@ export default function OnlineOrderView({ code }: Props) {
     return () => clearInterval(timer);
   }, [order?.status, load]);
 
+  // Tạo lại mã: máy chủ tính lại giá, tồn, phí ship — tổng đổi thì khách xác nhận tổng mới trước.
   const retry = async () => {
     setRetrying(true);
     try {
-      await retryOnlineOrderPayment(code, token);
+      const quote = await getRepayQuote(code, token);
+      if (quote.changed) {
+        const ok = await confirm({
+          title: 'Tổng tiền đã thay đổi',
+          content:
+            `Giá hoặc phí giao hàng đã cập nhật kể từ lúc bạn đặt:\n` +
+            `Tiền hàng: ${fCurrency(quote.subtotal)}\nPhí giao hàng: ${quote.shippingFee > 0 ? fCurrency(quote.shippingFee) : 'Miễn phí'}\n` +
+            `Tổng mới: ${fCurrency(quote.total)} (trước đây ${fCurrency(quote.previousTotal)})`,
+          confirmText: `Thanh toán ${fCurrency(quote.total)}`,
+          cancelText: 'Để sau',
+        });
+        if (!ok) return;
+      }
+      await retryOnlineOrderPayment(code, token, null, quote.total);
       await load();
     } catch (err) {
       enqueueSnackbar(apiErrorMessage(err, 'Không tạo được mã mới'), { variant: 'error' });
+      await load();
     } finally {
       setRetrying(false);
+    }
+  };
+
+  const cancel = async () => {
+    const ok = await confirm({
+      title: 'Huỷ đơn hàng?',
+      content: 'Đơn sẽ bị huỷ và mã thanh toán không dùng được nữa. Muốn mua lại, bạn đặt đơn mới.',
+      confirmText: 'Huỷ đơn',
+      cancelText: 'Giữ đơn',
+      destructive: true,
+    });
+    if (!ok) return;
+    setCancelling(true);
+    try {
+      setOrder(await cancelOnlineOrderPublic(code, token));
+      enqueueSnackbar('Đã huỷ đơn');
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không huỷ được đơn'), { variant: 'error' });
+      await load();
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -116,8 +157,12 @@ export default function OnlineOrderView({ code }: Props) {
     );
   }
 
+  const repayable = canRepay(order);
+  const unpaid = order.status === 'pending_payment' || order.status === 'expired';
+
   return (
     <Container maxWidth="md" sx={{ py: { xs: 3, md: 6 } }}>
+      {confirmDialog}
       <Stack spacing={3}>
         <Stack spacing={0.5}>
           <Typography variant="h4" component="h1">
@@ -129,7 +174,7 @@ export default function OnlineOrderView({ code }: Props) {
         </Stack>
 
         {order.status === 'pending_payment' && <PaymentPanel payment={order.payment} total={order.total} onRetry={retry} retrying={retrying} />}
-        {order.status === 'expired' && (
+        {order.status === 'expired' && repayable && (
           <Alert
             severity="warning"
             action={
@@ -138,10 +183,24 @@ export default function OnlineOrderView({ code }: Props) {
               </LoadingButton>
             }
           >
-            Mã thanh toán đã hết hạn. Tạo mã mới để thanh toán tiếp — nếu bạn đã chuyển khoản, đơn vẫn tự xác nhận khi tiền về.
+            Mã thanh toán đã hết hạn. Tạo mã mới để thanh toán tiếp (giá và phí giao hàng được tính lại) — nếu bạn đã chuyển khoản, đơn
+            vẫn tự xác nhận khi tiền về.
           </Alert>
         )}
-        {order.status === 'cancelled' && <Alert severity="error">Đơn đã huỷ. Liên hệ cửa hàng nếu bạn đã chuyển khoản.</Alert>}
+        {unpaid && !repayable && (
+          <Alert severity="error">Đơn đã quá hạn thanh toán và sẽ tự huỷ. Muốn mua tiếp, bạn đặt đơn mới.</Alert>
+        )}
+        {unpaid && order.payableUntil && repayable && (
+          <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" flexWrap="wrap" useFlexGap>
+            <Typography variant="body2" color="text.secondary">
+              Cửa hàng giữ đơn tới {fDateTime(order.payableUntil, 'HH:mm dd/MM/yyyy')} — quá hạn chưa thanh toán đơn tự huỷ.
+            </Typography>
+            <LoadingButton size="small" color="error" loading={cancelling} disabled={retrying} onClick={cancel}>
+              Huỷ đơn
+            </LoadingButton>
+          </Stack>
+        )}
+        {order.status === 'cancelled' && <Alert severity="error">{cancelledText(order.cancelReason)}</Alert>}
         {order.status === 'paid' && (
           <Alert severity="success" icon={<Iconify icon="solar:check-circle-bold" />}>
             <Typography variant="subtitle1">Cảm ơn bạn! Đơn đã thanh toán.</Typography>

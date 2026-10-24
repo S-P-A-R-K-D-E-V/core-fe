@@ -537,6 +537,9 @@ export type IOnlineOrder = {
   shipping?: IOnlineOrderShipping | null;
   /** Lựa chọn thanh toán khách chọn (vd "transfer:{kết nối ApiPay}") */
   paymentOptionKey?: string | null;
+  /** "Khách huỷ" | "Cửa hàng huỷ" | "Quá hạn thanh toán" — còn giữ khi tiền về sau lúc huỷ */
+  cancelReason?: string | null;
+  cancelledAt?: string | null;
 };
 
 export type IOnlineOrderQuery = {

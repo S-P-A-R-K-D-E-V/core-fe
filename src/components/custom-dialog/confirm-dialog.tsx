@@ -14,6 +14,7 @@ export default function ConfirmDialog({
   action,
   open,
   onClose,
+  cancelText = 'Cancel',
   ...other
 }: ConfirmDialogProps) {
   return (
@@ -26,7 +27,7 @@ export default function ConfirmDialog({
         {action}
 
         <Button variant="outlined" color="inherit" onClick={onClose}>
-          Cancel
+          {cancelText}
         </Button>
       </DialogActions>
     </Dialog>

@@ -73,6 +73,7 @@ function inputOf(s: IOnlineShopSettings): IOnlineShopSettingsInput {
     freeShippingThreshold: s.freeShippingThreshold ?? null,
     inspectionPolicy: s.inspectionPolicy,
     pickupBranchId: s.pickupBranchId ?? null,
+    paymentWindowHours: s.paymentWindowHours ?? 24,
   };
 }
 
@@ -245,6 +246,17 @@ export default function OnlineShopSettingsCard() {
               Dịch vụ giao hàng (spark-shipping) chưa bật trên hệ thống — tạm thời chỉ có nhận tại cửa hàng.
             </Alert>
           )}
+          <Divider sx={{ borderStyle: 'dashed' }} />
+          <TextField
+            type="number"
+            label="Giữ đơn chờ thanh toán"
+            value={form.paymentWindowHours ?? 24}
+            onChange={num('paymentWindowHours')}
+            inputProps={{ min: 1, max: 168, step: 1 }}
+            InputProps={{ endAdornment: <InputAdornment position="end">giờ</InputAdornment> }}
+            helperText="Tính từ lúc khách đặt. Trong hạn khách tạo lại mã thanh toán được (giá, phí ship tính lại) hoặc tự huỷ đơn; quá hạn chưa thanh toán thì đơn tự huỷ. Mỗi mã QR vẫn chỉ dùng 30 phút."
+            sx={{ maxWidth: 360 }}
+          />
         </Stack>
       </Card>
 

@@ -186,6 +186,12 @@ export default function OnlineOrderDetailDialog({ order, onClose, onChanged }: P
           {detail && (
             <Stack spacing={2.5}>
               {detail.fulfillmentError && <Alert severity="warning">{detail.fulfillmentError}</Alert>}
+              {detail.status === 'cancelled' && (
+                <Alert severity="info">
+                  Đơn đã huỷ{detail.cancelReason ? ` — ${detail.cancelReason}` : ''}
+                  {detail.cancelledAt ? ` lúc ${fDateTime(detail.cancelledAt)}` : ''}.
+                </Alert>
+              )}
 
               <Stack spacing={1}>
                 <Typography variant="subtitle2">Khách hàng</Typography>

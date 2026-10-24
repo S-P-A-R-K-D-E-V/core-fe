@@ -733,6 +733,8 @@ export const endpoints = {
     checkout: '/public/storefront/checkout',
     order: (code: string) => `/public/storefront/orders/${encodeURIComponent(code)}`,
     pay: (code: string) => `/public/storefront/orders/${encodeURIComponent(code)}/pay`,
+    repayQuote: (code: string) => `/public/storefront/orders/${encodeURIComponent(code)}/repay-quote`,
+    cancel: (code: string) => `/public/storefront/orders/${encodeURIComponent(code)}/cancel`,
   },
   reports: {
     dashboard: '/reports/dashboard',

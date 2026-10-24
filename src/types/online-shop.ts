@@ -66,6 +66,8 @@ export type IOnlineShopSettingsInput = {
   inspectionPolicy: InspectionPolicy;
   /** Chi nhánh gửi hàng; null = chi nhánh đang hoạt động đầu tiên có địa chỉ gửi hàng */
   pickupBranchId?: string | null;
+  /** Giữ đơn chờ thanh toán (giờ từ lúc đặt): trong hạn khách tạo lại mã được, quá hạn đơn tự huỷ. Mặc định 24 */
+  paymentWindowHours?: number | null;
 };
 
 /** Địa chỉ gửi hàng của chi nhánh (danh mục 2 cấp) — điểm lấy của hãng vận chuyển. */
@@ -283,4 +285,19 @@ export type IStorefrontOrder = {
     shipmentStatus: ShipmentStatus;
     shippingStatus?: string | null;
   };
+  /** Hạn tạo lại mã thanh toán (đơn chờ / hết hạn mã); quá hạn đơn tự huỷ */
+  payableUntil?: string | null;
+  /** "Khách huỷ" | "Cửa hàng huỷ" | "Quá hạn thanh toán" */
+  cancelReason?: string | null;
+};
+
+/** Xem trước khi tạo lại mã thanh toán: giá, phí ship tính lại. */
+export type IStorefrontRepayQuote = {
+  subtotal: number;
+  shippingFee: number;
+  total: number;
+  previousTotal: number;
+  changed: boolean;
+  payableUntil: string;
+  carrierLabel?: string | null;
 };
