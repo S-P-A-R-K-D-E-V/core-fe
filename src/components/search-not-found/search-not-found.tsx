@@ -18,18 +18,18 @@ export default function SearchNotFound({ query, sx, ...other }: Props) {
       {...other}
     >
       <Typography variant="h6" gutterBottom>
-        Not Found
+        Không tìm thấy
       </Typography>
 
       <Typography variant="body2">
-        No results found for &nbsp;
+        Không có kết quả cho &nbsp;
         <strong>&quot;{query}&quot;</strong>.
-        <br /> Try checking for typos or using complete words.
+        <br /> Thử kiểm tra lỗi chính tả hoặc gõ đủ từ.
       </Typography>
     </Paper>
   ) : (
     <Typography variant="body2" sx={sx}>
-      Please enter keywords
+      Nhập từ khoá để tìm
     </Typography>
   );
 }

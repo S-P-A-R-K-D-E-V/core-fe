@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 
 import { getStorageUrl } from 'src/utils/storage';
 
-import { productListKey } from 'src/api/product-keys';
+import { storefrontProductListKey } from 'src/api/product-keys';
 
 export interface TenantBranding {
   tenantCode: string;
@@ -42,6 +42,8 @@ export interface StorefrontProduct {
 export interface StorefrontProductPage {
   items: StorefrontProduct[];
   total: number;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface StorefrontProductDetail extends Omit<StorefrontProduct, 'imageUrl'> {
@@ -87,43 +89,12 @@ export async function getStorefrontProducts(page = 1, pageSize = 24): Promise<St
   };
 }
 
-type ShopListItem = {
-  id: string;
-  name: string;
-  fullName?: string | null;
-  code: string;
-  basePrice?: number | null;
-  coverImageUrl?: string | null;
-  categoryName?: string | null;
-  isActive?: boolean;
-  createdDate?: string;
-  inventories?: { onHand?: number | null }[] | null;
-};
-
 /**
- * Trang đầu danh sách /product (GET /products — cùng khoá SWR với useGetProducts) để trang render sẵn phía server:
- * công cụ tìm kiếm thấy tên, giá, link từng sản phẩm. Chỉ giữ trường mapListItem dùng, tồn kho gộp một số.
+ * Trang đầu danh sách /product (GET /public/storefront/products — cùng khoá SWR với useGetStorefrontProducts) để trang
+ * render sẵn phía server: công cụ tìm kiếm thấy tên, giá, link từng sản phẩm.
  */
-export async function getShopFirstPage() {
-  const data = await fetchPublic<{ items?: ShopListItem[]; totalCount?: number; page?: number; pageSize?: number }>(
-    productListKey()
-  );
-  if (!data?.items) return null;
-  return {
-    ...data,
-    items: data.items.map((p) => ({
-      id: p.id,
-      name: p.name,
-      fullName: p.fullName ?? null,
-      code: p.code,
-      basePrice: p.basePrice ?? 0,
-      coverImageUrl: p.coverImageUrl ?? null,
-      categoryName: p.categoryName ?? null,
-      isActive: p.isActive ?? true,
-      createdDate: p.createdDate,
-      inventories: [{ onHand: (p.inventories ?? []).reduce((sum, i) => sum + (i.onHand ?? 0), 0) }],
-    })),
-  };
+export async function getShopFirstPage(): Promise<StorefrontProductPage | null> {
+  return fetchPublic<StorefrontProductPage>(storefrontProductListKey());
 }
 
 export async function getStorefrontProduct(id: string): Promise<StorefrontProductDetail | null> {

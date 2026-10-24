@@ -15,7 +15,7 @@ import Typography from '@mui/material/Typography';
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
-import { useGetProduct } from 'src/api/product';
+import { useGetStorefrontProduct } from 'src/api/product';
 
 import Iconify from 'src/components/iconify';
 import EmptyContent from 'src/components/empty-content';
@@ -63,7 +63,7 @@ export default function ProductShopDetailsView({ id }: Props) {
 
   const [currentTab, setCurrentTab] = useState('description');
 
-  const { product, productLoading, productError } = useGetProduct(id);
+  const { product, productLoading, productError } = useGetStorefrontProduct(id);
 
   const handleChangeTab = useCallback((event: React.SyntheticEvent, newValue: string) => {
     setCurrentTab(newValue);
@@ -74,7 +74,8 @@ export default function ProductShopDetailsView({ id }: Props) {
   const renderError = (
     <EmptyContent
       filled
-      title={`${productError?.message}`}
+      title="Không tìm thấy sản phẩm"
+      description="Sản phẩm có thể đã ngừng bán hoặc đường dẫn không đúng."
       action={
         <Button
           component={RouterLink}
@@ -88,6 +89,9 @@ export default function ProductShopDetailsView({ id }: Props) {
       sx={{ py: 10 }}
     />
   );
+
+  // Chưa có đánh giá nào thì bỏ hẳn tab "Đánh giá" (khung đánh giá mẫu không có dữ liệu thật phía sau).
+  const hasReviews = !!product && (product.totalReviews > 0 || product.reviews.length > 0);
 
   const renderProduct = product && (
     <>
@@ -156,20 +160,29 @@ export default function ProductShopDetailsView({ id }: Props) {
               value: 'description',
               label: 'Mô tả sản phẩm',
             },
-            {
-              value: 'reviews',
-              label: `Đánh giá (${product.reviews.length})`,
-            },
+            ...(hasReviews
+              ? [
+                  {
+                    value: 'reviews',
+                    label: `Đánh giá (${product.reviews.length})`,
+                  },
+                ]
+              : []),
           ].map((tab) => (
             <Tab key={tab.value} value={tab.value} label={tab.label} />
           ))}
         </Tabs>
 
-        {currentTab === 'description' && (
-          <ProductDetailsDescription description={product?.description} />
-        )}
+        {currentTab === 'description' &&
+          (product.description ? (
+            <ProductDetailsDescription description={product.description} />
+          ) : (
+            <Typography variant="body2" sx={{ p: 3, color: 'text.secondary' }}>
+              Chưa có mô tả cho sản phẩm này.
+            </Typography>
+          ))}
 
-        {currentTab === 'reviews' && (
+        {hasReviews && currentTab === 'reviews' && (
           <ProductDetailsReview
             ratings={product.ratings}
             reviews={product.reviews}

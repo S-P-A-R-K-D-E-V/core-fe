@@ -12,7 +12,7 @@ import { paths } from 'src/routes/paths';
 import { useDebounce } from 'src/hooks/use-debounce';
 import { useBoolean } from 'src/hooks/use-boolean';
 
-import { useGetProducts, useSearchProducts } from 'src/api/product';
+import { useGetStorefrontProducts, useSearchStorefrontProducts } from 'src/api/product';
 import { SHOP_PAGE_SIZE } from 'src/api/product-keys';
 
 import EmptyContent from 'src/components/empty-content';
@@ -70,14 +70,14 @@ export default function ProductShopView({ title = 'Sản phẩm' }: Props) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  // Fetch from real backend — server-side keyword search + pagination
-  const { products, totalCount, productsLoading, productsEmpty } = useGetProducts({
+  // API công khai /public/storefront/products — tìm theo từ khoá + phân trang phía máy chủ, hàng mới trước.
+  const { products, totalCount, productsLoading, productsEmpty } = useGetStorefrontProducts({
     keyword: debouncedQuery || undefined,
     page,
     pageSize: PAGE_SIZE,
   });
 
-  const { searchResults, searchLoading } = useSearchProducts(debouncedQuery);
+  const { searchResults, searchLoading } = useSearchStorefrontProducts(debouncedQuery);
 
   // Client-side sort on the fetched page
   const dataFiltered = useMemo(
@@ -150,7 +150,8 @@ export default function ProductShopView({ title = 'Sản phẩm' }: Props) {
 // ----------------------------------------------------------------------
 
 function applySortFilter(products: IProductItem[], sortBy: string): IProductItem[] {
-  if (sortBy === 'newest') return orderBy(products, ['createdAt'], ['desc']);
+  // "Mới nhất": máy chủ đã xếp hàng mới trước (sort=newest).
+  if (sortBy === 'newest') return products;
   if (sortBy === 'priceAsc') return orderBy(products, ['price'], ['asc']);
   if (sortBy === 'priceDesc') return orderBy(products, ['price'], ['desc']);
   return products;

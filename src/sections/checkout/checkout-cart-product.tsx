@@ -68,10 +68,7 @@ export default function CheckoutCartProduct({ row, onDelete, onDecrease, onIncre
             disabledDecrease={quantity <= 1}
             disabledIncrease={quantity >= available}
           />
-
-          <Typography variant="caption" component="div" sx={{ color: 'text.secondary', mt: 1 }}>
-            Còn {available}
-          </Typography>
+          {/* Không hiện số tồn: trang sản phẩm chỉ biết còn/hết, máy chủ kiểm tồn khi đặt hàng. */}
         </Box>
       </TableCell>
 

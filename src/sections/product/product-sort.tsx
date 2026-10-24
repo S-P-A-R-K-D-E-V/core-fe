@@ -34,7 +34,7 @@ export default function ProductSort({ sort, onSort, sortOptions }: Props) {
         }
         sx={{ fontWeight: 'fontWeightSemiBold' }}
       >
-        Sort By:
+        Sắp xếp:
         <Box component="span" sx={{ ml: 0.5, fontWeight: 'fontWeightBold' }}>
           {sortLabel}
         </Box>

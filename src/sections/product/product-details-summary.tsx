@@ -2,14 +2,12 @@ import { useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 
 import Box from '@mui/material/Box';
-import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Rating from '@mui/material/Rating';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
-import { formHelperTextClasses } from '@mui/material/FormHelperText';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
@@ -25,6 +23,15 @@ import { IProductItem } from 'src/types/product';
 import { ICheckoutItem } from 'src/types/checkout';
 
 import IncrementerButton from './common/incrementer-button';
+
+// ----------------------------------------------------------------------
+
+// Tình trạng kho hiện cho khách. Mapper trả 'in_stock' / 'out_of_stock'; dữ liệu mẫu cũ viết 'in stock', 'low stock'….
+const INVENTORY_STATUS: Record<string, { label: string; color: string }> = {
+  in_stock: { label: 'Còn hàng', color: 'success.main' },
+  low_stock: { label: 'Sắp hết hàng', color: 'warning.main' },
+  out_of_stock: { label: 'Hết hàng', color: 'error.main' },
+};
 
 // ----------------------------------------------------------------------
 
@@ -65,9 +72,15 @@ export default function ProductDetailsSummary({
 
   const existProduct = !!items?.length && items.map((item) => item.id).includes(id);
 
+  const outOfStock = available < 1;
+
   const isMaxQuantity =
     !!items?.length &&
     items.filter((item) => item.id === id).map((item) => item.quantity)[0] >= available;
+
+  const inventoryStatus =
+    INVENTORY_STATUS[inventoryType.replace(/ /g, '_')] ??
+    INVENTORY_STATUS[outOfStock ? 'out_of_stock' : 'in_stock'];
 
   const defaultValues = {
     id,
@@ -76,8 +89,8 @@ export default function ProductDetailsSummary({
     available,
     price,
     colors: colors[0],
-    size: sizes[4],
-    quantity: available < 1 ? 0 : 1,
+    size: sizes[0],
+    quantity: outOfStock ? 0 : 1,
   };
 
   const methods = useForm({
@@ -95,12 +108,13 @@ export default function ProductDetailsSummary({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product]);
 
+  // "Mua ngay": thêm vào giỏ (nếu chưa có) rồi sang trang đặt hàng.
   const onSubmit = handleSubmit(async (data) => {
     try {
       if (!existProduct) {
         onAddCart?.({
           ...data,
-          colors: [values.colors],
+          colors: values.colors ? [values.colors] : [],
           subTotal: data.price * data.quantity,
         });
       }
@@ -115,7 +129,7 @@ export default function ProductDetailsSummary({
     try {
       onAddCart?.({
         ...values,
-        colors: [values.colors],
+        colors: values.colors ? [values.colors] : [],
         subTotal: values.price * values.quantity,
       });
     } catch (error) {
@@ -123,9 +137,10 @@ export default function ProductDetailsSummary({
     }
   }, [onAddCart, values]);
 
+  // priceSale = 0 (không giảm giá): phải ép về boolean — `0 && …` làm React in chữ "0" trước giá ("015.000 ₫").
   const renderPrice = (
     <Box sx={{ typography: 'h5' }}>
-      {priceSale && (
+      {!!priceSale && (
         <Box
           component="span"
           sx={{
@@ -142,50 +157,11 @@ export default function ProductDetailsSummary({
     </Box>
   );
 
-  const renderShare = (
-    <Stack direction="row" spacing={3} justifyContent="center">
-      <Link
-        variant="subtitle2"
-        sx={{
-          color: 'text.secondary',
-          display: 'inline-flex',
-          alignItems: 'center',
-        }}
-      >
-        <Iconify icon="mingcute:add-line" width={16} sx={{ mr: 1 }} />
-        Compare
-      </Link>
-
-      <Link
-        variant="subtitle2"
-        sx={{
-          color: 'text.secondary',
-          display: 'inline-flex',
-          alignItems: 'center',
-        }}
-      >
-        <Iconify icon="solar:heart-bold" width={16} sx={{ mr: 1 }} />
-        Favorite
-      </Link>
-
-      <Link
-        variant="subtitle2"
-        sx={{
-          color: 'text.secondary',
-          display: 'inline-flex',
-          alignItems: 'center',
-        }}
-      >
-        <Iconify icon="solar:share-bold" width={16} sx={{ mr: 1 }} />
-        Share
-      </Link>
-    </Stack>
-  );
-
-  const renderColorOptions = (
+  // Màu / kích cỡ chỉ hiện khi sản phẩm có dữ liệu (hàng KiotViet hiện chưa có); không có bảng size, so sánh, yêu thích, chia sẻ.
+  const renderColorOptions = colors.length > 0 && (
     <Stack direction="row">
       <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-        Color
+        Màu sắc
       </Typography>
 
       <Controller
@@ -203,29 +179,13 @@ export default function ProductDetailsSummary({
     </Stack>
   );
 
-  const renderSizeOptions = (
+  const renderSizeOptions = sizes.length > 0 && (
     <Stack direction="row">
       <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-        Size
+        Kích cỡ
       </Typography>
 
-      <RHFSelect
-        name="size"
-        size="small"
-        helperText={
-          <Link underline="always" color="textPrimary">
-            Size Chart
-          </Link>
-        }
-        sx={{
-          maxWidth: 88,
-          [`& .${formHelperTextClasses.root}`]: {
-            mx: 0,
-            mt: 1,
-            textAlign: 'right',
-          },
-        }}
-      >
+      <RHFSelect name="size" size="small" sx={{ maxWidth: 88 }}>
         {sizes.map((size) => (
           <MenuItem key={size} value={size}>
             {size}
@@ -238,23 +198,18 @@ export default function ProductDetailsSummary({
   const renderQuantity = (
     <Stack direction="row">
       <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-        Quantity
+        Số lượng
       </Typography>
 
-      <Stack spacing={1}>
-        <IncrementerButton
-          name="quantity"
-          quantity={values.quantity}
-          disabledDecrease={values.quantity <= 1}
-          disabledIncrease={values.quantity >= available}
-          onIncrease={() => setValue('quantity', values.quantity + 1)}
-          onDecrease={() => setValue('quantity', values.quantity - 1)}
-        />
-
-        <Typography variant="caption" component="div" sx={{ textAlign: 'right' }}>
-          Available: {available}
-        </Typography>
-      </Stack>
+      {/* Không hiện số tồn: cửa hàng online chỉ biết còn/hết (nhãn phía trên), máy chủ kiểm tồn khi đặt hàng. */}
+      <IncrementerButton
+        name="quantity"
+        quantity={values.quantity}
+        disabledDecrease={values.quantity <= 1}
+        disabledIncrease={values.quantity >= available}
+        onIncrease={() => setValue('quantity', values.quantity + 1)}
+        onDecrease={() => setValue('quantity', values.quantity - 1)}
+      />
     </Stack>
   );
 
@@ -262,7 +217,7 @@ export default function ProductDetailsSummary({
     <Stack direction="row" spacing={2}>
       <Button
         fullWidth
-        disabled={isMaxQuantity || disabledActions}
+        disabled={isMaxQuantity || outOfStock || disabledActions}
         size="large"
         color="warning"
         variant="contained"
@@ -270,11 +225,17 @@ export default function ProductDetailsSummary({
         onClick={handleAddCart}
         sx={{ whiteSpace: 'nowrap' }}
       >
-        Add to Cart
+        Thêm vào giỏ
       </Button>
 
-      <Button fullWidth size="large" type="submit" variant="contained" disabled={disabledActions}>
-        Buy Now
+      <Button
+        fullWidth
+        size="large"
+        type="submit"
+        variant="contained"
+        disabled={outOfStock || disabledActions}
+      >
+        Mua ngay
       </Button>
     </Stack>
   );
@@ -285,7 +246,8 @@ export default function ProductDetailsSummary({
     </Typography>
   );
 
-  const renderRating = (
+  // Chưa có đánh giá thì không hiện sao (0 sao trông như bị chấm điểm thấp).
+  const renderRating = totalReviews > 0 && (
     <Stack
       direction="row"
       alignItems="center"
@@ -295,7 +257,7 @@ export default function ProductDetailsSummary({
       }}
     >
       <Rating size="small" value={totalRatings} precision={0.1} readOnly sx={{ mr: 1 }} />
-      {`(${fShortenNumber(totalReviews)} reviews)`}
+      {`(${fShortenNumber(totalReviews)} đánh giá)`}
     </Stack>
   );
 
@@ -307,17 +269,8 @@ export default function ProductDetailsSummary({
   );
 
   const renderInventoryType = (
-    <Box
-      component="span"
-      sx={{
-        typography: 'overline',
-        color:
-          (inventoryType === 'out of stock' && 'error.main') ||
-          (inventoryType === 'low stock' && 'warning.main') ||
-          'success.main',
-      }}
-    >
-      {inventoryType}
+    <Box component="span" sx={{ typography: 'overline', color: inventoryStatus.color }}>
+      {inventoryStatus.label}
     </Box>
   );
 
@@ -329,13 +282,15 @@ export default function ProductDetailsSummary({
 
           {renderInventoryType}
 
-          <Typography variant="h5">{name}</Typography>
+          <Typography variant="h5" component="h1">
+            {name}
+          </Typography>
 
           {renderRating}
 
           {renderPrice}
 
-          {renderSubDescription}
+          {!!subDescription && renderSubDescription}
         </Stack>
 
         <Divider sx={{ borderStyle: 'dashed' }} />
@@ -349,8 +304,6 @@ export default function ProductDetailsSummary({
         <Divider sx={{ borderStyle: 'dashed' }} />
 
         {renderActions}
-
-        {renderShare}
       </Stack>
     </FormProvider>
   );
