@@ -106,6 +106,12 @@ function selectionHtml(editor: Editor): string {
   return div.innerHTML;
 }
 
+/** Phần trong của HTML chỉ gồm đúng một <p>…</p>; null nếu không phải. */
+export function singleParagraphInner(html: string): string | null {
+  const single = html.trim().match(/^<p[^>]*>([\s\S]*)<\/p>$/i);
+  return single && !/<\/?p[\s>]/i.test(single[1]) ? single[1] : null;
+}
+
 /**
  * Trình soạn bài tin tức (tiptap — editor của template Minimal v6): tiêu đề mục, chữ đậm / nghiêng / gạch, danh sách,
  * trích dẫn, căn lề, link, ảnh (tải lên R2), hoàn tác; menu AI nổi khi bôi đen đoạn văn; toàn màn hình.
@@ -219,11 +225,13 @@ export function NewsEditor({
 
   const runAi = async (action: string) => {
     if (!editor || !onAiRewrite) return;
-    const { from, to } = editor.state.selection;
+    const { from, to, $from, $to } = editor.state.selection;
     setAiBusy(action);
     try {
       const html = await onAiRewrite(selectionHtml(editor), action);
-      editor.chain().focus().insertContentAt({ from, to }, html).run();
+      // Vùng chọn nằm trong một đoạn: chèn phần trong của <p>, nếu không đoạn bị tách và sinh đoạn trống.
+      const insert = $from.sameParent($to) ? (singleParagraphInner(html) ?? html) : html;
+      editor.chain().focus().insertContentAt({ from, to }, insert).run();
     } catch (err) {
       onError?.(err instanceof Error ? err.message : 'AI chưa sửa được đoạn này');
     } finally {

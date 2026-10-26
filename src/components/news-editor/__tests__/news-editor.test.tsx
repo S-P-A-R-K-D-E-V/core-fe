@@ -13,7 +13,7 @@ vi.mock('next/font/google', () => {
 });
 
 // Imported after the mock above.
-import { NewsEditor } from '../news-editor';
+import { NewsEditor, singleParagraphInner } from '../news-editor';
 
 const theme = createTheme();
 
@@ -50,5 +50,12 @@ describe('NewsEditor', () => {
     );
     await waitFor(() => expect(screen.getByText('Bản nháp của AI')).toBeInTheDocument());
     expect(screen.queryByText('Xin chào')).not.toBeInTheDocument();
+  });
+
+  it('AI viết lại một đoạn: chỉ lấy phần trong <p> để không tách đoạn', () => {
+    expect(singleParagraphInner('<p>Ngắn <strong>gọn</strong></p>\n')).toBe('Ngắn <strong>gọn</strong>');
+    expect(singleParagraphInner('<p style="text-align: center">Giữa</p>')).toBe('Giữa');
+    expect(singleParagraphInner('<p>Một</p><p>Hai</p>')).toBeNull();
+    expect(singleParagraphInner('<ul><li>Mục</li></ul>')).toBeNull();
   });
 });
