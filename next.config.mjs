@@ -37,6 +37,8 @@ const BACKEND_API_PREFIXES = [
   'sales-returns',
   // Nhập phiếu từ ảnh hoá đơn NCC (đọc ảnh bằng AI, gợi ý mã, tạo phiếu nhập nháp).
   'purchase-imports',
+  // Tin tức của cửa hàng (trang quản trị /dashboard/tin-tuc, trợ lý AI viết bài).
+  'store-posts',
 ];
 
 const nextConfig = {
