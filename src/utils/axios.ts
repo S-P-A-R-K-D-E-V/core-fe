@@ -383,6 +383,7 @@ export const endpoints = {
     create: '/penalty-policies',
     update: (id: string) => `/penalty-policies/${id}`,
     delete: (id: string) => `/penalty-policies/${id}`,
+    monetarySettings: '/penalty-policies/monetary-settings',
   },
   cleaning: {
     templates: '/cleaning/templates',
