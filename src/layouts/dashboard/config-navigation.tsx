@@ -331,6 +331,14 @@ export function useNavData(
             branchType: 'fnb' as BranchType,
           },
 
+          // TIN TỨC trên trang công khai của cửa hàng (/tin-tuc) — soạn bài có trợ lý AI.
+          {
+            title: 'Tin tức',
+            path: paths.dashboard.news.root,
+            icon: ICONS.blog,
+            permissions: [PERMISSIONS.posts.manage],
+          },
+
           // CÀI ĐẶT CỬA HÀNG (thương hiệu, KiotViet riêng, khoá API cho trợ lý AI)
           {
             title: 'Cài đặt cửa hàng',

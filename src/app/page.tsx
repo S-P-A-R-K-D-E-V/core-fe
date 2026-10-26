@@ -19,6 +19,7 @@ import {
   storeHomeDescription,
 } from 'src/lib/store-seo';
 import { activeSeason } from 'src/lib/store-season';
+import { getPublishedPosts } from 'src/lib/store-posts';
 
 /** Trang đăng nhập chung (auth.devbyspark.com): không phải cửa hàng nào — hiện đăng nhập Spark Store. */
 function onAuthHost(): boolean {
@@ -79,7 +80,10 @@ type HomePageProps = { searchParams?: Record<string, string | string[] | undefin
 export default async function HomePage({ searchParams }: HomePageProps) {
   if (onAuthHost()) return <HubLoginPage />;
 
-  const { branding, products, categories, description } = await loadHome();
+  const [{ branding, products, categories, description }, news] = await Promise.all([
+    loadHome(),
+    getPublishedPosts({ page: 1, pageSize: 3 }),
+  ]);
   // Giao diện mùa lễ (Halloween 20–31/10, Giáng Sinh 1–26/12) — ?season=halloween|christmas để xem trước, ?season=off để tắt.
   const season = activeSeason({ branding, preview: searchParams?.season });
   const jsonLd =
@@ -102,6 +106,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         categories={categories}
         description={description}
         season={season}
+        posts={news.items}
       />
     </>
   );

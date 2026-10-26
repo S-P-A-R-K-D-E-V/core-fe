@@ -44,6 +44,7 @@ const CLEANING = PERMISSIONS.cleaning;
 export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   { prefix: paths.dashboard.role.root, roles: ADMIN_ROLES },
   { prefix: paths.dashboard.storeSettings.root, roles: ADMIN_ROLES },
+  { prefix: paths.dashboard.news.root, roles: null, permissions: [PERMISSIONS.posts.manage] },
   // Thiết bị cửa hàng: quản lý xem / ghép / thu hồi máy quầy, kiosk của chi nhánh mình (server lọc theo chi nhánh).
   { prefix: paths.dashboard.storeSettings.devices, roles: MANAGER_ROLES },
   { prefix: paths.dashboard.notificationConfig.root, roles: ADMIN_ROLES },

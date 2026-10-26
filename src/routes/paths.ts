@@ -43,6 +43,11 @@ export const paths = {
       details: `/product/${MOCK_ID}`,
     },
   },
+  // Tin tức của cửa hàng (bài đã đăng) — trang công khai /tin-tuc.
+  news: {
+    root: `/tin-tuc`,
+    details: (slug: string) => `/tin-tuc/${slug}`,
+  },
   post: {
     root: `/post`,
     details: (title: string) => `/post/${paramCase(title)}`,
@@ -170,6 +175,12 @@ export const paths = {
     holidayPolicy: {
       root: `${ROOTS.DASHBOARD}/holiday-policy`,
       list: `${ROOTS.DASHBOARD}/holiday-policy/list`,
+    },
+    // Tin tức của cửa hàng: soạn / đăng bài (có trợ lý AI) — quyền posts.manage.
+    news: {
+      root: `${ROOTS.DASHBOARD}/tin-tuc`,
+      new: `${ROOTS.DASHBOARD}/tin-tuc/new`,
+      edit: (id: string) => `${ROOTS.DASHBOARD}/tin-tuc/${id}/edit`,
     },
     storeSettings: {
       root: `${ROOTS.DASHBOARD}/store-settings`,

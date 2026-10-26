@@ -151,6 +151,8 @@ export const PERMISSIONS = {
   promotionCampaign: { read: 'promotion-campaign.read', manage: 'promotion-campaign.manage' },
   posCart: { read: 'pos-cart.read', manage: 'pos-cart.manage', convert: 'pos-cart.convert' },
   orders: { read: 'orders.read', create: 'orders.create', update: 'orders.update', delete: 'orders.delete' },
+  /** Tin tức trên trang công khai của cửa hàng (/store-posts, /dashboard/tin-tuc) — kể cả trợ lý AI viết bài. */
+  posts: { manage: 'posts.manage' },
   /**
    * Nhân viên — hồ sơ của mình không cần quyền. Tài khoản Admin chỉ Admin đụng được, gán vai trò / thêm quản lý chỉ Admin
    * (luật theo vai trò).

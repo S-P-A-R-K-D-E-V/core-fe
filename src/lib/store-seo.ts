@@ -1,3 +1,4 @@
+import type { StorePostDetail } from './store-posts';
 import type { TenantBranding, StorefrontProduct, StorefrontProductDetail } from './tenant-branding';
 
 import { storeIndustry } from './store-industry';
@@ -17,7 +18,9 @@ export const DEMO_TENANTS = ['demo'];
 export const TITLE_MAX = 65;
 export const DESCRIPTION_MAX = 160;
 
-export function storeDisplayName(branding: Pick<TenantBranding, 'storeName' | 'tenantCode'> | null | undefined): string {
+export function storeDisplayName(
+  branding: Pick<TenantBranding, 'storeName' | 'tenantCode'> | null | undefined
+): string {
   return branding?.storeName?.trim() || branding?.tenantCode || 'Cửa hàng';
 }
 
@@ -46,7 +49,10 @@ export function displayCategory(name: string): string {
 }
 
 /** Các nhóm hàng có nhiều sản phẩm nhất (giữ thứ tự xuất hiện khi bằng nhau). */
-export function topCategories(products: Pick<StorefrontProduct, 'categoryName'>[], max = 4): string[] {
+export function topCategories(
+  products: Pick<StorefrontProduct, 'categoryName'>[],
+  max = 4
+): string[] {
   const counts = new Map<string, { name: string; count: number; order: number }>();
   products.forEach((p, order) => {
     const raw = p.categoryName?.trim();
@@ -63,13 +69,19 @@ export function topCategories(products: Pick<StorefrontProduct, 'categoryName'>[
 }
 
 /** Thẻ <title> trang chủ: SEO chủ cửa hàng đặt → "Tên — vế đầu mô tả" → "Tên — nhóm hàng" → "Tên — địa chỉ" → "Tên". */
-export function storeHomeTitle(branding: TenantBranding | null | undefined, categories: string[] = []): string {
+export function storeHomeTitle(
+  branding: TenantBranding | null | undefined,
+  categories: string[] = []
+): string {
   const custom = branding?.seoTitle?.trim();
   if (custom) return custom;
 
   const name = storeDisplayName(branding);
   const tail =
-    firstClause(branding?.shortDescription) || categories.slice(0, 3).join(', ') || branding?.address?.trim() || '';
+    firstClause(branding?.shortDescription) ||
+    categories.slice(0, 3).join(', ') ||
+    branding?.address?.trim() ||
+    '';
   if (!tail || name.toLocaleLowerCase('vi').includes(tail.toLocaleLowerCase('vi'))) return name;
 
   const room = TITLE_MAX - name.length - 3;
@@ -94,8 +106,12 @@ export function storeHomeDescription(
 
   const intro = address ? `${name} tại ${address}` : name;
   const parts = [
-    categories.length ? `${intro}: ${words.collection} gồm ${categories.slice(0, 4).join(', ')}.` : `${intro}.`,
-    productCount > 0 ? `Xem ${productCount} ${words.item} đang bán kèm giá.` : `Xem ${words.collection}, giá và thông tin liên hệ.`,
+    categories.length
+      ? `${intro}: ${words.collection} gồm ${categories.slice(0, 4).join(', ')}.`
+      : `${intro}.`,
+    productCount > 0
+      ? `Xem ${productCount} ${words.item} đang bán kèm giá.`
+      : `Xem ${words.collection}, giá và thông tin liên hệ.`,
     phone ? `Liên hệ ${phone}.` : '',
   ];
   return clip(parts.filter(Boolean).join(' '), DESCRIPTION_MAX);
@@ -122,7 +138,9 @@ export function storeJsonLd(params: {
   const url = `${origin}/`;
   const logo = absoluteUrl(branding.logoUrl, origin);
   const image = logo ?? absoluteUrl(products.find((p) => p.imageUrl)?.imageUrl, origin);
-  const sameAs = [branding.messengerLink, branding.zaloLink].filter((l): l is string => !!l && /^https?:\/\//.test(l));
+  const sameAs = [branding.messengerLink, branding.zaloLink].filter(
+    (l): l is string => !!l && /^https?:\/\//.test(l)
+  );
 
   return {
     '@context': 'https://schema.org',
@@ -146,7 +164,11 @@ export function storeJsonLd(params: {
         ...(image && { image }),
         ...(branding.phone?.trim() && { telephone: branding.phone.trim() }),
         ...(branding.address?.trim() && {
-          address: { '@type': 'PostalAddress', streetAddress: branding.address.trim(), addressCountry: 'VN' },
+          address: {
+            '@type': 'PostalAddress',
+            streetAddress: branding.address.trim(),
+            addressCountry: 'VN',
+          },
         }),
         ...(sameAs.length && { sameAs }),
       },
@@ -163,7 +185,10 @@ export function productDescription(product: StorefrontProductDetail, storeName: 
   if (product.description?.trim()) return clip(product.description, DESCRIPTION_MAX);
   const category = product.categoryName ? ` – ${displayCategory(product.categoryName)}` : '';
   const stock = product.inStock ? 'Còn hàng.' : 'Tạm hết hàng.';
-  return clip(`${product.name}${category}. Giá ${formatVnd(product.price)} tại ${storeName}. ${stock}`, DESCRIPTION_MAX);
+  return clip(
+    `${product.name}${category}. Giá ${formatVnd(product.price)} tại ${storeName}. ${stock}`,
+    DESCRIPTION_MAX
+  );
 }
 
 /** schema.org Product + Offer cho trang một sản phẩm. */
@@ -175,7 +200,9 @@ export function productJsonLd(params: {
 }) {
   const { product, origin, storeName, description } = params;
   const url = `${origin}/product/${product.id}/`;
-  const images = product.imageUrls.map((u) => absoluteUrl(u, origin)).filter((u): u is string => !!u);
+  const images = product.imageUrls
+    .map((u) => absoluteUrl(u, origin))
+    .filter((u): u is string => !!u);
 
   return {
     '@context': 'https://schema.org',
@@ -191,9 +218,56 @@ export function productJsonLd(params: {
       url,
       price: product.price,
       priceCurrency: 'VND',
-      availability: product.inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      availability: product.inStock
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
       seller: { '@type': 'Organization', name: storeName, url: `${origin}/` },
     },
+  };
+}
+
+/** schema.org BlogPosting cho một bài tin tức của cửa hàng (/tin-tuc/[slug]). */
+export function postJsonLd(params: {
+  post: Pick<
+    StorePostDetail,
+    | 'slug'
+    | 'title'
+    | 'summary'
+    | 'metaDescription'
+    | 'coverUrl'
+    | 'publishedAt'
+    | 'updatedAt'
+    | 'tags'
+    | 'authorName'
+  >;
+  origin: string;
+  storeName: string;
+  logoUrl?: string | null;
+}) {
+  const { post, origin, storeName, logoUrl } = params;
+  const url = `${origin}/tin-tuc/${post.slug}/`;
+  const image = absoluteUrl(post.coverUrl, origin);
+  const logo = absoluteUrl(logoUrl, origin);
+  const publisher = {
+    '@type': 'Organization',
+    name: storeName,
+    url: `${origin}/`,
+    ...(logo && { logo: { '@type': 'ImageObject', url: logo } }),
+  };
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    '@id': `${url}#article`,
+    mainEntityOfPage: url,
+    headline: clip(post.title, 110),
+    description: post.metaDescription ?? post.summary ?? undefined,
+    ...(image && { image: [image] }),
+    ...(post.publishedAt && { datePublished: post.publishedAt }),
+    dateModified: post.updatedAt,
+    ...(post.tags.length && { keywords: post.tags.join(', ') }),
+    author: post.authorName ? { '@type': 'Person', name: post.authorName } : publisher,
+    publisher,
   };
 }
 

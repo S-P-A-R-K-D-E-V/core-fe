@@ -10,26 +10,29 @@ import Footer from './footer';
 import Header from './header';
 
 // Trợ lý chat tải sau khi trang đã hiện (không nằm trong JS ban đầu của trang công khai — đỡ chặn luồng chính).
-const ChatbotWidget = dynamic(() => import('src/components/chatbot/chatbot-widget'), { ssr: false });
+const ChatbotWidget = dynamic(() => import('src/components/chatbot/chatbot-widget'), {
+  ssr: false,
+});
 
 // ----------------------------------------------------------------------
 
 type Props = {
   children: React.ReactNode;
   hasProducts?: boolean;
+  hasPosts?: boolean;
   logoUrl?: string | null;
   /** Trang chủ truyền branding đầy đủ để chân trang có địa chỉ / số điện thoại của cửa hàng. */
   branding?: TenantBranding | null;
 };
 
-export default function MainLayout({ children, hasProducts, logoUrl, branding }: Props) {
+export default function MainLayout({ children, hasProducts, hasPosts, logoUrl, branding }: Props) {
   const pathname = usePathname();
 
   const homePage = pathname === '/';
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: 1 }}>
-      <Header hasProducts={hasProducts} logoUrl={logoUrl} />
+      <Header hasProducts={hasProducts} hasPosts={hasPosts} logoUrl={logoUrl} />
 
       <Box
         component="main"

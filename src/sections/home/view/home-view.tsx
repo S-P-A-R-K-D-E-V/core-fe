@@ -13,6 +13,7 @@ import Iconify from 'src/components/iconify';
 
 import { CICI_TENANT } from 'src/lib/store-seo';
 import { SEASONS, type SeasonKey } from 'src/lib/store-season';
+import type { StorePostListItem } from 'src/lib/store-posts';
 import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding';
 
 import HomeHero from '../home-hero';
@@ -23,6 +24,7 @@ import HomeCleanInterfaces from '../home-clean-interfaces';
 import HomeTestimonials from '../home-testimonials';
 import HomeFAQs from '../home-faqs';
 import HomeAdvertisement from '../home-advertisement';
+import HomeNews from '../home-news';
 import { Snowfall } from '../components/snowfall';
 import { SeasonProvider } from '../components/season-context';
 
@@ -39,6 +41,8 @@ type Props = {
   description: string;
   /** Mùa lễ đang hiện (src/lib/store-season.ts) — null ngoài mùa hoặc cửa hàng đã tắt. */
   season?: SeasonKey | null;
+  /** 3 bài tin tức mới nhất đã đăng (mục "Tin tức mới"; rỗng thì ẩn cả mục và link menu). */
+  posts?: StorePostListItem[];
 };
 
 export default function HomeView({
@@ -48,6 +52,7 @@ export default function HomeView({
   categories,
   description,
   season = null,
+  posts = [],
 }: Props) {
   const { scrollYProgress } = useScroll();
 
@@ -70,7 +75,12 @@ export default function HomeView({
 
   return (
     <SeasonProvider value={season}>
-      <MainLayout hasProducts={products.length > 0} logoUrl={branding?.logoUrl} branding={branding}>
+      <MainLayout
+        hasProducts={products.length > 0}
+        hasPosts={posts.length > 0}
+        logoUrl={branding?.logoUrl}
+        branding={branding}
+      >
         <ScrollProgress scrollYProgress={scrollYProgress} />
 
         <HomeHero products={featured} branding={branding} categories={categories} />
@@ -99,6 +109,8 @@ export default function HomeView({
           {isCiCi && <HomeCleanInterfaces branding={branding} />}
 
           {isCiCi && <HomeTestimonials />}
+
+          <HomeNews posts={posts} branding={branding} />
 
           <HomeFAQs branding={branding} categories={categories} isCiCi={isCiCi} />
 

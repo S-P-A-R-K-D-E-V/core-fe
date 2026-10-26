@@ -59,7 +59,7 @@ function requestHost(): string {
  * Gọi thẳng core-api phía server (không qua rewrites()/browser) với X-Tenant-Domain = Host của request — core-api
  * tự xác định cửa hàng theo tên miền. Lỗi / không có cửa hàng → null.
  */
-async function fetchPublic<T>(path: string): Promise<T | null> {
+export async function fetchPublic<T>(path: string): Promise<T | null> {
   const backendUrl = process.env.BACKEND_URL || 'http://core-api:5000';
 
   try {

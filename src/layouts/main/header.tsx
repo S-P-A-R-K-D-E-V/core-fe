@@ -27,10 +27,12 @@ import SettingsButton from '../common/settings-button';
 
 type Props = {
   hasProducts?: boolean;
+  /** Cửa hàng có bài tin tức đã đăng — hiện mục "Tin tức". */
+  hasPosts?: boolean;
   logoUrl?: string | null;
 };
 
-export default function Header({ hasProducts = true, logoUrl }: Props) {
+export default function Header({ hasProducts = true, hasPosts = false, logoUrl }: Props) {
   const theme = useTheme();
 
   const mdUp = useResponsive('up', 'md');
@@ -39,7 +41,7 @@ export default function Header({ hasProducts = true, logoUrl }: Props) {
 
   const { authenticated } = useAuthContext();
 
-  const navData = mainNav({ hasProducts, authenticated });
+  const navData = mainNav({ hasProducts, hasPosts, authenticated });
 
   return (
     <AppBar>
