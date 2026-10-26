@@ -97,6 +97,12 @@ export async function getShopFirstPage(): Promise<StorefrontProductPage | null> 
   return fetchPublic<StorefrontProductPage>(storefrontProductListKey());
 }
 
+/** Phương thức thanh toán online cửa hàng đang bật (GET /public/storefront/checkout-config) — lỗi → null. */
+export async function getStorefrontPaymentMethods(): Promise<string[] | null> {
+  const data = await fetchPublic<{ payments?: { method: string }[] }>('/public/storefront/checkout-config');
+  return data ? (data.payments ?? []).map((p) => p.method) : null;
+}
+
 export async function getStorefrontProduct(id: string): Promise<StorefrontProductDetail | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const data = await fetchPublic<StorefrontProductDetail>(`/public/storefront/products/${id}`);

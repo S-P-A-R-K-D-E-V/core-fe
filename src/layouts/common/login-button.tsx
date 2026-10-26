@@ -14,7 +14,7 @@ type Props = {
 export default function LoginButton({ sx }: Props) {
   return (
     <Button component={RouterLink} href={PATH_AFTER_LOGIN} variant="outlined" sx={{ mr: 1, ...sx }}>
-      Login
+      Đăng nhập
     </Button>
   );
 }

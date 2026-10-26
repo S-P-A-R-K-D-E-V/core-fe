@@ -6,19 +6,19 @@ import Toolbar from '@mui/material/Toolbar';
 import { useTheme } from '@mui/material/styles';
 import Container from '@mui/material/Container';
 
-import { paths } from 'src/routes/paths';
-
 import { useOffSetTop } from 'src/hooks/use-off-set-top';
 import { useResponsive } from 'src/hooks/use-responsive';
 
 import { bgBlur } from 'src/theme/css';
+
+import { useAuthContext } from 'src/auth/hooks';
 
 import Logo from 'src/components/logo';
 
 import NavMobile from './nav/mobile';
 import NavDesktop from './nav/desktop';
 import { HEADER } from '../config-layout';
-import { navConfig } from './config-navigation';
+import { mainNav } from './config-navigation';
 import LoginOrAccount from '../common/login-or-account';
 import HeaderShadow from '../common/header-shadow';
 import SettingsButton from '../common/settings-button';
@@ -37,7 +37,9 @@ export default function Header({ hasProducts = true, logoUrl }: Props) {
 
   const offsetTop = useOffSetTop(HEADER.H_DESKTOP);
 
-  const navData = hasProducts ? navConfig : navConfig.filter((item) => item.path !== paths.product.root);
+  const { authenticated } = useAuthContext();
+
+  const navData = mainNav({ hasProducts, authenticated });
 
   return (
     <AppBar>

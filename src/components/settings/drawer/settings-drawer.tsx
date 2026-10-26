@@ -51,10 +51,10 @@ export default function SettingsDrawer() {
       sx={{ py: 2, pr: 1, pl: 2.5 }}
     >
       <Typography variant="h6" sx={{ flexGrow: 1 }}>
-        Settings
+        Giao diện
       </Typography>
 
-      <Tooltip title="Reset">
+      <Tooltip title="Đặt lại">
         <IconButton onClick={settings.onReset}>
           <Badge color="error" variant="dot" invisible={!settings.canReset}>
             <Iconify icon="solar:restart-bold" />
@@ -71,7 +71,7 @@ export default function SettingsDrawer() {
   const renderMode = (
     <div>
       <Typography variant="caption" component="div" sx={{ ...labelStyles }}>
-        Mode
+        Sáng / tối
       </Typography>
       <BaseOptions
         value={settings.themeMode}
@@ -85,7 +85,7 @@ export default function SettingsDrawer() {
   const renderContrast = (
     <div>
       <Typography variant="caption" component="div" sx={{ ...labelStyles }}>
-        Contrast
+        Độ tương phản
       </Typography>
       <BaseOptions
         value={settings.themeContrast}
@@ -99,7 +99,7 @@ export default function SettingsDrawer() {
   const renderDirection = (
     <div>
       <Typography variant="caption" component="div" sx={{ ...labelStyles }}>
-        Direction
+        Hướng chữ
       </Typography>
       <BaseOptions
         value={settings.themeDirection}
@@ -113,7 +113,7 @@ export default function SettingsDrawer() {
   const renderLayout = (
     <div>
       <Typography variant="caption" component="div" sx={{ ...labelStyles }}>
-        Layout
+        Bố cục
       </Typography>
       <LayoutOptions
         value={settings.themeLayout}
@@ -130,8 +130,8 @@ export default function SettingsDrawer() {
         component="div"
         sx={{ ...labelStyles, display: 'inline-flex', alignItems: 'center' }}
       >
-        Stretch
-        <Tooltip title="Only available at large resolutions > 1600px (xl)">
+        Giãn toàn chiều ngang
+        <Tooltip title="Chỉ áp dụng trên màn hình rộng hơn 1600px">
           <Iconify icon="eva:info-outline" width={16} sx={{ ml: 0.5 }} />
         </Tooltip>
       </Typography>
@@ -145,7 +145,7 @@ export default function SettingsDrawer() {
   const renderPresets = (
     <div>
       <Typography variant="caption" component="div" sx={{ ...labelStyles }}>
-        Presets
+        Màu chủ đạo
       </Typography>
       <PresetsOptions
         value={settings.themeColorPresets}
@@ -157,12 +157,12 @@ export default function SettingsDrawer() {
   const renderFont = (
     <Stack spacing={2.5}>
       <Typography component="div" sx={{ ...sectionLabelStyles }}>
-        Font
+        Chữ
       </Typography>
 
       <div>
         <Typography variant="caption" component="div" sx={{ ...labelStyles }}>
-          Family
+          Kiểu chữ
         </Typography>
         <FontFamilyOptions
           options={FONT_OPTIONS.map((f) => f.label)}
@@ -177,8 +177,8 @@ export default function SettingsDrawer() {
           component="div"
           sx={{ ...labelStyles, display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
         >
-          Size
-          <Tooltip title="Scales all text proportionally">
+          Cỡ chữ
+          <Tooltip title="Phóng to / thu nhỏ toàn bộ chữ">
             <Iconify icon="eva:info-outline" width={14} sx={{ color: 'text.disabled' }} />
           </Tooltip>
         </Typography>

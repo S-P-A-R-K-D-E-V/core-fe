@@ -119,6 +119,24 @@ describe('ProductDetailsSummary (cửa hàng online)', () => {
     expect(onGotoStep).toHaveBeenCalledWith(0);
   });
 
+  it('keeps the chosen quantity when the same product is reloaded, and adds that many', () => {
+    const onAddCart = vi.fn();
+    const { rerender } = render(<ProductDetailsSummary product={makeProduct()} items={[]} onAddCart={onAddCart} />);
+    const increase = () =>
+      screen
+        .getAllByRole('button')
+        .filter((b) => !['Thêm vào giỏ', 'Mua ngay'].includes(b.textContent ?? ''))
+        .at(-1)!;
+
+    fireEvent.click(increase());
+    fireEvent.click(increase());
+    // SWR tải lại: object mới, cùng nội dung.
+    rerender(<ProductDetailsSummary product={makeProduct()} items={[]} onAddCart={onAddCart} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm vào giỏ' }));
+
+    expect(onAddCart).toHaveBeenCalledWith(expect.objectContaining({ quantity: 3, subTotal: 45000 }));
+  });
+
   it('blocks buying when the product is out of stock', () => {
     render(
       <ProductDetailsSummary

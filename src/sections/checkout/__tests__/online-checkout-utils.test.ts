@@ -1,9 +1,11 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 
+import type { ICheckoutItem } from 'src/types/checkout';
 import type { IStorefrontShippingQuote } from 'src/types/online-shop';
 
 import {
   orderHref,
+  addCartItem,
   orderItems,
   addressReady,
   rememberOrder,
@@ -77,5 +79,40 @@ describe('online checkout utils', () => {
     const recent = readRecentOrders();
     expect(recent.map((o) => o.code)).toEqual(['W3', 'W6', 'W5', 'W4', 'W2']);
     expect(orderHref('W3', 'a b')).toBe('/order/W3/?t=a%20b');
+  });
+});
+
+describe('addCartItem', () => {
+  const item = (quantity: number, available = 99): ICheckoutItem => ({
+    id: 'gt15',
+    name: 'Ghim tăm - GT15',
+    coverUrl: '/a.jpg',
+    price: 15_000,
+    quantity,
+    available,
+    colors: [],
+    size: '',
+    subTotal: 15_000 * quantity,
+  });
+
+  it('appends a new item as chosen', () => {
+    expect(addCartItem([], item(3))).toEqual([item(3)]);
+  });
+
+  it('adds the chosen quantity to an item already in the cart (not just 1)', () => {
+    const [line] = addCartItem([item(1)], item(3));
+    expect(line.quantity).toBe(4);
+  });
+
+  it('never goes past what is left, and treats 0 as "add one"', () => {
+    expect(addCartItem([item(2, 3)], item(5, 3))[0].quantity).toBe(3);
+    expect(addCartItem([item(2)], item(0))[0].quantity).toBe(3);
+  });
+
+  it('keeps other lines untouched', () => {
+    const other = { ...item(1), id: 'gt25' };
+    const result = addCartItem([other, item(1)], item(2));
+    expect(result[0]).toBe(other);
+    expect(result[1].quantity).toBe(3);
   });
 });

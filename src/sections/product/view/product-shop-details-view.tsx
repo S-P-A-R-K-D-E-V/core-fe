@@ -29,34 +29,17 @@ import { ProductDetailsSkeleton } from '../product-skeleton';
 import ProductDetailsSummary from '../product-details-summary';
 import ProductDetailsCarousel from '../product-details-carousel';
 import ProductDetailsDescription from '../product-details-description';
-
-// ----------------------------------------------------------------------
-
-const SUMMARY = [
-  {
-    title: 'Hàng kiểm định kỹ',
-    description: 'Mỗi sản phẩm được kiểm tra chất lượng kỹ lưỡng trước khi đến tay bạn.',
-    icon: 'solar:verified-check-bold',
-  },
-  {
-    title: 'Tư vấn miễn phí',
-    description: 'Ghé cửa hàng tại 21 Chùa Láng hoặc nhắn tin để được tư vấn trực tiếp.',
-    icon: 'solar:chat-round-dots-bold',
-  },
-  {
-    title: 'Thanh toán linh hoạt',
-    description: 'Tiền mặt, chuyển khoản, MoMo / ZaloPay — thanh toán theo cách bạn thích.',
-    icon: 'solar:wallet-bold',
-  },
-];
+import type { StoreHighlight } from '../store-highlights';
 
 // ----------------------------------------------------------------------
 
 type Props = {
   id: string;
+  /** Ô cam kết dưới ảnh — dựng phía server theo dữ liệu cửa hàng (src/sections/product/store-highlights.ts). */
+  highlights?: StoreHighlight[];
 };
 
-export default function ProductShopDetailsView({ id }: Props) {
+export default function ProductShopDetailsView({ id, highlights = [] }: Props) {
   const settings = useSettingsContext();
 
   const checkout = useCheckoutContext();
@@ -122,31 +105,33 @@ export default function ProductShopDetailsView({ id }: Props) {
         </Grid>
       </Grid>
 
-      <Box
-        gap={5}
-        display="grid"
-        gridTemplateColumns={{
-          xs: 'repeat(1, 1fr)',
-          md: 'repeat(3, 1fr)',
-        }}
-        sx={{ my: 10 }}
-      >
-        {SUMMARY.map((item) => (
-          <Box key={item.title} sx={{ textAlign: 'center', px: 5 }}>
-            <Iconify icon={item.icon} width={32} sx={{ color: 'primary.main' }} />
+      {highlights.length > 0 && (
+        <Box
+          gap={5}
+          display="grid"
+          gridTemplateColumns={{
+            xs: 'repeat(1, 1fr)',
+            md: `repeat(${highlights.length}, 1fr)`,
+          }}
+          sx={{ my: 10 }}
+        >
+          {highlights.map((item) => (
+            <Box key={item.title} sx={{ textAlign: 'center', px: 5 }}>
+              <Iconify icon={item.icon} width={32} sx={{ color: 'primary.main' }} />
 
-            <Typography variant="subtitle1" sx={{ mb: 1, mt: 2 }}>
-              {item.title}
-            </Typography>
+              <Typography variant="subtitle1" sx={{ mb: 1, mt: 2 }}>
+                {item.title}
+              </Typography>
 
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              {item.description}
-            </Typography>
-          </Box>
-        ))}
-      </Box>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                {item.description}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
 
-      <Card>
+      <Card sx={{ ...(!highlights.length && { mt: 10 }) }}>
         <Tabs
           value={currentTab}
           onChange={handleChangeTab}

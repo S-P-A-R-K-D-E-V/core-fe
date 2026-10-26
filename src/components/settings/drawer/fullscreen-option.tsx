@@ -50,7 +50,7 @@ export default function FullScreenOption() {
           sx={{ width: 16, height: 16, mr: 1 }}
         />
 
-        {fullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+        {fullscreen ? 'Thoát toàn màn hình' : 'Toàn màn hình'}
       </ButtonBase>
     </Box>
   );

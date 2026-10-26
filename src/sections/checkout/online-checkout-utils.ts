@@ -6,6 +6,29 @@ import type { IStorefrontShippingQuote, IStorefrontShippingOption } from 'src/ty
 // chỉ để khách xem trước.
 // ----------------------------------------------------------------------
 
+/**
+ * Thêm một món vào giỏ: món đã có thì cộng đúng số lượng khách chọn (tối thiểu 1), không vượt số còn lại của lần thêm
+ * này (`available`, 0 = không biết); món mới thì nối vào cuối.
+ */
+export function addCartItem(items: ICheckoutItem[], newItem: ICheckoutItem): ICheckoutItem[] {
+  const existing = items.find((i) => i.id === newItem.id);
+  if (!existing) return [...items, newItem];
+
+  const added = existing.quantity + Math.max(1, newItem.quantity || 0);
+  const quantity = newItem.available > 0 ? Math.min(added, newItem.available) : added;
+
+  return items.map((i) =>
+    i.id === newItem.id
+      ? {
+          ...i,
+          colors: Array.from(new Set([...i.colors, ...newItem.colors])),
+          quantity,
+          available: newItem.available || i.available,
+        }
+      : i
+  );
+}
+
 export function orderItems(items: ICheckoutItem[]): { productId: string; quantity: number }[] {
   return items.filter((i) => i.quantity > 0).map((i) => ({ productId: i.id, quantity: i.quantity }));
 }

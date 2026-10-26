@@ -101,12 +101,14 @@ export default function ProductDetailsSummary({
 
   const values = watch();
 
+  // Đặt lại khi sang sản phẩm khác hoặc giá / số còn đổi. Không theo object `product`: SWR tải lại (vd khách quay lại
+  // tab) tạo object mới cùng nội dung — đặt lại lúc đó làm mất số lượng khách đang chọn.
   useEffect(() => {
     if (product) {
       reset(defaultValues);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product]);
+  }, [id, price, available]);
 
   // "Mua ngay": thêm vào giỏ (nếu chưa có) rồi sang trang đặt hàng.
   const onSubmit = handleSubmit(async (data) => {

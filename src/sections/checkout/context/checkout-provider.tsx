@@ -1,6 +1,5 @@
 'use client';
 
-import uniq from 'lodash/uniq';
 import { useMemo, useEffect, useCallback } from 'react';
 
 import { paths } from 'src/routes/paths';
@@ -8,7 +7,7 @@ import { useRouter } from 'src/routes/hooks';
 
 import { getStorage, useLocalStorage } from 'src/hooks/use-local-storage';
 
-import { rememberOrder } from '../online-checkout-utils';
+import { addCartItem, rememberOrder } from '../online-checkout-utils';
 import { PRODUCT_CHECKOUT_STEPS } from 'src/_mock/_product';
 
 
@@ -78,22 +77,7 @@ export function CheckoutProvider({ children }: Props) {
 
   const onAddToCart = useCallback(
     (newItem: ICheckoutItem) => {
-      const updatedItems: ICheckoutItem[] = state.items.map((item: ICheckoutItem) => {
-        if (item.id === newItem.id) {
-          return {
-            ...item,
-            colors: uniq([...item.colors, ...newItem.colors]),
-            quantity: item.quantity + 1,
-          };
-        }
-        return item;
-      });
-
-      if (!updatedItems.some((item: ICheckoutItem) => item.id === newItem.id)) {
-        updatedItems.push(newItem);
-      }
-
-      update('items', updatedItems);
+      update('items', addCartItem(state.items, newItem));
     },
     [update, state.items]
   );

@@ -50,7 +50,7 @@ export default function SettingsButton({ sx }: Props) {
           whileTap="tap"
           whileHover="hover"
           variants={varHover(1.05)}
-          aria-label="settings"
+          aria-label="Cài đặt giao diện"
           onClick={settings.onToggle}
           sx={{
             width: 40,

@@ -2,8 +2,14 @@ import type { Metadata } from 'next';
 
 import axios, { endpoints } from 'src/utils/axios';
 
+import { storeHighlights } from 'src/sections/product/store-highlights';
 import ProductShopDetailsView from 'src/sections/product/view/product-shop-details-view';
-import { getRequestOrigin, getTenantBranding, getStorefrontProduct } from 'src/lib/tenant-branding';
+import {
+  getRequestOrigin,
+  getTenantBranding,
+  getStorefrontProduct,
+  getStorefrontPaymentMethods,
+} from 'src/lib/tenant-branding';
 import {
   absoluteUrl,
   jsonLdString,
@@ -49,8 +55,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProductShopDetailsPage({ params }: Props) {
   const { id } = params;
-  const [branding, product] = await Promise.all([getTenantBranding(), getStorefrontProduct(id)]);
+  const [branding, product, paymentMethods] = await Promise.all([
+    getTenantBranding(),
+    getStorefrontProduct(id),
+    getStorefrontPaymentMethods(),
+  ]);
   const storeName = storeDisplayName(branding);
+  // Ô cam kết dưới ảnh theo dữ liệu của chính cửa hàng (địa chỉ, kênh nhắn tin, thanh toán online đang bật).
+  const highlights = storeHighlights({
+    address: branding?.address,
+    canMessage: !!(branding?.messengerLink || branding?.zaloLink || branding?.phone),
+    paymentMethods: paymentMethods ?? [],
+  });
 
   return (
     <>
@@ -70,7 +86,7 @@ export default async function ProductShopDetailsPage({ params }: Props) {
           }}
         />
       )}
-      <ProductShopDetailsView id={id} />
+      <ProductShopDetailsView id={id} highlights={highlights} />
     </>
   );
 }
