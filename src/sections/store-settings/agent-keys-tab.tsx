@@ -42,6 +42,7 @@ import {
 } from 'src/api/store-settings';
 
 import { McpSessionsCard } from './mcp-sessions-card';
+import { EndAllSessionsCard } from './end-all-sessions-card';
 import AgentPermissionPicker from './agent-permission-picker';
 import { CodeBlock, McpPromptCopy, McpConnectCard } from './mcp-connect-card';
 import {
@@ -216,6 +217,8 @@ export default function AgentKeysTab() {
       </Card>
 
       <McpSessionsCard />
+
+      <EndAllSessionsCard />
 
       {/* Tạo khoá */}
       <Dialog open={openCreate} onClose={() => setOpenCreate(false)} fullWidth maxWidth="lg">

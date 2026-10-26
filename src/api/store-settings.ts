@@ -149,6 +149,20 @@ export async function revokeAgentKey(id: string): Promise<void> {
   await axios.delete(`/agent-keys/${id}`);
 }
 
+export interface IEndAllSessionsResult {
+  /** Số thành viên cửa hàng bị đăng xuất (không tính người bấm). */
+  members: number;
+  refreshTokensCleared: number;
+  /** Số phiên đăng nhập (app, web, máy quầy) đã đóng. */
+  sessionsEnded: number;
+}
+
+/** Đăng xuất mọi người của cửa hàng (trừ người bấm) — chỉ Admin. Dùng sau sự cố lộ dữ liệu tài khoản. */
+export async function endAllStoreSessions(): Promise<IEndAllSessionsResult> {
+  const res = await axios.post<IEndAllSessionsResult>('/admin/security/end-all-sessions');
+  return res.data;
+}
+
 export async function deleteMyAccount(): Promise<void> {
   await axios.delete('/auth/account', { data: { confirm: true } });
 }
