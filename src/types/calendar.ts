@@ -49,6 +49,9 @@ export interface ICalendarScheduleEvent {
       staffId: string;
       staffName: string;
       attendance?: IAttendanceLog;
+      /** Khu phụ trách trong ca ("A".."D"). */
+      zones?: string[];
+      isShiftLead?: boolean;
     }[];
   };
 }

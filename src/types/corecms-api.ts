@@ -410,7 +410,16 @@ export interface IShiftAssignment {
   shiftType?: string;
   shiftColor?: string;           // Deprecated
   attendanceLog?: IAttendanceLog;
+  /** Khu phụ trách trong ca ("A".."D", nhiều khu được); rỗng = chưa phân khu. */
+  zones?: StoreZoneCode[];
+  /** Trưởng ca của ca này. */
+  isShiftLead?: boolean;
 }
+
+/** Khu phụ trách trong ca — CiCi: A quầy/cửa/vỉa hè, B phần trong tầng 1, C tầng 2, D bàn gói quà (dịp lễ). */
+export type StoreZoneCode = 'A' | 'B' | 'C' | 'D';
+
+export const STORE_ZONE_CODES: StoreZoneCode[] = ['A', 'B', 'C', 'D'];
 
 export interface ICreateShiftAssignmentRequest {
   staffId: string;
@@ -1884,6 +1893,8 @@ export interface ICategory {
   imageUrl?: string;
   createdAt: string;
   subCategories?: ICategory[];
+  /** Tầng bày hàng đặt riêng cho nhóm (1, 2...); null = theo danh mục cha. */
+  floor?: number | null;
 }
 
 export interface ICreateCategoryRequest {

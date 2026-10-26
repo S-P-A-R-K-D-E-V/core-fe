@@ -19,7 +19,7 @@ import { useSnackbar } from 'src/components/snackbar';
 import FormProvider, { RHFTextField, RHFSelect } from 'src/components/hook-form';
 
 import { ICategory } from 'src/types/corecms-api';
-import { getAllCategories, createCategory, updateCategory } from 'src/api/categories';
+import { getAllCategories, createCategory, updateCategory, setCategoryFloor } from 'src/api/categories';
 
 // ----------------------------------------------------------------------
 
@@ -57,6 +57,8 @@ export default function CategoryNewEditForm({ currentCategory }: Props) {
     parentCategoryId: Yup.string().default(''),
     sortOrder: Yup.number().default(0),
     imageUrl: Yup.string().default(''),
+    // '' = theo danh mục cha; '1' / '2' = tầng đặt riêng.
+    floor: Yup.string().default(''),
   });
 
   const defaultValues = useMemo(
@@ -66,6 +68,7 @@ export default function CategoryNewEditForm({ currentCategory }: Props) {
       parentCategoryId: currentCategory?.parentCategoryId || '',
       sortOrder: currentCategory?.sortOrder || 0,
       imageUrl: currentCategory?.imageUrl || '',
+      floor: currentCategory?.floor ? String(currentCategory.floor) : '',
     }),
     [currentCategory]
   );
@@ -87,11 +90,14 @@ export default function CategoryNewEditForm({ currentCategory }: Props) {
         sortOrder: data.sortOrder,
         imageUrl: data.imageUrl || undefined,
       };
+      const floor = data.floor ? Number(data.floor) : null;
       if (currentCategory) {
         await updateCategory(currentCategory.id, payload);
+        if (floor !== (currentCategory.floor ?? null)) await setCategoryFloor(currentCategory.id, floor);
         enqueueSnackbar('Cập nhật thành công!');
       } else {
-        await createCategory(payload);
+        const created = await createCategory(payload);
+        if (floor !== null) await setCategoryFloor(created.id, floor);
         enqueueSnackbar('Tạo thành công!');
       }
       router.push(paths.dashboard.pos.category.list);
@@ -123,6 +129,15 @@ export default function CategoryNewEditForm({ currentCategory }: Props) {
                 ))}
               </RHFSelect>
               <RHFTextField name="imageUrl" label="URL hình ảnh" />
+              <RHFSelect
+                name="floor"
+                label="Tầng bày hàng"
+                helperText="Dùng để tính doanh thu theo tầng. Để trống thì theo danh mục cha."
+              >
+                <MenuItem value="">— Theo danh mục cha —</MenuItem>
+                <MenuItem value="1">Tầng 1</MenuItem>
+                <MenuItem value="2">Tầng 2</MenuItem>
+              </RHFSelect>
             </Box>
             <RHFTextField name="description" label="Mô tả" multiline rows={3} sx={{ mt: 3 }} />
             <Stack alignItems="flex-end" sx={{ mt: 3 }}>
