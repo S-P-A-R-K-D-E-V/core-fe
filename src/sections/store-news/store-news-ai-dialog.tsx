@@ -9,7 +9,6 @@ import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
-import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import MenuItem from '@mui/material/MenuItem';
@@ -25,14 +24,15 @@ import ListItemButton from '@mui/material/ListItemButton';
 import { useDebounce } from 'src/hooks/use-debounce';
 
 import { fCurrency } from 'src/utils/format-number';
-import { apiErrorMessage } from 'src/utils/api-error';
 
 import Iconify from 'src/components/iconify';
 
-import { aiDraft, aiIdeas } from 'src/api/store-posts';
+import { useAiStream } from 'src/api/store-posts-stream';
 import { useSearchStorefrontProducts } from 'src/api/product';
 
 import { NewsContent } from 'src/sections/news/news-content';
+
+import { AiProgressPanel } from './ai-progress-panel';
 
 // ----------------------------------------------------------------------
 
@@ -62,47 +62,39 @@ export function StoreNewsAiDialog({ open, onClose, onApply }: Props) {
   const [products, setProducts] = useState<PickedProduct[]>([]);
   const [productQuery, setProductQuery] = useState('');
   const [draft, setDraft] = useState<StorePostDraft | null>(null);
-  const [busy, setBusy] = useState<'ideas' | 'draft' | null>(null);
-  const [error, setError] = useState('');
+  // Hai lệnh AI dạng stream: hiện từng bước, suy nghĩ và chữ đang viết thay vòng xoay.
+  const ideasAi = useAiStream();
+  const draftAi = useAiStream();
+  const busy = ideasAi.progress.busy ? 'ideas' : draftAi.progress.busy ? 'draft' : null;
 
   const debouncedQuery = useDebounce(productQuery, 400);
   const { searchResults, searchLoading } = useSearchStorefrontProducts(debouncedQuery);
 
   const suggest = async () => {
-    setBusy('ideas');
-    setError('');
-    try {
-      setIdeas(await aiIdeas(hint));
-    } catch (err) {
-      setError(apiErrorMessage(err, 'AI chưa gợi ý được — thử lại sau ít phút'));
-    } finally {
-      setBusy(null);
-    }
+    const result = await ideasAi.run<{ ideas: StorePostIdea[] }>('ai/ideas/stream', { hint });
+    if (result) setIdeas(result.ideas);
   };
 
   const write = async () => {
-    setBusy('draft');
-    setError('');
     setDraft(null);
-    try {
-      setDraft(
-        await aiDraft({
-          topic,
-          keywords: keywords || undefined,
-          tone,
-          length,
-          productIds: products.map((p) => p.id),
-        })
-      );
-    } catch (err) {
-      setError(apiErrorMessage(err, 'AI chưa viết được — thử lại sau ít phút'));
-    } finally {
-      setBusy(null);
-    }
+    const result = await draftAi.run<StorePostDraft>('ai/draft/stream', {
+      topic,
+      keywords: keywords || undefined,
+      tone,
+      length,
+      productIds: products.map((p) => p.id),
+    });
+    if (result) setDraft(result);
+  };
+
+  const close = () => {
+    ideasAi.cancel();
+    draftAi.cancel();
+    onClose();
   };
 
   return (
-    <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="md">
+    <Dialog open={open} onClose={close} fullWidth maxWidth="md">
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Iconify icon="solar:magic-stick-3-bold-duotone" sx={{ color: 'primary.main' }} />
         Viết bài bằng AI
@@ -118,12 +110,6 @@ export function StoreNewsAiDialog({ open, onClose, onApply }: Props) {
       </Tabs>
 
       <DialogContent sx={{ pt: 3 }}>
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
         {tab === 'ideas' && (
           <Stack spacing={2}>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
@@ -144,6 +130,7 @@ export function StoreNewsAiDialog({ open, onClose, onApply }: Props) {
                 Gợi ý chủ đề
               </LoadingButton>
             </Stack>
+            <AiProgressPanel progress={ideasAi.progress} preview="none" onCancel={ideasAi.cancel} />
             {ideas.map((idea) => (
               <ListItemButton
                 key={idea.title}
@@ -256,6 +243,10 @@ export function StoreNewsAiDialog({ open, onClose, onApply }: Props) {
               )}
             />
 
+            {(draftAi.progress.busy || draftAi.progress.error) && (
+              <AiProgressPanel progress={draftAi.progress} preview="draft" onCancel={draftAi.cancel} />
+            )}
+
             {draft && (
               <Box sx={{ p: 2.5, borderRadius: 1.5, bgcolor: 'background.neutral' }}>
                 <Typography variant="overline" sx={{ color: 'text.secondary' }}>
@@ -277,7 +268,7 @@ export function StoreNewsAiDialog({ open, onClose, onApply }: Props) {
       </DialogContent>
 
       <DialogActions>
-        <Button color="inherit" onClick={onClose} disabled={!!busy}>
+        <Button color="inherit" onClick={close}>
           Đóng
         </Button>
         {tab === 'draft' && (

@@ -54,6 +54,9 @@ const nextConfig = {
     BUILD_STATIC_EXPORT: isStaticExport,
   },
   experimental: {
+    // rewrites() tới core-api cắt kết nối sau 30 giây (mặc định) — lệnh dài trả "Internal Server Error". Trợ lý AI viết
+    // bài đã đi đường stream riêng (app/store-posts-ai); nới thêm cho các lệnh không stream.
+    proxyTimeout: 120_000,
     serverActions: {
       // Stable key across all pods/deployments — prevents "Failed to find
       // Server Action" when browser cache has JS from a previous build.

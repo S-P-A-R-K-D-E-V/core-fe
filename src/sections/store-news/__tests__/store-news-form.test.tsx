@@ -20,25 +20,33 @@ vi.mock('next/font/google', () => {
 const api = {
   createStorePost: vi.fn(),
   updateStorePost: vi.fn(),
-  aiSeo: vi.fn(),
-  aiRewrite: vi.fn(),
-  aiDraft: vi.fn(),
-  aiIdeas: vi.fn(),
   uploadStorePostImage: vi.fn(),
+  searchStorePostImages: vi.fn(),
+  importStorePostImage: vi.fn(),
+  // Mọi lệnh AI dạng stream (đường dẫn, thân lệnh) → kết quả cuối.
+  stream: vi.fn(),
 };
 vi.mock('src/api/store-posts', () => ({
   createStorePost: (...a: any[]) => api.createStorePost(...a),
   updateStorePost: (...a: any[]) => api.updateStorePost(...a),
-  aiSeo: (...a: any[]) => api.aiSeo(...a),
-  aiRewrite: (...a: any[]) => api.aiRewrite(...a),
-  aiDraft: (...a: any[]) => api.aiDraft(...a),
-  aiIdeas: (...a: any[]) => api.aiIdeas(...a),
   uploadStorePostImage: (...a: any[]) => api.uploadStorePostImage(...a),
+  searchStorePostImages: (...a: any[]) => api.searchStorePostImages(...a),
+  importStorePostImage: (...a: any[]) => api.importStorePostImage(...a),
   useStorePostAi: () => ({ enabled: true, reason: null, actions: [] }),
+}));
+
+vi.mock('src/api/store-posts-stream', () => ({
+  useAiStream: () => ({
+    progress: { busy: false, steps: [], thinking: '', text: '', error: '' },
+    run: (path: string, body: unknown) => api.stream(path, body),
+    cancel: () => {},
+    reset: () => {},
+  }),
 }));
 
 vi.mock('src/api/product', () => ({
   useSearchStorefrontProducts: () => ({ searchResults: [], searchLoading: false }),
+  mapStorefrontProduct: (item: any) => item,
 }));
 
 // Editor tiptap thay bằng ô chữ thường (jsdom không dựng được ProseMirror đầy đủ).
@@ -73,6 +81,7 @@ const POST: StorePostDetail = {
   summary: 'Mẹo chọn bờm',
   contentHtml: '<p>Nội dung</p>',
   coverUrl: null,
+  coverCredit: null,
   tags: ['Mẹo hay'],
   status: 'published',
   publishedAt: '2026-10-26T03:00:00Z',
@@ -108,6 +117,7 @@ describe('StoreNewsForm', () => {
       summary: null,
       contentHtml: '<p>Gợi ý quà</p>',
       coverUrl: null,
+      coverCredit: null,
       tags: [],
       metaTitle: null,
       metaDescription: null,
@@ -146,7 +156,7 @@ describe('StoreNewsForm', () => {
 
   it('AI gợi ý SEO: điền tiêu đề / mô tả / từ khoá; không đè đường dẫn đã có', async () => {
     const user = userEvent.setup({ delay: null });
-    api.aiSeo.mockResolvedValue({
+    api.stream.mockResolvedValue({
       metaTitle: 'Bờm đính đá đẹp',
       metaDescription: 'Mô tả cho Google',
       metaKeywords: 'bờm, phụ kiện',
@@ -164,6 +174,53 @@ describe('StoreNewsForm', () => {
     expect(screen.getByRole('textbox', { name: 'Từ khoá' })).toHaveValue('bờm, phụ kiện');
     expect(screen.getByRole('textbox', { name: 'Đường dẫn' })).toHaveValue('bom-dinh-da');
     expect(screen.getByRole('textbox', { name: 'Mô tả ngắn' })).toHaveValue('Mẹo chọn bờm');
-    expect(api.aiSeo).toHaveBeenCalledWith('Bờm đính đá', '<p>Nội dung</p>');
+    expect(api.stream).toHaveBeenCalledWith('ai/seo/stream', {
+      title: 'Bờm đính đá',
+      contentHtml: '<p>Nội dung</p>',
+    });
+  });
+
+  it('ảnh bìa tìm trên web: chép về kho, hiện dòng ghi nguồn và lưu kèm bài', async () => {
+    const user = userEvent.setup({ delay: null });
+    api.searchStorePostImages.mockResolvedValue({
+      query: 'hair band',
+      providers: ['openverse'],
+      items: [
+        {
+          provider: 'openverse',
+          id: 'abc-1',
+          thumbnailUrl: 'https://img.example/t.jpg',
+          title: 'Hair band',
+          creator: 'Anna',
+          sourceUrl: 'https://flickr.example/1',
+          license: 'CC BY 2.0',
+          width: 800,
+          height: 600,
+        },
+      ],
+    });
+    api.importStorePostImage.mockResolvedValue({
+      url: 'https://media.example/posts/web-1.jpg',
+      creditHtml: 'Ảnh: <a href="https://flickr.example/1">Anna</a> / Openverse (CC BY 2.0)',
+    });
+    api.updateStorePost.mockResolvedValue(POST);
+    renderForm(POST);
+
+    await user.click(screen.getByRole('button', { name: 'Tìm trên web' }));
+    const search = await screen.findByPlaceholderText(/Từ khoá ảnh/);
+    await user.clear(search);
+    await user.type(search, 'bờm tóc{Enter}');
+    await user.click(await screen.findByRole('button', { name: /Anna · CC BY 2.0/ }));
+
+    await waitFor(() => expect(api.importStorePostImage).toHaveBeenCalledWith('openverse', 'abc-1'));
+    expect(api.searchStorePostImages).toHaveBeenCalledWith('bờm tóc');
+    expect(await screen.findByRole('link', { name: 'Anna' })).toHaveAttribute('href', 'https://flickr.example/1');
+
+    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+    await waitFor(() => expect(api.updateStorePost).toHaveBeenCalledTimes(1));
+    expect(api.updateStorePost.mock.calls[0][1]).toMatchObject({
+      coverUrl: 'https://media.example/posts/web-1.jpg',
+      coverCredit: 'Ảnh: <a href="https://flickr.example/1">Anna</a> / Openverse (CC BY 2.0)',
+    });
   });
 });

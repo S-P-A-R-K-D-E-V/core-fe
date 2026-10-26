@@ -33,6 +33,9 @@ import { newsContentSx } from './news-content-sx';
 
 export type NewsEditorAiAction = { key: string; label: string; icon: string };
 
+/** Ảnh chèn vào bài; creditHtml (đã lọc) hiện thành dòng nghiêng ngay dưới ảnh. */
+export type NewsEditorImage = { url: string; alt: string; creditHtml: string | null };
+
 type Props = {
   value: string;
   onChange: (html: string) => void;
@@ -41,9 +44,16 @@ type Props = {
   helperText?: React.ReactNode;
   /** Tải ảnh lên (presigned R2) — trả URL công khai để chèn vào bài. */
   onUploadImage?: (file: File) => Promise<string>;
+  /**
+   * Mở hộp chọn ảnh của trang (AI tạo ảnh, ảnh web có nguồn, ảnh sản phẩm…) thay cho chọn tệp; nhận đoạn chữ đang bôi
+   * đen làm gợi ý, trả ảnh cần chèn hoặc null khi đóng hộp.
+   */
+  onPickImage?: (suggestion: string) => Promise<NewsEditorImage | null>;
   /** Trợ lý AI sửa đoạn đang bôi đen (menu nổi trên vùng chọn); không truyền = không có menu. */
   aiActions?: NewsEditorAiAction[];
   onAiRewrite?: (html: string, action: string) => Promise<string>;
+  /** Tiến trình của lệnh AI đang sửa đoạn (bước, số ký tự đã viết) — hiện dưới menu AI. */
+  aiStatus?: React.ReactNode;
   onError?: (message: string) => void;
 };
 
@@ -107,8 +117,10 @@ export function NewsEditor({
   error,
   helperText,
   onUploadImage,
+  onPickImage,
   aiActions,
   onAiRewrite,
+  aiStatus,
   onError,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -172,6 +184,24 @@ export function NewsEditor({
     },
     [editor, onUploadImage, onError]
   );
+
+  const pickImage = async () => {
+    if (!editor || !onPickImage) return;
+    const { from, to } = editor.state.selection;
+    const image = await onPickImage(editor.state.doc.textBetween(from, to, ' ').slice(0, 200));
+    if (!image || editor.isDestroyed) return;
+    const alt = image.alt.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    const src = image.url.replace(/"/g, '%22');
+    // Chèn sau đoạn đang chọn (không đè chữ); ảnh ngoài có dòng ghi nguồn ngay dưới.
+    editor
+      .chain()
+      .focus()
+      .insertContentAt(
+        Math.min(to, editor.state.doc.content.size),
+        `<img src="${src}" alt="${alt}">${image.creditHtml ? `<p><em>${image.creditHtml}</em></p>` : ''}`
+      )
+      .run();
+  };
 
   const applyLink = () => {
     if (!editor) return;
@@ -339,7 +369,13 @@ export function NewsEditor({
               );
             }}
           />
-          {onUploadImage && (
+          {onPickImage ? (
+            <ToolButton
+              title="Chèn ảnh (tải lên, tạo bằng AI, tìm trên web…)"
+              icon="solar:gallery-add-bold"
+              onClick={pickImage}
+            />
+          ) : onUploadImage && (
             <ToolButton
               title={uploading ? 'Đang tải ảnh…' : 'Chèn ảnh'}
               icon="solar:gallery-add-bold"
@@ -466,6 +502,11 @@ export function NewsEditor({
                 {a.label}
               </Button>
             ))}
+            {aiBusy && aiStatus && (
+              <Box sx={{ width: 1, px: 1, pb: 0.25, typography: 'caption', color: 'text.secondary' }}>
+                {aiStatus}
+              </Box>
+            )}
           </Paper>
         </BubbleMenu>
       ) : null}

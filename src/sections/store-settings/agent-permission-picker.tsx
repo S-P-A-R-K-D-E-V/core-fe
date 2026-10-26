@@ -54,6 +54,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   'partner-voucher': 'Công nợ đối tác',
   settlement: 'Chốt sổ',
   shareholder: 'Cổ đông',
+  posts: 'Tin tức',
 };
 
 /** Nhóm quyền thuộc tính năng theo gói — ẩn khi cửa hàng chưa bật (API cũng trả 403). */
@@ -113,6 +114,8 @@ const CATEGORIES: { label: string; icon: string; domains: string[] }[] = [
       'shareholder',
     ],
   },
+  // Agent ngoài (MCP) viết bài: posts.read / write (nháp, lấy ảnh) / publish / delete.
+  { label: 'Trang web & nội dung', icon: 'solar:document-text-bold', domains: ['posts'] },
 ];
 
 /** Nhóm có từ chừng này quyền trở lên chiếm cả hàng, quyền xếp nhiều cột. */

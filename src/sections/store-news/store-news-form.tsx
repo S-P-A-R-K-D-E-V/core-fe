@@ -1,10 +1,12 @@
 'use client';
 
 import type { StorePostDetail } from 'src/lib/store-posts';
-import type { StorePostDraft, StorePostInput } from 'src/api/store-posts';
+import type { NewsEditorImage } from 'src/components/news-editor';
+import type { PickedImage, ImagePickerTab } from './store-news-image-picker';
+import type { StorePostSeo, StorePostDraft, StorePostInput } from 'src/api/store-posts';
 
 import { z } from 'zod';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
@@ -39,9 +41,8 @@ import { useSnackbar } from 'src/components/snackbar';
 import { NewsEditor } from 'src/components/news-editor';
 import FormProvider, { RHFTextField } from 'src/components/hook-form';
 
+import { useAiStream } from 'src/api/store-posts-stream';
 import {
-  aiSeo,
-  aiRewrite,
   createStorePost,
   updateStorePost,
   useStorePostAi,
@@ -50,7 +51,9 @@ import {
 
 import { NewsContent } from 'src/sections/news/news-content';
 
+import { AiProgressPanel } from './ai-progress-panel';
 import { StoreNewsAiDialog } from './store-news-ai-dialog';
+import { StoreNewsImagePicker } from './store-news-image-picker';
 
 // ----------------------------------------------------------------------
 
@@ -61,6 +64,8 @@ const Schema = z.object({
   summary: z.string().max(500, 'Mô tả ngắn tối đa 500 ký tự'),
   contentHtml: z.string(),
   coverUrl: z.string(),
+  // Dòng ghi nguồn của ảnh bìa (HTML đã lọc) — ảnh lấy từ web / dán link của người khác.
+  coverCredit: z.string(),
   tags: z.array(z.string()).max(10, 'Tối đa 10 thẻ'),
   metaTitle: z.string().max(70, 'Tiêu đề SEO tối đa 70 ký tự'),
   metaDescription: z.string().max(300, 'Mô tả SEO tối đa 300 ký tự'),
@@ -86,6 +91,7 @@ function toValues(post?: StorePostDetail): FormValues {
     summary: post?.summary ?? '',
     contentHtml: post?.contentHtml ?? '',
     coverUrl: post?.coverUrl ?? '',
+    coverCredit: post?.coverCredit ?? '',
     tags: post?.tags ?? [],
     metaTitle: post?.metaTitle ?? '',
     metaDescription: post?.metaDescription ?? '',
@@ -102,6 +108,7 @@ function toInput(v: FormValues): StorePostInput {
     summary: orNull(v.summary),
     contentHtml: v.contentHtml,
     coverUrl: orNull(v.coverUrl),
+    coverCredit: v.coverUrl.trim() ? orNull(v.coverCredit) : null,
     tags: v.tags,
     metaTitle: orNull(v.metaTitle),
     metaDescription: orNull(v.metaDescription),
@@ -142,6 +149,22 @@ function SectionCard({
   );
 }
 
+const COVER_SOURCES: { tab: ImagePickerTab; label: string; icon: string; ai?: boolean }[] = [
+  { tab: 'ai', label: 'Tạo bằng AI', icon: 'solar:magic-stick-3-bold', ai: true },
+  { tab: 'web', label: 'Tìm trên web', icon: 'solar:global-bold' },
+  { tab: 'products', label: 'Ảnh sản phẩm', icon: 'solar:bag-4-bold' },
+  { tab: 'upload', label: 'Dán link', icon: 'solar:link-bold' },
+];
+
+/** Bước đang làm + số ký tự AI đã viết — dòng nhỏ dưới menu AI của trình soạn. */
+function aiStatusLine(progress: { steps: { text: string }[]; text: string }) {
+  const step = progress.steps[progress.steps.length - 1]?.text ?? 'Đang gửi yêu cầu…';
+  const chars = progress.text.replace(/<[^>]*>?/g, '').length;
+  return chars ? `${step} — ${chars.toLocaleString('vi-VN')} ký tự` : `${step}…`;
+}
+
+type PickerState = { purpose: 'cover' | 'inline'; tab?: ImagePickerTab; suggestion: string };
+
 type Props = { post?: StorePostDetail };
 
 /** Soạn / sửa bài tin tức (bố cục form của template Minimal v6) — có trợ lý AI viết nháp, sửa đoạn chọn, gợi ý SEO. */
@@ -151,9 +174,13 @@ export function StoreNewsForm({ post }: Props) {
   const [confirm, confirmDialog] = useConfirmDialog();
   const ai = useStorePostAi();
   const [aiOpen, setAiOpen] = useState(false);
-  const [seoBusy, setSeoBusy] = useState(false);
+  const rewriteAi = useAiStream();
+  const seoAi = useAiStream();
   const [preview, setPreview] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [picker, setPicker] = useState<PickerState | null>(null);
+  // Ảnh chèn trong bài: trình soạn chờ Promise này tới khi chọn xong / đóng hộp.
+  const pickResolve = useRef<((image: NewsEditorImage | null) => void) | null>(null);
 
   const methods = useForm<FormValues>({
     resolver: zodResolver(Schema),
@@ -200,20 +227,46 @@ export function StoreNewsForm({ post }: Props) {
   };
 
   const suggestSeo = async () => {
-    setSeoBusy(true);
-    try {
-      const seo = await aiSeo(getValues('title'), getValues('contentHtml'));
-      setValue('metaTitle', seo.metaTitle, { shouldDirty: true });
-      setValue('metaDescription', seo.metaDescription, { shouldDirty: true });
-      setValue('metaKeywords', seo.metaKeywords, { shouldDirty: true });
-      if (!getValues('slug').trim() && seo.slug) setValue('slug', seo.slug, { shouldDirty: true });
-      if (!getValues('summary').trim() && seo.summary)
-        setValue('summary', seo.summary, { shouldDirty: true });
-    } catch (err) {
-      enqueueSnackbar(apiErrorMessage(err, 'AI chưa gợi ý được'), { variant: 'error' });
-    } finally {
-      setSeoBusy(false);
+    const seo = await seoAi.run<StorePostSeo>('ai/seo/stream', {
+      title: getValues('title'),
+      contentHtml: getValues('contentHtml'),
+    });
+    if (!seo) return;
+    setValue('metaTitle', seo.metaTitle, { shouldDirty: true });
+    setValue('metaDescription', seo.metaDescription, { shouldDirty: true });
+    setValue('metaKeywords', seo.metaKeywords, { shouldDirty: true });
+    if (!getValues('slug').trim() && seo.slug) setValue('slug', seo.slug, { shouldDirty: true });
+    if (!getValues('summary').trim() && seo.summary)
+      setValue('summary', seo.summary, { shouldDirty: true });
+    seoAi.reset();
+  };
+
+  const rewrite = async (html: string, action: string) => {
+    const result = await rewriteAi.run<{ html: string }>('ai/rewrite/stream', { html, action }, true);
+    if (!result) throw new Error('Đã dừng AI');
+    return result.html;
+  };
+
+  const pickInlineImage = (selected: string) =>
+    new Promise<NewsEditorImage | null>((resolve) => {
+      pickResolve.current = resolve;
+      setPicker({ purpose: 'inline', suggestion: selected || getValues('title') });
+    });
+
+  const onImagePicked = (image: PickedImage) => {
+    if (picker?.purpose === 'cover') {
+      setValue('coverUrl', image.url, { shouldDirty: true });
+      setValue('coverCredit', image.creditHtml ?? '', { shouldDirty: true });
+    } else {
+      pickResolve.current?.(image);
+      pickResolve.current = null;
     }
+  };
+
+  const closePicker = () => {
+    pickResolve.current?.(null);
+    pickResolve.current = null;
+    setPicker(null);
   };
 
   const uploadCover = async (file: File) => {
@@ -224,6 +277,7 @@ export function StoreNewsForm({ post }: Props) {
     setCoverUploading(true);
     try {
       setValue('coverUrl', await uploadStorePostImage(file), { shouldDirty: true });
+      setValue('coverCredit', '', { shouldDirty: true });
     } catch (err) {
       enqueueSnackbar(apiErrorMessage(err, 'Tải ảnh bìa thất bại'), { variant: 'error' });
     } finally {
@@ -286,23 +340,53 @@ export function StoreNewsForm({ post }: Props) {
                   value={field.value}
                   onChange={field.onChange}
                   onUploadImage={uploadStorePostImage}
+                  onPickImage={pickInlineImage}
                   aiActions={aiEnabled ? AI_ACTIONS : undefined}
-                  onAiRewrite={(html, action) => aiRewrite(html, action)}
+                  onAiRewrite={rewrite}
+                  aiStatus={aiStatusLine(rewriteAi.progress)}
                   onError={(message) => enqueueSnackbar(message, { variant: 'error' })}
                 />
               )}
             />
           </Stack>
           <Stack spacing={1}>
-            <Typography variant="subtitle2">Ảnh bìa</Typography>
+            <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1}>
+              <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
+                Ảnh bìa
+              </Typography>
+              {COVER_SOURCES.filter((s) => !s.ai || aiEnabled).map((s) => (
+                <Button
+                  key={s.tab}
+                  size="small"
+                  variant="soft"
+                  color={s.ai ? 'primary' : 'inherit'}
+                  startIcon={<Iconify icon={s.icon} width={16} />}
+                  onClick={() => setPicker({ purpose: 'cover', tab: s.tab, suggestion: values.title })}
+                >
+                  {s.label}
+                </Button>
+              ))}
+            </Stack>
             <Upload
               accept={{ 'image/*': [] }}
               file={values.coverUrl || null}
               disabled={coverUploading}
               placeholder={coverUploading ? 'Đang tải ảnh…' : undefined}
               onDrop={(files) => files[0] && uploadCover(files[0])}
-              onDelete={() => setValue('coverUrl', '', { shouldDirty: true })}
+              onDelete={() => {
+                setValue('coverUrl', '', { shouldDirty: true });
+                setValue('coverCredit', '', { shouldDirty: true });
+              }}
             />
+            {values.coverUrl && values.coverCredit && (
+              <Typography
+                variant="caption"
+                sx={{ color: 'text.secondary', '& a': { color: 'inherit' } }}
+                // Dòng ghi nguồn do core-be tạo (đã lọc) hoặc do hộp chọn ảnh dựng (đã escape).
+                // eslint-disable-next-line react/no-danger
+                dangerouslySetInnerHTML={{ __html: values.coverCredit }}
+              />
+            )}
           </Stack>
         </SectionCard>
 
@@ -365,7 +449,7 @@ export function StoreNewsForm({ post }: Props) {
                 size="small"
                 variant="soft"
                 color="primary"
-                loading={seoBusy}
+                loading={seoAi.progress.busy}
                 onClick={suggestSeo}
                 startIcon={<Iconify icon="solar:magic-stick-3-bold" />}
               >
@@ -373,6 +457,7 @@ export function StoreNewsForm({ post }: Props) {
               </LoadingButton>
             )}
           </Stack>
+          <AiProgressPanel progress={seoAi.progress} preview="none" onCancel={seoAi.cancel} />
           <RHFTextField
             name="metaTitle"
             label="Tiêu đề SEO"
@@ -429,6 +514,16 @@ export function StoreNewsForm({ post }: Props) {
 
       <StoreNewsAiDialog open={aiOpen} onClose={() => setAiOpen(false)} onApply={applyDraft} />
 
+      <StoreNewsImagePicker
+        open={!!picker}
+        purpose={picker?.purpose ?? 'cover'}
+        initialTab={picker?.tab}
+        suggestion={picker?.suggestion}
+        aiEnabled={aiEnabled}
+        onPick={onImagePicked}
+        onClose={closePicker}
+      />
+
       <Dialog fullScreen open={preview} onClose={() => setPreview(false)}>
         <Stack
           direction="row"
@@ -448,6 +543,14 @@ export function StoreNewsForm({ post }: Props) {
             src={values.coverUrl}
             alt=""
             sx={{ width: 1, maxHeight: 420, objectFit: 'cover' }}
+          />
+        )}
+        {values.coverUrl && values.coverCredit && (
+          <Typography
+            variant="caption"
+            sx={{ display: 'block', px: 3, pt: 1, color: 'text.secondary', textAlign: 'right' }}
+            // eslint-disable-next-line react/no-danger
+            dangerouslySetInnerHTML={{ __html: values.coverCredit }}
           />
         )}
         <Box sx={{ maxWidth: 880, mx: 'auto', px: 3, py: 5 }}>

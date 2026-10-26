@@ -130,6 +130,25 @@ export function NewsDetailsView({ branding, data }: Props) {
             </Stack>
           </Stack>
         </Container>
+        {post.coverUrl && post.coverCredit && (
+          <Typography
+            variant="caption"
+            sx={{
+              right: 16,
+              bottom: 8,
+              position: 'absolute',
+              maxWidth: 'calc(100% - 32px)',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+              color: 'rgba(255,255,255,0.72)',
+              '& a': { color: 'inherit' },
+            }}
+            // Nguồn ảnh bìa (ảnh lấy từ web) — HTML core-be đã lọc khi lưu bài.
+            // eslint-disable-next-line react/no-danger
+            dangerouslySetInnerHTML={{ __html: post.coverCredit }}
+          />
+        )}
       </Box>
 
       <Container maxWidth="md" sx={{ py: { xs: 5, md: 8 } }}>

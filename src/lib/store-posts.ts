@@ -24,6 +24,8 @@ export type StorePostListItem = {
 
 export type StorePostDetail = StorePostListItem & {
   contentHtml: string;
+  /** Dòng ghi nguồn ảnh bìa (HTML đã lọc ở core-be) — ảnh lấy từ web / tạo bằng AI. */
+  coverCredit: string | null;
   metaTitle: string | null;
   metaDescription: string | null;
   metaKeywords: string | null;

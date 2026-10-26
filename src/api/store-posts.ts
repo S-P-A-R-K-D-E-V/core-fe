@@ -25,6 +25,7 @@ export type StorePostInput = {
   summary: string | null;
   contentHtml: string;
   coverUrl: string | null;
+  coverCredit: string | null;
   tags: string[];
   metaTitle: string | null;
   metaDescription: string | null;
@@ -112,25 +113,34 @@ export async function uploadStorePostImage(file: File): Promise<string> {
   return data.publicUrl;
 }
 
-export async function aiIdeas(hint: string) {
-  return (await axios.post<{ ideas: StorePostIdea[] }>(`${ROOT}/ai/ideas`, { hint })).data.ideas;
+// Lệnh AI (gợi ý chủ đề, viết nháp, viết lại, SEO, tạo ảnh) đi dạng stream — xem src/api/store-posts-stream.ts.
+
+// ---------- Ảnh: tìm trên web (giấy phép dùng thương mại), nhập về kho của cửa hàng kèm dòng ghi nguồn ----------
+
+export type StorePostImageCandidate = {
+  provider: 'openverse' | 'pexels';
+  id: string;
+  thumbnailUrl: string;
+  title: string | null;
+  creator: string | null;
+  sourceUrl: string | null;
+  license: string | null;
+  width: number | null;
+  height: number | null;
+};
+
+/** Ảnh đã lưu trên R2 và dòng ghi nguồn (HTML đã lọc) — null với ảnh của chính cửa hàng. */
+export type StorePostImage = { url: string; creditHtml: string | null };
+
+export async function searchStorePostImages(q: string) {
+  return (
+    await axios.get<{ query: string; items: StorePostImageCandidate[]; providers: string[] }>(
+      `${ROOT}/images/search`,
+      { params: { q } }
+    )
+  ).data;
 }
 
-export async function aiDraft(body: {
-  topic: string;
-  keywords?: string;
-  tone?: string;
-  length?: 'short' | 'medium' | 'long';
-  productIds?: string[];
-}) {
-  return (await axios.post<StorePostDraft>(`${ROOT}/ai/draft`, body)).data;
-}
-
-export async function aiRewrite(html: string, action: string, instruction?: string) {
-  return (await axios.post<{ html: string }>(`${ROOT}/ai/rewrite`, { html, action, instruction }))
-    .data.html;
-}
-
-export async function aiSeo(title: string, contentHtml: string) {
-  return (await axios.post<StorePostSeo>(`${ROOT}/ai/seo`, { title, contentHtml })).data;
+export async function importStorePostImage(provider: string, id: string) {
+  return (await axios.post<StorePostImage>(`${ROOT}/images/import`, { provider, id })).data;
 }
