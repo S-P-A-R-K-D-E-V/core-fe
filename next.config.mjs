@@ -25,6 +25,8 @@ const BACKEND_API_PREFIXES = [
   'fnb',
   // Đơn online từ storefront (trang quản trị Đơn online).
   'online-orders',
+  // Kiểm tra cửa hàng: bảng kiểm, lượt kiểm, lỗi cần sửa, việc sửa tận gốc.
+  'inspections', 'corrective-actions',
   // Kết nối hãng vận chuyển (Thanh toán → Cài đặt → Bán online & giao hàng) — chuyển tiếp spark-shipping.
   'shipping',
   // API công khai của cửa hàng (thương hiệu, sản phẩm) — app mobile bản cửa hàng dùng để kiểm tra mã cửa hàng.

@@ -68,6 +68,7 @@ const PAYROLL = PERMISSIONS.payroll;
 const SHIFT = PERMISSIONS.shift;
 const ATTENDANCE = PERMISSIONS.attendance;
 const CLEANING = PERMISSIONS.cleaning;
+const INSPECTION = PERMISSIONS.inspection;
 const PRODUCTS = PERMISSIONS.products;
 
 type NavAccess = {
@@ -406,6 +407,25 @@ export function useNavData(
               { title: t('cleaningTemplates'), path: paths.dashboard.cleaning.templates, permissions: [CLEANING.templateManage] },
               { title: t('cleaningReview'), path: paths.dashboard.cleaning.review, permissions: [CLEANING.read] },
               { title: t('cleaningWeekOverview'), path: paths.dashboard.cleaning.weekOverview, permissions: [CLEANING.read] },
+            ],
+          },
+
+          // KIỂM TRA CỬA HÀNG (lỗi của tôi: mọi nhân viên; trưởng ca kiểm ca mình từ "Tổng quan" khi có quyền / app;
+          // còn lại theo quyền inspection.*, mặc định Admin/Manager). Mọi cửa hàng có phân ca.
+          {
+            title: t('inspection'),
+            path: paths.dashboard.inspection.root,
+            icon: ICONS.kanban,
+            roles: ['Admin', 'Manager', 'Staff'],
+            featureKey: 'workforce.shift-scheduling',
+            children: [
+              // Tổng quan: quản lý thấy số liệu; trưởng ca / nhân viên thấy ca mình hôm nay + nút bắt đầu kiểm nhanh.
+              { title: t('inspectionOverview'), path: paths.dashboard.inspection.root },
+              { title: t('inspectionMyFaults'), path: paths.dashboard.inspection.myFaults },
+              { title: t('inspectionHistory'), path: paths.dashboard.inspection.history, permissions: [INSPECTION.read] },
+              { title: t('inspectionHeatmap'), path: paths.dashboard.inspection.heatmap, permissions: [INSPECTION.read] },
+              { title: t('inspectionCorrectiveActions'), path: paths.dashboard.inspection.correctiveActions, permissions: [INSPECTION.read] },
+              { title: t('inspectionTemplates'), path: paths.dashboard.inspection.templates, permissions: [INSPECTION.templateManage] },
             ],
           },
 

@@ -228,6 +228,15 @@ export const paths = {
       review: `${ROOTS.DASHBOARD}/cleaning/review`,
       weekOverview: `${ROOTS.DASHBOARD}/cleaning/week-overview`,
     },
+    inspection: {
+      root: `${ROOTS.DASHBOARD}/inspection`,
+      run: (id: string) => `${ROOTS.DASHBOARD}/inspection/run/${id}`,
+      history: `${ROOTS.DASHBOARD}/inspection/history`,
+      myFaults: `${ROOTS.DASHBOARD}/inspection/my-faults`,
+      heatmap: `${ROOTS.DASHBOARD}/inspection/heatmap`,
+      correctiveActions: `${ROOTS.DASHBOARD}/inspection/corrective-actions`,
+      templates: `${ROOTS.DASHBOARD}/inspection/templates`,
+    },
     mediaLibrary: {
       root: `${ROOTS.DASHBOARD}/media-library`,
     },

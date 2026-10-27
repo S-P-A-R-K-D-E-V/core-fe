@@ -71,6 +71,18 @@ export const PERMISSIONS = {
     review: 'cleaning.review',
     penaltyManage: 'cleaning.penalty.manage',
   },
+  /**
+   * Kiểm tra cửa hàng (/inspections). Trưởng ca tự kiểm nhanh ca mình và người phụ trách tự sửa lỗi của mình không cần
+   * quyền; kết quả kiểm không có đường nào tới bảng lương.
+   */
+  inspection: {
+    conduct: 'inspection.conduct',
+    spot: 'inspection.spot',
+    read: 'inspection.read',
+    manage: 'inspection.manage',
+    templateManage: 'inspection.template.manage',
+    correctiveActionManage: 'inspection.corrective-action.manage',
+  },
   /** Ca làm — xem mẫu / lịch ca, lịch của mình, đăng ký / nhường / đổi ca của mình không cần quyền. */
   shift: {
     templateManage: 'shift.template.manage',
