@@ -1,3 +1,5 @@
+import type { IPersonHourWarnings } from './hr';
+
 // Core CMS Backend API Types
 // ----------------------------------------------------------------------
 
@@ -955,6 +957,8 @@ export interface IShiftSwapRequest {
   targetConfirmedAt?: string;
   targetDeclineReason?: string;
   createdAt: string;
+  /** Cảnh báo giờ (Nội quy Điều 5–6) — chỉ có ở màn chờ duyệt. */
+  hourWarnings?: IPersonHourWarnings[] | null;
 }
 
 export interface ICreateShiftSwapRequestRequest {
@@ -1068,6 +1072,8 @@ export interface IShiftPoolPost {
   lastClaimRejectedNote?: string;
   lastClaimRejectedAt?: string;
   createdAt: string;
+  /** Cảnh báo giờ (Nội quy Điều 5–6) — chỉ có ở màn chờ duyệt. */
+  hourWarnings?: IPersonHourWarnings[] | null;
 }
 
 export interface ICreateShiftPoolPostDto {

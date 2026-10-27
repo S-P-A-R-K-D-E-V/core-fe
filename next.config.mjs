@@ -27,6 +27,8 @@ const BACKEND_API_PREFIXES = [
   'online-orders',
   // Kiểm tra cửa hàng: bảng kiểm, lượt kiểm, lỗi cần sửa, việc sửa tận gốc.
   'inspections', 'corrective-actions',
+  // Nhân sự: xin nghỉ ca, văn bản ký xác nhận, target tuần, nhiệm vụ, biên bản, điểm + xếp loại, hợp đồng lao động.
+  'shift-leave', 'policy-documents', 'sales-targets', 'work-tasks', 'hr-records', 'performance', 'employment-contracts',
   // Kết nối hãng vận chuyển (Thanh toán → Cài đặt → Bán online & giao hàng) — chuyển tiếp spark-shipping.
   'shipping',
   // API công khai của cửa hàng (thương hiệu, sản phẩm) — app mobile bản cửa hàng dùng để kiểm tra mã cửa hàng.

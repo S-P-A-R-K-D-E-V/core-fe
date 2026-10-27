@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
 import Dialog from '@mui/material/Dialog';
@@ -34,6 +35,7 @@ import {
 import type { IShiftSwapRequest } from 'src/types/corecms-api';
 
 import { getPendingShiftSwapRequests, reviewShiftSwapRequest } from 'src/api/shiftSwap';
+import { HourWarningsAlert } from 'src/sections/hr/hr-common';
 
 // ----------------------------------------------------------------------
 
@@ -167,7 +169,12 @@ export default function PendingShiftSwapRequestsView() {
                         <td style={{ padding: '16px' }}>{row.targetUserName || '-'}</td>
                         <td style={{ padding: '16px' }}>{row.targetShiftName || '-'}</td>
                         <td style={{ padding: '16px' }}>{formatDate(row.targetShiftDate)}</td>
-                        <td style={{ padding: '16px' }}>{row.reason || '-'}</td>
+                        <td style={{ padding: '16px' }}>
+                          {row.reason || '-'}
+                          {(row.hourWarnings?.length ?? 0) > 0 && (
+                            <Chip size="small" color="warning" variant="outlined" label="Cảnh báo giờ làm" sx={{ ml: 1 }} />
+                          )}
+                        </td>
                         <td style={{ padding: '16px' }}>{formatDateTime(row.createdAt)}</td>
                         <td style={{ padding: '16px' }}>
                           <Stack direction="row" spacing={0.5}>
@@ -214,6 +221,9 @@ export default function PendingShiftSwapRequestsView() {
         </DialogTitle>
         <DialogContent>
           <Stack spacing={3} sx={{ pt: 2 }}>
+            {reviewDialog.status === 'Approved' && (
+              <HourWarningsAlert people={requests.find((r) => r.id === reviewDialog.requestId)?.hourWarnings} />
+            )}
             <TextField
               fullWidth
               multiline

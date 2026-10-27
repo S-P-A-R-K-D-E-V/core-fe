@@ -228,6 +228,15 @@ export const paths = {
       review: `${ROOTS.DASHBOARD}/cleaning/review`,
       weekOverview: `${ROOTS.DASHBOARD}/cleaning/week-overview`,
     },
+    hr: {
+      leave: `${ROOTS.DASHBOARD}/hr/leave`,
+      policies: `${ROOTS.DASHBOARD}/hr/policies`,
+      targets: `${ROOTS.DASHBOARD}/hr/targets`,
+      tasks: `${ROOTS.DASHBOARD}/hr/tasks`,
+      records: `${ROOTS.DASHBOARD}/hr/records`,
+      performance: `${ROOTS.DASHBOARD}/hr/performance`,
+      contracts: `${ROOTS.DASHBOARD}/hr/contracts`,
+    },
     inspection: {
       root: `${ROOTS.DASHBOARD}/inspection`,
       run: (id: string) => `${ROOTS.DASHBOARD}/inspection/run/${id}`,

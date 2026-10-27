@@ -95,6 +95,22 @@ export const PERMISSIONS = {
     override: 'shift.override',
     auditRead: 'shift.audit.read',
     reminderManage: 'shift.reminder.manage',
+    /** Duyệt đơn xin nghỉ ca đã xếp (Nội quy Điều 7) — tạm thời chỉ Admin. */
+    leaveReview: 'shift.leave.review',
+  },
+  /**
+   * Nhân sự theo Quy chế / Nội quy: văn bản ký xác nhận, target tuần, nhiệm vụ, biên bản, điểm + xếp loại. Nhân viên xem /
+   * ký / nộp phần của mình không cần quyền.
+   */
+  hr: {
+    policyManage: 'hr.policy.manage',
+    targetManage: 'hr.target.manage',
+    taskManage: 'hr.task.manage',
+    recordManage: 'hr.record.manage',
+    performanceRead: 'hr.performance.read',
+    performanceManage: 'hr.performance.manage',
+    /** Hồ sơ nhân sự (dữ liệu cá nhân) + mẫu và hợp đồng lao động — chỉ Admin. */
+    contractManage: 'hr.contract.manage',
   },
   /** Hàng hoá — xem hàng, nhóm hàng, thương hiệu, đơn vị không cần quyền (màn bán hàng). Thêm / sửa cần kèm xem giá vốn. */
   products: {
