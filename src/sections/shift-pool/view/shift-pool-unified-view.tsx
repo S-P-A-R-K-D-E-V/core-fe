@@ -51,6 +51,8 @@ import {
   reviewShiftPoolPost,
 } from 'src/api/shiftPool';
 
+import { HourWarningsAlert } from 'src/sections/hr/hr-common';
+
 import PoolCalendar from './pool-calendar';
 import LegendDot from './pool-legend';
 import {
@@ -178,6 +180,9 @@ function PostCard({ post, tab, onAction }: PostCardProps) {
                 {post.posterName} → {post.claimerName}
               </Typography>
             </Stack>
+          )}
+          {tab === 'pending' && (post.hourWarnings?.length ?? 0) > 0 && (
+            <Chip size="small" color="warning" variant="outlined" label="Cảnh báo giờ làm" sx={{ alignSelf: 'flex-start' }} />
           )}
 
           {/* Note */}
@@ -839,6 +844,8 @@ export default function ShiftPoolUnifiedView() {
                   )}
                 </Stack>
               )}
+
+              <HourWarningsAlert people={reviewTarget.hourWarnings} />
 
               <Stack direction="row" spacing={1} flexWrap="wrap">
                 {reviewTarget.needType === 'Swap' && (

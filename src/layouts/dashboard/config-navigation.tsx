@@ -429,6 +429,24 @@ export function useNavData(
             ],
           },
 
+          // NHÂN SỰ theo Quy chế / Nội quy (mọi nhân viên: xin nghỉ ca, ký văn bản, nhiệm vụ / biên bản / điểm của mình;
+          // quản lý theo quyền hr.*, shift.leave.review). Mọi cửa hàng có phân ca.
+          {
+            title: t('hr'),
+            path: paths.dashboard.hr.leave,
+            icon: ICONS.job,
+            roles: ['Admin', 'Manager', 'Staff'],
+            featureKey: 'workforce.shift-scheduling',
+            children: [
+              { title: t('hrLeave'), path: paths.dashboard.hr.leave },
+              { title: t('hrPolicies'), path: paths.dashboard.hr.policies },
+              { title: t('hrTargets'), path: paths.dashboard.hr.targets },
+              { title: t('hrTasks'), path: paths.dashboard.hr.tasks },
+              { title: t('hrRecords'), path: paths.dashboard.hr.records },
+              { title: t('hrPerformance'), path: paths.dashboard.hr.performance },
+            ],
+          },
+
           // MEDIA LIBRARY (Admin - xem/xoá media cũ trên R2)
           {
             title: t('mediaLibrary'),
