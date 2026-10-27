@@ -62,6 +62,7 @@ import type { TourDefinition } from 'src/hooks/use-tour';
 
 import { StyledCalendar } from '../../calendar/styles';
 import CalendarToolbar from '../../calendar/calendar-toolbar';
+import { RatingChip, useStaffRatings } from 'src/sections/hr/staff-ratings';
 
 // ----------------------------------------------------------------------
 
@@ -93,6 +94,8 @@ function isScheduleOnDate(schedule: IShiftSchedule, d: Date): boolean {
 }
 
 export default function ShiftRegistrationView() {
+  // Điểm tháng gần nhất cạnh tên người đăng ký (A3) — chỉ người có hr.performance.read thấy, chỉ để tham khảo.
+  const staffRatings = useStaffRatings();
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
   const settings = useSettingsContext();
@@ -1001,6 +1004,7 @@ export default function ShiftRegistrationView() {
                               {new Date(s.createdAt).toLocaleString('vi-VN')}
                             </Typography>
                           </Box>
+                          <RatingChip value={staffRatings.get(s.staffId)} />
                           {s.staffId === currentUserId && (
                             <Chip label="Bạn" size="small" color="primary" />
                           )}

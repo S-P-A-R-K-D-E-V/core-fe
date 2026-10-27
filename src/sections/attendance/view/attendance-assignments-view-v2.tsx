@@ -105,6 +105,7 @@ import CalendarToolbar from '../../calendar/calendar-toolbar';
 import { AssignmentZonesDialog } from '../assignment-zones-dialog';
 import { HourWarningsAlert } from 'src/sections/hr/hr-common';
 import { ProposedWarningsAlert, useBatchHourWarnings } from 'src/sections/hr/hour-warnings-preview';
+import { RatingChip, useStaffRatings } from 'src/sections/hr/staff-ratings';
 import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
 // ----------------------------------------------------------------------
@@ -1747,6 +1748,8 @@ export default function AttendanceAssignmentsView() {
     [autoAssignSlots]
   );
   const autoWarnings = useBatchHourWarnings(autoProposal, autoAssignDialog.value);
+  // Điểm tháng gần nhất cạnh tên người (A3) — chỉ tham khảo.
+  const staffRatings = useStaffRatings();
 
   return (
     <>
@@ -3783,6 +3786,7 @@ export default function AttendanceAssignmentsView() {
                                           <Typography variant="body2" fontWeight={600} noWrap>
                                             {info.name}
                                           </Typography>
+                                          <RatingChip value={staffRatings.get(staffId)} />
                                           <Typography
                                             variant="caption"
                                             color="text.secondary"
@@ -3885,6 +3889,7 @@ export default function AttendanceAssignmentsView() {
                                           <Typography variant="body2" fontWeight={500} noWrap>
                                             {info.name}
                                           </Typography>
+                                          <RatingChip value={staffRatings.get(staffId)} />
                                           <Typography
                                             variant="caption"
                                             color="text.secondary"
@@ -3990,6 +3995,7 @@ export default function AttendanceAssignmentsView() {
                                         <Typography variant="body2" fontWeight={600} noWrap>
                                           {info.name}
                                         </Typography>
+                                        <RatingChip value={staffRatings.get(staffId)} />
                                         {!isRegistered && (
                                           <Chip
                                             label="Chỉ định"
