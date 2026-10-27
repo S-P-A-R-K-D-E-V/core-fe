@@ -28,6 +28,7 @@ import type {
   ISupportShiftOpening,
   IProposedAssignment,
   IProposedAssignmentWarnings,
+  ICompensation,
 } from 'src/types/hr';
 
 // ----------------------------------------------------------------------
@@ -479,5 +480,27 @@ export async function reviewSupportClaim(
     approve,
     note: note || null,
   });
+  return response.data;
+}
+
+// ── Bồi thường thiệt hại ───────────────────────────────────────────────
+
+export async function getCompensations(staffId?: string): Promise<ICompensation[]> {
+  const response = await axios.get<ICompensation[]>(endpoints.hr.compensations, { params: { staffId } });
+  return response.data;
+}
+
+export async function getMyCompensations(): Promise<ICompensation[]> {
+  const response = await axios.get<ICompensation[]>(endpoints.hr.compensationsMine);
+  return response.data;
+}
+
+export async function createCompensation(body: { hrRecordId: string; amount: number; note?: string | null }): Promise<ICompensation> {
+  const response = await axios.post<ICompensation>(endpoints.hr.compensations, body);
+  return response.data;
+}
+
+export async function cancelCompensation(id: string, reason: string): Promise<ICompensation> {
+  const response = await axios.put<ICompensation>(endpoints.hr.compensationCancel(id), { reason });
   return response.data;
 }

@@ -18,6 +18,13 @@ export function fVnd(value: number | null | undefined): string {
   return `${Math.round(value).toLocaleString('vi-VN')}đ`;
 }
 
+/** Số tiền nhập (có thể có dấu trừ, dấu chấm hàng nghìn) → số. */
+export function parseAmount(text: string): number | null {
+  const cleaned = text.replace(/[^\d-]/g, '');
+  if (!cleaned || cleaned === '-') return null;
+  return Number(cleaned);
+}
+
 export function fPct(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
   return `${value.toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%`;

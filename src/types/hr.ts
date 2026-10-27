@@ -518,3 +518,26 @@ export interface IProposedAssignmentWarnings {
   shiftScheduleId: string;
   warnings: IHourWarning[];
 }
+
+// ── Bồi thường thiệt hại (Quy chế Điều 25) ───────────────────────────────
+
+export type HrCompensationStatus = 'Active' | 'Cancelled';
+
+/** Không phải phạt: trừ dần vào kỳ lương cuối tháng, mỗi tháng tối đa 30% lương thực trả. */
+export interface ICompensation {
+  id: string;
+  staffId: string;
+  staffName: string;
+  hrRecordId: string;
+  recordType: HrRecordType;
+  recordDate: string;
+  damageAmount?: number | null;
+  amount: number;
+  deducted: number;
+  remaining: number;
+  note?: string | null;
+  status: HrCompensationStatus;
+  approvedAt: string;
+  cancelledAt?: string | null;
+  cancelReason?: string | null;
+}

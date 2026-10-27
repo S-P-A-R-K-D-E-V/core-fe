@@ -379,6 +379,7 @@ export const endpoints = {
     update: (id: string) => `/holiday-policies/${id}`,
     delete: (id: string) => `/holiday-policies/${id}`,
     statutoryPay: '/holiday-policies/statutory-pay',
+    weeklyBonusPay: '/holiday-policies/weekly-bonus-pay',
   },
   penaltyPolicy: {
     list: '/penalty-policies',
@@ -484,6 +485,9 @@ export const endpoints = {
     contractSigned: (id: string) => `/employment-contracts/${id}/signed`,
     contractTerminate: (id: string) => `/employment-contracts/${id}/terminate`,
     contractVoid: (id: string) => `/employment-contracts/${id}/void`,
+    compensations: '/hr-compensations',
+    compensationsMine: '/hr-compensations/mine',
+    compensationCancel: (id: string) => `/hr-compensations/${id}/cancel`,
     supportShifts: '/support-shifts',
     supportShiftCancel: (id: string) => `/support-shifts/${id}/cancel`,
     supportShiftClaim: (id: string) => `/support-shifts/${id}/claims`,

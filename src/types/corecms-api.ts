@@ -1199,6 +1199,12 @@ export interface IStatutoryPaySettings {
   updatedAt: string | null;
 }
 
+/** Trả thưởng doanh số tuần vào lương từ tuần (thứ Hai) này; null = chỉ tính thử. */
+export interface IWeeklyBonusPaySettings {
+  weeklyBonusPayFrom: string | null;
+  updatedAt: string | null;
+}
+
 export interface IUpdateHolidayPolicyRequest {
   name: string;
   fromDate: string;

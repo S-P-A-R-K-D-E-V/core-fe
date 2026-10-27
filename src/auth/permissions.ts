@@ -111,6 +111,8 @@ export const PERMISSIONS = {
     performanceManage: 'hr.performance.manage',
     /** Hồ sơ nhân sự (dữ liệu cá nhân) + mẫu và hợp đồng lao động — chỉ Admin. */
     contractManage: 'hr.contract.manage',
+    /** Duyệt / huỷ khoản bồi thường từ biên bản chênh lệch có lỗi cá nhân — chỉ Admin. */
+    compensationManage: 'hr.compensation.manage',
   },
   /** Hàng hoá — xem hàng, nhóm hàng, thương hiệu, đơn vị không cần quyền (màn bán hàng). Thêm / sửa cần kèm xem giá vốn. */
   products: {

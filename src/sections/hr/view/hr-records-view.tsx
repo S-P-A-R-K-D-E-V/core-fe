@@ -48,7 +48,8 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import type { IHrRecord, HrRecordType, HrRecordStatus } from 'src/types/hr';
 import { HR_RECORD_TYPE_LABEL, CASH_RECORD_THRESHOLD, HR_RECORD_STATUS_LABEL } from 'src/types/hr';
 
-import { fVnd, MonthField, monthStart, previousMonth } from '../hr-common';
+import { fVnd, MonthField, monthStart, parseAmount, previousMonth } from '../hr-common';
+import { canCompensate, CompensationsPanel, CreateCompensationDialog } from '../compensations-panel';
 
 // ----------------------------------------------------------------------
 // Biên bản (Quy chế Chương VIII, Phụ lục C; Nội quy Điều 27): chênh lệch tiền / hàng, vi phạm nội quy, cảnh báo mức hoàn
@@ -94,12 +95,7 @@ function newDraft(): Draft {
 
 const isDiscrepancy = (t: HrRecordType) => t === 'CashDiscrepancy' || t === 'StockDiscrepancy';
 
-/** Số tiền nhập (có thể có dấu trừ, dấu chấm hàng nghìn) → số. */
-export function parseAmount(text: string): number | null {
-  const cleaned = text.replace(/[^\d-]/g, '');
-  if (!cleaned || cleaned === '-') return null;
-  return Number(cleaned);
-}
+export { parseAmount };
 
 export default function HrRecordsView({ initialTab }: { initialTab?: string }) {
   const settings = useSettingsContext();
@@ -117,6 +113,10 @@ export default function HrRecordsView({ initialTab }: { initialTab?: string }) {
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [detail, setDetail] = useState<IHrRecord | null>(null);
+  // Bồi thường (B7): Admin duyệt từ biên bản chênh lệch có lỗi cá nhân.
+  const canManageCompensation = hasPermission(user, PERMISSIONS.hr.compensationManage);
+  const [compensating, setCompensating] = useState<IHrRecord | null>(null);
+  const [compensationsKey, setCompensationsKey] = useState(0);
   const [action, setAction] = useState<{ record: IHrRecord; kind: 'sign' | 'refuse' | 'void' | 'refused'; text: string } | null>(
     null
   );
@@ -216,7 +216,8 @@ export default function HrRecordsView({ initialTab }: { initialTab?: string }) {
         sx={{ mb: 2 }}
       />
       <Alert severity="info" sx={{ mb: 2 }}>
-        Biên bản chỉ ghi nhận sự việc — không phạt tiền, không trừ lương. Nhân viên được ghi ý kiến trước khi ký; không đồng ý thì
+        Biên bản chỉ ghi nhận sự việc — không phạt tiền. Bồi thường thiệt hại (nếu có lỗi cá nhân) là khoản riêng Admin
+        duyệt, trừ dần tối đa 30% lương / tháng. Nhân viên được ghi ý kiến trước khi ký; không đồng ý thì
         từ chối ký và ghi rõ lý do.
       </Alert>
 
@@ -314,6 +315,10 @@ export default function HrRecordsView({ initialTab }: { initialTab?: string }) {
           </TableContainer>
         </Card>
       )}
+
+      {/* Bồi thường: quản lý thấy của mọi người (Admin), nhân viên thấy của mình */}
+      {tab === 'manage' && canManageCompensation && <CompensationsPanel refreshKey={compensationsKey} />}
+      {tab === 'mine' && <CompensationsPanel mine />}
 
       {/* Lập biên bản */}
       <Dialog open={!!draft} onClose={() => !busy && setDraft(null)} fullWidth maxWidth="sm">
@@ -446,9 +451,26 @@ export default function HrRecordsView({ initialTab }: { initialTab?: string }) {
           {detail?.status === 'AwaitingSignature' && (
             <Button onClick={() => setAction({ record: detail, kind: 'refused', text: '' })}>Ghi nhận không ký</Button>
           )}
+          {detail && canManageCompensation && canCompensate(detail) && (
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setCompensating(detail);
+                setDetail(null);
+              }}
+            >
+              Lập bồi thường
+            </Button>
+          )}
           <Button onClick={() => setDetail(null)}>Đóng</Button>
         </DialogActions>
       </Dialog>
+
+      <CreateCompensationDialog
+        record={compensating}
+        onClose={() => setCompensating(null)}
+        onCreated={() => setCompensationsKey((k) => k + 1)}
+      />
 
       {/* Ký / không ký / huỷ */}
       <Dialog open={!!action} onClose={() => !busy && setAction(null)} fullWidth maxWidth="xs">
