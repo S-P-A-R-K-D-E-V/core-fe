@@ -97,6 +97,7 @@ import PaymentQRDialog from 'src/components/payment-qr-dialog';
 
 import { usePayrollAccess } from '../payroll-access';
 import PenaltyDetailDialog from 'src/components/penalty-detail-dialog';
+import AllowanceDetailDialog from 'src/components/allowance-detail-dialog';
 import ShiftCrossCheckBadge from 'src/components/shift-cross-check-badge';
 
 
@@ -113,7 +114,7 @@ const TABLE_HEAD = [
   { id: 'totalLateMinutes', label: 'Đi muộn (phút)', width: 110 },
   { id: 'totalHoursWorked', label: 'Giờ làm', width: 100 },
   { id: 'baseSalary', label: 'Lương CB', width: 140 },
-  { id: 'bonus', label: 'Thưởng lễ', width: 120 },
+  { id: 'bonus', label: 'Thưởng & phụ cấp', width: 130 },
   { id: 'penaltyAmount', label: 'Tiền phạt', width: 120 },
   { id: 'totalSalary', label: 'Tổng lương', width: 150 },
   { id: 'status', label: 'Trạng thái', width: 100 },
@@ -151,6 +152,7 @@ export default function PayrollBatchView() {
   // Payment QR dialog state
   const [paymentDialogRecord, setPaymentDialogRecord] = useState<IPayrollRecord | null>(null);
   const [penaltyDetailRecord, setPenaltyDetailRecord] = useState<IPayrollRecord | null>(null);
+  const [allowanceDetailRecord, setAllowanceDetailRecord] = useState<IPayrollRecord | null>(null);
 
   // Salary config preview state — shown before generate/recalculate
   const [salaryConfigOpen, setSalaryConfigOpen] = useState(false);
@@ -1301,8 +1303,24 @@ export default function PayrollBatchView() {
                         </TableCell>
                         <TableCell onClick={() => handleOpenShiftDetail(row)}>{row.totalHoursWorked.toFixed(1)}h</TableCell>
                         <TableCell onClick={() => handleOpenShiftDetail(row)}>{formatCurrency(row.baseSalary)}</TableCell>
-                        <TableCell onClick={() => handleOpenShiftDetail(row)}>
-                          {row.bonus > 0 ? formatCurrency(row.bonus) : '-'}
+                        <TableCell
+                          onClick={(e) => {
+                            if (row.bonus + row.overtimeSalary <= 0) return;
+                            e.stopPropagation();
+                            setAllowanceDetailRecord(row);
+                          }}
+                        >
+                          {row.bonus + row.overtimeSalary > 0 ? (
+                            <Typography
+                              color="success.main"
+                              variant="body2"
+                              sx={{ textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}
+                            >
+                              {formatCurrency(row.bonus + row.overtimeSalary)}
+                            </Typography>
+                          ) : (
+                            '-'
+                          )}
                         </TableCell>
                         <TableCell
                           onClick={(e) => {
@@ -2414,6 +2432,13 @@ export default function PayrollBatchView() {
         open={!!penaltyDetailRecord}
         record={penaltyDetailRecord}
         onClose={() => setPenaltyDetailRecord(null)}
+      />
+
+      {/* ── Allowance Detail Dialog (thưởng lễ, làm thêm giờ, ca đêm, làm hộ) ── */}
+      <AllowanceDetailDialog
+        open={!!allowanceDetailRecord}
+        record={allowanceDetailRecord}
+        onClose={() => setAllowanceDetailRecord(null)}
       />
 
       {/* ── Payment QR Dialog ─────────────────────────────────────────────── */}

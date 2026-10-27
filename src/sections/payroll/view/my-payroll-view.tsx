@@ -35,6 +35,7 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import Iconify from 'src/components/iconify';
 import Label from 'src/components/label';
 import PenaltyDetailDialog from 'src/components/penalty-detail-dialog';
+import AllowanceDetailDialog from 'src/components/allowance-detail-dialog';
 import ShiftCrossCheckBadge from 'src/components/shift-cross-check-badge';
 import Scrollbar from 'src/components/scrollbar';
 import { useSettingsContext } from 'src/components/settings';
@@ -63,7 +64,7 @@ const TABLE_HEAD = [
   { id: 'totalLateMinutes', label: 'Đi muộn (phút)', width: 110 },
   { id: 'totalHoursWorked', label: 'Giờ làm', width: 100 },
   { id: 'baseSalary', label: 'Lương CB', width: 140 },
-  { id: 'bonus', label: 'Thưởng lễ', width: 120 },
+  { id: 'bonus', label: 'Thưởng & phụ cấp', width: 130 },
   { id: 'penaltyAmount', label: 'Tiền phạt', width: 120 },
   { id: 'totalSalary', label: 'Tổng lương', width: 150 },
   { id: 'status', label: 'Trạng thái', width: 100 },
@@ -102,6 +103,7 @@ export default function MyPayrollView() {
 
   // Penalty detail popup
   const [penaltyDetailRecord, setPenaltyDetailRecord] = useState<IPayrollRecord | null>(null);
+  const [allowanceDetailRecord, setAllowanceDetailRecord] = useState<IPayrollRecord | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -320,8 +322,22 @@ export default function MyPayrollView() {
                         </TableCell>
                         <TableCell>{row.totalHoursWorked.toFixed(1)}h</TableCell>
                         <TableCell>{formatCurrency(row.baseSalary)}</TableCell>
-                        <TableCell>
-                          {row.bonus > 0 ? formatCurrency(row.bonus) : '-'}
+                        <TableCell
+                          onClick={() => {
+                            if (row.bonus + row.overtimeSalary > 0) setAllowanceDetailRecord(row);
+                          }}
+                        >
+                          {row.bonus + row.overtimeSalary > 0 ? (
+                            <Typography
+                              color="success.main"
+                              variant="body2"
+                              sx={{ textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}
+                            >
+                              {formatCurrency(row.bonus + row.overtimeSalary)}
+                            </Typography>
+                          ) : (
+                            '-'
+                          )}
                         </TableCell>
                         <TableCell
                           onClick={() => {
@@ -649,6 +665,12 @@ export default function MyPayrollView() {
         open={!!penaltyDetailRecord}
         record={penaltyDetailRecord}
         onClose={() => setPenaltyDetailRecord(null)}
+      />
+
+      <AllowanceDetailDialog
+        open={!!allowanceDetailRecord}
+        record={allowanceDetailRecord}
+        onClose={() => setAllowanceDetailRecord(null)}
       />
     </Container>
   );
