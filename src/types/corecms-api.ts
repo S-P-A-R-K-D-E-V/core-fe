@@ -1150,6 +1150,8 @@ export interface IHolidayPolicy {
   description?: string;
   isActive: boolean;
   createdAt: string;
+  /** Ngày nghỉ lễ, Tết theo luật (Điều 112): khi trả lương theo luật, giờ làm ngày này được bù đủ tối thiểu 300%. */
+  isStatutory?: boolean;
 }
 
 export interface ICreateHolidayPolicyRequest {
@@ -1162,6 +1164,16 @@ export interface ICreateHolidayPolicyRequest {
   fixedAmountValue?: number;
   applyOnSunday?: boolean;
   description?: string;
+  isStatutory?: boolean;
+}
+
+/** GET/PUT /holiday-policies/statutory-pay — trả lương theo Bộ luật Lao động 2019 Điều 98. */
+export interface IStatutoryPaySettings {
+  /** "yyyy-MM-dd"; null = chưa áp dụng. */
+  statutoryPayFrom: string | null;
+  /** Giờ làm bình thường mỗi ngày (mặc định 8); vượt mức là làm thêm giờ. */
+  normalHoursPerDay: number;
+  updatedAt: string | null;
 }
 
 export interface IUpdateHolidayPolicyRequest {
@@ -1175,6 +1187,7 @@ export interface IUpdateHolidayPolicyRequest {
   applyOnSunday?: boolean;
   description?: string;
   isActive?: boolean;
+  isStatutory?: boolean;
 }
 
 // --- Penalty Policy ---
@@ -1282,6 +1295,25 @@ export interface IShiftWaiverInfo {
 export interface IPayrollPenaltyDetailItem {
   id: string;
   itemType: 'Penalty' | 'ManualPenalty' | 'CleaningPenalty';
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+}
+
+// 1 dòng trong "Chi tiết thưởng & phụ cấp" (GET /payroll/{id}/allowance-details) — tổng Amount khớp bonus + overtimeSalary.
+export type PayrollAllowanceItemType =
+  | 'HolidayBonus'
+  | 'HolidayStatutoryTopUp'
+  | 'OvertimePremium'
+  | 'NightPremium'
+  | 'NightOvertimePremium'
+  | 'LateCoverPay'
+  | 'PoolCoverPay';
+
+export interface IPayrollAllowanceDetailItem {
+  id: string;
+  itemType: PayrollAllowanceItemType;
   description: string;
   quantity: number;
   unitPrice: number;

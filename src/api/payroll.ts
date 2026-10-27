@@ -1,6 +1,7 @@
 import axios, { endpoints } from 'src/utils/axios';
 
 import type {
+  IPayrollAllowanceDetailItem,
   IBatchPayrollCalculationRequest,
   IBatchPayrollResponse,
   IBulkFinalizePayrollRequest,
@@ -76,6 +77,16 @@ export async function getPayrollShiftDetails(
 ): Promise<IPayrollShiftDetailResponse> {
   const response = await axios.get<IPayrollShiftDetailResponse>(
     endpoints.payroll.shiftDetails(payrollRecordId)
+  );
+  return response.data;
+}
+
+/** Thưởng lễ, bù đủ 300% ngày lễ, làm thêm giờ, ca đêm, làm hộ — tổng khớp bonus + overtimeSalary. */
+export async function getPayrollAllowanceDetails(
+  payrollRecordId: string
+): Promise<IPayrollAllowanceDetailItem[]> {
+  const response = await axios.get<IPayrollAllowanceDetailItem[]>(
+    endpoints.payroll.allowanceDetails(payrollRecordId)
   );
   return response.data;
 }

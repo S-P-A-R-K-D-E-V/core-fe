@@ -320,6 +320,7 @@ export const endpoints = {
     myPayroll: '/payroll/my-payroll',
     shiftDetails: (id: string) => `/payroll/${id}/shift-details`,
     penaltyDetails: (id: string) => `/payroll/${id}/penalty-details`,
+    allowanceDetails: (id: string) => `/payroll/${id}/allowance-details`,
     waivePenalty: '/payroll/waive-penalty',
     removeWaiver: (waiverId: string) => `/payroll/waive-penalty/${waiverId}`,
     manualPenalties: (payrollRecordId: string) => `/payroll/${payrollRecordId}/manual-penalties`,
@@ -377,6 +378,7 @@ export const endpoints = {
     create: '/holiday-policies',
     update: (id: string) => `/holiday-policies/${id}`,
     delete: (id: string) => `/holiday-policies/${id}`,
+    statutoryPay: '/holiday-policies/statutory-pay',
   },
   penaltyPolicy: {
     list: '/penalty-policies',

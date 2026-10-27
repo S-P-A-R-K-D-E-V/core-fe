@@ -42,6 +42,8 @@ import {
   updateHolidayPolicy,
 } from 'src/api/holidayPolicy';
 
+import { StatutoryPayCard } from '../statutory-pay-card';
+
 
 // ----------------------------------------------------------------------
 
@@ -51,6 +53,7 @@ const TABLE_HEAD = [
   { id: 'bonusType', label: 'Loại thưởng', width: 150 },
   { id: 'bonusValue', label: 'Giá trị', width: 150 },
   { id: 'sunday', label: 'CN tính', width: 100 },
+  { id: 'statutory', label: 'Lễ theo luật', width: 110 },
   { id: 'status', label: 'Trạng thái', width: 100 },
   { id: 'actions', label: 'Hành động', width: 120 },
 ];
@@ -85,6 +88,7 @@ export default function HolidayPolicyListView() {
     fixedAmountValue: 0,
     applyOnSunday: true,
     isActive: true,
+    isStatutory: true,
     description: '',
   });
 
@@ -118,6 +122,7 @@ export default function HolidayPolicyListView() {
         fixedAmountValue: policy.fixedAmountValue || 0,
         applyOnSunday: policy.applyOnSunday,
         isActive: policy.isActive,
+        isStatutory: policy.isStatutory ?? true,
         description: policy.description || '',
       });
     } else {
@@ -132,6 +137,7 @@ export default function HolidayPolicyListView() {
         fixedAmountValue: 0,
         applyOnSunday: true,
         isActive: true,
+        isStatutory: true,
         description: '',
       });
     }
@@ -210,6 +216,8 @@ export default function HolidayPolicyListView() {
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
+      <StatutoryPayCard />
+
       <Card>
         {loading ? (
           <Stack alignItems="center" justifyContent="center" sx={{ py: 10 }}>
@@ -231,6 +239,7 @@ export default function HolidayPolicyListView() {
                         <td>{BONUS_TYPES.find((t) => t.value === policy.bonusType)?.label}</td>
                         <td>{getBonusValueDisplay(policy)}</td>
                         <td>{policy.applyOnSunday ? 'Có' : 'Không'}</td>
+                        <td>{policy.isStatutory === false ? 'Không' : 'Có'}</td>
                         <td>
                           <Label color={policy.isActive ? 'success' : 'default'}>
                             {policy.isActive ? 'Kích hoạt' : 'Tạm dừng'}
@@ -356,6 +365,18 @@ export default function HolidayPolicyListView() {
             >
               <MenuItem value="true">Có</MenuItem>
               <MenuItem value="false">Không</MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              label="Ngày nghỉ lễ, Tết theo Bộ luật Lao động"
+              value={formData.isStatutory ? 'true' : 'false'}
+              onChange={(e) => setFormData({ ...formData, isStatutory: e.target.value === 'true' })}
+              helperText="Khi trả lương theo luật, giờ làm ngày lễ theo luật được bù cho đủ tối thiểu 300%. Chọn Không cho ngày thưởng riêng của cửa hàng (vd 8/3)."
+              fullWidth
+            >
+              <MenuItem value="true">Có (Tết, Giỗ Tổ, 30/4, 1/5, 2/9…)</MenuItem>
+              <MenuItem value="false">Không — ngày thưởng riêng</MenuItem>
             </TextField>
 
             <TextField
