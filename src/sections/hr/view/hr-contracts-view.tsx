@@ -43,6 +43,7 @@ import {
   voidContract,
   createContract,
   getMyContracts,
+  importPaperContract,
   finalizeContract,
   getContractFields,
   terminateContract,
@@ -228,6 +229,7 @@ function ContractsTab() {
   const [status, setStatus] = useState<EmploymentContractStatus | ''>('');
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [detail, setDetail] = useState<IEmploymentContract | null>(null);
 
   const load = useCallback(async () => {
@@ -264,6 +266,9 @@ function ContractsTab() {
           ))}
         </TextField>
         <Box sx={{ flex: 1 }} />
+        <Button variant="outlined" onClick={() => setImporting(true)}>
+          Đăng hợp đồng giấy
+        </Button>
         <Button variant="contained" onClick={() => setCreating(true)}>
           Soạn hợp đồng
         </Button>
@@ -314,6 +319,15 @@ function ContractsTab() {
         )}
       </Card>
 
+      <ImportPaperContractDialog
+        open={importing}
+        onClose={() => setImporting(false)}
+        onDone={(c) => {
+          setImporting(false);
+          load();
+          setDetail(c);
+        }}
+      />
       <CreateContractDialog
         open={creating}
         onClose={() => setCreating(false)}
@@ -335,7 +349,37 @@ function ContractsTab() {
   );
 }
 
-function TermsFields({ terms, onChange }: { terms: IContractTerms; onChange: (t: IContractTerms) => void }) {
+/** Hợp đồng đăng lại từ bản giấy (không soạn từ mẫu) — không có nội dung để in / tải Word. */
+const isPaperContract = (c: Pick<IEmploymentContract, 'templateId'>) => c.templateId === '00000000-0000-0000-0000-000000000000';
+
+/** Hợp đồng đã ký của một người — gốc cho phụ lục (D12). */
+function useSignedParents(staffId: string, enabled: boolean) {
+  const [parents, setParents] = useState<IEmploymentContract[]>([]);
+  useEffect(() => {
+    if (!enabled || !staffId) {
+      setParents([]);
+      return;
+    }
+    getContracts({ staffId, status: 'Signed' })
+      .then((list) => setParents(list.filter((c) => c.contractType !== 'Appendix')))
+      .catch(() => setParents([]));
+  }, [staffId, enabled]);
+  return parents;
+}
+
+/**
+ * Điều khoản hợp đồng. Có `appendixParents` (hợp đồng đã ký của người đó) thì chọn được "Phụ lục" và hợp đồng gốc;
+ * không truyền = không cho chọn phụ lục (sửa bản nháp đã có loại).
+ */
+function TermsFields({
+  terms,
+  onChange,
+  appendixParents,
+}: {
+  terms: IContractTerms;
+  onChange: (t: IContractTerms) => void;
+  appendixParents?: IEmploymentContract[];
+}) {
   return (
     <>
       <TextField
@@ -344,17 +388,38 @@ function TermsFields({ terms, onChange }: { terms: IContractTerms; onChange: (t:
         value={terms.contractType}
         onChange={(e) => {
           const contractType = e.target.value as EmploymentContractType;
-          onChange({ ...terms, contractType, endDate: contractType === 'Indefinite' ? null : terms.endDate });
+          onChange({
+            ...terms,
+            contractType,
+            endDate: contractType === 'Indefinite' ? null : terms.endDate,
+            parentContractId: contractType === 'Appendix' ? terms.parentContractId : null,
+          });
         }}
       >
         {(Object.keys(CONTRACT_TYPE_LABEL) as EmploymentContractType[])
-          .filter((t) => t !== 'Appendix')
+          .filter((t) => t !== 'Appendix' || !!appendixParents || terms.contractType === 'Appendix')
           .map((t) => (
             <MenuItem key={t} value={t}>
               {CONTRACT_TYPE_LABEL[t]}
             </MenuItem>
           ))}
       </TextField>
+      {terms.contractType === 'Appendix' && appendixParents && (
+        <TextField
+          select
+          label="Phụ lục của hợp đồng"
+          value={terms.parentContractId ?? ''}
+          onChange={(e) => onChange({ ...terms, parentContractId: e.target.value || null })}
+          helperText={appendixParents.length === 0 ? 'Người này chưa có hợp đồng đã ký.' : undefined}
+          error={appendixParents.length === 0}
+        >
+          {appendixParents.map((p) => (
+            <MenuItem key={p.id} value={p.id}>
+              {p.contractNumber ?? 'Không số'} · {CONTRACT_TYPE_LABEL[p.contractType]} · từ {fDate(p.startDate)}
+            </MenuItem>
+          ))}
+        </TextField>
+      )}
       <Stack direction="row" spacing={2}>
         <TextField
           type="date"
@@ -410,6 +475,119 @@ function TermsFields({ terms, onChange }: { terms: IContractTerms; onChange: (t:
   );
 }
 
+/**
+ * Đăng hợp đồng / phụ lục GIẤY đã ký từ trước (D12): không soạn từ mẫu — ghi loại, số trên bản giấy, ngày, rồi tải luôn
+ * ảnh / PDF bản ký. Hợp đồng vào trạng thái "Đã ký", nhân viên xem bản ký trên app.
+ */
+function ImportPaperContractDialog({
+  open,
+  onClose,
+  onDone,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onDone: (c: IEmploymentContract) => void;
+}) {
+  const { enqueueSnackbar } = useSnackbar();
+  const [staff, setStaff] = useState<{ id: string; name: string }[]>([]);
+  const [staffId, setStaffId] = useState('');
+  const [number, setNumber] = useState('');
+  const [signedOn, setSignedOn] = useState('');
+  const [note, setNote] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [terms, setTerms] = useState<IContractTerms>({
+    contractType: 'FixedTermUnder12Months',
+    startDate: '',
+    endDate: null,
+    isPartTime: true,
+    minHoursPerMonth: 40,
+    maxHoursPerMonth: 96,
+  });
+  const [saving, setSaving] = useState(false);
+  const appendixParents = useSignedParents(staffId, open);
+
+  useEffect(() => {
+    if (!open) return;
+    getActiveStaffUsers()
+      .then((u) => setStaff(u.map((x) => ({ id: x.id, name: x.fullName }))))
+      .catch(() => setStaff([]));
+  }, [open]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const created = await importPaperContract(staffId, terms, number.trim() || null, note.trim() || null);
+      // Tạo xong mà tải tệp lỗi: hợp đồng vẫn còn ở "Chờ ký" — mở chi tiết để tải lại bản ký.
+      try {
+        const uploaded = await uploadContractFiles(created.id, files);
+        onDone(await markContractSigned(created.id, signedOn, uploaded));
+        enqueueSnackbar('Đã đăng hợp đồng giấy và bản ký');
+      } catch (err) {
+        enqueueSnackbar(apiErrorMessage(err, 'Đã đăng hợp đồng nhưng chưa tải được bản ký — tải lại trong chi tiết'), {
+          variant: 'warning',
+        });
+        onDone(created);
+      }
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không đăng được hợp đồng'), { variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const ready =
+    !!staffId &&
+    !!terms.startDate &&
+    !!signedOn &&
+    files.length > 0 &&
+    (terms.contractType !== 'Appendix' || !!terms.parentContractId);
+
+  return (
+    <Dialog open={open} onClose={() => !saving && onClose()} fullWidth maxWidth="sm">
+      <DialogTitle>Đăng hợp đồng giấy có sẵn</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ pt: 1 }}>
+          <Alert severity="info">
+            Dùng cho hợp đồng / phụ lục đã ký trên giấy trước khi dùng hệ thống. Không soạn từ mẫu — nội dung xem ở bản ký tải lên.
+          </Alert>
+          <TextField select label="Nhân viên" value={staffId} onChange={(e) => setStaffId(e.target.value)}>
+            {staff.map((s) => (
+              <MenuItem key={s.id} value={s.id}>
+                {s.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TermsFields terms={terms} onChange={setTerms} appendixParents={appendixParents} />
+          <Stack direction="row" spacing={2}>
+            <TextField label="Số trên bản giấy (nếu có)" value={number} onChange={(e) => setNumber(e.target.value)} fullWidth />
+            <TextField
+              type="date"
+              label="Ngày ký"
+              value={signedOn}
+              onChange={(e) => setSignedOn(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+          </Stack>
+          <TextField label="Ghi chú" value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2} />
+          <Button variant="outlined" component="label">
+            Chọn ảnh / PDF bản ký ({files.length})
+            <input hidden multiple type="file" accept={FILE_TYPES} onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, 10))} />
+          </Button>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={saving}>
+          Đóng
+        </Button>
+        <LoadingButton variant="contained" loading={saving} disabled={!ready} onClick={save}>
+          Đăng hợp đồng
+        </LoadingButton>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function CreateContractDialog({
   open,
   onClose,
@@ -433,6 +611,7 @@ function CreateContractDialog({
     maxHoursPerMonth: 96,
   });
   const [saving, setSaving] = useState(false);
+  const appendixParents = useSignedParents(staffId, open);
 
   useEffect(() => {
     if (!open) return;
@@ -477,7 +656,7 @@ function CreateContractDialog({
             onChange={(e) => {
               setTemplateId(e.target.value);
               const t = templates.find((x) => x.id === e.target.value);
-              if (t && t.contractType !== 'Appendix') setTerms((prev) => ({ ...prev, contractType: t.contractType }));
+              if (t) setTerms((prev) => ({ ...prev, contractType: t.contractType }));
             }}
           >
             {templates.map((t) => (
@@ -486,7 +665,7 @@ function CreateContractDialog({
               </MenuItem>
             ))}
           </TextField>
-          <TermsFields terms={terms} onChange={setTerms} />
+          <TermsFields terms={terms} onChange={setTerms} appendixParents={appendixParents} />
           <Typography variant="caption" color="text.secondary">
             Lương lấy theo cấu hình lương đang hiệu lực tại ngày bắt đầu. Thông tin cá nhân lấy từ tab &quot;Hồ sơ nhân sự&quot;.
           </Typography>
@@ -496,7 +675,12 @@ function CreateContractDialog({
         <Button onClick={onClose} disabled={saving}>
           Đóng
         </Button>
-        <LoadingButton variant="contained" loading={saving} disabled={!staffId || !templateId || !terms.startDate} onClick={save}>
+        <LoadingButton
+          variant="contained"
+          loading={saving}
+          disabled={!staffId || !templateId || !terms.startDate || (terms.contractType === 'Appendix' && !terms.parentContractId)}
+          onClick={save}
+        >
           Soạn
         </LoadingButton>
       </DialogActions>
@@ -598,7 +782,7 @@ function ContractDetailDialog({
               </>
             )}
 
-            {c.status !== 'Draft' && c.status !== 'Voided' && (
+            {c.status !== 'Draft' && c.status !== 'Voided' && !isPaperContract(c) && (
               <Button
                 variant="outlined"
                 onClick={() => !printContract(c) && enqueueSnackbar('Trình duyệt chặn cửa sổ in — cho phép pop-up rồi thử lại.', { variant: 'warning' })}

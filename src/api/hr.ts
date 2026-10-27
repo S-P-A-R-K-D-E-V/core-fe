@@ -391,6 +391,17 @@ export async function createContract(staffId: string, templateId: string, terms:
 }
 
 /** Sửa bản nháp — gửi lại điều khoản cũ để trộn lại theo hồ sơ / lương mới nhất. */
+/** Đăng hợp đồng / phụ lục giấy đã ký từ trước (không soạn từ mẫu); sau đó tải bản ký như thường. */
+export async function importPaperContract(
+  staffId: string,
+  terms: IContractTerms,
+  contractNumber: string | null,
+  note: string | null
+): Promise<IEmploymentContract> {
+  const response = await axios.post<IEmploymentContract>(endpoints.hr.contractImport, { staffId, terms, contractNumber, note });
+  return response.data;
+}
+
 export async function updateContractDraft(id: string, terms: IContractTerms): Promise<IEmploymentContract> {
   const response = await axios.put<IEmploymentContract>(endpoints.hr.contract(id), terms);
   return response.data;

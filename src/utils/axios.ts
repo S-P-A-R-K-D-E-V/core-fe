@@ -485,6 +485,7 @@ export const endpoints = {
     contractSigned: (id: string) => `/employment-contracts/${id}/signed`,
     contractTerminate: (id: string) => `/employment-contracts/${id}/terminate`,
     contractVoid: (id: string) => `/employment-contracts/${id}/void`,
+    contractImport: '/employment-contracts/import',
     compensations: '/hr-compensations',
     compensationsMine: '/hr-compensations/mine',
     compensationCancel: (id: string) => `/hr-compensations/${id}/cancel`,
