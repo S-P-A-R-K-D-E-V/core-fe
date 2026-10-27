@@ -102,6 +102,7 @@ import { getActiveStaffUsers, setSchedulingPriority } from 'src/api/users';
 
 import { StyledCalendar } from '../../calendar/styles';
 import CalendarToolbar from '../../calendar/calendar-toolbar';
+import { AssignmentZonesDialog } from '../assignment-zones-dialog';
 import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
 // ----------------------------------------------------------------------
@@ -206,6 +207,7 @@ export default function AttendanceAssignmentsView() {
   const confirm = useBoolean();
   const detailDialog = useBoolean();
   const manageDialog = useBoolean();
+  const zonesDialog = useBoolean();
   const calendarRef = useRef<any>(null);
 
   const [assignMode, setAssignMode] = useState<'single' | 'bulk'>('single');
@@ -858,6 +860,8 @@ export default function AttendanceAssignmentsView() {
         staffId: assignment.staffId,
         staffName: assignment.staffName,
         attendance: assignment.attendanceLog, // nếu API trả về
+        zones: assignment.zones ?? [],
+        isShiftLead: !!assignment.isShiftLead,
       });
     });
 
@@ -1942,7 +1946,16 @@ export default function AttendanceAssignmentsView() {
                             <Box sx={{
                               display: "flex", alignItems: "center", gap: 0.5
                             }}>
-                              <p>👤{u.staffName}</p>
+                              <p>{u.isShiftLead ? '⭐' : '👤'}{u.staffName}</p>
+                              {u.zones?.length > 0 && (
+                                <Box
+                                  component="span"
+                                  title={`Khu ${u.zones.join(', ')}`}
+                                  sx={{ px: 0.5, borderRadius: 0.75, fontWeight: 700, fontSize: 11, border: '1px solid currentColor' }}
+                                >
+                                  {u.zones.join('')}
+                                </Box>
+                              )}
                             </Box>
                             <span>{getStatusIcon(u.attendance)}</span>
                           </Box>
@@ -3598,6 +3611,15 @@ export default function AttendanceAssignmentsView() {
                 Ngày: {new Date(managingEvent.date).toLocaleDateString('vi-VN')} | Đã phân:{' '}
                 {dndAssigned.length} người
               </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Iconify icon="solar:map-point-wave-bold" />}
+                onClick={zonesDialog.onTrue}
+                sx={{ mt: 1 }}
+              >
+                Khu & trưởng ca
+              </Button>
             </DialogTitle>
 
             <DialogContent dividers sx={{ p: 0 }}>
@@ -4279,6 +4301,21 @@ export default function AttendanceAssignmentsView() {
           )}
         </DialogActions>
       </Dialog>
+
+      {/* Khu & trưởng ca của ca đang mở trong "Phân Công Ca" — chỉ các phân ca đã lưu */}
+      {managingEvent && (
+        <AssignmentZonesDialog
+          open={zonesDialog.value}
+          onClose={zonesDialog.onFalse}
+          title={`${managingEvent.title} (${managingEvent.startTime} - ${managingEvent.endTime}) · ${new Date(
+            managingEvent.date
+          ).toLocaleDateString('vi-VN')}`}
+          assignments={tableData.filter(
+            (a) => a.shiftScheduleId === managingEvent.scheduleId && a.date.split('T')[0] === managingEvent.date
+          )}
+          onSaved={fetchAssignments}
+        />
+      )}
 
       {/* Confirm Delete Dialog */}
       <ConfirmDialog

@@ -38,3 +38,25 @@ export async function updatePenaltyPolicy(
 export async function deletePenaltyPolicy(id: string): Promise<void> {
   await axios.delete(endpoints.penaltyPolicy.delete(id));
 }
+
+// Ngừng phạt tiền (PayrollSetting): kỳ lương bắt đầu từ ngày này chỉ ghi nhận vi phạm (0đ), không trừ lương.
+
+export interface IMonetaryPenaltySettings {
+  /** 'yyyy-MM-dd'; null = đang phạt tiền theo chính sách. */
+  monetaryPenaltiesDisabledFrom: string | null;
+  updatedAt: string | null;
+}
+
+export async function getMonetaryPenaltySettings(): Promise<IMonetaryPenaltySettings> {
+  const response = await axios.get<IMonetaryPenaltySettings>(endpoints.penaltyPolicy.monetarySettings);
+  return response.data;
+}
+
+export async function updateMonetaryPenaltySettings(
+  monetaryPenaltiesDisabledFrom: string | null
+): Promise<IMonetaryPenaltySettings> {
+  const response = await axios.put<IMonetaryPenaltySettings>(endpoints.penaltyPolicy.monetarySettings, {
+    monetaryPenaltiesDisabledFrom,
+  });
+  return response.data;
+}

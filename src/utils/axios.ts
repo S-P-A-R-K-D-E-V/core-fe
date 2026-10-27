@@ -216,6 +216,7 @@ export const endpoints = {
     history: '/shift-assignments/history',
     undo: (id: string) => `/shift-assignments/history/${id}/undo`,
     delete: (id: string) => `/shift-assignments/${id}`,
+    zoneLead: (id: string) => `/shift-assignments/${id}/zone-lead`,
     byStaffAndDate: (staffId: string, date: string) => `/shift-assignments/staff/${staffId}/date/${date}`,
     byStaffAndDateRange: (staffId: string) => `/shift-assignments/staff/${staffId}/range`,
     mySchedule: '/shift-assignments/my-schedule',
@@ -383,6 +384,7 @@ export const endpoints = {
     create: '/penalty-policies',
     update: (id: string) => `/penalty-policies/${id}`,
     delete: (id: string) => `/penalty-policies/${id}`,
+    monetarySettings: '/penalty-policies/monetary-settings',
   },
   cleaning: {
     templates: '/cleaning/templates',
@@ -520,6 +522,7 @@ export const endpoints = {
     create: '/categories',
     update: (id: string) => `/categories/${id}`,
     delete: (id: string) => `/categories/${id}`,
+    floor: (id: string) => `/categories/${id}/floor`,
   },
   // Đơn vị tính — BE là /units (trước trỏ /unit-of-measures không tồn tại).
   unitOfMeasures: {

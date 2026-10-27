@@ -69,10 +69,15 @@ export default function CategoryTreeDialog({ open, onClose, selectedId, onSelect
     }
   };
 
-  const handleUpdate = async (id: string) => {
+  // BE ghi đè cả danh mục cha và trạng thái: phải gửi lại giá trị đang có, không thì danh mục bị tắt và lên gốc.
+  const handleUpdate = async (node: ICategory) => {
     if (!editName.trim()) return;
     try {
-      await updateCategory(id, { name: editName.trim() });
+      await updateCategory(node.id, {
+        name: editName.trim(),
+        parentCategoryId: node.parentCategoryId || undefined,
+        isActive: node.isActive,
+      });
       enqueueSnackbar('Cập nhật thành công');
       setEditingId(null);
       loadCategories();
@@ -105,7 +110,7 @@ export default function CategoryTreeDialog({ open, onClose, selectedId, onSelect
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleUpdate(node.id);
+                    if (e.key === 'Enter') handleUpdate(node);
                     if (e.key === 'Escape') setEditingId(null);
                   }}
                   onClick={(e) => e.stopPropagation()}
@@ -117,7 +122,7 @@ export default function CategoryTreeDialog({ open, onClose, selectedId, onSelect
                   color="success"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleUpdate(node.id);
+                    handleUpdate(node);
                   }}
                 >
                   <Iconify icon="mdi:check" width={16} />

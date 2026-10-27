@@ -46,6 +46,8 @@ import {
 } from 'src/api/penaltyPolicy';
 import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
+import { MonetaryPenaltyCard } from '../monetary-penalty-card';
+
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
@@ -218,6 +220,8 @@ export default function PenaltyPolicyListView() {
         }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
+
+      <MonetaryPenaltyCard />
 
       <Card>
         {loading ? (

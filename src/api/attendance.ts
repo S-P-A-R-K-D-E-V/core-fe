@@ -30,6 +30,7 @@ import {
   IProcessAttendanceRequestDto,
   IAttendanceReport,
   IBranchLocation,
+  StoreZoneCode,
 } from 'src/types/corecms-api';
 
 // ======================================================================
@@ -205,6 +206,22 @@ export async function manageShiftAssignments(
 
 export async function deleteShiftAssignment(id: string): Promise<void> {
   await axios.delete(endpoints.shiftAssignments.delete(id));
+}
+
+/**
+ * Đặt khu phụ trách + trưởng ca cho một phân ca. Trong cùng ca mỗi khu tối đa một người, tối đa một trưởng ca — trùng
+ * thì backend trả 409 kèm tên người đang giữ.
+ */
+export async function setAssignmentZoneLead(
+  id: string,
+  zones: StoreZoneCode[],
+  isShiftLead: boolean
+): Promise<IShiftAssignment> {
+  const response = await axios.put<IShiftAssignment>(endpoints.shiftAssignments.zoneLead(id), {
+    zones,
+    isShiftLead,
+  });
+  return response.data;
 }
 
 export interface ICheckinInfo {

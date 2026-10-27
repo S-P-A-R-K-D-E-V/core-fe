@@ -23,6 +23,11 @@ export async function updateCategory(id: string, data: IUpdateCategoryRequest): 
   await axios.put(endpoints.categories.update(id), data);
 }
 
+/** Tầng bày hàng của nhóm (1, 2...; null = theo danh mục cha). Lưu riêng, không qua updateCategory. */
+export async function setCategoryFloor(id: string, floor: number | null): Promise<void> {
+  await axios.put(endpoints.categories.floor(id), { floor });
+}
+
 export async function deleteCategory(id: string): Promise<void> {
   await axios.delete(endpoints.categories.delete(id));
 }
