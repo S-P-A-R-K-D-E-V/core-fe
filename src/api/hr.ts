@@ -25,6 +25,7 @@ import type {
   EmployeeProfileInput,
   EmploymentContractType,
   EmploymentContractStatus,
+  ISupportShiftOpening,
 } from 'src/types/hr';
 
 // ----------------------------------------------------------------------
@@ -419,5 +420,53 @@ export async function terminateContract(id: string, terminatedOn: string, reason
 
 export async function voidContract(id: string, reason: string): Promise<IEmploymentContract> {
   const response = await axios.put<IEmploymentContract>(endpoints.hr.contractVoid(id), { reason });
+  return response.data;
+}
+
+// ── Ca hỗ trợ mở trên chợ ca ───────────────────────────────────────────
+
+export async function getSupportShifts(params?: {
+  from?: string;
+  to?: string;
+  openOnly?: boolean;
+}): Promise<ISupportShiftOpening[]> {
+  const response = await axios.get<ISupportShiftOpening[]>(endpoints.hr.supportShifts, { params });
+  return response.data;
+}
+
+export async function createSupportShift(body: {
+  shiftScheduleId: string;
+  date: string;
+  slots: number;
+  note?: string | null;
+}): Promise<ISupportShiftOpening> {
+  const response = await axios.post<ISupportShiftOpening>(endpoints.hr.supportShifts, body);
+  return response.data;
+}
+
+export async function cancelSupportShift(id: string, note?: string): Promise<ISupportShiftOpening> {
+  const response = await axios.put<ISupportShiftOpening>(endpoints.hr.supportShiftCancel(id), { note: note || null });
+  return response.data;
+}
+
+export async function claimSupportShift(id: string, note?: string): Promise<ISupportShiftOpening> {
+  const response = await axios.post<ISupportShiftOpening>(endpoints.hr.supportShiftClaim(id), { note: note || null });
+  return response.data;
+}
+
+export async function withdrawSupportClaim(claimId: string): Promise<ISupportShiftOpening> {
+  const response = await axios.put<ISupportShiftOpening>(endpoints.hr.supportClaimWithdraw(claimId));
+  return response.data;
+}
+
+export async function reviewSupportClaim(
+  claimId: string,
+  approve: boolean,
+  note?: string
+): Promise<ISupportShiftOpening> {
+  const response = await axios.put<ISupportShiftOpening>(endpoints.hr.supportClaimReview(claimId), {
+    approve,
+    note: note || null,
+  });
   return response.data;
 }

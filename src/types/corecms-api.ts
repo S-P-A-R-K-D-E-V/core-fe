@@ -278,6 +278,10 @@ export interface IShiftTemplate {
   cleaningBlock?: CleaningShiftBlock | null;
   isActive: boolean;
   createdAt: string;
+  /** Ca hỗ trợ (chỉ mẫu ca phụ): đơn giá riêng thay lương giờ của người làm; null = trả như ca thường. */
+  fixedHourlyRate?: number | null;
+  /** Giờ trả tối thiểu khi có đi làm ca này (quy chế: 1,5 giờ). */
+  minimumPaidHours?: number | null;
 }
 
 export interface ICreateShiftTemplateRequest {
@@ -286,6 +290,7 @@ export interface ICreateShiftTemplateRequest {
   shiftType: string;
   color?: string;
   cleaningBlock?: string | null;
+  supportPay?: IShiftTemplateSupportPay | null;
 }
 
 export interface IUpdateShiftTemplateRequest {
@@ -295,6 +300,13 @@ export interface IUpdateShiftTemplateRequest {
   color?: string;
   cleaningBlock?: string | null;
   isActive: boolean;
+  /** Bỏ trống = giữ nguyên đơn giá ca hỗ trợ đang có. */
+  supportPay?: IShiftTemplateSupportPay | null;
+}
+
+export interface IShiftTemplateSupportPay {
+  fixedHourlyRate: number | null;
+  minimumPaidHours: number | null;
 }
 
 // --- Shift Schedule (Versioned + Locked) ---

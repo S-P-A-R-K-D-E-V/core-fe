@@ -483,6 +483,11 @@ export const endpoints = {
     contractSigned: (id: string) => `/employment-contracts/${id}/signed`,
     contractTerminate: (id: string) => `/employment-contracts/${id}/terminate`,
     contractVoid: (id: string) => `/employment-contracts/${id}/void`,
+    supportShifts: '/support-shifts',
+    supportShiftCancel: (id: string) => `/support-shifts/${id}/cancel`,
+    supportShiftClaim: (id: string) => `/support-shifts/${id}/claims`,
+    supportClaimWithdraw: (claimId: string) => `/support-shifts/claims/${claimId}/withdraw`,
+    supportClaimReview: (claimId: string) => `/support-shifts/claims/${claimId}/review`,
   },
   mediaLibrary: {
     cleaningPhotos: '/media-library/cleaning-photos',

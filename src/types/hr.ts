@@ -439,3 +439,51 @@ export interface IEmploymentContract {
   /** Bản Word đã trộn (mẫu có tệp .docx) — link có chữ ký. */
   docxUrl?: string | null;
 }
+
+// ── Ca hỗ trợ mở trên chợ ca ─────────────────────────────────────────────
+
+export type SupportShiftOpeningStatus = 'Open' | 'Filled' | 'Cancelled';
+export type SupportShiftClaimStatus = 'Pending' | 'Approved' | 'Rejected' | 'Withdrawn';
+
+export const SUPPORT_OPENING_STATUS_LABEL: Record<SupportShiftOpeningStatus, string> = {
+  Open: 'Đang cần người',
+  Filled: 'Đã đủ người',
+  Cancelled: 'Đã huỷ',
+};
+
+export const SUPPORT_CLAIM_STATUS_LABEL: Record<SupportShiftClaimStatus, string> = {
+  Pending: 'Chờ duyệt',
+  Approved: 'Đã duyệt',
+  Rejected: 'Từ chối',
+  Withdrawn: 'Đã rút',
+};
+
+export interface ISupportShiftClaim {
+  id: string;
+  staffId: string;
+  staffName: string;
+  status: SupportShiftClaimStatus;
+  note?: string | null;
+  reviewNote?: string | null;
+  reviewedAt?: string | null;
+  shiftAssignmentId?: string | null;
+  createdAt: string;
+}
+
+/** Người không có quyền xếp ca chỉ nhận về đơn của chính mình trong `claims`. */
+export interface ISupportShiftOpening {
+  id: string;
+  shiftScheduleId: string;
+  shiftName: string;
+  startTime: string;
+  endTime: string;
+  date: string;
+  slots: number;
+  approvedCount: number;
+  note?: string | null;
+  status: SupportShiftOpeningStatus;
+  fixedHourlyRate?: number | null;
+  minimumPaidHours?: number | null;
+  createdAt: string;
+  claims: ISupportShiftClaim[];
+}
