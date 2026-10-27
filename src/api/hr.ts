@@ -26,6 +26,8 @@ import type {
   EmploymentContractType,
   EmploymentContractStatus,
   ISupportShiftOpening,
+  IProposedAssignment,
+  IProposedAssignmentWarnings,
 } from 'src/types/hr';
 
 // ----------------------------------------------------------------------
@@ -41,8 +43,17 @@ export async function getHourWarnings(params: {
   date: string;
   shiftScheduleId: string;
   excludeAssignmentId?: string;
+  /** "A,C" — khu người đó sẽ đứng; kèm trưởng ca để có cảnh báo vai trò. */
+  zones?: string;
+  isShiftLead?: boolean;
 }): Promise<IHourWarning[]> {
   const response = await axios.get<IHourWarning[]>(endpoints.hr.hourWarnings, { params });
+  return response.data;
+}
+
+/** Cảnh báo cho cả lô ca dự kiến (xét cả các ca khác trong lô) — chỉ trả ca có cảnh báo. */
+export async function getBatchHourWarnings(items: IProposedAssignment[]): Promise<IProposedAssignmentWarnings[]> {
+  const response = await axios.post<IProposedAssignmentWarnings[]>(endpoints.hr.hourWarningsBatch, { items });
   return response.data;
 }
 

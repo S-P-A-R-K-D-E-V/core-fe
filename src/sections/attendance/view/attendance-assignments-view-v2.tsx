@@ -103,6 +103,8 @@ import { getActiveStaffUsers, setSchedulingPriority } from 'src/api/users';
 import { StyledCalendar } from '../../calendar/styles';
 import CalendarToolbar from '../../calendar/calendar-toolbar';
 import { AssignmentZonesDialog } from '../assignment-zones-dialog';
+import { HourWarningsAlert } from 'src/sections/hr/hr-common';
+import { ProposedWarningsAlert, useBatchHourWarnings } from 'src/sections/hr/hour-warnings-preview';
 import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
 // ----------------------------------------------------------------------
@@ -1712,6 +1714,40 @@ export default function AttendanceAssignmentsView() {
     setDate(arg.view.currentStart);
   }, []);
 
+  // ── Cảnh báo theo Nội quy trước khi lưu (A1): giờ làm, nghỉ giữa ca, vai trò thử việc. Chỉ cảnh báo. ──
+  const staffName = useCallback((id: string) => users.find((u) => u.id === id)?.fullName ?? 'Nhân viên', [users]);
+  const shiftName = useCallback(
+    (id: string) => {
+      const s = schedules.find((x) => x.id === id);
+      return s ? `${s.templateName} ${s.startTime}–${s.endTime}` : 'Ca';
+    },
+    [schedules]
+  );
+  const singleProposal = useMemo(
+    () =>
+      newStaffId && newScheduleId && newDate
+        ? [{ staffId: newStaffId, shiftScheduleId: newScheduleId, date: newDate.split('T')[0] }]
+        : [],
+    [newStaffId, newScheduleId, newDate]
+  );
+  const singleWarnings = useBatchHourWarnings(singleProposal, assignMode === 'single' && createDialog.value);
+  const manageProposal = useMemo(
+    () =>
+      managingEvent
+        ? dndAssigned.map((staffId) => ({ staffId, shiftScheduleId: managingEvent.scheduleId, date: managingEvent.date }))
+        : [],
+    [managingEvent, dndAssigned]
+  );
+  const manageWarnings = useBatchHourWarnings(manageProposal, manageDialog.value);
+  const autoProposal = useMemo(
+    () =>
+      autoAssignSlots.flatMap((slot) =>
+        slot.proposedStaffIds.map((staffId) => ({ staffId, shiftScheduleId: slot.scheduleId, date: slot.date }))
+      ),
+    [autoAssignSlots]
+  );
+  const autoWarnings = useBatchHourWarnings(autoProposal, autoAssignDialog.value);
+
   return (
     <>
       {confirmDialog}
@@ -2094,6 +2130,8 @@ export default function AttendanceAssignmentsView() {
               multiline
               rows={2}
             />
+
+            <HourWarningsAlert warnings={singleWarnings.result[0]?.warnings} />
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -3399,6 +3437,16 @@ export default function AttendanceAssignmentsView() {
           </Typography>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 1.5 }}>
+          {autoWarnings.result.length > 0 && (
+            <Box sx={{ mb: 1.5 }}>
+              <ProposedWarningsAlert
+                result={autoWarnings.result}
+                nameOf={staffName}
+                shiftOf={shiftName}
+                title={`Cảnh báo theo Nội quy cho khung lịch này (${autoWarnings.result.length} ca) — vẫn áp dụng được`}
+              />
+            </Box>
+          )}
           {/* Legend */}
           <Stack direction="row" spacing={2} sx={{ mb: 1.5, flexWrap: 'wrap', rowGap: 0.5 }}>
             <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -4028,6 +4076,11 @@ export default function AttendanceAssignmentsView() {
               </DragDropContext>
             </DialogContent>
 
+            {manageWarnings.result.length > 0 && (
+              <Box sx={{ px: 3, pt: 1 }}>
+                <ProposedWarningsAlert result={manageWarnings.result} nameOf={staffName} />
+              </Box>
+            )}
             <DialogActions sx={{ px: 3, py: 2 }}>
               <Tooltip title="Đặt phân công ca này = đúng tập nhân viên đã check-in (khôi phục khi lỡ ghi đè)">
                 <LoadingButton

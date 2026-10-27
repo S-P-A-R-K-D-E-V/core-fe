@@ -282,6 +282,8 @@ export interface IShiftTemplate {
   fixedHourlyRate?: number | null;
   /** Giờ trả tối thiểu khi có đi làm ca này (quy chế: 1,5 giờ). */
   minimumPaidHours?: number | null;
+  /** Phút nghỉ giữa ca đã bố trí (cảnh báo nghỉ giữa ca khi xếp). */
+  breakMinutes?: number | null;
 }
 
 export interface ICreateShiftTemplateRequest {
@@ -291,6 +293,7 @@ export interface ICreateShiftTemplateRequest {
   color?: string;
   cleaningBlock?: string | null;
   supportPay?: IShiftTemplateSupportPay | null;
+  breakMinutes?: number | null;
 }
 
 export interface IUpdateShiftTemplateRequest {
@@ -302,6 +305,8 @@ export interface IUpdateShiftTemplateRequest {
   isActive: boolean;
   /** Bỏ trống = giữ nguyên đơn giá ca hỗ trợ đang có. */
   supportPay?: IShiftTemplateSupportPay | null;
+  /** Bỏ trống = giữ nguyên; 0 = bỏ phút nghỉ. */
+  breakMinutes?: number | null;
 }
 
 export interface IShiftTemplateSupportPay {

@@ -428,6 +428,7 @@ export const endpoints = {
   // Nhân sự theo Quy chế / Nội quy CiCi.
   hr: {
     hourWarnings: '/shift-assignments/hour-warnings',
+    hourWarningsBatch: '/shift-assignments/hour-warnings/batch',
     leave: '/shift-leave',
     leaveMine: '/shift-leave/mine',
     leavePending: '/shift-leave/pending',

@@ -11,7 +11,18 @@ export type HourWarningCode =
   | 'OverDailyMax'
   | 'NoWeeklyRest'
   | 'MonthOver96'
-  | 'MonthOvertimeOver40';
+  | 'MonthOvertimeOver40'
+  | 'NoBreak'
+  // Vai trò (C10): người thử việc làm trưởng ca, đứng khu C một mình, 2 người thử việc cùng ca.
+  | 'ProbationShiftLead'
+  | 'ProbationAloneInZoneC'
+  | 'TwoProbationOnShift'
+  // Chợ ca: duyệt sau giờ ca, ca liền kề chồng giờ, giờ làm hộ bất thường.
+  | 'RetroactiveApproval'
+  | 'AdjacentOverlap'
+  | 'CoverOutsideShift'
+  | 'CoverTooShort'
+  | 'CoverOverlapping';
 
 export interface IHourWarning {
   code: HourWarningCode | string;
@@ -486,4 +497,24 @@ export interface ISupportShiftOpening {
   minimumPaidHours?: number | null;
   createdAt: string;
   claims: ISupportShiftClaim[];
+}
+
+// ── Cảnh báo cho một lô ca dự kiến ───────────────────────────────────────
+
+/** Một ca dự kiến (chưa lưu): người, ngày yyyy-MM-dd, lịch ca, khu, trưởng ca. */
+export interface IProposedAssignment {
+  staffId: string;
+  date: string;
+  shiftScheduleId: string;
+  zones?: string[];
+  isShiftLead?: boolean;
+}
+
+/** Cảnh báo của ca thứ `index` trong lô (chỉ ca có cảnh báo). */
+export interface IProposedAssignmentWarnings {
+  index: number;
+  staffId: string;
+  date: string;
+  shiftScheduleId: string;
+  warnings: IHourWarning[];
 }
