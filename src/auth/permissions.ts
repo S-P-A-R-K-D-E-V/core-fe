@@ -109,6 +109,8 @@ export const PERMISSIONS = {
     recordManage: 'hr.record.manage',
     performanceRead: 'hr.performance.read',
     performanceManage: 'hr.performance.manage',
+    /** Hồ sơ nhân sự (dữ liệu cá nhân) + mẫu và hợp đồng lao động — chỉ Admin. */
+    contractManage: 'hr.contract.manage',
   },
   /** Hàng hoá — xem hàng, nhóm hàng, thương hiệu, đơn vị không cần quyền (màn bán hàng). Thêm / sửa cần kèm xem giá vốn. */
   products: {

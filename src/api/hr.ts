@@ -17,6 +17,14 @@ import type {
   IPerformanceMonth,
   IPerformanceScore,
   IPolicyAcknowledgementStatus,
+  IContractField,
+  IContractTerms,
+  IEmployeeProfile,
+  IContractTemplate,
+  IEmploymentContract,
+  EmployeeProfileInput,
+  EmploymentContractType,
+  EmploymentContractStatus,
 } from 'src/types/hr';
 
 // ----------------------------------------------------------------------
@@ -275,4 +283,109 @@ export async function requestPerformanceReview(id: string, note: string): Promis
 export async function respondPerformanceReview(id: string, response: string): Promise<IPerformanceScore> {
   const res = await axios.put<IPerformanceScore>(endpoints.hr.reviewResponse(id), { response });
   return res.data;
+}
+
+// ── Hợp đồng lao động + hồ sơ nhân sự (chỉ Admin; nhân viên chỉ xem của mình) ─
+
+export async function getContractFields(): Promise<IContractField[]> {
+  const response = await axios.get<IContractField[]>(endpoints.hr.contractFields);
+  return response.data;
+}
+
+export async function getContractTemplates(): Promise<IContractTemplate[]> {
+  const response = await axios.get<IContractTemplate[]>(endpoints.hr.contractTemplates);
+  return response.data;
+}
+
+/** Bản nháp mẫu mới: copyFromId = phiên bản mới của mẫu đó; null = mẫu dựng sẵn. */
+export async function createContractTemplate(copyFromId: string | null): Promise<IContractTemplate> {
+  const response = await axios.post<IContractTemplate>(endpoints.hr.contractTemplates, { copyFromId });
+  return response.data;
+}
+
+export async function updateContractTemplate(
+  id: string,
+  body: { code: string; name: string; contractType: EmploymentContractType; body: string }
+): Promise<IContractTemplate> {
+  const response = await axios.put<IContractTemplate>(endpoints.hr.contractTemplate(id), body);
+  return response.data;
+}
+
+export async function publishContractTemplate(id: string): Promise<IContractTemplate> {
+  const response = await axios.post<IContractTemplate>(endpoints.hr.contractTemplatePublish(id));
+  return response.data;
+}
+
+export async function deleteContractTemplate(id: string): Promise<void> {
+  await axios.delete(endpoints.hr.contractTemplate(id));
+}
+
+export async function getEmployeeProfiles(): Promise<IEmployeeProfile[]> {
+  const response = await axios.get<IEmployeeProfile[]>(endpoints.hr.employeeProfiles);
+  return response.data;
+}
+
+export async function saveEmployeeProfile(userId: string, body: EmployeeProfileInput): Promise<IEmployeeProfile> {
+  const response = await axios.put<IEmployeeProfile>(endpoints.hr.employeeProfile(userId), body);
+  return response.data;
+}
+
+export async function getContracts(params: { staffId?: string; status?: EmploymentContractStatus }): Promise<IEmploymentContract[]> {
+  const response = await axios.get<IEmploymentContract[]>(endpoints.hr.contracts, { params });
+  return response.data;
+}
+
+export async function getMyContracts(): Promise<IEmploymentContract[]> {
+  const response = await axios.get<IEmploymentContract[]>(endpoints.hr.contractsMine);
+  return response.data;
+}
+
+export async function createContract(staffId: string, templateId: string, terms: IContractTerms): Promise<IEmploymentContract> {
+  const response = await axios.post<IEmploymentContract>(endpoints.hr.contracts, { staffId, templateId, terms });
+  return response.data;
+}
+
+/** Sửa bản nháp — gửi lại điều khoản cũ để trộn lại theo hồ sơ / lương mới nhất. */
+export async function updateContractDraft(id: string, terms: IContractTerms): Promise<IEmploymentContract> {
+  const response = await axios.put<IEmploymentContract>(endpoints.hr.contract(id), terms);
+  return response.data;
+}
+
+export async function finalizeContract(id: string): Promise<IEmploymentContract> {
+  const response = await axios.post<IEmploymentContract>(endpoints.hr.contractFinalize(id));
+  return response.data;
+}
+
+/** Tải bản ký (ảnh / PDF) lên kho riêng tư của hợp đồng, trả object key + kiểu để ghi nhận đã ký. */
+export async function uploadContractFiles(id: string, files: File[]): Promise<{ objectKey: string; contentType: string }[]> {
+  if (files.length === 0) return [];
+  const presign = await axios.post<{ objectKey: string; uploadUrl: string }[]>(endpoints.hr.contractPresign(id), {
+    files: files.map((f) => ({ contentType: f.type })),
+  });
+  await Promise.all(
+    presign.data.map(async (p, i) => {
+      const put = await fetch(p.uploadUrl, { method: 'PUT', headers: { 'Content-Type': files[i].type }, body: files[i] });
+      if (!put.ok) throw new Error(`Tải tệp lên thất bại (${put.status})`);
+    })
+  );
+  return presign.data.map((p, i) => ({ objectKey: p.objectKey, contentType: files[i].type }));
+}
+
+export async function markContractSigned(
+  id: string,
+  signedOn: string,
+  files: { objectKey: string; contentType: string }[]
+): Promise<IEmploymentContract> {
+  const response = await axios.put<IEmploymentContract>(endpoints.hr.contractSigned(id), { signedOn, files });
+  return response.data;
+}
+
+export async function terminateContract(id: string, terminatedOn: string, reason: string): Promise<IEmploymentContract> {
+  const response = await axios.put<IEmploymentContract>(endpoints.hr.contractTerminate(id), { terminatedOn, reason });
+  return response.data;
+}
+
+export async function voidContract(id: string, reason: string): Promise<IEmploymentContract> {
+  const response = await axios.put<IEmploymentContract>(endpoints.hr.contractVoid(id), { reason });
+  return response.data;
 }

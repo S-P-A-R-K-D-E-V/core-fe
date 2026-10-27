@@ -325,3 +325,108 @@ export interface IExcludedShift {
   createdBy: string;
   createdAt: string;
 }
+
+// ── Hợp đồng lao động + hồ sơ nhân sự (chỉ Admin quản lý; nhân viên chỉ xem của mình) ─────
+
+export type EmploymentContractType = 'Probation' | 'FixedTermUnder12Months' | 'FixedTerm12To36Months' | 'Indefinite' | 'Appendix';
+export type EmploymentContractStatus = 'Draft' | 'AwaitingSignature' | 'Signed' | 'Terminated' | 'Voided';
+export type Gender = 'Male' | 'Female' | 'Other';
+
+export const CONTRACT_TYPE_LABEL: Record<EmploymentContractType, string> = {
+  Probation: 'Thử việc (tối đa 60 ngày)',
+  FixedTermUnder12Months: 'Xác định thời hạn dưới 12 tháng',
+  FixedTerm12To36Months: 'Xác định thời hạn 12–36 tháng',
+  Indefinite: 'Không xác định thời hạn',
+  Appendix: 'Phụ lục hợp đồng',
+};
+
+export const CONTRACT_STATUS_LABEL: Record<EmploymentContractStatus, string> = {
+  Draft: 'Nháp',
+  AwaitingSignature: 'Chờ ký giấy',
+  Signed: 'Đã ký',
+  Terminated: 'Đã chấm dứt',
+  Voided: 'Đã huỷ',
+};
+
+export const GENDER_LABEL: Record<Gender, string> = { Male: 'Nam', Female: 'Nữ', Other: 'Khác' };
+
+export interface IContractField {
+  key: string;
+  label: string;
+  required: boolean;
+}
+
+export interface IContractTemplate {
+  id: string;
+  code: string;
+  name: string;
+  version: number;
+  contractType: EmploymentContractType;
+  body: string;
+  isActive: boolean;
+  publishedAt?: string | null;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
+export interface IEmployeeProfile {
+  userId: string;
+  fullName: string;
+  phoneNumber?: string | null;
+  hasIdCardImages: boolean;
+  dateOfBirth?: string | null;
+  gender?: Gender | null;
+  idNumber?: string | null;
+  idIssuedOn?: string | null;
+  idIssuedPlace?: string | null;
+  permanentAddress?: string | null;
+  jobTitle?: string | null;
+  joinedOn?: string | null;
+  missingFields: string[];
+}
+
+export type EmployeeProfileInput = Omit<IEmployeeProfile, 'userId' | 'fullName' | 'phoneNumber' | 'hasIdCardImages' | 'missingFields'>;
+
+export interface IContractTerms {
+  contractType: EmploymentContractType;
+  parentContractId?: string | null;
+  startDate: string;
+  endDate?: string | null;
+  jobTitle?: string | null;
+  workplace?: string | null;
+  isPartTime: boolean;
+  minHoursPerMonth?: number | null;
+  maxHoursPerMonth?: number | null;
+}
+
+export interface IEmploymentContract {
+  id: string;
+  staffId: string;
+  staffName: string;
+  templateId: string;
+  templateVersion: number;
+  parentContractId?: string | null;
+  contractNumber?: string | null;
+  contractType: EmploymentContractType;
+  startDate: string;
+  endDate?: string | null;
+  jobTitle: string;
+  workplace?: string | null;
+  isPartTime: boolean;
+  minHoursPerMonth?: number | null;
+  maxHoursPerMonth?: number | null;
+  salaryType?: string | null;
+  salaryAmount?: number | null;
+  probationRate?: number | null;
+  renderedBody: string;
+  missingFields: string[];
+  status: EmploymentContractStatus;
+  finalizedAt?: string | null;
+  signedOn?: string | null;
+  signedUploadedAt?: string | null;
+  terminatedOn?: string | null;
+  terminationReason?: string | null;
+  voidReason?: string | null;
+  createdAt: string;
+  files: { id: string; url: string; contentType: string; uploadedAt: string }[];
+}

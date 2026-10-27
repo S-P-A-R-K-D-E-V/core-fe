@@ -444,6 +444,7 @@ export function useNavData(
               { title: t('hrTasks'), path: paths.dashboard.hr.tasks },
               { title: t('hrRecords'), path: paths.dashboard.hr.records },
               { title: t('hrPerformance'), path: paths.dashboard.hr.performance },
+              { title: t('hrContracts'), path: paths.dashboard.hr.contracts },
             ],
           },
 
