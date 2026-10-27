@@ -914,6 +914,13 @@ export default function PayrollBatchView() {
     setCoverTimesOut('');
   };
 
+  // Lưu được nhưng giờ làm hộ bất thường (ngoài khung ca, dưới 1 giờ, chồng người làm hộ khác) → báo vàng kèm lý do.
+  const notifySaved = (done: string, post: IShiftPoolPost) => {
+    const notes = (post.hourWarnings ?? []).flatMap((p) => p.warnings.map((w) => w.message));
+    if (notes.length === 0) enqueueSnackbar(done, { variant: 'success' });
+    else enqueueSnackbar(`${done} — lưu ý: ${notes.join(' ')}`, { variant: 'warning', autoHideDuration: 10000 });
+  };
+
   const handleSubmitRetroCover = async () => {
     if (!editingShift || !retroClaimerId) return;
     // Giờ ca hộ: nhập thì phải đủ cả 2 mốc và ra > vào (BE cũng validate, chặn sớm cho UX)
@@ -929,7 +936,7 @@ export default function PayrollBatchView() {
     }
     try {
       setRetroSubmitting(true);
-      await adminCreateApprovedCover({
+      const created = await adminCreateApprovedCover({
         shiftAssignmentId: editingShift.shiftAssignmentId,
         claimerId: retroClaimerId,
         needType: retroNeedType,
@@ -940,7 +947,7 @@ export default function PayrollBatchView() {
         coverCheckOutTime:
           retroNeedType === 'PartialCover' && retroCoverOut ? datetimeLocalToUtcIso(retroCoverOut) : undefined,
       });
-      enqueueSnackbar('Đã tạo làm hộ retroactive', { variant: 'success' });
+      notifySaved('Đã tạo làm hộ retroactive', created);
       setRetroOpen(false);
       setRetroClaimerId('');
       setRetroNote('');
@@ -985,11 +992,11 @@ export default function PayrollBatchView() {
     }
     try {
       setCoverTimesSubmitting(true);
-      await adminSetCoverTimes(coverTimesEditId, {
+      const saved = await adminSetCoverTimes(coverTimesEditId, {
         checkInTime: datetimeLocalToUtcIso(coverTimesIn),
         checkOutTime: datetimeLocalToUtcIso(coverTimesOut),
       });
-      enqueueSnackbar('Đã cập nhật giờ chấm công ca hộ', { variant: 'success' });
+      notifySaved('Đã cập nhật giờ chấm công ca hộ', saved);
       setCoverTimesEditId(null);
       setCoverTimesIn('');
       setCoverTimesOut('');

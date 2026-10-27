@@ -11,7 +11,18 @@ export type HourWarningCode =
   | 'OverDailyMax'
   | 'NoWeeklyRest'
   | 'MonthOver96'
-  | 'MonthOvertimeOver40';
+  | 'MonthOvertimeOver40'
+  | 'NoBreak'
+  // Vai trò (C10): người thử việc làm trưởng ca, đứng khu C một mình, 2 người thử việc cùng ca.
+  | 'ProbationShiftLead'
+  | 'ProbationAloneInZoneC'
+  | 'TwoProbationOnShift'
+  // Chợ ca: duyệt sau giờ ca, ca liền kề chồng giờ, giờ làm hộ bất thường.
+  | 'RetroactiveApproval'
+  | 'AdjacentOverlap'
+  | 'CoverOutsideShift'
+  | 'CoverTooShort'
+  | 'CoverOverlapping';
 
 export interface IHourWarning {
   code: HourWarningCode | string;
@@ -69,6 +80,11 @@ export interface IPolicyDocument {
   version: number;
   url?: string | null;
   summary?: string | null;
+  /** Tệp văn bản (PDF / ảnh) ở kho riêng tư — fileUrl là link có chữ ký. */
+  fileKey?: string | null;
+  fileName?: string | null;
+  fileContentType?: string | null;
+  fileUrl?: string | null;
   isActive: boolean;
   publishedAt: string;
   acknowledgedAt?: string | null;
@@ -367,6 +383,8 @@ export interface IContractTemplate {
   publishedAt?: string | null;
   createdAt: string;
   updatedAt?: string | null;
+  /** Tên tệp mẫu Word (.docx) đã gắn — khi chốt sinh bản Word giữ định dạng gốc. */
+  docxFileName?: string | null;
 }
 
 export interface IEmployeeProfile {
@@ -429,4 +447,97 @@ export interface IEmploymentContract {
   voidReason?: string | null;
   createdAt: string;
   files: { id: string; url: string; contentType: string; uploadedAt: string }[];
+  /** Bản Word đã trộn (mẫu có tệp .docx) — link có chữ ký. */
+  docxUrl?: string | null;
+}
+
+// ── Ca hỗ trợ mở trên chợ ca ─────────────────────────────────────────────
+
+export type SupportShiftOpeningStatus = 'Open' | 'Filled' | 'Cancelled';
+export type SupportShiftClaimStatus = 'Pending' | 'Approved' | 'Rejected' | 'Withdrawn';
+
+export const SUPPORT_OPENING_STATUS_LABEL: Record<SupportShiftOpeningStatus, string> = {
+  Open: 'Đang cần người',
+  Filled: 'Đã đủ người',
+  Cancelled: 'Đã huỷ',
+};
+
+export const SUPPORT_CLAIM_STATUS_LABEL: Record<SupportShiftClaimStatus, string> = {
+  Pending: 'Chờ duyệt',
+  Approved: 'Đã duyệt',
+  Rejected: 'Từ chối',
+  Withdrawn: 'Đã rút',
+};
+
+export interface ISupportShiftClaim {
+  id: string;
+  staffId: string;
+  staffName: string;
+  status: SupportShiftClaimStatus;
+  note?: string | null;
+  reviewNote?: string | null;
+  reviewedAt?: string | null;
+  shiftAssignmentId?: string | null;
+  createdAt: string;
+}
+
+/** Người không có quyền xếp ca chỉ nhận về đơn của chính mình trong `claims`. */
+export interface ISupportShiftOpening {
+  id: string;
+  shiftScheduleId: string;
+  shiftName: string;
+  startTime: string;
+  endTime: string;
+  date: string;
+  slots: number;
+  approvedCount: number;
+  note?: string | null;
+  status: SupportShiftOpeningStatus;
+  fixedHourlyRate?: number | null;
+  minimumPaidHours?: number | null;
+  createdAt: string;
+  claims: ISupportShiftClaim[];
+}
+
+// ── Cảnh báo cho một lô ca dự kiến ───────────────────────────────────────
+
+/** Một ca dự kiến (chưa lưu): người, ngày yyyy-MM-dd, lịch ca, khu, trưởng ca. */
+export interface IProposedAssignment {
+  staffId: string;
+  date: string;
+  shiftScheduleId: string;
+  zones?: string[];
+  isShiftLead?: boolean;
+}
+
+/** Cảnh báo của ca thứ `index` trong lô (chỉ ca có cảnh báo). */
+export interface IProposedAssignmentWarnings {
+  index: number;
+  staffId: string;
+  date: string;
+  shiftScheduleId: string;
+  warnings: IHourWarning[];
+}
+
+// ── Bồi thường thiệt hại (Quy chế Điều 25) ───────────────────────────────
+
+export type HrCompensationStatus = 'Active' | 'Cancelled';
+
+/** Không phải phạt: trừ dần vào kỳ lương cuối tháng, mỗi tháng tối đa 30% lương thực trả. */
+export interface ICompensation {
+  id: string;
+  staffId: string;
+  staffName: string;
+  hrRecordId: string;
+  recordType: HrRecordType;
+  recordDate: string;
+  damageAmount?: number | null;
+  amount: number;
+  deducted: number;
+  remaining: number;
+  note?: string | null;
+  status: HrCompensationStatus;
+  approvedAt: string;
+  cancelledAt?: string | null;
+  cancelReason?: string | null;
 }

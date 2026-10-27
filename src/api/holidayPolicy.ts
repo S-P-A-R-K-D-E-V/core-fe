@@ -4,6 +4,7 @@ import type {
   ICreateHolidayPolicyRequest,
   IHolidayPolicy,
   IStatutoryPaySettings,
+  IWeeklyBonusPaySettings,
   IUpdateHolidayPolicyRequest,
 } from 'src/types/corecms-api';
 
@@ -54,5 +55,16 @@ export async function updateStatutoryPaySettings(
     statutoryPayFrom,
     normalHoursPerDay,
   });
+  return response.data;
+}
+
+/** Trả thưởng doanh số tuần vào lương kỳ cuối tháng: tuần bắt đầu (null = chỉ tính thử). */
+export async function getWeeklyBonusPaySettings(): Promise<IWeeklyBonusPaySettings> {
+  const response = await axios.get<IWeeklyBonusPaySettings>(endpoints.holidayPolicy.weeklyBonusPay);
+  return response.data;
+}
+
+export async function updateWeeklyBonusPaySettings(weeklyBonusPayFrom: string | null): Promise<IWeeklyBonusPaySettings> {
+  const response = await axios.put<IWeeklyBonusPaySettings>(endpoints.holidayPolicy.weeklyBonusPay, { weeklyBonusPayFrom });
   return response.data;
 }

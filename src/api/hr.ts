@@ -25,6 +25,10 @@ import type {
   EmployeeProfileInput,
   EmploymentContractType,
   EmploymentContractStatus,
+  ISupportShiftOpening,
+  IProposedAssignment,
+  IProposedAssignmentWarnings,
+  ICompensation,
 } from 'src/types/hr';
 
 // ----------------------------------------------------------------------
@@ -40,8 +44,17 @@ export async function getHourWarnings(params: {
   date: string;
   shiftScheduleId: string;
   excludeAssignmentId?: string;
+  /** "A,C" — khu người đó sẽ đứng; kèm trưởng ca để có cảnh báo vai trò. */
+  zones?: string;
+  isShiftLead?: boolean;
 }): Promise<IHourWarning[]> {
   const response = await axios.get<IHourWarning[]>(endpoints.hr.hourWarnings, { params });
+  return response.data;
+}
+
+/** Cảnh báo cho cả lô ca dự kiến (xét cả các ca khác trong lô) — chỉ trả ca có cảnh báo. */
+export async function getBatchHourWarnings(items: IProposedAssignment[]): Promise<IProposedAssignmentWarnings[]> {
+  const response = await axios.post<IProposedAssignmentWarnings[]>(endpoints.hr.hourWarningsBatch, { items });
   return response.data;
 }
 
@@ -95,9 +108,22 @@ export async function publishPolicyDocument(body: {
   title: string;
   url?: string | null;
   summary?: string | null;
+  fileKey?: string | null;
+  fileName?: string | null;
 }): Promise<IPolicyDocument> {
   const response = await axios.post<IPolicyDocument>(endpoints.hr.policies, body);
   return response.data;
+}
+
+/** Tải tệp văn bản (PDF / ảnh) lên kho riêng tư, trả object key để gửi kèm khi đăng. */
+export async function uploadPolicyFile(file: File): Promise<string> {
+  const presign = await axios.post<{ objectKey: string; uploadUrl: string }>(endpoints.hr.policyFilePresign, {
+    contentType: file.type,
+    fileName: file.name,
+  });
+  const put = await fetch(presign.data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+  if (!put.ok) throw new Error(`Tải tệp lên thất bại (${put.status})`);
+  return presign.data.objectKey;
 }
 
 export async function deactivatePolicyDocument(id: string): Promise<IPolicyDocument> {
@@ -316,6 +342,25 @@ export async function publishContractTemplate(id: string): Promise<IContractTemp
   return response.data;
 }
 
+const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+/** Gắn mẫu Word (.docx) cho bản nháp mẫu: xin URL, PUT thẳng kho riêng tư, rồi báo máy chủ (kiểm trường trộn). */
+export async function uploadContractTemplateDocx(templateId: string, file: File): Promise<IContractTemplate> {
+  const presign = await axios.post<{ objectKey: string; uploadUrl: string }>(endpoints.hr.contractTemplateDocxPresign(templateId));
+  const put = await fetch(presign.data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': DOCX_TYPE }, body: file });
+  if (!put.ok) throw new Error(`Tải tệp lên thất bại (${put.status})`);
+  const response = await axios.put<IContractTemplate>(endpoints.hr.contractTemplateDocx(templateId), {
+    objectKey: presign.data.objectKey,
+    fileName: file.name,
+  });
+  return response.data;
+}
+
+export async function removeContractTemplateDocx(templateId: string): Promise<IContractTemplate> {
+  const response = await axios.put<IContractTemplate>(endpoints.hr.contractTemplateDocx(templateId), { objectKey: null });
+  return response.data;
+}
+
 export async function deleteContractTemplate(id: string): Promise<void> {
   await axios.delete(endpoints.hr.contractTemplate(id));
 }
@@ -346,6 +391,17 @@ export async function createContract(staffId: string, templateId: string, terms:
 }
 
 /** Sửa bản nháp — gửi lại điều khoản cũ để trộn lại theo hồ sơ / lương mới nhất. */
+/** Đăng hợp đồng / phụ lục giấy đã ký từ trước (không soạn từ mẫu); sau đó tải bản ký như thường. */
+export async function importPaperContract(
+  staffId: string,
+  terms: IContractTerms,
+  contractNumber: string | null,
+  note: string | null
+): Promise<IEmploymentContract> {
+  const response = await axios.post<IEmploymentContract>(endpoints.hr.contractImport, { staffId, terms, contractNumber, note });
+  return response.data;
+}
+
 export async function updateContractDraft(id: string, terms: IContractTerms): Promise<IEmploymentContract> {
   const response = await axios.put<IEmploymentContract>(endpoints.hr.contract(id), terms);
   return response.data;
@@ -387,5 +443,75 @@ export async function terminateContract(id: string, terminatedOn: string, reason
 
 export async function voidContract(id: string, reason: string): Promise<IEmploymentContract> {
   const response = await axios.put<IEmploymentContract>(endpoints.hr.contractVoid(id), { reason });
+  return response.data;
+}
+
+// ── Ca hỗ trợ mở trên chợ ca ───────────────────────────────────────────
+
+export async function getSupportShifts(params?: {
+  from?: string;
+  to?: string;
+  openOnly?: boolean;
+}): Promise<ISupportShiftOpening[]> {
+  const response = await axios.get<ISupportShiftOpening[]>(endpoints.hr.supportShifts, { params });
+  return response.data;
+}
+
+export async function createSupportShift(body: {
+  shiftScheduleId: string;
+  date: string;
+  slots: number;
+  note?: string | null;
+}): Promise<ISupportShiftOpening> {
+  const response = await axios.post<ISupportShiftOpening>(endpoints.hr.supportShifts, body);
+  return response.data;
+}
+
+export async function cancelSupportShift(id: string, note?: string): Promise<ISupportShiftOpening> {
+  const response = await axios.put<ISupportShiftOpening>(endpoints.hr.supportShiftCancel(id), { note: note || null });
+  return response.data;
+}
+
+export async function claimSupportShift(id: string, note?: string): Promise<ISupportShiftOpening> {
+  const response = await axios.post<ISupportShiftOpening>(endpoints.hr.supportShiftClaim(id), { note: note || null });
+  return response.data;
+}
+
+export async function withdrawSupportClaim(claimId: string): Promise<ISupportShiftOpening> {
+  const response = await axios.put<ISupportShiftOpening>(endpoints.hr.supportClaimWithdraw(claimId));
+  return response.data;
+}
+
+export async function reviewSupportClaim(
+  claimId: string,
+  approve: boolean,
+  note?: string
+): Promise<ISupportShiftOpening> {
+  const response = await axios.put<ISupportShiftOpening>(endpoints.hr.supportClaimReview(claimId), {
+    approve,
+    note: note || null,
+  });
+  return response.data;
+}
+
+// ── Bồi thường thiệt hại ───────────────────────────────────────────────
+
+export async function getCompensations(staffId?: string): Promise<ICompensation[]> {
+  const response = await axios.get<ICompensation[]>(endpoints.hr.compensations, { params: { staffId } });
+  return response.data;
+}
+
+export async function getMyCompensations(): Promise<ICompensation[]> {
+  const response = await axios.get<ICompensation[]>(endpoints.hr.compensationsMine);
+  return response.data;
+}
+
+export async function createCompensation(body: { hrRecordId: string; amount: number; note?: string | null }): Promise<ICompensation> {
+  const response = await axios.post<ICompensation>(endpoints.hr.compensations, body);
+  return response.data;
+}
+
+export async function cancelCompensation(id: string, reason: string): Promise<ICompensation> {
+  const response = await axios.put<ICompensation>(endpoints.hr.compensationCancel(id), { reason });
   return response.data;
 }

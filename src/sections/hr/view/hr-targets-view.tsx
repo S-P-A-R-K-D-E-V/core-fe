@@ -380,8 +380,9 @@ function BonusTable({ weeks }: { weeks: IWeeklyBonus[] }) {
   return (
     <Stack spacing={2} sx={{ p: 2 }}>
       <Alert severity="info">
-        Tính thử theo Quy chế Điều 5: quỹ = 3% phần doanh thu 100–110% target + 5% phần trên 110%, chia theo giờ làm thực tế.
-        Chưa vào bảng lương.
+        Theo Quy chế Điều 5: quỹ = 3% phần doanh thu 100–110% target + 5% phần trên 110%, chia theo giờ làm thực tế. Doanh
+        thu tính thưởng bỏ đơn online và dòng hàng giảm từ 30%. Chỉ vào bảng lương (kỳ cuối tháng) khi đã đặt ngày ở trang
+        Chính sách ngày lễ › Thưởng doanh số tuần vào lương.
       </Alert>
       {weeks.map((w) => (
         <Card key={w.weekStart} variant="outlined">

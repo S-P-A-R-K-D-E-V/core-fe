@@ -51,7 +51,7 @@ vi.mock('src/api/hr', () => ({
 }));
 
 // Imported after the mocks above.
-import HrContractsView, { buildPrintHtml } from 'src/sections/hr/view/hr-contracts-view';
+import HrContractsView, { buildPrintHtml, contractBodyHtml } from 'src/sections/hr/view/hr-contracts-view';
 
 const wrap = (node: React.ReactNode) => render(<ThemeProvider theme={createTheme()}>{node}</ThemeProvider>);
 
@@ -121,5 +121,22 @@ describe('HrContractsView', () => {
     await waitFor(() =>
       expect(api.saveEmployeeProfile).toHaveBeenCalledWith('lan', expect.objectContaining({ idNumber: '001304012345', gender: null }))
     );
+  });
+});
+
+describe('contractBodyHtml', () => {
+  it('formats a contract: centred heading, bold articles, signature block, escaped text', () => {
+    const html = contractBodyHtml(
+      'CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập – Tự do – Hạnh phúc\n\nCăn cứ <luật>;\nĐiều 1. Công việc\n   a) Khu A\n[[NGAT_TRANG]]\n[[CHU_KY]]',
+      'Trần Lan'
+    );
+    expect(html).toContain('<p class="center strong">CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>');
+    expect(html).toContain('<p class="center">Độc lập – Tự do – Hạnh phúc</p>');
+    expect(html).toContain('<p>Căn cứ &lt;luật&gt;;</p>');
+    expect(html).toContain('<p class="strong head">Điều 1. Công việc</p>');
+    expect(html).toContain('padding-left');
+    expect(html).toContain('class="page-break"');
+    expect(html).toContain('NGƯỜI SỬ DỤNG LAO ĐỘNG');
+    expect(html).toContain('<strong>Trần Lan</strong>');
   });
 });

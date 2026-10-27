@@ -34,6 +34,7 @@ import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
 import {
   getPolicyDocuments,
+  uploadPolicyFile,
   publishPolicyDocument,
   deactivatePolicyDocument,
   acknowledgePolicyDocument,
@@ -51,9 +52,18 @@ import type { IPolicyDocument, IPolicyAcknowledgementStatus } from 'src/types/hr
 // cùng mã: bản cũ hết hiệu lực, mọi người xác nhận lại. Đăng văn bản cần hr.policy.manage (Admin).
 // ----------------------------------------------------------------------
 
-type Draft = { code: string; title: string; url: string; summary: string };
+type Draft = {
+  code: string;
+  title: string;
+  url: string;
+  summary: string;
+  /** Tệp mới chọn (tải lên lúc đăng) hoặc tệp của bản cũ (fileKey). */
+  file: File | null;
+  fileKey: string | null;
+  fileName: string | null;
+};
 
-const emptyDraft: Draft = { code: '', title: '', url: '', summary: '' };
+const emptyDraft: Draft = { code: '', title: '', url: '', summary: '', file: null, fileKey: null, fileName: null };
 
 export default function HrPoliciesView() {
   const settings = useSettingsContext();
@@ -104,11 +114,14 @@ export default function HrPoliciesView() {
     if (!draft) return;
     setSaving(true);
     try {
+      const fileKey = draft.file ? await uploadPolicyFile(draft.file) : draft.fileKey;
       await publishPolicyDocument({
         code: draft.code.trim(),
         title: draft.title.trim(),
         url: draft.url.trim() || null,
         summary: draft.summary.trim() || null,
+        fileKey,
+        fileName: draft.file?.name ?? draft.fileName,
       });
       enqueueSnackbar('Đã đăng — mọi người được báo để đọc và xác nhận');
       setDraft(null);
@@ -142,8 +155,17 @@ export default function HrPoliciesView() {
     }
   };
 
+  // Bản mới dùng lại tệp của bản cũ cho tới khi chọn tệp khác.
   const newVersionOf = (doc: IPolicyDocument) =>
-    setDraft({ code: doc.code, title: doc.title, url: doc.url ?? '', summary: doc.summary ?? '' });
+    setDraft({
+      code: doc.code,
+      title: doc.title,
+      url: doc.url ?? '',
+      summary: doc.summary ?? '',
+      file: null,
+      fileKey: doc.fileKey ?? null,
+      fileName: doc.fileName ?? null,
+    });
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'lg'}>
@@ -183,11 +205,18 @@ export default function HrPoliciesView() {
                         {doc.summary}
                       </Typography>
                     )}
-                    {doc.url && (
-                      <Link href={doc.url} target="_blank" rel="noopener" sx={{ display: 'inline-block', mt: 1 }}>
-                        Mở văn bản đầy đủ
-                      </Link>
-                    )}
+                    <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                      {doc.fileUrl && (
+                        <Link href={doc.fileUrl} target="_blank" rel="noopener">
+                          Mở tệp văn bản{doc.fileName ? ` (${doc.fileName})` : ''}
+                        </Link>
+                      )}
+                      {doc.url && (
+                        <Link href={doc.url} target="_blank" rel="noopener">
+                          Mở văn bản đầy đủ
+                        </Link>
+                      )}
+                    </Stack>
                   </Box>
                   <Stack spacing={1} alignItems={{ xs: 'flex-start', sm: 'flex-end' }} sx={{ flexShrink: 0 }}>
                     {doc.acknowledgedAt ? (
@@ -278,8 +307,30 @@ export default function HrPoliciesView() {
                 helperText="Chữ thường không dấu, số, gạch ngang — vd noi-quy, quy-che-luong, phu-luc-a."
               />
               <TextField label="Tên văn bản" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Button variant="outlined" component="label">
+                  {draft.file || draft.fileKey ? 'Đổi tệp văn bản' : 'Tải tệp văn bản (PDF / ảnh)'}
+                  <input
+                    hidden
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/png,image/webp"
+                    onChange={(e) => setDraft({ ...draft, file: e.target.files?.[0] ?? null })}
+                  />
+                </Button>
+                <Typography variant="body2" color="text.secondary" noWrap>
+                  {draft.file?.name ?? (draft.fileKey ? `${draft.fileName ?? 'Tệp'} (của bản trước)` : 'Chưa có tệp')}
+                </Typography>
+                {(draft.file || draft.fileKey) && (
+                  <Button size="small" color="inherit" onClick={() => setDraft({ ...draft, file: null, fileKey: null, fileName: null })}>
+                    Bỏ tệp
+                  </Button>
+                )}
+              </Stack>
+              <Typography variant="caption" color="text.secondary">
+                Văn bản Word: lưu thành PDF rồi tải lên (tối đa 20 MB). Tệp nằm ở kho riêng tư, chỉ người trong cửa hàng mở được.
+              </Typography>
               <TextField
-                label="Link văn bản đầy đủ (https://…)"
+                label="Link văn bản đầy đủ (https://…) — không bắt buộc nếu đã có tệp"
                 value={draft.url}
                 onChange={(e) => setDraft({ ...draft, url: e.target.value })}
               />
@@ -300,7 +351,11 @@ export default function HrPoliciesView() {
           <LoadingButton
             variant="contained"
             loading={saving}
-            disabled={!draft?.code.trim() || !draft?.title.trim() || (!draft?.url.trim() && !draft?.summary.trim())}
+            disabled={
+              !draft?.code.trim() ||
+              !draft?.title.trim() ||
+              (!draft?.url.trim() && !draft?.summary.trim() && !draft?.file && !draft?.fileKey)
+            }
             onClick={publish}
           >
             Đăng

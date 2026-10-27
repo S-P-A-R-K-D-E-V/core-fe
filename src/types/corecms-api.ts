@@ -278,6 +278,12 @@ export interface IShiftTemplate {
   cleaningBlock?: CleaningShiftBlock | null;
   isActive: boolean;
   createdAt: string;
+  /** Ca hỗ trợ (chỉ mẫu ca phụ): đơn giá riêng thay lương giờ của người làm; null = trả như ca thường. */
+  fixedHourlyRate?: number | null;
+  /** Giờ trả tối thiểu khi có đi làm ca này (quy chế: 1,5 giờ). */
+  minimumPaidHours?: number | null;
+  /** Phút nghỉ giữa ca đã bố trí (cảnh báo nghỉ giữa ca khi xếp). */
+  breakMinutes?: number | null;
 }
 
 export interface ICreateShiftTemplateRequest {
@@ -286,6 +292,8 @@ export interface ICreateShiftTemplateRequest {
   shiftType: string;
   color?: string;
   cleaningBlock?: string | null;
+  supportPay?: IShiftTemplateSupportPay | null;
+  breakMinutes?: number | null;
 }
 
 export interface IUpdateShiftTemplateRequest {
@@ -295,6 +303,15 @@ export interface IUpdateShiftTemplateRequest {
   color?: string;
   cleaningBlock?: string | null;
   isActive: boolean;
+  /** Bỏ trống = giữ nguyên đơn giá ca hỗ trợ đang có. */
+  supportPay?: IShiftTemplateSupportPay | null;
+  /** Bỏ trống = giữ nguyên; 0 = bỏ phút nghỉ. */
+  breakMinutes?: number | null;
+}
+
+export interface IShiftTemplateSupportPay {
+  fixedHourlyRate: number | null;
+  minimumPaidHours: number | null;
 }
 
 // --- Shift Schedule (Versioned + Locked) ---
@@ -1179,6 +1196,12 @@ export interface IStatutoryPaySettings {
   statutoryPayFrom: string | null;
   /** Giờ làm bình thường mỗi ngày (mặc định 8); vượt mức là làm thêm giờ. */
   normalHoursPerDay: number;
+  updatedAt: string | null;
+}
+
+/** Trả thưởng doanh số tuần vào lương từ tuần (thứ Hai) này; null = chỉ tính thử. */
+export interface IWeeklyBonusPaySettings {
+  weeklyBonusPayFrom: string | null;
   updatedAt: string | null;
 }
 

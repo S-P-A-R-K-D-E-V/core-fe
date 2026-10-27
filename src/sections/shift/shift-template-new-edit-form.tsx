@@ -38,6 +38,19 @@ export default function ShiftTemplateNewEditForm({ currentTemplate }: Props) {
     color: Yup.string().nullable(),
     cleaningBlock: Yup.string().nullable(),
     isActive: Yup.boolean(),
+    // Ca hỗ trợ (chỉ ca phụ): bỏ trống = trả theo lương giờ của người làm như ca thường.
+    breakMinutes: Yup.string()
+      .nullable()
+      .test('break', 'Từ 0 đến 120 phút', (v) => !v || (Number(v) >= 0 && Number(v) <= 120)),
+    fixedHourlyRate: Yup.string()
+      .nullable()
+      .test('rate', 'Đơn giá phải lớn hơn 0', (v) => !v || Number(v) > 0),
+    minimumPaidHours: Yup.string()
+      .nullable()
+      .test('min', 'Từ trên 0 đến 8 giờ', (v) => !v || (Number(v) > 0 && Number(v) <= 8))
+      .test('needs-rate', 'Cần nhập đơn giá trước', function needsRate(v) {
+        return !v || !!this.parent.fixedHourlyRate;
+      }),
   });
 
   const defaultValues = useMemo(
@@ -48,6 +61,9 @@ export default function ShiftTemplateNewEditForm({ currentTemplate }: Props) {
       color: currentTemplate?.color || '#1976d2',
       cleaningBlock: currentTemplate?.cleaningBlock || '',
       isActive: currentTemplate?.isActive ?? true,
+      breakMinutes: currentTemplate?.breakMinutes != null ? String(currentTemplate.breakMinutes) : '',
+      fixedHourlyRate: currentTemplate?.fixedHourlyRate != null ? String(currentTemplate.fixedHourlyRate) : '',
+      minimumPaidHours: currentTemplate?.minimumPaidHours != null ? String(currentTemplate.minimumPaidHours) : '',
     }),
     [currentTemplate]
   );
@@ -58,12 +74,16 @@ export default function ShiftTemplateNewEditForm({ currentTemplate }: Props) {
   });
 
   const {
+    watch,
     handleSubmit,
     formState: { isSubmitting },
   } = methods;
 
+  const isExtra = watch('shiftType') === 'Extra';
+
   const onSubmit = handleSubmit(async (data) => {
     try {
+      const extra = data.shiftType === 'Extra';
       const payload = {
         name: data.name,
         description: data.description || undefined,
@@ -71,6 +91,12 @@ export default function ShiftTemplateNewEditForm({ currentTemplate }: Props) {
         color: data.color || undefined,
         cleaningBlock: data.cleaningBlock || null,
         isActive: data.isActive ?? true,
+        // Bỏ trống = 0 (không có giờ nghỉ bố trí sẵn).
+        breakMinutes: data.breakMinutes ? Number(data.breakMinutes) : 0,
+        supportPay: {
+          fixedHourlyRate: extra && data.fixedHourlyRate ? Number(data.fixedHourlyRate) : null,
+          minimumPaidHours: extra && data.fixedHourlyRate && data.minimumPaidHours ? Number(data.minimumPaidHours) : null,
+        },
       };
 
       if (currentTemplate) {
@@ -118,6 +144,34 @@ export default function ShiftTemplateNewEditForm({ currentTemplate }: Props) {
                 <MenuItem value="Afternoon">Chiều</MenuItem>
                 <MenuItem value="Evening">Tối</MenuItem>
               </RHFSelect>
+
+              <RHFTextField
+                name="breakMinutes"
+                label="Phút nghỉ giữa ca"
+                type="number"
+                placeholder="30"
+                helperText="Nội quy Điều 5: làm từ 6 giờ cần 30 phút nghỉ. Đặt ở đây thì hết cảnh báo khi xếp ca."
+              />
+
+              {isExtra && (
+                <>
+                  <RHFTextField
+                    name="fixedHourlyRate"
+                    label="Đơn giá ca hỗ trợ (đ/giờ)"
+                    type="number"
+                    placeholder="38500"
+                    helperText="Bỏ trống = trả theo lương giờ của người làm. Có đơn giá = ca hỗ trợ (đăng lên chợ ca được)."
+                  />
+                  <RHFTextField
+                    name="minimumPaidHours"
+                    label="Giờ trả tối thiểu"
+                    type="number"
+                    placeholder="1.5"
+                    inputProps={{ step: 0.5 }}
+                    helperText="Có đi làm thì trả ít nhất số giờ này (quy chế: 1,5 giờ)."
+                  />
+                </>
+              )}
             </Box>
 
             <Stack spacing={2} sx={{ mt: 3 }}>

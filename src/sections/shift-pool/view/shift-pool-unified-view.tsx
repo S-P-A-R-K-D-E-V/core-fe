@@ -54,6 +54,7 @@ import {
 import { HourWarningsAlert } from 'src/sections/hr/hr-common';
 
 import PoolCalendar from './pool-calendar';
+import { SupportShiftsCard } from './support-shifts-card';
 import LegendDot from './pool-legend';
 import {
   fmtDate,
@@ -485,6 +486,9 @@ export default function ShiftPoolUnifiedView() {
         }
         sx={{ mb: 3 }}
       />
+
+      {/* Ca hỗ trợ mở (quản lý đăng, ai cũng nhận được) */}
+      <SupportShiftsCard />
 
       {/* Tab bar + Filter bar */}
       <Card sx={{ mb: 2.5 }}>

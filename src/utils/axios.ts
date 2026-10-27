@@ -379,6 +379,7 @@ export const endpoints = {
     update: (id: string) => `/holiday-policies/${id}`,
     delete: (id: string) => `/holiday-policies/${id}`,
     statutoryPay: '/holiday-policies/statutory-pay',
+    weeklyBonusPay: '/holiday-policies/weekly-bonus-pay',
   },
   penaltyPolicy: {
     list: '/penalty-policies',
@@ -428,6 +429,7 @@ export const endpoints = {
   // Nhân sự theo Quy chế / Nội quy CiCi.
   hr: {
     hourWarnings: '/shift-assignments/hour-warnings',
+    hourWarningsBatch: '/shift-assignments/hour-warnings/batch',
     leave: '/shift-leave',
     leaveMine: '/shift-leave/mine',
     leavePending: '/shift-leave/pending',
@@ -439,6 +441,7 @@ export const endpoints = {
     policyDeactivate: (id: string) => `/policy-documents/${id}/deactivate`,
     policyAcknowledge: (id: string) => `/policy-documents/${id}/acknowledge`,
     policyAcknowledgements: (id: string) => `/policy-documents/${id}/acknowledgements`,
+    policyFilePresign: '/policy-documents/files/presign',
     targets: '/sales-targets',
     targetsGenerate: '/sales-targets/generate',
     targetsPublish: '/sales-targets/publish',
@@ -470,6 +473,8 @@ export const endpoints = {
     contractTemplates: '/employment-contracts/templates',
     contractTemplate: (id: string) => `/employment-contracts/templates/${id}`,
     contractTemplatePublish: (id: string) => `/employment-contracts/templates/${id}/publish`,
+    contractTemplateDocxPresign: (id: string) => `/employment-contracts/templates/${id}/docx/presign`,
+    contractTemplateDocx: (id: string) => `/employment-contracts/templates/${id}/docx`,
     employeeProfiles: '/employment-contracts/profiles',
     employeeProfile: (userId: string) => `/employment-contracts/profiles/${userId}`,
     contracts: '/employment-contracts',
@@ -480,6 +485,15 @@ export const endpoints = {
     contractSigned: (id: string) => `/employment-contracts/${id}/signed`,
     contractTerminate: (id: string) => `/employment-contracts/${id}/terminate`,
     contractVoid: (id: string) => `/employment-contracts/${id}/void`,
+    contractImport: '/employment-contracts/import',
+    compensations: '/hr-compensations',
+    compensationsMine: '/hr-compensations/mine',
+    compensationCancel: (id: string) => `/hr-compensations/${id}/cancel`,
+    supportShifts: '/support-shifts',
+    supportShiftCancel: (id: string) => `/support-shifts/${id}/cancel`,
+    supportShiftClaim: (id: string) => `/support-shifts/${id}/claims`,
+    supportClaimWithdraw: (claimId: string) => `/support-shifts/claims/${claimId}/withdraw`,
+    supportClaimReview: (claimId: string) => `/support-shifts/claims/${claimId}/review`,
   },
   mediaLibrary: {
     cleaningPhotos: '/media-library/cleaning-photos',

@@ -43,6 +43,7 @@ import {
 } from 'src/api/holidayPolicy';
 
 import { StatutoryPayCard } from '../statutory-pay-card';
+import { WeeklyBonusPayCard } from '../weekly-bonus-pay-card';
 
 
 // ----------------------------------------------------------------------
@@ -217,6 +218,7 @@ export default function HolidayPolicyListView() {
       />
 
       <StatutoryPayCard />
+      <WeeklyBonusPayCard />
 
       <Card>
         {loading ? (
