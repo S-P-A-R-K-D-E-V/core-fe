@@ -329,6 +329,25 @@ export async function publishContractTemplate(id: string): Promise<IContractTemp
   return response.data;
 }
 
+const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+/** Gắn mẫu Word (.docx) cho bản nháp mẫu: xin URL, PUT thẳng kho riêng tư, rồi báo máy chủ (kiểm trường trộn). */
+export async function uploadContractTemplateDocx(templateId: string, file: File): Promise<IContractTemplate> {
+  const presign = await axios.post<{ objectKey: string; uploadUrl: string }>(endpoints.hr.contractTemplateDocxPresign(templateId));
+  const put = await fetch(presign.data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': DOCX_TYPE }, body: file });
+  if (!put.ok) throw new Error(`Tải tệp lên thất bại (${put.status})`);
+  const response = await axios.put<IContractTemplate>(endpoints.hr.contractTemplateDocx(templateId), {
+    objectKey: presign.data.objectKey,
+    fileName: file.name,
+  });
+  return response.data;
+}
+
+export async function removeContractTemplateDocx(templateId: string): Promise<IContractTemplate> {
+  const response = await axios.put<IContractTemplate>(endpoints.hr.contractTemplateDocx(templateId), { objectKey: null });
+  return response.data;
+}
+
 export async function deleteContractTemplate(id: string): Promise<void> {
   await axios.delete(endpoints.hr.contractTemplate(id));
 }

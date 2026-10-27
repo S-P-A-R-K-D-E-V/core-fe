@@ -372,6 +372,8 @@ export interface IContractTemplate {
   publishedAt?: string | null;
   createdAt: string;
   updatedAt?: string | null;
+  /** Tên tệp mẫu Word (.docx) đã gắn — khi chốt sinh bản Word giữ định dạng gốc. */
+  docxFileName?: string | null;
 }
 
 export interface IEmployeeProfile {
@@ -434,4 +436,6 @@ export interface IEmploymentContract {
   voidReason?: string | null;
   createdAt: string;
   files: { id: string; url: string; contentType: string; uploadedAt: string }[];
+  /** Bản Word đã trộn (mẫu có tệp .docx) — link có chữ ký. */
+  docxUrl?: string | null;
 }

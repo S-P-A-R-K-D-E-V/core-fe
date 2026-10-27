@@ -471,6 +471,8 @@ export const endpoints = {
     contractTemplates: '/employment-contracts/templates',
     contractTemplate: (id: string) => `/employment-contracts/templates/${id}`,
     contractTemplatePublish: (id: string) => `/employment-contracts/templates/${id}/publish`,
+    contractTemplateDocxPresign: (id: string) => `/employment-contracts/templates/${id}/docx/presign`,
+    contractTemplateDocx: (id: string) => `/employment-contracts/templates/${id}/docx`,
     employeeProfiles: '/employment-contracts/profiles',
     employeeProfile: (userId: string) => `/employment-contracts/profiles/${userId}`,
     contracts: '/employment-contracts',
