@@ -92,7 +92,8 @@ export default function CategoryNewEditForm({ currentCategory }: Props) {
       };
       const floor = data.floor ? Number(data.floor) : null;
       if (currentCategory) {
-        await updateCategory(currentCategory.id, payload);
+        // BE bắt buộc isActive: thiếu là danh mục bị tắt, nên gửi lại trạng thái đang có.
+        await updateCategory(currentCategory.id, { ...payload, isActive: currentCategory.isActive });
         if (floor !== (currentCategory.floor ?? null)) await setCategoryFloor(currentCategory.id, floor);
         enqueueSnackbar('Cập nhật thành công!');
       } else {
