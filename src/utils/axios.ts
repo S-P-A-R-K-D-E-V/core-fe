@@ -439,6 +439,7 @@ export const endpoints = {
     policyDeactivate: (id: string) => `/policy-documents/${id}/deactivate`,
     policyAcknowledge: (id: string) => `/policy-documents/${id}/acknowledge`,
     policyAcknowledgements: (id: string) => `/policy-documents/${id}/acknowledgements`,
+    policyFilePresign: '/policy-documents/files/presign',
     targets: '/sales-targets',
     targetsGenerate: '/sales-targets/generate',
     targetsPublish: '/sales-targets/publish',

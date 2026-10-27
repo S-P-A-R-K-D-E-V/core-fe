@@ -95,9 +95,22 @@ export async function publishPolicyDocument(body: {
   title: string;
   url?: string | null;
   summary?: string | null;
+  fileKey?: string | null;
+  fileName?: string | null;
 }): Promise<IPolicyDocument> {
   const response = await axios.post<IPolicyDocument>(endpoints.hr.policies, body);
   return response.data;
+}
+
+/** Tải tệp văn bản (PDF / ảnh) lên kho riêng tư, trả object key để gửi kèm khi đăng. */
+export async function uploadPolicyFile(file: File): Promise<string> {
+  const presign = await axios.post<{ objectKey: string; uploadUrl: string }>(endpoints.hr.policyFilePresign, {
+    contentType: file.type,
+    fileName: file.name,
+  });
+  const put = await fetch(presign.data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+  if (!put.ok) throw new Error(`Tải tệp lên thất bại (${put.status})`);
+  return presign.data.objectKey;
 }
 
 export async function deactivatePolicyDocument(id: string): Promise<IPolicyDocument> {

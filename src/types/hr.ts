@@ -69,6 +69,11 @@ export interface IPolicyDocument {
   version: number;
   url?: string | null;
   summary?: string | null;
+  /** Tệp văn bản (PDF / ảnh) ở kho riêng tư — fileUrl là link có chữ ký. */
+  fileKey?: string | null;
+  fileName?: string | null;
+  fileContentType?: string | null;
+  fileUrl?: string | null;
   isActive: boolean;
   publishedAt: string;
   acknowledgedAt?: string | null;
