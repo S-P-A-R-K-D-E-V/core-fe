@@ -326,6 +326,9 @@ export const endpoints = {
     manualPenalties: (payrollRecordId: string) => `/payroll/${payrollRecordId}/manual-penalties`,
     createManualPenalty: '/payroll/manual-penalties',
     voidManualPenalty: (id: string) => `/payroll/manual-penalties/${id}`,
+    manualBonuses: (payrollRecordId: string) => `/payroll/${payrollRecordId}/manual-bonuses`,
+    createManualBonus: '/payroll/manual-bonuses',
+    voidManualBonus: (id: string) => `/payroll/manual-bonuses/${id}`,
     unscheduledAttendance: (payrollRecordId: string) => `/payroll/${payrollRecordId}/unscheduled-attendance`,
     salaryConfigPreview: '/payroll/salary-config-preview',
     bulkFinalize: '/payroll/bulk-finalize',
@@ -445,6 +448,9 @@ export const endpoints = {
     targets: '/sales-targets',
     targetsGenerate: '/sales-targets/generate',
     targetsPublish: '/sales-targets/publish',
+    targetsUnpublish: '/sales-targets/unpublish',
+    ruleSettings: '/hr-rule-settings',
+    ruleSettingsActive: '/hr-rule-settings/active',
     target: (weekStart: string) => `/sales-targets/${weekStart}`,
     weeklyBonus: '/sales-targets/weekly-bonus',
     tasks: '/work-tasks',
@@ -670,7 +676,7 @@ export const endpoints = {
     withdraw: (id: string) => `/payroll-complaints/${id}/withdraw`,
     reply: (id: string) => `/payroll-complaints/${id}/reply`,
   },
-  // Chương trình thưởng theo đơn (Quy chế Điều 4, 14a.4)
+  // Chương trình thưởng theo đơn
   bonusPrograms: {
     list: '/bonus-programs',
     detail: (id: string) => `/bonus-programs/${id}`,

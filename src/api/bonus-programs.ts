@@ -49,3 +49,8 @@ export async function getMyBonusPrograms(month?: string): Promise<IMyBonusProgra
   const response = await axios.get<IMyBonusProgram[]>(endpoints.bonusPrograms.mine, { params: { month } });
   return response.data;
 }
+
+/** Xoá hẳn chương trình — phiếu lương đã chốt giữ nguyên; kỳ chưa chốt tính lại thì không còn khoản thưởng này. */
+export async function deleteBonusProgram(id: string): Promise<void> {
+  await axios.delete(endpoints.bonusPrograms.detail(id));
+}

@@ -37,11 +37,14 @@ import { paths } from 'src/routes/paths';
 import { fDate } from 'src/utils/format-time';
 import { apiErrorMessage } from 'src/utils/api-error';
 
+import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
+
 import { getActiveStaffUsers } from 'src/api/users';
 import { getAllCategories } from 'src/api/categories';
 import {
   getBonusOrders,
   saveBonusProgram,
+  deleteBonusProgram,
   getBonusPrograms,
   getBonusProgramMonth,
   setBonusOrderAttribution,
@@ -67,8 +70,7 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import { fVnd, parseAmount } from '../hr/hr-common';
 
 // ----------------------------------------------------------------------
-// Chương trình thưởng theo đơn (Quy chế Điều 4, 14a.4, 29; chủ tịch 2026-10-28) — chỉ Admin. Thưởng doanh số tuần (Điều 5)
-// vẫn cấu hình ở trang Chính sách ngày lễ.
+// Chương trình thưởng theo đơn do Admin cấu hình (chủ tịch 2026-10-28) — chỉ Admin; xoá được (phiếu đã chốt giữ nguyên).
 // ----------------------------------------------------------------------
 
 const SOURCES: BonusSalesSource[] = ['Online', 'Web', 'Pos', 'KiotViet'];
@@ -80,18 +82,18 @@ function describe(p: IBonusProgram): string {
 }
 
 const emptyProgram = (): ISaveBonusProgram => ({
-  name: 'Hoa hồng đơn online',
+  name: '',
   note: null,
   isActive: true,
   sources: ['Online'],
   mode: 'PercentOfRevenue',
-  ratePercent: 3,
+  ratePercent: null,
   fixedAmount: null,
   minOrderTotal: null,
-  excludeDiscountRatio: 0.3,
+  excludeDiscountRatio: null,
   recipient: 'Closer',
   returnDays: 15,
-  startOn: fDate(new Date(Date.now() + 15 * 86_400_000), 'yyyy-MM-dd'),
+  startOn: fDate(new Date(), 'yyyy-MM-dd'),
   endOn: null,
   payFrom: null,
   categoryRates: [],
@@ -111,10 +113,36 @@ function ProgramDialog({
   onSaved: () => void;
 }) {
   const { enqueueSnackbar } = useSnackbar();
+  const [askConfirm, confirmDialog] = useConfirmDialog();
   const [form, setForm] = useState<ISaveBonusProgram>(emptyProgram());
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const locked = program?.locked ?? false;
+
+  const remove = async () => {
+    if (!program) return;
+    const ok = await askConfirm({
+      title: `Xoá chương trình "${program.name}"?`,
+      content: program.locked
+        ? 'Chương trình đã trả vào lương. Phiếu lương đã chốt giữ nguyên; kỳ chưa chốt tính lại sẽ không còn khoản thưởng này.'
+        : 'Kết quả tính thử của chương trình sẽ không còn.',
+      confirmText: 'Xoá',
+      cancelText: 'Huỷ',
+      destructive: true,
+    });
+    if (!ok) return;
+    setSaving(true);
+    try {
+      await deleteBonusProgram(program.id);
+      enqueueSnackbar('Đã xoá chương trình thưởng', { variant: 'success' });
+      onSaved();
+      onClose();
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không xoá được chương trình'), { variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
     getAllCategories()
@@ -125,7 +153,7 @@ function ProgramDialog({
   useEffect(() => {
     if (!open) return;
     if (program) {
-      const { id, locked: _l, noticeWarning: _w, ...rest } = program;
+      const { id, locked: _l, ...rest } = program;
       setForm(rest);
     } else {
       setForm(emptyProgram());
@@ -145,10 +173,8 @@ function ProgramDialog({
   const submit = async () => {
     setSaving(true);
     try {
-      const saved = await saveBonusProgram(program?.id ?? null, { ...form, name: form.name.trim() });
-      enqueueSnackbar(saved.noticeWarning ? `Đã lưu. ${saved.noticeWarning}` : 'Đã lưu chương trình thưởng', {
-        variant: saved.noticeWarning ? 'warning' : 'success',
-      });
+      await saveBonusProgram(program?.id ?? null, { ...form, name: form.name.trim() });
+      enqueueSnackbar('Đã lưu chương trình thưởng', { variant: 'success' });
       onSaved();
       onClose();
     } catch (err) {
@@ -165,7 +191,7 @@ function ProgramDialog({
         <Stack spacing={2} sx={{ pt: 1 }}>
           {locked && (
             <Alert severity="warning">
-              Đã trả vào lương từ {fDate(program?.payFrom, 'dd/MM/yyyy')} — không sửa cách tính được (Quy chế Điều 29, không hồi tố).
+              Đã trả vào lương từ {fDate(program?.payFrom, 'dd/MM/yyyy')} — không sửa cách tính được.
               Muốn đổi mức thưởng: đặt ngày kết thúc ở đây và thêm chương trình mới.
             </Alert>
           )}
@@ -319,13 +345,14 @@ function ProgramDialog({
           />
           <TextField label="Ghi chú" value={form.note ?? ''} onChange={(e) => set('note', e.target.value || null)} multiline minRows={2} />
           <FormControlLabel control={<Switch checked={form.isActive} onChange={(e) => set('isActive', e.target.checked)} />} label="Đang dùng" />
-          <Typography variant="caption" color="text.secondary">
-            Quy chế Điều 29: đổi tỷ lệ / mức thưởng công bố trước ít nhất 15 ngày; Quy chế Điều 27: hoa hồng đơn online áp dụng
-            chính thức từ Quý I/2027 — trước đó để trống ngày trả vào lương để chỉ tính thử.
-          </Typography>
         </Stack>
       </DialogContent>
       <DialogActions>
+        {program && (
+          <Button color="error" onClick={remove} disabled={saving} sx={{ mr: 'auto' }}>
+            Xoá
+          </Button>
+        )}
         <Button onClick={onClose} disabled={saving}>
           Đóng
         </Button>
@@ -333,6 +360,7 @@ function ProgramDialog({
           Lưu
         </LoadingButton>
       </DialogActions>
+      {confirmDialog}
     </Dialog>
   );
 }
@@ -383,11 +411,6 @@ function ProgramsTab({ programs, onChanged }: { programs: IBonusProgram[]; onCha
                 >
                   <TableCell>
                     {p.name}
-                    {p.noticeWarning && (
-                      <Typography variant="caption" color="warning.main" display="block">
-                        {p.noticeWarning}
-                      </Typography>
-                    )}
                   </TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>

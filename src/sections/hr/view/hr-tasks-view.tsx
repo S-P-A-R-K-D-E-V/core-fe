@@ -193,8 +193,7 @@ export default function HrTasksView({ initialTab }: { initialTab?: string }) {
         sx={{ mb: 2 }}
       />
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Nhiệm vụ làm trong giờ ca, nộp kèm ảnh nghiệm thu; quản lý duyệt. Điểm nhiệm vụ (20) tính theo tỷ lệ được duyệt đúng hạn
-        của từng nhóm. Phiếu sáng kiến: ghi rõ mục tiêu, sản phẩm, cơ chế, thời gian, chi phí và doanh thu dự kiến.
+        Nhiệm vụ làm trong giờ ca, nộp kèm ảnh nghiệm thu; quản lý duyệt.
       </Typography>
 
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>

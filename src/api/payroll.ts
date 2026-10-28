@@ -8,6 +8,7 @@ import type {
   IBulkFinalizePayrollResponse,
   ICreateManualPenaltyRequest,
   IFinalizePayrollRequest,
+  IManualBonus,
   IManualPenalty,
   IMarkPayrollPaidRequest,
   IPayrollCalculationRequest,
@@ -127,6 +128,22 @@ export async function createManualPenalty(
 
 export async function voidManualPenalty(id: string): Promise<void> {
   await axios.delete(endpoints.payroll.voidManualPenalty(id));
+}
+
+// Thưởng nhập tay (Admin — payroll.bonus-program.manage), cộng cột Thưởng khi tính / tính lại chu kỳ
+
+export async function getManualBonuses(payrollRecordId: string): Promise<IManualBonus[]> {
+  const response = await axios.get<IManualBonus[]>(endpoints.payroll.manualBonuses(payrollRecordId));
+  return response.data;
+}
+
+export async function createManualBonus(data: ICreateManualPenaltyRequest): Promise<IManualBonus> {
+  const response = await axios.post<IManualBonus>(endpoints.payroll.createManualBonus, data);
+  return response.data;
+}
+
+export async function voidManualBonus(id: string): Promise<void> {
+  await axios.delete(endpoints.payroll.voidManualBonus(id));
 }
 
 // Sai ca (chấm công không khớp lịch phân công nào — không phạt, không tự trả lương)

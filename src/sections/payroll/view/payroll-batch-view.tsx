@@ -96,6 +96,7 @@ import SalaryConfigPreviewDialog from 'src/components/salary-config-preview-dial
 import PaymentQRDialog from 'src/components/payment-qr-dialog';
 
 import { usePayrollAccess } from '../payroll-access';
+import { ManualBonusSection } from '../manual-bonus-section';
 import PenaltyDetailDialog from 'src/components/penalty-detail-dialog';
 import AllowanceDetailDialog from 'src/components/allowance-detail-dialog';
 import ShiftCrossCheckBadge from 'src/components/shift-cross-check-badge';
@@ -1818,6 +1819,7 @@ export default function PayrollBatchView() {
               ))}
             </Stack>
           )}
+          <ManualBonusSection record={selectedPayrollRecord} />
           {unscheduledAttendance.length > 0 && (
             <Stack spacing={0.5} sx={{ mt: 1, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
               <Typography variant="caption" fontWeight={700} color="text.secondary">

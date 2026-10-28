@@ -41,6 +41,7 @@ import {
   withdrawPayrollComplaint,
   getPayrollComplaintWindow,
 } from 'src/api/payroll-complaints';
+import { useActiveHrRules } from 'src/api/hr-rules';
 import {
   type IPayrollComplaint,
   type PayrollComplaintStatus,
@@ -55,8 +56,8 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import { fVnd } from '../hr/hr-common';
 
 // ----------------------------------------------------------------------
-// Khiếu nại phiếu lương (Quy chế Điều 12.3): nhân viên gửi trong 3 ngày làm việc kể từ ngày nhận phiếu (không tính Chủ nhật);
-// quản lý (payroll.complaint.review) trả lời "Có sai sót" / "Phiếu đúng" trong 3 ngày làm việc. Khiếu nại không tự đổi tiền —
+// Khiếu nại phiếu lương: nhân viên gửi trong hạn cửa hàng đặt (Cấu hình luật) kể từ ngày nhận phiếu (không tính Chủ nhật);
+// quản lý (payroll.complaint.review) trả lời "Có sai sót" / "Phiếu đúng" trong cùng hạn. Khiếu nại không tự đổi tiền —
 // có sai sót thì tính lại bảng lương như thường.
 // ----------------------------------------------------------------------
 
@@ -74,7 +75,7 @@ function StatusChip({ c }: { c: IPayrollComplaint }) {
 
 const period = (c: { fromDate: string; toDate: string }) => `${fDate(c.fromDate, 'dd/MM')}–${fDate(c.toDate, 'dd/MM/yyyy')}`;
 
-/** Nút "Khiếu nại" trên một phiếu lương của chính mình — chỉ hiện khi còn hạn (3 ngày làm việc). */
+/** Nút "Khiếu nại" trên một phiếu lương của chính mình — chỉ hiện khi còn hạn (cửa hàng tắt khiếu nại thì không hiện). */
 export function PayrollComplaintButton({ payrollRecordId, onFiled }: { payrollRecordId: string | null; onFiled?: () => void }) {
   const { enqueueSnackbar } = useSnackbar();
   const [win, setWin] = useState<IPayrollComplaintWindow | null>(null);
@@ -103,7 +104,7 @@ export function PayrollComplaintButton({ payrollRecordId, onFiled }: { payrollRe
     setSaving(true);
     try {
       await filePayrollComplaint(payrollRecordId, content.trim());
-      enqueueSnackbar('Đã gửi khiếu nại — quản lý trả lời trong 3 ngày làm việc');
+      enqueueSnackbar('Đã gửi khiếu nại — quản lý sẽ trả lời');
       setOpen(false);
       setContent('');
       await load();
@@ -135,7 +136,7 @@ export function PayrollComplaintButton({ payrollRecordId, onFiled }: { payrollRe
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
             <Alert severity="info">
-              Ghi rõ khoản nào sai (ca nào, ngày nào, số giờ / số tiền đúng theo bạn). Quản lý trả lời trong 3 ngày làm việc; có
+              Ghi rõ khoản nào sai (ca nào, ngày nào, số giờ / số tiền đúng theo bạn). Quản lý sẽ trả lời; có
               sai sót thì bảng lương được tính lại.
             </Alert>
             <TextField
@@ -197,7 +198,7 @@ export function MyPayrollComplaintsCard({ refreshKey = 0 }: { refreshKey?: numbe
 
   return (
     <Card sx={{ mt: 3 }}>
-      <CardHeader title="Khiếu nại phiếu lương của tôi" subheader="Quản lý trả lời trong 3 ngày làm việc." />
+      <CardHeader title="Khiếu nại phiếu lương của tôi" />
       <TableContainer>
         <Table size="small">
           <TableHead>
@@ -320,6 +321,7 @@ function ReplyDialog({
 /** Trang quản lý: khiếu nại chờ trả lời / tất cả. */
 export function PayrollComplaintsView() {
   const settings = useSettingsContext();
+  const days = useActiveHrRules()?.complaintWorkingDays ?? null;
   const { enqueueSnackbar } = useSnackbar();
   const [tab, setTab] = useState<'pending' | 'all'>('pending');
   const [list, setList] = useState<IPayrollComplaint[]>([]);
@@ -345,8 +347,10 @@ export function PayrollComplaintsView() {
         sx={{ mb: { xs: 3, md: 5 } }}
       />
       <Alert severity="info" sx={{ mb: 2 }}>
-        Quy chế Điều 12: nhân viên khiếu nại trong 3 ngày làm việc kể từ ngày nhận phiếu, Cửa hàng trả lời trong 3 ngày làm việc
-        (không tính Chủ nhật). Có sai sót thì tính lại bảng lương của người đó rồi trả lời.
+        {days
+          ? `Nhân viên khiếu nại trong ${days} ngày làm việc kể từ ngày nhận phiếu, trả lời trong ${days} ngày làm việc (không tính Chủ nhật). `
+          : 'Cửa hàng chưa bật khiếu nại phiếu lương (Nhân sự → Cấu hình luật). '}
+        Có sai sót thì tính lại bảng lương của người đó rồi trả lời.
       </Alert>
       <Card>
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 2 }}>

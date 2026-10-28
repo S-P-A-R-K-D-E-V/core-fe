@@ -22,7 +22,7 @@ import { getStatutoryPaySettings, updateStatutoryPaySettings } from 'src/api/hol
 import { useSnackbar } from 'src/components/snackbar';
 
 // ----------------------------------------------------------------------
-// Trả lương theo Bộ luật Lao động 2019 Điều 98 (PUT /holiday-policies/statutory-pay): kỳ lương bắt đầu từ ngày đã chọn cộng
+// Trả lương theo luật (PUT /holiday-policies/statutory-pay): kỳ lương bắt đầu từ ngày đã chọn cộng
 // phụ cấp ca đêm 22:00–06:00 (+30%), làm thêm giờ ngày thường (150%), làm thêm giờ ban đêm (+20%) và bù cho đủ 300% giờ
 // làm ngày lễ, Tết theo luật. Kỳ trước ngày đó giữ nguyên; bỏ ngày là tính như cũ.
 
@@ -111,18 +111,15 @@ export function StatutoryPayCard() {
 
   return (
     <Card sx={{ mb: 3 }}>
-      <CardHeader title="Trả lương theo Bộ luật Lao động" />
+      <CardHeader title="Trả lương theo luật" />
       <CardContent>
         <Stack spacing={2}>
           {from ? (
             <Alert severity="success">
-              Cửa hàng trả lương theo Điều 98 từ {fDate(from)}, giờ làm bình thường {hours} giờ/ngày.
+              Cửa hàng trả lương theo luật từ {fDate(from)}, giờ làm bình thường {hours} giờ/ngày.
             </Alert>
           ) : (
-            <Alert severity="warning">
-              Bộ luật Lao động 2019 (Điều 98) quy định mức trả tối thiểu cho ca đêm, làm thêm giờ và ngày lễ. Chọn ngày
-              bắt đầu áp dụng.
-            </Alert>
+            <Alert severity="info">Chưa áp dụng. Chọn ngày bắt đầu áp dụng.</Alert>
           )}
 
           <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 2.5 }}>

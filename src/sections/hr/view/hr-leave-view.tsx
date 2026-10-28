@@ -52,10 +52,12 @@ import type { IShiftAssignment } from 'src/types/corecms-api';
 import type { IShiftLeave, ShiftLeaveStatus } from 'src/types/hr';
 import { SHIFT_LEAVE_STATUS_LABEL } from 'src/types/hr';
 
+import { useActiveHrRules } from 'src/api/hr-rules';
+
 import { monthEnd, MonthField, monthStart } from '../hr-common';
 
 // ----------------------------------------------------------------------
-// Xin nghỉ ca đã xếp (Nội quy Điều 7): báo trước ít nhất 24 giờ, trừ ốm đau / việc gia đình khẩn cấp có lý do; phải được
+// Xin nghỉ ca đã xếp: báo trước theo cấu hình cửa hàng (Cấu hình luật; trống = không yêu cầu), trừ khẩn cấp có lý do; phải được
 // duyệt. Duyệt = ca được gỡ khỏi lịch, không tính vắng. Quyền duyệt shift.leave.review (tạm thời chỉ Admin).
 // ----------------------------------------------------------------------
 
@@ -68,7 +70,6 @@ const STATUS_COLOR: Record<ShiftLeaveStatus, 'warning' | 'success' | 'error' | '
   Cancelled: 'default',
 };
 
-const NOTICE_HOURS = 24;
 
 function toIsoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -82,6 +83,7 @@ export function hoursUntil(date: string, startTime: string, now: Date = new Date
 
 export default function HrLeaveView({ initialTab }: { initialTab?: string }) {
   const settings = useSettingsContext();
+  const noticeHours = useActiveHrRules()?.leaveMinNoticeHours ?? null;
   const { enqueueSnackbar } = useSnackbar();
   const { user } = useAuthContext();
 
@@ -158,8 +160,10 @@ export default function HrLeaveView({ initialTab }: { initialTab?: string }) {
         sx={{ mb: 2 }}
       />
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Xin nghỉ một ca đã xếp phải báo trước ít nhất 24 giờ (Nội quy Điều 7). Ốm đau hoặc việc gia đình khẩn cấp thì đánh dấu
-        &quot;Khẩn cấp&quot; và ghi rõ lý do. Đơn được duyệt thì ca được gỡ khỏi lịch, không tính vắng.
+        {noticeHours
+          ? `Xin nghỉ một ca đã xếp phải báo trước ít nhất ${noticeHours} giờ. Ốm đau hoặc việc gia đình khẩn cấp thì đánh dấu "Khẩn cấp" và ghi rõ lý do. `
+          : ''}
+        Đơn được duyệt thì ca được gỡ khỏi lịch, không tính vắng.
       </Typography>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
@@ -316,6 +320,7 @@ export default function HrLeaveView({ initialTab }: { initialTab?: string }) {
 // ----------------------------------------------------------------------
 
 function CreateLeaveDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
+  const noticeHours = useActiveHrRules()?.leaveMinNoticeHours ?? null;
   const { enqueueSnackbar } = useSnackbar();
   const [shifts, setShifts] = useState<IShiftAssignment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -346,7 +351,7 @@ function CreateLeaveDialog({ open, onClose, onCreated }: { open: boolean; onClos
   }, [open]);
 
   const selected = useMemo(() => shifts.find((s) => (s.assignmentId || s.id) === assignmentId), [shifts, assignmentId]);
-  const lateNotice = !!selected && hoursUntil(selected.date, selected.startTime) < NOTICE_HOURS;
+  const lateNotice = !!selected && noticeHours != null && hoursUntil(selected.date, selected.startTime) < noticeHours;
 
   const save = async () => {
     setSaving(true);
@@ -381,7 +386,7 @@ function CreateLeaveDialog({ open, onClose, onCreated }: { open: boolean; onClos
           )}
           {lateNotice && (
             <Alert severity="warning">
-              Còn dưới 24 giờ tới giờ ca. Chỉ xin được khi ốm đau hoặc việc gia đình khẩn cấp — đánh dấu &quot;Khẩn cấp&quot; và
+              Còn dưới {noticeHours} giờ tới giờ ca. Chỉ xin được khi ốm đau hoặc việc gia đình khẩn cấp — đánh dấu &quot;Khẩn cấp&quot; và
               ghi rõ lý do.
             </Alert>
           )}

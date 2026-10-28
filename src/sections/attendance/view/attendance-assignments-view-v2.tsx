@@ -3446,7 +3446,7 @@ export default function AttendanceAssignmentsView() {
                 result={autoWarnings.result}
                 nameOf={staffName}
                 shiftOf={shiftName}
-                title={`Cảnh báo theo Nội quy cho khung lịch này (${autoWarnings.result.length} ca) — vẫn áp dụng được`}
+                title={`Cảnh báo giờ làm cho khung lịch này (${autoWarnings.result.length} ca) — vẫn áp dụng được`}
               />
             </Box>
           )}

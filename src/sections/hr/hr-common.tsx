@@ -98,7 +98,7 @@ export function HourWarningsAlert({
         ))}
         {!dense && (
           <Typography variant="caption" color="text.secondary">
-            Chỉ cảnh báo theo Nội quy — bạn vẫn duyệt / xếp được nếu đã trao đổi với nhân viên.
+            Chỉ cảnh báo — bạn vẫn duyệt / xếp được nếu đã trao đổi với nhân viên.
           </Typography>
         )}
       </Stack>

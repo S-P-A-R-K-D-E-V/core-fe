@@ -40,12 +40,12 @@ afterEach(() => {
 });
 
 describe('StatutoryPayCard', () => {
-  it('chưa áp dụng: cảnh báo Điều 98, lưu ngày và giờ làm sau khi xác nhận', async () => {
+  it('chưa áp dụng: nhắc chọn ngày, lưu ngày và giờ làm sau khi xác nhận', async () => {
     getStatutoryPaySettings.mockResolvedValue({ statutoryPayFrom: null, normalHoursPerDay: 8, updatedAt: null });
     updateStatutoryPaySettings.mockResolvedValue({ statutoryPayFrom: '2026-11-01', normalHoursPerDay: 8, updatedAt: 'x' });
     renderCard();
 
-    expect(await screen.findByText(/\(Điều 98\)/)).toBeTruthy();
+    expect(await screen.findByText(/Chưa áp dụng/)).toBeTruthy();
     const input = screen.getByLabelText('Áp dụng từ ngày') as HTMLInputElement;
     await userEvent.clear(input);
     await userEvent.type(input, '2026-11-01');
@@ -53,7 +53,7 @@ describe('StatutoryPayCard', () => {
     await confirmInDialog('Áp dụng');
 
     await waitFor(() => expect(updateStatutoryPaySettings).toHaveBeenCalledWith('2026-11-01', 8));
-    expect(await screen.findByText(/theo Điều 98 từ 01\/11\/2026, giờ làm bình thường 8 giờ\/ngày/)).toBeTruthy();
+    expect(await screen.findByText(/theo luật từ 01\/11\/2026, giờ làm bình thường 8 giờ\/ngày/)).toBeTruthy();
   });
 
   it('giờ làm bình thường ngoài 4–10 thì khoá nút Lưu', async () => {
@@ -77,6 +77,6 @@ describe('StatutoryPayCard', () => {
     await confirmInDialog('Bỏ ngày áp dụng');
 
     await waitFor(() => expect(updateStatutoryPaySettings).toHaveBeenCalledWith(null, null));
-    expect(await screen.findByText(/\(Điều 98\)/)).toBeTruthy();
+    expect(await screen.findByText(/Chưa áp dụng/)).toBeTruthy();
   });
 });

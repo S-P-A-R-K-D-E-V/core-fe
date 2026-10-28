@@ -371,7 +371,7 @@ export default function HolidayPolicyListView() {
 
             <TextField
               select
-              label="Ngày nghỉ lễ, Tết theo Bộ luật Lao động"
+              label="Ngày nghỉ lễ, Tết theo luật"
               value={formData.isStatutory ? 'true' : 'false'}
               onChange={(e) => setFormData({ ...formData, isStatutory: e.target.value === 'true' })}
               helperText="Khi trả lương theo luật, giờ làm ngày lễ theo luật được bù cho đủ tối thiểu 300%. Chọn Không cho ngày thưởng riêng của cửa hàng (vd 8/3)."

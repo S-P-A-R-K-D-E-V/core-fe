@@ -431,7 +431,7 @@ export function useNavData(
             ],
           },
 
-          // NHÂN SỰ theo Quy chế / Nội quy (mọi nhân viên: xin nghỉ ca, ký văn bản, nhiệm vụ / biên bản / điểm của mình;
+          // NHÂN SỰ (mọi nhân viên: xin nghỉ ca, ký văn bản, nhiệm vụ / biên bản / điểm của mình;
           // quản lý theo quyền hr.*, shift.leave.review). Mọi cửa hàng có phân ca.
           {
             title: t('hr'),
@@ -447,6 +447,7 @@ export function useNavData(
               { title: t('hrRecords'), path: paths.dashboard.hr.records },
               { title: t('hrPerformance'), path: paths.dashboard.hr.performance },
               { title: t('hrContracts'), path: paths.dashboard.hr.contracts },
+              { title: t('hrRules'), path: paths.dashboard.hr.rules, permissions: [PERMISSIONS.hr.ruleManage] },
             ],
           },
 

@@ -1439,6 +1439,19 @@ export interface ICreateManualPenaltyRequest {
   description: string;
 }
 
+// --- Thưởng nhập tay (Admin nhập cho 1 người / 1 chu kỳ, cộng cột Thưởng) ---
+export interface IManualBonus {
+  id: string;
+  userId: string;
+  payrollCycleId: string;
+  amount: number;
+  description: string;
+  createdByName?: string | null;
+  createdAt: string;
+  voidedAt?: string | null;
+  voidedByName?: string | null;
+}
+
 // --- Unscheduled attendance ("sai ca" — chấm công không khớp lịch phân công nào) ---
 export interface IUnscheduledAttendanceItem {
   logId: string;

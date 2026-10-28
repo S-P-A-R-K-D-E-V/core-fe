@@ -35,6 +35,7 @@ import { apiErrorMessage } from 'src/utils/api-error';
 import { useAuthContext } from 'src/auth/hooks';
 import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 import { getShiftSchedulesByDateRange } from 'src/api/attendance';
+import { useActiveHrRules } from 'src/api/hr-rules';
 import { PERMISSIONS, hasPermission, hasAnyPermission } from 'src/auth/permissions';
 import {
   addExcludedShift,
@@ -78,6 +79,7 @@ const COMPONENTS: { key: keyof IPerformanceScore; label: string; max: string }[]
 
 export default function HrPerformanceView({ initialTab }: { initialTab?: string }) {
   const settings = useSettingsContext();
+  const rules = useActiveHrRules();
   const { enqueueSnackbar } = useSnackbar();
   const { user } = useAuthContext();
 
@@ -173,11 +175,17 @@ export default function HrPerformanceView({ initialTab }: { initialTab?: string 
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
+      {rules && !rules.performanceEnabled && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Cửa hàng chưa bật chấm điểm hiệu suất — bật ở Nhân sự → Cấu hình luật.
+        </Alert>
+      )}
       <CustomBreadcrumbs
         heading="Điểm & xếp loại"
         links={[{ name: 'Nhân sự' }, { name: 'Điểm & xếp loại' }]}
         action={
           canManage &&
+          rules?.performanceEnabled &&
           tab === 'month' && (
             <Stack direction="row" spacing={1}>
               <LoadingButton variant="outlined" loading={busy} disabled={published} onClick={compute}>
@@ -302,7 +310,7 @@ export default function HrPerformanceView({ initialTab }: { initialTab?: string 
           <Card>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 2, pb: 1 }}>
               <Box>
-                <Typography variant="subtitle1">Ca loại khỏi tỷ lệ đạt target (Điều 19)</Typography>
+                <Typography variant="subtitle1">Ca loại khỏi tỷ lệ đạt target</Typography>
                 <Typography variant="caption" color="text.secondary">
                   Mất điện, sự cố phần mềm bán hàng, đóng cửa đột xuất, thời tiết cực đoan có cảnh báo.
                 </Typography>

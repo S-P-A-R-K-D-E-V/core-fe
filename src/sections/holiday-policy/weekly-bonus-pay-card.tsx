@@ -8,7 +8,6 @@ import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import CardHeader from '@mui/material/CardHeader';
-import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
 import LoadingButton from '@mui/lab/LoadingButton';
 
@@ -17,21 +16,18 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
+import { useActiveHrRules } from 'src/api/hr-rules';
 import { getWeeklyBonusPaySettings, updateWeeklyBonusPaySettings } from 'src/api/holidayPolicy';
 
 import { useSnackbar } from 'src/components/snackbar';
 
 // ----------------------------------------------------------------------
-// Thưởng doanh số tuần vào lương (Quy chế Đ5; PUT /holiday-policies/weekly-bonus-pay): từ tuần đã chọn, thưởng của các tuần
-// kết thúc trong tháng được cộng vào kỳ lương cuối tháng. Chưa chọn = chỉ tính thử ở Nhân sự › Target (giai đoạn thử 11–12).
-
-const RULES = [
-  'Quỹ thưởng: 3% phần vượt target tới 110%, 5% phần trên 110%; chia theo giờ làm thực tế trong tuần.',
-  'Doanh thu tính thưởng bỏ đơn online và dòng hàng được giảm từ 30% (hàng xả).',
-  'Tuần thuộc tháng của ngày Chủ nhật; trả ở kỳ lương có ngày cuối tháng (kỳ 2).',
-];
+// Thưởng doanh số tuần vào lương (PUT /holiday-policies/weekly-bonus-pay): từ tuần đã chọn, thưởng của các tuần kết thúc trong
+// tháng được cộng vào kỳ lương cuối tháng. Chưa chọn = chỉ tính thử ở Nhân sự › Target. Bậc thưởng do cửa hàng đặt ở Nhân sự ›
+// Cấu hình luật; cửa hàng không bật thưởng tuần thì không hiện thẻ này.
 
 export function WeeklyBonusPayCard() {
+  const rules = useActiveHrRules();
   const { enqueueSnackbar } = useSnackbar();
   const [confirm, confirmDialog] = useConfirmDialog();
   const [from, setFrom] = useState<string | null>(null);
@@ -89,7 +85,7 @@ export function WeeklyBonusPayCard() {
     }
   };
 
-  if (!loaded) return null;
+  if (!loaded || !rules?.weeklyBonusEnabled) return null;
 
   return (
     <Card sx={{ mb: 3 }}>
@@ -100,18 +96,8 @@ export function WeeklyBonusPayCard() {
           {from ? (
             <Alert severity="success">Thưởng doanh số tuần được trả vào lương từ tuần {fDate(from)}.</Alert>
           ) : (
-            <Alert severity="info">
-              Đang chỉ tính thử (xem ở Nhân sự › Target). Chọn tuần bắt đầu trả khi hết giai đoạn thử.
-            </Alert>
+            <Alert severity="info">Đang chỉ tính thử (xem ở Nhân sự › Target). Chọn tuần bắt đầu trả vào lương.</Alert>
           )}
-
-          <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 2.5 }}>
-            {RULES.map((rule) => (
-              <Typography key={rule} component="li" variant="body2" color="text.secondary">
-                {rule}
-              </Typography>
-            ))}
-          </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
             <TextField
