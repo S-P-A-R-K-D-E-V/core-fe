@@ -51,6 +51,8 @@ import type { IPayrollRecord, IPayrollShiftDetailResponse, IPayrollShiftItem } f
 
 import { getMyPayroll, getPayrollShiftDetails } from 'src/api/payroll';
 
+import { PayrollComplaintButton, MyPayrollComplaintsCard } from '../payroll-complaints';
+
 // ----------------------------------------------------------------------
 
 const TABLE_HEAD = [
@@ -98,6 +100,7 @@ export default function MyPayrollView() {
   const [shiftDetailLoading, setShiftDetailLoading] = useState(false);
   const [shiftDetail, setShiftDetail] = useState<IPayrollShiftDetailResponse | null>(null);
   const [selectedPayroll, setSelectedPayroll] = useState<IPayrollRecord | null>(null);
+  const [complaintsKey, setComplaintsKey] = useState(0);
   const [shiftDetailTab, setShiftDetailTab] = useState<'calendar' | 'table'>('calendar');
   const [calendarWeekOffset, setCalendarWeekOffset] = useState(0);
 
@@ -384,6 +387,8 @@ export default function MyPayrollView() {
         )}
       </Card>
 
+      <MyPayrollComplaintsCard refreshKey={complaintsKey} />
+
       {/* Shift detail dialog (read-only for staff) */}
       <Dialog
         open={openShiftDetail}
@@ -655,6 +660,10 @@ export default function MyPayrollView() {
           ) : null}
         </DialogContent>
         <DialogActions>
+          <PayrollComplaintButton
+            payrollRecordId={selectedPayroll?.id ?? null}
+            onFiled={() => setComplaintsKey((k) => k + 1)}
+          />
           <Button onClick={handleCloseShiftDetail} color="inherit">
             Đóng
           </Button>

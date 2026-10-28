@@ -171,6 +171,8 @@ export const paths = {
       myPayroll: `${ROOTS.DASHBOARD}/payroll/my-payroll`,
       cycles: `${ROOTS.DASHBOARD}/payroll/cycles`,
       batch: `${ROOTS.DASHBOARD}/payroll/batch`,
+      complaints: `${ROOTS.DASHBOARD}/payroll/complaints`,
+      bonusPrograms: `${ROOTS.DASHBOARD}/payroll/bonus-programs`,
     },
     holidayPolicy: {
       root: `${ROOTS.DASHBOARD}/holiday-policy`,
@@ -327,6 +329,7 @@ export const paths = {
         list: `${ROOTS.DASHBOARD}/pos/inventory/list`,
         lowStock: `${ROOTS.DASHBOARD}/pos/inventory/low-stock`,
         transactions: `${ROOTS.DASHBOARD}/pos/inventory/transactions`,
+        shiftChecks: `${ROOTS.DASHBOARD}/pos/inventory/shift-checks`,
       },
       supplier: {
         root: `${ROOTS.DASHBOARD}/pos/supplier`,

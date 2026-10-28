@@ -12,11 +12,11 @@ const BACKEND_API_PREFIXES = [
   'shifts', 'shift-templates', 'shift-schedules', 'shift-assignments', 'shift-swap', 'shift-registrations', 'shift-cash', 'late-cover', 'shift-pool', 'shift-audit', 'shift-reminder-rules',
   'attendance', 'branches', 'checkin',
   'salary', 'salary-configurations', 'salary-history',
-  'payroll', 'payroll-cycles',
+  'payroll', 'payroll-cycles', 'payroll-complaints', 'bonus-programs',
   'holiday-policies', 'penalty-policies',
   'kiotviet', 'notification', 'notifications', 'user-tours',
   'categories', 'unit-of-measures', 'units', 'variant-attributes', 'products',
-  'warehouses', 'inventory', 'suppliers', 'purchase-orders',
+  'warehouses', 'inventory', 'suppliers', 'purchase-orders', 'shift-stock-checks',
   'customers', 'sales-orders', 'bank-accounts', 'payment', 'reports',
   'chatbot', 'messenger', 'expenses', 'shareholders', 'cleaning', 'media-library',
   'admin', 'kiosk', 'kiosk-pairing', 'kiosk-devices', 'face-tracking',
@@ -29,6 +29,8 @@ const BACKEND_API_PREFIXES = [
   'inspections', 'corrective-actions',
   // Nhân sự: xin nghỉ ca, văn bản ký xác nhận, target tuần, nhiệm vụ, biên bản, điểm + xếp loại, hợp đồng lao động.
   'shift-leave', 'policy-documents', 'sales-targets', 'work-tasks', 'hr-records', 'performance', 'employment-contracts',
+  // Bồi thường thiệt hại, ca hỗ trợ trên chợ ca (Phase 2).
+  'hr-compensations', 'support-shifts',
   // Kết nối hãng vận chuyển (Thanh toán → Cài đặt → Bán online & giao hàng) — chuyển tiếp spark-shipping.
   'shipping',
   // API công khai của cửa hàng (thương hiệu, sản phẩm) — app mobile bản cửa hàng dùng để kiểm tra mã cửa hàng.

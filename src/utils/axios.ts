@@ -651,6 +651,34 @@ export const endpoints = {
     transactions: '/inventory/transactions',
     adjust: '/inventory/adjust',
   },
+  // Kiểm hàng khu vực mỗi ca (Quy chế Điều 24.3)
+  shiftStockChecks: {
+    list: '/shift-stock-checks',
+    mine: '/shift-stock-checks/mine',
+    detail: (id: string) => `/shift-stock-checks/${id}`,
+    counts: (id: string) => `/shift-stock-checks/${id}/counts`,
+    submit: (id: string) => `/shift-stock-checks/${id}/submit`,
+    review: (id: string) => `/shift-stock-checks/${id}/review`,
+    areas: '/shift-stock-checks/areas',
+    area: (id: string) => `/shift-stock-checks/areas/${id}`,
+  },
+  // Khiếu nại phiếu lương (Quy chế Điều 12.3)
+  payrollComplaints: {
+    list: '/payroll-complaints',
+    mine: '/payroll-complaints/mine',
+    window: (payrollRecordId: string) => `/payroll-complaints/window/${payrollRecordId}`,
+    withdraw: (id: string) => `/payroll-complaints/${id}/withdraw`,
+    reply: (id: string) => `/payroll-complaints/${id}/reply`,
+  },
+  // Chương trình thưởng theo đơn (Quy chế Điều 4, 14a.4)
+  bonusPrograms: {
+    list: '/bonus-programs',
+    detail: (id: string) => `/bonus-programs/${id}`,
+    month: (id: string) => `/bonus-programs/${id}/month`,
+    orders: '/bonus-programs/orders',
+    order: (salesOrderId: string) => `/bonus-programs/orders/${salesOrderId}`,
+    mine: '/bonus-programs/mine',
+  },
   // Purchasing
   suppliers: {
     list: '/suppliers',

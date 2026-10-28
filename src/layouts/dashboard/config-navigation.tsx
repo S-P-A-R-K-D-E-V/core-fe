@@ -422,6 +422,8 @@ export function useNavData(
               // Tổng quan: quản lý thấy số liệu; trưởng ca / nhân viên thấy ca mình hôm nay + nút bắt đầu kiểm nhanh.
               { title: t('inspectionOverview'), path: paths.dashboard.inspection.root },
               { title: t('inspectionMyFaults'), path: paths.dashboard.inspection.myFaults },
+              // Kiểm hàng khu vực mỗi ca: người làm ca đếm phiếu ca mình; quản lý (stocktake.read) xem chênh lệch.
+              { title: 'Kiểm hàng ca', path: paths.dashboard.pos.inventory.shiftChecks },
               { title: t('inspectionHistory'), path: paths.dashboard.inspection.history, permissions: [INSPECTION.read] },
               { title: t('inspectionHeatmap'), path: paths.dashboard.inspection.heatmap, permissions: [INSPECTION.read] },
               { title: t('inspectionCorrectiveActions'), path: paths.dashboard.inspection.correctiveActions, permissions: [INSPECTION.read] },
@@ -524,6 +526,18 @@ export function useNavData(
                 path: paths.dashboard.payroll.batch,
                 featureKey: 'payroll.core',
                 allPermissions: [PAYROLL.recordsRead],
+              },
+              {
+                title: 'Khiếu nại phiếu lương',
+                path: paths.dashboard.payroll.complaints,
+                featureKey: 'payroll.core',
+                allPermissions: [PAYROLL.complaintReview],
+              },
+              {
+                title: 'Chương trình thưởng',
+                path: paths.dashboard.payroll.bonusPrograms,
+                featureKey: 'payroll.core',
+                allPermissions: [PAYROLL.bonusProgramManage],
               },
             ],
           },

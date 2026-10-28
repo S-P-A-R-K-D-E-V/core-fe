@@ -57,6 +57,8 @@ export const PERMISSIONS = {
     policyManage: 'payroll.policy.manage',
     salaryConfigRead: 'payroll.salary-config.read',
     salaryConfigManage: 'payroll.salary-config.manage',
+    complaintReview: 'payroll.complaint.review',
+    bonusProgramManage: 'payroll.bonus-program.manage',
   },
   /** Chấm công — tự chấm công, việc của chính mình không cần quyền. */
   attendance: {
@@ -130,7 +132,12 @@ export const PERMISSIONS = {
     adjust: 'inventory.adjust',
   },
   /** Phiếu kiểm kho / xuất huỷ / xuất dùng nội bộ: lập (gồm huỷ phiếu nháp) và hoàn thành đều cần kèm quyền xem. */
-  stockTake: { read: 'stocktake.read', create: 'stocktake.create', complete: 'stocktake.complete' },
+  stockTake: {
+    read: 'stocktake.read',
+    create: 'stocktake.create',
+    complete: 'stocktake.complete',
+    shiftCheckManage: 'stocktake.shift-check.manage',
+  },
   damageNote: { read: 'damage-note.read', create: 'damage-note.create', complete: 'damage-note.complete' },
   internalUseNote: {
     read: 'internal-use-note.read',
