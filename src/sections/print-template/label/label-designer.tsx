@@ -499,7 +499,7 @@ export function LabelDesigner({ value, onChange, context, disabled }: Props) {
             }}
           >
             {/* Lớp hiển thị: đúng HTML in ra, ở cỡ thật rồi phóng to. */}
-            <style>{LABEL_ELEMENT_CSS}</style>
+            <style dangerouslySetInnerHTML={{ __html: LABEL_ELEMENT_CSS }} />
             <Box
               className="lb"
               sx={{

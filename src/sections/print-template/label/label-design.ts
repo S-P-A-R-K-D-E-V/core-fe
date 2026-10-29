@@ -169,6 +169,9 @@ export function newElementId(): string {
 
 const round = (value: number) => Math.round(value * 1000) / 1000;
 
+/** Về lưới điểm in 203 dpi (0,125 mm) — số gọn để sửa và đúng lưới khi in. */
+const dot = (value: number) => Math.round(value * 8) / 8;
+
 export function presetPaper(presetId: string): LabelTemplate {
   const preset = LABEL_TEMPLATES.find((template) => template.id === presetId);
   return normalizeTemplate({
@@ -190,10 +193,10 @@ export function suggestedElements(paper: LabelTemplate): LabelElement[] {
   const usableH = paper.labelHeightMm - pad * 2;
   const namePt = paper.namePt;
   const pricePt = paper.pricePt;
-  const lineMm = (pt: number) => round(pt * 0.3528 * 1.25);
+  const lineMm = (pt: number) => dot(pt * 0.3528 * 1.25);
 
   if (paper.layout === 'split') {
-    const half = round(usableW / 2);
+    const half = dot(usableW / 2);
     return [
       {
         id: newElementId(),
@@ -209,10 +212,10 @@ export function suggestedElements(paper: LabelTemplate): LabelElement[] {
       {
         id: newElementId(),
         type: 'text',
-        xMm: round(pad + half),
+        xMm: dot(pad + half),
         yMm: pad,
         wMm: half,
-        hMm: round(usableH * 0.6),
+        hMm: dot(usableH * 0.6),
         text: '{{product_name}}',
         fontPt: namePt,
         bold: true,
@@ -222,10 +225,10 @@ export function suggestedElements(paper: LabelTemplate): LabelElement[] {
       {
         id: newElementId(),
         type: 'text',
-        xMm: round(pad + half),
-        yMm: round(pad + usableH * 0.6),
+        xMm: dot(pad + half),
+        yMm: dot(pad + usableH * 0.6),
         wMm: half,
-        hMm: round(usableH * 0.4),
+        hMm: dot(usableH * 0.4),
         text: '{{final_price}}',
         fontPt: pricePt,
         bold: true,
@@ -235,16 +238,16 @@ export function suggestedElements(paper: LabelTemplate): LabelElement[] {
     ];
   }
 
-  const nameH = Math.min(round(lineMm(namePt) * 2), round(usableH * 0.35));
-  const priceH = Math.min(lineMm(pricePt), round(usableH * 0.25));
-  const barcodeH = round(usableH - nameH - priceH - 0.5);
+  const nameH = Math.min(dot(lineMm(namePt) * 2), dot(usableH * 0.35));
+  const priceH = Math.min(lineMm(pricePt), dot(usableH * 0.25));
+  const barcodeH = dot(usableH - nameH - priceH - 0.5);
   return [
     {
       id: newElementId(),
       type: 'text',
       xMm: pad,
       yMm: pad,
-      wMm: round(usableW),
+      wMm: dot(usableW),
       hMm: nameH,
       text: '{{product_name}}',
       fontPt: namePt,
@@ -256,8 +259,8 @@ export function suggestedElements(paper: LabelTemplate): LabelElement[] {
       id: newElementId(),
       type: 'barcode',
       xMm: pad,
-      yMm: round(pad + nameH + 0.25),
-      wMm: round(usableW),
+      yMm: dot(pad + nameH + 0.25),
+      wMm: dot(usableW),
       hMm: barcodeH,
       source: 'barcode-or-code',
       showText: true,
@@ -267,8 +270,8 @@ export function suggestedElements(paper: LabelTemplate): LabelElement[] {
       id: newElementId(),
       type: 'text',
       xMm: pad,
-      yMm: round(pad + usableH - priceH),
-      wMm: round(usableW),
+      yMm: dot(pad + usableH - priceH),
+      wMm: dot(usableW),
       hMm: priceH,
       text: '{{final_price}}',
       fontPt: pricePt,
@@ -303,7 +306,7 @@ export function createElement(
   const sizes: Record<LabelElementType, { w: number; h: number }> = {
     text: {
       w: Math.min(paper.labelWidthMm - 1, 25),
-      h: round(fontPt * 0.3528 * 1.25 * (field?.style?.maxLines ?? 1) + 0.5),
+      h: dot(fontPt * 0.3528 * 1.25 * (field?.style?.maxLines ?? 1) + 0.5),
     },
     barcode: { w: Math.min(paper.labelWidthMm - 1, 30), h: Math.min(paper.labelHeightMm - 1, 10) },
     qrcode: { w: Math.min(paper.labelHeightMm - 1, 14), h: Math.min(paper.labelHeightMm - 1, 14) },
@@ -316,8 +319,8 @@ export function createElement(
     type,
     xMm: 0,
     yMm: 0,
-    wMm: round(size.w),
-    hMm: round(size.h),
+    wMm: dot(size.w),
+    hMm: dot(size.h),
   };
   if (type === 'text') {
     Object.assign(element, {

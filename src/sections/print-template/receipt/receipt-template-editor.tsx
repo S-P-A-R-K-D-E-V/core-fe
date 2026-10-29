@@ -529,7 +529,8 @@ export function ReceiptTemplateEditor({ value, onChange, settings, zoom, disable
             minHeight: 420,
           }}
         >
-          <style>{css}</style>
+          {/* CSS dựng từ thiết lập đã chuẩn hoá — innerHTML để SSR và client giống hệt nhau (không escape dấu "). */}
+          <style dangerouslySetInnerHTML={{ __html: css }} />
           <Box
             sx={{
               zoom,
