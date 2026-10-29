@@ -20,7 +20,9 @@ import type {
   IContractField,
   IContractTerms,
   IEmployeeProfile,
+  IContractPreview,
   IContractTemplate,
+  IContractTemplateImport,
   IEmploymentContract,
   EmployeeProfileInput,
   EmploymentContractType,
@@ -323,15 +325,16 @@ export async function getContractTemplates(): Promise<IContractTemplate[]> {
   return response.data;
 }
 
-/** Bản nháp mẫu mới: copyFromId = phiên bản mới của mẫu đó; null = mẫu dựng sẵn. */
+/** Bản nháp mẫu mới: copyFromId = phiên bản mới của mẫu đó; null = mẫu trống (HTML). */
 export async function createContractTemplate(copyFromId: string | null): Promise<IContractTemplate> {
   const response = await axios.post<IContractTemplate>(endpoints.hr.contractTemplates, { copyFromId });
   return response.data;
 }
 
+/** isHtml = true: body là HTML từ trình soạn (máy chủ lọc thẻ). */
 export async function updateContractTemplate(
   id: string,
-  body: { code: string; name: string; contractType: EmploymentContractType; body: string }
+  body: { code: string; name: string; contractType: EmploymentContractType; body: string; isHtml?: boolean }
 ): Promise<IContractTemplate> {
   const response = await axios.put<IContractTemplate>(endpoints.hr.contractTemplate(id), body);
   return response.data;
@@ -363,6 +366,43 @@ export async function removeContractTemplateDocx(templateId: string): Promise<IC
 
 export async function deleteContractTemplate(id: string): Promise<void> {
   await axios.delete(endpoints.hr.contractTemplate(id));
+}
+
+const PDF_TYPE = 'application/pdf';
+
+/** Kiểu tệp mẫu tải lên theo đuôi (trình duyệt đôi khi để trống type của .docx). */
+export function contractImportType(file: File): string | null {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.docx') || file.type === DOCX_TYPE) return DOCX_TYPE;
+  if (name.endsWith('.pdf') || file.type === PDF_TYPE) return PDF_TYPE;
+  return null;
+}
+
+/**
+ * Tải mẫu hợp đồng (.docx / .pdf) vào bản nháp: xin URL, PUT thẳng kho riêng tư, rồi máy chủ đọc tệp + AI gắn trường
+ * (có thể mất khoảng 1 phút). Nội dung bản nháp được thay bằng HTML đọc được.
+ */
+export async function importContractTemplateFile(templateId: string, file: File): Promise<IContractTemplateImport> {
+  const contentType = contractImportType(file);
+  if (!contentType) throw new Error('Chỉ nhận tệp .docx hoặc .pdf');
+  const presign = await axios.post<{ objectKey: string; uploadUrl: string }>(
+    endpoints.hr.contractTemplateImportPresign(templateId),
+    { contentType }
+  );
+  const put = await fetch(presign.data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file });
+  if (!put.ok) throw new Error(`Tải tệp lên thất bại (${put.status})`);
+  const response = await axios.post<IContractTemplateImport>(
+    endpoints.hr.contractTemplateImport(templateId),
+    { objectKey: presign.data.objectKey, fileName: file.name },
+    { timeout: 180_000 }
+  );
+  return response.data;
+}
+
+/** Xem trước mẫu với hồ sơ + lương hiện tại của một nhân viên. */
+export async function previewContractTemplate(templateId: string, staffId: string): Promise<IContractPreview> {
+  const response = await axios.post<IContractPreview>(endpoints.hr.contractTemplatePreview(templateId), { staffId });
+  return response.data;
 }
 
 export async function getEmployeeProfiles(): Promise<IEmployeeProfile[]> {
@@ -409,6 +449,30 @@ export async function updateContractDraft(id: string, terms: IContractTerms): Pr
 
 export async function finalizeContract(id: string): Promise<IEmploymentContract> {
   const response = await axios.post<IEmploymentContract>(endpoints.hr.contractFinalize(id));
+  return response.data;
+}
+
+/** Nội dung bản nháp để sửa tay: HTML đã trộn hồ sơ, còn giữ {{so_hop_dong}} và hai trường chữ ký. */
+export async function getEditableContractBody(id: string): Promise<string> {
+  const response = await axios.get<{ body: string }>(endpoints.hr.contractEditable(id));
+  return response.data.body;
+}
+
+/** Lưu nội dung sửa tay của bản nháp; null = bỏ sửa tay, trộn lại từ mẫu. */
+export async function saveContractBody(id: string, body: string | null): Promise<IEmploymentContract> {
+  const response = await axios.put<IEmploymentContract>(endpoints.hr.contractBody(id), { body });
+  return response.data;
+}
+
+/** Nét vẽ chữ ký: mỗi nét là danh sách [x, y] theo toạ độ khung ký (0..width, 0..height). */
+export type SignatureStrokes = number[][][];
+
+/** Nhân viên ký hợp đồng của mình (chữ ký vẽ + đồng ý lời cam kết). */
+export async function signContract(
+  id: string,
+  signature: { strokes: SignatureStrokes; width: number; height: number }
+): Promise<IEmploymentContract> {
+  const response = await axios.post<IEmploymentContract>(endpoints.hr.contractSign(id), { ...signature, agree: true });
   return response.data;
 }
 
