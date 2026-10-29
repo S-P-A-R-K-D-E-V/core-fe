@@ -1,20 +1,20 @@
 'use client';
 
 import type { Editor } from '@tiptap/react';
+import type { EditorView } from '@tiptap/pm/view';
 
-import { useEffect } from 'react';
 import StarterKit from '@tiptap/starter-kit';
 import Table from '@tiptap/extension-table';
-import { Node, mergeAttributes } from '@tiptap/core';
 import TableRow from '@tiptap/extension-table-row';
 import Underline from '@tiptap/extension-underline';
+import { useRef, useEffect, useCallback } from 'react';
 import TableCell from '@tiptap/extension-table-cell';
 import TextAlign from '@tiptap/extension-text-align';
 import { useEditor, EditorContent } from '@tiptap/react';
 import TableHeader from '@tiptap/extension-table-header';
+import { Node, nodePasteRule, nodeInputRule, mergeAttributes } from '@tiptap/core';
 
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Divider from '@mui/material/Divider';
@@ -27,10 +27,18 @@ import Iconify from 'src/components/iconify';
 import type { IContractField } from 'src/types/hr';
 
 import { CONTRACT_CSS } from './contract-render';
+import {
+  fieldToken,
+  fieldChipText,
+  FIELD_DRAG_TYPE,
+  tokensToFieldNodes,
+  fieldNodesToTokens,
+} from './contract-fields-html';
 
 // ----------------------------------------------------------------------
 // Trình soạn nội dung hợp đồng (tiptap): đoạn, tiêu đề, đậm / nghiêng / gạch chân, căn lề, danh sách, bảng, ngắt trang.
-// Trường trộn {{ma}} là chữ thường trong văn bản — kéo chip trường thả vào chỗ cần điền, hoặc bấm chip để chèn ở con trỏ.
+// Trường trộn là thẻ (node `mergeField`) hiện tên tiếng Việt — kéo trường thả vào chỗ cần điền, hoặc bấm để chèn ở con
+// trỏ; gõ / dán `{{ma}}` cũng thành thẻ. Lưu ra vẫn là chữ `{{ma}}` (contract-fields-html).
 // ----------------------------------------------------------------------
 
 /** Ngắt trang khi in: <div class="page-break"></div> (máy chủ giữ thẻ này khi lọc). */
@@ -47,7 +55,86 @@ const PageBreak = Node.create({
   },
 });
 
-export const fieldToken = (key: string) => `{{${key}}}`;
+type ChipResolver = (key: string) => { text: string; unknown: boolean };
+
+function paintFieldChip(dom: HTMLElement, key: string, resolve: ChipResolver) {
+  const { text, unknown } = resolve(key);
+  dom.textContent = text;
+  dom.title = fieldToken(key);
+  dom.classList.toggle('merge-field--unknown', unknown);
+}
+
+/** Trường trộn: thẻ nội dòng, không gõ được bên trong, kéo được để chuyển chỗ. */
+export const MergeField = Node.create<{ resolve: ChipResolver }>({
+  name: 'mergeField',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  selectable: true,
+  draggable: true,
+
+  addOptions() {
+    return { resolve: (key: string) => ({ text: key, unknown: false }) };
+  },
+
+  addAttributes() {
+    return {
+      key: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-field'),
+        renderHTML: (attributes) => ({ 'data-field': attributes.key }),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'span[data-field]' }];
+  },
+
+  renderHTML({ node, HTMLAttributes }) {
+    return ['span', mergeAttributes(HTMLAttributes, { class: 'merge-field' }), fieldToken(node.attrs.key)];
+  },
+
+  renderText({ node }) {
+    return fieldToken(node.attrs.key);
+  },
+
+  addNodeView() {
+    const { resolve } = this.options;
+    return ({ node }) => {
+      const dom = document.createElement('span');
+      dom.className = 'merge-field';
+      dom.dataset.field = node.attrs.key;
+      dom.contentEditable = 'false';
+      paintFieldChip(dom, node.attrs.key, resolve);
+      return { dom };
+    };
+  },
+
+  addInputRules() {
+    return [nodeInputRule({ find: /\{\{([a-z0-9_]+)\}\}$/, type: this.type, getAttributes: (m) => ({ key: m[1] }) })];
+  },
+
+  addPasteRules() {
+    return [nodePasteRule({ find: /\{\{([a-z0-9_]+)\}\}/g, type: this.type, getAttributes: (m) => ({ key: m[1] }) })];
+  },
+});
+
+/**
+ * Thả trường kéo từ danh sách vào nội dung: chèn thẻ đúng chỗ thả. Kéo thứ khác (chữ, thẻ đã có trong bài) để tiptap tự xử
+ * lý như thường.
+ */
+export function handleFieldDrop(view: EditorView, event: DragEvent): boolean {
+  const key = event.dataTransfer?.getData(FIELD_DRAG_TYPE);
+  const type = view.state.schema.nodes.mergeField;
+  if (!key || !type) return false;
+  const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
+  if (!at) return false;
+  event.preventDefault();
+  view.dispatch(view.state.tr.insert(at.pos, type.create({ key })).scrollIntoView());
+  view.focus();
+  return true;
+}
 
 function ToolButton({
   title,
@@ -187,16 +274,22 @@ function Toolbar({ editor }: { editor: Editor }) {
   );
 }
 
+
 type Props = {
   value: string;
   onChange: (html: string) => void;
   /** Trường trộn để kéo thả / bấm chèn; không truyền = không có bảng trường (sửa nội dung một hợp đồng). */
   fields?: IContractField[];
+  /** Chỉ để hiện tên tiếng Việt trên thẻ trường khi không có bảng trường (sửa nội dung một hợp đồng). */
+  labelFields?: IContractField[];
   disabled?: boolean;
   minHeight?: number;
 };
 
-export function ContractEditor({ value, onChange, fields, disabled, minHeight = 480 }: Props) {
+export function ContractEditor({ value, onChange, fields, labelFields, disabled, minHeight = 480 }: Props) {
+  const labelsRef = useRef(new Map<string, string>());
+  const resolve = useCallback<ChipResolver>((key) => fieldChipText(key, labelsRef.current), []);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3, 4] }, codeBlock: false, code: false }),
@@ -207,25 +300,38 @@ export function ContractEditor({ value, onChange, fields, disabled, minHeight = 
       TableHeader,
       TableCell,
       PageBreak,
+      MergeField.configure({ resolve }),
     ],
-    content: value,
+    content: tokensToFieldNodes(value),
     editable: !disabled,
     immediatelyRender: false,
-    onUpdate: ({ editor: e }) => onChange(e.getHTML()),
+    editorProps: { handleDrop: (view, event) => handleFieldDrop(view, event) },
+    onUpdate: ({ editor: e }) => onChange(fieldNodesToTokens(e.getHTML())),
   });
 
   // Nội dung đổi từ ngoài (tải mẫu lên, mở bản khác) → nạp lại; đang gõ thì giá trị trùng nên không nạp.
   useEffect(() => {
-    if (editor && !editor.isDestroyed && value !== editor.getHTML()) editor.commands.setContent(value || '', false);
+    if (editor && !editor.isDestroyed && value !== fieldNodesToTokens(editor.getHTML()))
+      editor.commands.setContent(tokensToFieldNodes(value || ''), false);
   }, [editor, value]);
 
   useEffect(() => {
     if (editor && !editor.isDestroyed) editor.setEditable(!disabled);
   }, [editor, disabled]);
 
+  // Danh sách trường về sau khi trình soạn đã dựng: ghi lại tên trên các thẻ đang hiện.
+  const known = fields ?? labelFields;
+  useEffect(() => {
+    labelsRef.current = new Map((known ?? []).map((f) => [f.key, f.label]));
+    if (!editor || editor.isDestroyed) return;
+    editor.view.dom.querySelectorAll<HTMLElement>('span.merge-field[data-field]').forEach((el) => {
+      paintFieldChip(el, el.dataset.field ?? '', resolve);
+    });
+  }, [editor, known, resolve]);
+
   const insertField = (key: string) => {
     if (!editor || disabled) return;
-    editor.chain().focus().insertContent(fieldToken(key)).run();
+    editor.chain().focus().insertContent({ type: 'mergeField', attrs: { key } }).run();
   };
 
   return (
@@ -242,6 +348,27 @@ export function ContractEditor({ value, onChange, fields, disabled, minHeight = 
             '& .ProseMirror': { outline: 'none', minHeight: minHeight - 32 },
             '& .ProseMirror table td, & .ProseMirror table th': { position: 'relative' },
             '& .ProseMirror .selectedCell': { bgcolor: 'rgba(0, 120, 255, 0.08)' },
+            '& .ProseMirror .merge-field': {
+              display: 'inline-block',
+              px: 0.75,
+              mx: '1px',
+              borderRadius: 0.75,
+              border: '1px solid rgba(0, 120, 255, 0.35)',
+              bgcolor: 'rgba(0, 120, 255, 0.08)',
+              color: '#0b4fa8',
+              fontFamily: 'sans-serif',
+              fontSize: '0.85em',
+              lineHeight: 1.6,
+              whiteSpace: 'nowrap',
+              cursor: disabled ? 'default' : 'grab',
+              userSelect: 'none',
+            },
+            '& .ProseMirror .merge-field--unknown': {
+              color: 'error.main',
+              borderColor: 'error.main',
+              bgcolor: 'rgba(255, 86, 48, 0.08)',
+            },
+            '& .ProseMirror .merge-field.ProseMirror-selectednode': { outline: '2px solid', outlineColor: 'primary.main' },
             '& .ProseMirror div.page-break': {
               my: 2,
               borderTop: '1px dashed',
@@ -278,27 +405,52 @@ export function ContractEditor({ value, onChange, fields, disabled, minHeight = 
             Kéo trường thả vào chỗ cần điền, hoặc đặt con trỏ rồi bấm trường. Trường bắt buộc (*) còn trống thì không chốt
             được hợp đồng. Hai trường chữ ký hiện ảnh chữ ký khi nhân viên đã ký.
           </Typography>
-          <Stack spacing={0.75} sx={{ maxHeight: '60vh', overflow: 'auto', pr: 0.5 }}>
+          <Stack spacing={0.5} sx={{ maxHeight: '60vh', overflow: 'auto', pr: 0.5 }}>
             {fields.map((f) => (
-              <Stack key={f.key} direction="row" spacing={1} alignItems="center">
-                <Chip
-                  size="small"
-                  variant="outlined"
-                  label={fieldToken(f.key)}
-                  disabled={disabled}
-                  draggable={!disabled}
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData('text/plain', fieldToken(f.key));
-                    e.dataTransfer.effectAllowed = 'copy';
-                  }}
-                  onClick={() => insertField(f.key)}
-                  sx={{ cursor: disabled ? 'default' : 'grab', fontFamily: 'monospace' }}
-                />
-                <Typography variant="caption">
-                  {f.label}
-                  {f.required ? ' *' : ''}
-                </Typography>
-              </Stack>
+              <ButtonBase
+                key={f.key}
+                disabled={disabled}
+                draggable={!disabled}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(FIELD_DRAG_TYPE, f.key);
+                  e.dataTransfer.setData('text/plain', fieldToken(f.key));
+                  e.dataTransfer.effectAllowed = 'copy';
+                }}
+                onClick={() => insertField(f.key)}
+                aria-label={`Chèn trường ${f.label}`}
+                sx={{
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                  gap: 1,
+                  px: 1,
+                  py: 0.75,
+                  borderRadius: 1,
+                  border: 1,
+                  borderColor: 'divider',
+                  cursor: disabled ? 'default' : 'grab',
+                  '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.light' },
+                  '&.Mui-disabled': { opacity: 0.5 },
+                }}
+              >
+                <Iconify icon="mdi:drag" width={18} sx={{ color: 'text.disabled', flexShrink: 0 }} />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="body2" sx={{ lineHeight: 1.4 }}>
+                    {f.key.startsWith('chu_ky_') ? `✍ ${f.label}` : f.label}
+                    {f.required && (
+                      <Box component="span" sx={{ color: 'error.main' }}>
+                        {' *'}
+                      </Box>
+                    )}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    component="div"
+                    sx={{ color: 'text.disabled', fontFamily: 'monospace', wordBreak: 'break-all' }}
+                  >
+                    {fieldToken(f.key)}
+                  </Typography>
+                </Box>
+              </ButtonBase>
             ))}
           </Stack>
         </Stack>

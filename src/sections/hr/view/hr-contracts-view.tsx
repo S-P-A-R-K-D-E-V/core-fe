@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
@@ -64,8 +64,9 @@ import {
   getEditableContractBody,
   contractImportType,
   previewContractTemplate,
-  importContractTemplateFile,
+  uploadContractTemplateImport,
 } from 'src/api/hr';
+import { ContractImportError, streamContractTemplateImport } from 'src/api/contract-import-stream';
 import type { SignatureStrokes } from 'src/api/hr';
 
 import { useSnackbar } from 'src/components/snackbar';
@@ -679,6 +680,8 @@ function ContractDetailDialog({
   const [signedOn, setSignedOn] = useState('');
   const [action, setAction] = useState<{ kind: 'terminate' | 'void'; date: string; reason: string } | null>(null);
   const [bodyEdit, setBodyEdit] = useState<string | null>(null);
+  // Tên tiếng Việt cho thẻ trường còn lại khi sửa nội dung (số hợp đồng, chỗ ký).
+  const [fieldLabels, setFieldLabels] = useState<IContractField[]>([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -719,6 +722,7 @@ function ContractDetailDialog({
     setBusy(true);
     try {
       setBodyEdit(await getEditableContractBody(c.id));
+      if (fieldLabels.length === 0) getContractFields().then(setFieldLabels).catch(() => {});
     } catch (err) {
       enqueueSnackbar(apiErrorMessage(err, 'Không mở được nội dung để sửa'), { variant: 'error' });
     } finally {
@@ -956,7 +960,9 @@ function ContractDetailDialog({
           <Alert severity="info" sx={{ mb: 2 }}>
             Thông tin đã điền sẵn theo hồ sơ. Số hợp đồng {'{{so_hop_dong}}'} được cấp khi chốt; hai trường chữ ký giữ nguyên.
           </Alert>
-          {bodyEdit !== null && <ContractEditor value={bodyEdit} onChange={setBodyEdit} minHeight={420} />}
+          {bodyEdit !== null && (
+            <ContractEditor value={bodyEdit} onChange={setBodyEdit} labelFields={fieldLabels} minHeight={420} />
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setBodyEdit(null)} disabled={busy}>
@@ -1140,6 +1146,48 @@ function ProfilesTab() {
 
 // ── Mẫu hợp đồng ───────────────────────────────────────────────────────
 
+type ImportState = {
+  templateId: string;
+  startedAt: number;
+  steps: { key: string; text: string }[];
+  done: boolean;
+  error?: string;
+};
+
+/** Tiến trình tải mẫu: các bước máy chủ báo về + số giây đã chạy; xong thì ẩn (lỗi thì giữ lời báo). */
+function ImportProgress({ state }: { state: ImportState }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (state.done) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [state.done]);
+
+  if (state.error) return <Alert severity="error">{state.error}</Alert>;
+  if (state.done) return null;
+  const seconds = Math.max(0, Math.round((now - state.startedAt) / 1000));
+  return (
+    <Alert severity="info" icon={<CircularProgress size={18} />}>
+      <Stack spacing={0.25}>
+        {state.steps.map((s, i) => (
+          <Typography
+            key={`${s.key}-${i}`}
+            variant="body2"
+            sx={{ color: i < state.steps.length - 1 ? 'text.secondary' : 'text.primary' }}
+          >
+            {i < state.steps.length - 1 ? '✓ ' : ''}
+            {s.text}
+          </Typography>
+        ))}
+        <Typography variant="caption" color="text.secondary">
+          {seconds} giây — đóng cửa sổ vẫn giữ nội dung đã đọc được.
+        </Typography>
+      </Stack>
+    </Alert>
+  );
+}
+
 function TemplatesTab() {
   const { enqueueSnackbar } = useSnackbar();
   const [confirm, confirmDialog] = useConfirmDialog();
@@ -1148,9 +1196,19 @@ function TemplatesTab() {
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState<IContractTemplate | null>(null);
   const [busy, setBusy] = useState(false);
-  // AI đang đọc tệp mẫu (có thể ~1 phút).
-  const [importing, setImporting] = useState(false);
+  // Tải mẫu lên: các bước máy chủ báo về (AI gắn trường có thể ~1 phút); nội dung đọc được vào trình soạn ngay khi có.
+  const [importState, setImportState] = useState<ImportState | null>(null);
+  const importing = !!importState && !importState.done;
+  const importAbort = useRef<AbortController | null>(null);
+  // Mẫu đang mở trong hộp sửa — kết quả tải về sau chỉ đổ vào đúng mẫu đó (đóng / mở mẫu khác thì chỉ tải lại danh sách).
+  const editIdRef = useRef<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  useEffect(() => {
+    editIdRef.current = edit?.id ?? null;
+  }, [edit]);
+
+  useEffect(() => () => importAbort.current?.abort(), []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1196,29 +1254,59 @@ function TemplatesTab() {
     }
   };
 
-  /** Tải tệp mẫu lên: chưa có bản nháp thì tạo mẫu trống trước, rồi máy chủ đọc tệp + AI gắn trường. */
+  /**
+   * Tải tệp mẫu lên: chưa có bản nháp thì tạo mẫu trống trước; PUT tệp; máy chủ đọc tệp (lưu ngay vào bản nháp, gửi về
+   * "content") rồi AI gắn trường ("result"). Đóng hộp thoại giữa chừng vẫn giữ nội dung đã lưu.
+   */
   const importFile = async (file: File, draft: IContractTemplate | null) => {
     if (!contractImportType(file)) {
       enqueueSnackbar('Chỉ nhận tệp .docx hoặc .pdf', { variant: 'error' });
       return;
     }
-    setImporting(true);
+    importAbort.current?.abort();
+    const controller = new AbortController();
+    importAbort.current = controller;
+    let templateId: string | null = draft?.id ?? null;
+    const update = (fn: (s: ImportState) => ImportState) =>
+      setImportState((s) => (s && s.templateId === templateId ? fn(s) : s));
+
     try {
       const target = draft ?? (await createContractTemplate(null));
+      templateId = target.id;
       if (!draft) setEdit(target);
-      const result = await importContractTemplateFile(target.id, file);
-      setEdit(result.template);
+      editIdRef.current = target.id;
+      setImportState({
+        templateId: target.id,
+        startedAt: Date.now(),
+        steps: [{ key: 'upload', text: 'Đang tải tệp lên…' }],
+        done: false,
+      });
+
+      const upload = await uploadContractTemplateImport(target.id, file);
+      const result = await streamContractTemplateImport(
+        target.id,
+        upload,
+        (e) => {
+          if (e.type === 'step') update((s) => ({ ...s, steps: [...s.steps, { key: e.key, text: e.text }] }));
+          else if (editIdRef.current === e.template.id) setEdit(e.template);
+        },
+        controller.signal
+      );
+
+      if (editIdRef.current === result.template.id) setEdit(result.template);
+      update((s) => ({ ...s, done: true }));
       if (result.warning) enqueueSnackbar(result.warning, { variant: 'warning' });
       else
         enqueueSnackbar(
           result.fieldsPlacedByAi ? 'Đã đọc mẫu và gắn trường — rà lại trước khi công bố' : 'Đã đọc mẫu — kéo trường vào chỗ cần điền'
         );
-      load();
     } catch (err) {
-      enqueueSnackbar(apiErrorMessage(err, 'Không đọc được tệp mẫu'), { variant: 'error' });
-      load();
+      if (controller.signal.aborted) return;
+      const message = err instanceof ContractImportError ? err.message : apiErrorMessage(err, 'Không đọc được tệp mẫu');
+      update((s) => ({ ...s, done: true, error: message }));
+      enqueueSnackbar(message, { variant: 'error' });
     } finally {
-      setImporting(false);
+      load();
     }
   };
 
@@ -1372,7 +1460,7 @@ function TemplatesTab() {
         )}
       </Card>
 
-      <Dialog open={!!edit} onClose={() => !busy && !importing && setEdit(null)} fullWidth maxWidth="xl">
+      <Dialog open={!!edit} onClose={() => !busy && setEdit(null)} fullWidth maxWidth="xl">
         <DialogTitle>
           {edit?.publishedAt ? 'Mẫu đã công bố' : 'Sửa bản nháp mẫu'} · bản {edit?.version}
         </DialogTitle>
@@ -1410,18 +1498,14 @@ function TemplatesTab() {
                 </TextField>
               </Stack>
 
-              {importing && (
-                <Alert severity="info" icon={<CircularProgress size={18} />}>
-                  AI đang đọc mẫu và gắn trường thông tin — có thể mất khoảng 1 phút, đừng đóng cửa sổ.
-                </Alert>
-              )}
+              {importState?.templateId === edit.id && <ImportProgress state={importState} />}
 
               {edit.isHtml ? (
                 <ContractEditor
                   value={edit.body}
                   onChange={(body) => setEdit((prev) => (prev ? { ...prev, body } : prev))}
                   fields={fields}
-                  disabled={!!edit.publishedAt || importing}
+                  disabled={!!edit.publishedAt || (importing && importState?.templateId === edit.id)}
                 />
               ) : (
                 <LegacyTemplateBody
@@ -1450,7 +1534,7 @@ function TemplatesTab() {
           <Button disabled={busy || importing} onClick={() => setPreviewOpen(true)}>
             Xem trước
           </Button>
-          <Button onClick={() => setEdit(null)} disabled={busy || importing}>
+          <Button onClick={() => setEdit(null)} disabled={busy}>
             Đóng
           </Button>
           {edit && !edit.publishedAt && (

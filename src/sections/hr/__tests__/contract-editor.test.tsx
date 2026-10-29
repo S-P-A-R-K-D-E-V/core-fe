@@ -5,7 +5,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 // ----------------------------------------------------------------------
-// Trình soạn mẫu hợp đồng: giữ bảng khi nạp HTML, bấm chip trường chèn {{ma}} vào nội dung, kéo chip mang {{ma}} để thả;
+// Trình soạn mẫu hợp đồng: giữ bảng khi nạp HTML, trường là thẻ tên tiếng Việt (lưu ra vẫn {{ma}}), bấm / kéo thả trường;
 // hiển thị: trường chữ ký thành ảnh chữ ký khi nhân viên đã ký, chỗ trống khi chưa.
 // ----------------------------------------------------------------------
 
@@ -15,7 +15,10 @@ vi.mock('next/font/google', () => {
 });
 
 // Imported after the mock above.
-import { ContractEditor } from 'src/sections/hr/contract-editor';
+import { Editor } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
+
+import { MergeField, ContractEditor, handleFieldDrop } from 'src/sections/hr/contract-editor';
 import { htmlContractBody, fillSignatureFields } from 'src/sections/hr/contract-render';
 
 const theme = createTheme();
@@ -43,24 +46,47 @@ describe('ContractEditor', () => {
     expect(screen.getByRole('button', { name: 'Chèn bảng' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ngắt trang' })).toBeInTheDocument();
 
-    await user.click(screen.getByText('{{ho_ten}}'));
+    await user.click(screen.getByRole('button', { name: 'Chèn trường Họ và tên' }));
+    expect(document.querySelector('.ProseMirror .merge-field[data-field="ho_ten"]')?.textContent).toBe('Họ và tên');
 
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(expect.stringContaining('{{ho_ten}}')));
     expect(onChange.mock.calls.at(-1)![0]).toContain('<table');
   });
 
-  it('kéo chip trường mang {{ma}} dạng chữ để thả vào nội dung', async () => {
+  it('kéo trường mang mã riêng của trường (và {{ma}} dạng chữ cho ô khác)', async () => {
     render(
       <ThemeProvider theme={theme}>
         <ContractEditor value="<p>A</p>" onChange={vi.fn()} fields={fields} />
       </ThemeProvider>
     );
-    const chip = (await screen.findByText('{{ho_ten}}')).closest('[draggable="true"]')!;
+    const chip = await screen.findByRole('button', { name: 'Chèn trường Họ và tên' });
     const setData = vi.fn();
 
     fireEvent.dragStart(chip, { dataTransfer: { setData, effectAllowed: 'none' } });
 
+    expect(setData).toHaveBeenCalledWith('application/x-contract-field', 'ho_ten');
     expect(setData).toHaveBeenCalledWith('text/plain', '{{ho_ten}}');
+  });
+
+  it('nạp {{ma}} thành thẻ tên tiếng Việt, mã lạ tô đỏ, lưu ra vẫn {{ma}}', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ThemeProvider theme={theme}>
+        <ContractEditor value="<p>Ông/bà {{ho_ten}} ký {{chu_ky_nguoi_lao_dong}} {{bia}}</p>" onChange={onChange} fields={fields} />
+      </ThemeProvider>
+    );
+
+    await waitFor(() => expect(document.querySelectorAll('.ProseMirror .merge-field')).toHaveLength(3));
+    const chips = Array.from(document.querySelectorAll<HTMLElement>('.ProseMirror .merge-field'));
+    expect(chips.map((c) => c.textContent)).toEqual(['Họ và tên', '✍ Chữ ký người lao động', 'bia']);
+    expect(chips[2].classList.contains('merge-field--unknown')).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: 'Chèn trường Họ và tên' }));
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    const saved = onChange.mock.calls.at(-1)![0] as string;
+    expect(saved).toContain('Ông/bà {{ho_ten}} ký {{chu_ky_nguoi_lao_dong}} {{bia}}');
+    expect(saved).not.toContain('data-field');
   });
 
   it('không có bảng trường khi sửa nội dung một hợp đồng', async () => {
@@ -85,5 +111,27 @@ describe('contract rendering', () => {
     expect(block).toContain('NGƯỜI SỬ DỤNG LAO ĐỘNG');
     expect(block).toContain('class="sign-image"');
     expect(block).toContain('class="page-break"');
+  });
+});
+
+describe('handleFieldDrop', () => {
+  it('thả trường từ danh sách: chèn thẻ đúng chỗ thả; kéo thứ khác để tiptap tự xử lý', () => {
+    const editor = new Editor({ extensions: [StarterKit, MergeField], content: '<p>Họ tên: A</p>' });
+    const { view } = editor;
+    // jsdom không có bố cục: giả chỗ thả là ngay trước "A" (vị trí 9).
+    view.posAtCoords = () => ({ pos: 9, inside: -1 });
+    const drag = (data: Record<string, string>) =>
+      ({
+        clientX: 10,
+        clientY: 10,
+        preventDefault: vi.fn(),
+        dataTransfer: { getData: (type: string) => data[type] ?? '' },
+      }) as unknown as DragEvent;
+
+    expect(handleFieldDrop(view, drag({ 'text/plain': 'chữ thường' }))).toBe(false);
+    expect(handleFieldDrop(view, drag({ 'application/x-contract-field': 'ho_ten' }))).toBe(true);
+
+    expect(editor.getHTML()).toBe('<p>Họ tên: <span data-field="ho_ten" class="merge-field">{{ho_ten}}</span>A</p>');
+    editor.destroy();
   });
 });

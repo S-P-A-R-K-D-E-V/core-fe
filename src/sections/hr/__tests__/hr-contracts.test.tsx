@@ -36,8 +36,13 @@ const api = vi.hoisted(() => ({
   getContractTemplates: vi.fn(),
   getContractFields: vi.fn(),
   createContractTemplate: vi.fn(),
-  importContractTemplateFile: vi.fn(),
+  uploadContractTemplateImport: vi.fn(),
+  streamContractTemplateImport: vi.fn(),
   signContract: vi.fn(),
+}));
+vi.mock('src/api/contract-import-stream', () => ({
+  ContractImportError: class extends Error {},
+  streamContractTemplateImport: (...a: any[]) => api.streamContractTemplateImport(...a),
 }));
 vi.mock('src/api/hr', () => ({
   ...Object.fromEntries(Object.keys(api).map((k) => [k, (...a: any[]) => (api as any)[k](...a)])),
@@ -142,7 +147,7 @@ describe('HrContractsView', () => {
     );
   });
 
-  it('admin uploads a .docx template: blank draft first, then the AI import fills the editor', async () => {
+  it('admin uploads a .docx template: blank draft first, read content shows at once, then fields arrive as chips', async () => {
     auth.user.permissions = ['hr.contract.manage'];
     api.getContracts.mockResolvedValue([]);
     api.getContractTemplates.mockResolvedValue([]);
@@ -159,10 +164,21 @@ describe('HrContractsView', () => {
       isHtml: true,
     };
     api.createContractTemplate.mockResolvedValue(draft);
-    api.importContractTemplateFile.mockResolvedValue({
-      template: { ...draft, body: '<h2>HỢP ĐỒNG LAO ĐỘNG</h2><p>Họ và tên: {{ho_ten}}</p>' },
-      fieldsPlacedByAi: true,
-      warning: 'AI chưa chắc chỗ điền ngày cấp CCCD',
+    api.uploadContractTemplateImport.mockResolvedValue({ objectKey: 'k1', fileName: 'hop-dong.docx' });
+    // Máy chủ: đọc xong .docx thì gửi nội dung (đã lưu nháp), AI gắn trường xong mới gửi kết quả.
+    let finish: () => void = () => {};
+    api.streamContractTemplateImport.mockImplementation(async (_id: string, _body: unknown, onEvent: (e: any) => void) => {
+      onEvent({ type: 'step', key: 'read', text: 'Đang đọc tệp…' });
+      onEvent({ type: 'content', template: { ...draft, body: '<h2>HỢP ĐỒNG LAO ĐỘNG</h2><p>Họ và tên: ……</p>' } });
+      onEvent({ type: 'step', key: 'ai', text: 'AI đang gắn trường…' });
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      return {
+        template: { ...draft, body: '<h2>HỢP ĐỒNG LAO ĐỘNG</h2><p>Họ và tên: {{ho_ten}}</p>' },
+        fieldsPlacedByAi: true,
+        warning: 'AI chưa chắc chỗ điền ngày cấp CCCD',
+      };
     });
     const user = userEvent.setup();
 
@@ -173,10 +189,26 @@ describe('HrContractsView', () => {
     const input = screen.getByText('Tải mẫu lên (.docx / .pdf)').closest('label')!.querySelector('input[type="file"]')!;
     await user.upload(input as HTMLInputElement, file);
 
-    await waitFor(() => expect(api.importContractTemplateFile).toHaveBeenCalledWith('t9', file));
+    await waitFor(() => expect(api.uploadContractTemplateImport).toHaveBeenCalledWith('t9', file));
     expect(api.createContractTemplate).toHaveBeenCalledWith(null);
+    expect(api.streamContractTemplateImport).toHaveBeenCalledWith(
+      't9',
+      { objectKey: 'k1', fileName: 'hop-dong.docx' },
+      expect.any(Function),
+      expect.anything()
+    );
+    // Nội dung đọc được vào trình soạn ngay, AI vẫn đang chạy.
     expect(await screen.findByText('HỢP ĐỒNG LAO ĐỘNG')).toBeInTheDocument();
+    expect(screen.getByText('AI đang gắn trường…')).toBeInTheDocument();
+    expect(screen.getByText('✓ Đang đọc tệp…')).toBeInTheDocument();
+
+    finish();
+
+    // Kết quả: trường thành thẻ tên tiếng Việt trong trình soạn.
+    await waitFor(() => expect(document.querySelector('.ProseMirror .merge-field[data-field="ho_ten"]')).not.toBeNull());
+    expect(document.querySelector('.ProseMirror .merge-field[data-field="ho_ten"]')!.textContent).toBe('Họ và tên');
     expect(enqueueSnackbar).toHaveBeenCalledWith('AI chưa chắc chỗ điền ngày cấp CCCD', { variant: 'warning' });
+    expect(screen.queryByText('AI đang gắn trường…')).toBeNull();
   });
 
   it('staff sign their awaiting contract: draw, agree, send strokes', async () => {
