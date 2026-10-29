@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
@@ -20,6 +21,8 @@ import StarterKit from '@tiptap/starter-kit';
 
 import { MergeField, ContractEditor, handleFieldDrop } from 'src/sections/hr/contract-editor';
 import { htmlContractBody, fillSignatureFields } from 'src/sections/hr/contract-render';
+
+import type { IContractCustomField } from 'src/types/hr';
 
 const theme = createTheme();
 const fields = [
@@ -99,6 +102,91 @@ describe('ContractEditor', () => {
     expect(screen.queryByText('Trường thông tin')).toBeNull();
   });
 });
+
+describe('ContractEditor — định dạng ngày + trường riêng của mẫu', () => {
+  const dateFields = [
+    {
+      key: 'ngay_lap',
+      label: 'Ngày lập',
+      required: true,
+      isDate: true,
+      formats: [
+        { code: 'ngay', label: 'Ngày (29)' },
+        { code: 'thang', label: 'Tháng (10)' },
+        { code: 'nam2', label: 'Năm 2 số (26)' },
+      ],
+    },
+  ];
+
+  it('bấm thẻ trường ngày → chọn định dạng → lưu {{ma:dinh_dang}}', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ThemeProvider theme={theme}>
+        <ContractEditor value="<p>Hôm nay ngày {{ngay_lap:ngay}}</p>" onChange={onChange} fields={dateFields} />
+      </ThemeProvider>
+    );
+    await waitFor(() =>
+      expect(document.querySelector('.ProseMirror .merge-field[data-field="ngay_lap"]')?.textContent).toBe('Ngày lập · ngày')
+    );
+
+    fireEvent.click(document.querySelector('.ProseMirror .merge-field[data-field="ngay_lap"]')!);
+    await user.click(await screen.findByRole('menuitem', { name: 'Tháng (10)' }));
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(expect.stringContaining('{{ngay_lap:thang}}')));
+    expect(document.querySelector('.ProseMirror .merge-field[data-field="ngay_lap"]')?.textContent).toBe('Ngày lập · tháng');
+  });
+
+  it('thêm trường riêng: mã tự sinh rieng_…, hiện trong bảng trường, kéo được', async () => {
+    const user = userEvent.setup();
+    const onCustom = vi.fn();
+    function Harness() {
+      const [custom, setCustom] = useState<IContractCustomField[]>([]);
+      return (
+        <ThemeProvider theme={theme}>
+          <ContractEditor
+            value="<p>MST: {{rieng_ma_so_thue}}</p>"
+            onChange={vi.fn()}
+            fields={fields}
+            customFields={custom}
+            onCustomFieldsChange={(list) => {
+              onCustom(list);
+              setCustom(list);
+            }}
+          />
+        </ThemeProvider>
+      );
+    }
+    render(<Harness />);
+    // Chưa khai báo thì mã riêng trong nội dung là mã lạ (đỏ).
+    await waitFor(() =>
+      expect(
+        document.querySelector('.ProseMirror .merge-field[data-field="rieng_ma_so_thue"]')?.classList.contains('merge-field--unknown')
+      ).toBe(true)
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Thêm' }));
+    await user.type(screen.getByLabelText('Nhãn'), 'Mã số thuế');
+    expect((screen.getByLabelText('Mã') as HTMLInputElement).value).toBe('rieng_ma_so_thue');
+    await user.type(screen.getByLabelText('Giá trị mặc định'), '0109876543');
+    await user.click(screen.getByRole('button', { name: 'Lưu' }));
+
+    expect(onCustom).toHaveBeenLastCalledWith([
+      { key: 'rieng_ma_so_thue', label: 'Mã số thuế', required: true, defaultValue: '0109876543' },
+    ]);
+    const chip = await screen.findByRole('button', { name: 'Chèn trường Mã số thuế' });
+    await waitFor(() => {
+      const inBody = document.querySelector('.ProseMirror .merge-field[data-field="rieng_ma_so_thue"]');
+      expect(inBody?.textContent).toBe('Mã số thuế');
+      expect(inBody?.classList.contains('merge-field--unknown')).toBe(false);
+    });
+
+    const setData = vi.fn();
+    fireEvent.dragStart(chip, { dataTransfer: { setData, effectAllowed: 'none' } });
+    expect(setData).toHaveBeenCalledWith('application/x-contract-field', 'rieng_ma_so_thue');
+  });
+});
+
 
 describe('contract rendering', () => {
   it('trường chữ ký: ảnh khi đã ký, chỗ trống khi chưa; [[CHU_KY]] thành khối ký', () => {

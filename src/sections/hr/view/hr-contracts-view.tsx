@@ -81,6 +81,7 @@ import type {
   IContractPreview,
   IContractTemplate,
   IEmploymentContract,
+  IContractCustomField,
   EmploymentContractType,
   EmploymentContractStatus,
 } from 'src/types/hr';
@@ -88,6 +89,7 @@ import { GENDER_LABEL, CONTRACT_TYPE_LABEL, CONTRACT_SIGN_CONSENT, CONTRACT_STAT
 
 import { fVnd } from '../hr-common';
 import { ContractEditor } from '../contract-editor';
+import { bodyUsesField } from '../contract-fields-html';
 import { SignaturePad, hasSignature, SIGNATURE_WIDTH, SIGNATURE_HEIGHT } from '../signature-pad';
 import { printPage, CONTRACT_CSS, signatureImg, buildPrintPage, buildPrintHtml, renderContractHtml } from '../contract-render';
 
@@ -164,6 +166,7 @@ function termsOf(c: IEmploymentContract): IContractTerms {
     isPartTime: c.isPartTime,
     minHoursPerMonth: c.minHoursPerMonth,
     maxHoursPerMonth: c.maxHoursPerMonth,
+    customValues: c.customFields?.length ? customValuesOf(c.customFields, c.customValues) : null,
   };
 }
 
@@ -451,6 +454,46 @@ function TermsFields({
   );
 }
 
+/** Giá trị trường riêng của mẫu cho một hợp đồng: đã nhập, không thì mặc định của mẫu. */
+export function customValuesOf(
+  fields: IContractCustomField[] | null | undefined,
+  values?: Record<string, string> | null
+): Record<string, string> {
+  return Object.fromEntries((fields ?? []).map((f) => [f.key, values?.[f.key] ?? f.defaultValue ?? '']));
+}
+
+/** Trường riêng bắt buộc còn trống (chặn soạn — nhập trước khi áp vào hợp đồng). */
+const missingCustom = (fields: IContractCustomField[] | null | undefined, values?: Record<string, string> | null) =>
+  (fields ?? []).filter((f) => f.required && !(values?.[f.key] ?? '').trim());
+
+/** Thông tin riêng của mẫu (MST, người đại diện…): một ô mỗi trường, bắt buộc có *. */
+function CustomValuesFields({
+  fields,
+  values,
+  onChange,
+}: {
+  fields: IContractCustomField[] | null | undefined;
+  values: Record<string, string> | null | undefined;
+  onChange: (values: Record<string, string>) => void;
+}) {
+  if (!fields?.length) return null;
+  return (
+    <Stack spacing={1.5}>
+      <Typography variant="subtitle2">Thông tin riêng của mẫu</Typography>
+      {fields.map((f) => (
+        <TextField
+          key={f.key}
+          label={f.label}
+          required={f.required}
+          value={values?.[f.key] ?? ''}
+          onChange={(e) => onChange({ ...(values ?? {}), [f.key]: e.target.value })}
+          fullWidth
+        />
+      ))}
+    </Stack>
+  );
+}
+
 /**
  * Đăng hợp đồng / phụ lục GIẤY đã ký từ trước (D12): không soạn từ mẫu — ghi loại, số trên bản giấy, ngày, rồi tải luôn
  * ảnh / PDF bản ký. Hợp đồng vào trạng thái "Đã ký", nhân viên xem bản ký trên app.
@@ -588,6 +631,7 @@ function CreateContractDialog({
   });
   const [saving, setSaving] = useState(false);
   const appendixParents = useSignedParents(staffId, open);
+  const selectedTemplate = templates.find((t) => t.id === templateId);
 
   useEffect(() => {
     if (!open) return;
@@ -632,7 +676,12 @@ function CreateContractDialog({
             onChange={(e) => {
               setTemplateId(e.target.value);
               const t = templates.find((x) => x.id === e.target.value);
-              if (t) setTerms((prev) => ({ ...prev, contractType: t.contractType }));
+              if (t)
+                setTerms((prev) => ({
+                  ...prev,
+                  contractType: t.contractType,
+                  customValues: t.customFields?.length ? customValuesOf(t.customFields) : null,
+                }));
             }}
           >
             {templates.map((t) => (
@@ -642,6 +691,11 @@ function CreateContractDialog({
             ))}
           </TextField>
           <TermsFields terms={terms} onChange={setTerms} appendixParents={appendixParents} />
+          <CustomValuesFields
+            fields={selectedTemplate?.customFields}
+            values={terms.customValues}
+            onChange={(customValues) => setTerms((prev) => ({ ...prev, customValues }))}
+          />
           <Typography variant="caption" color="text.secondary">
             Lương lấy theo cấu hình lương đang hiệu lực tại ngày bắt đầu. Thông tin cá nhân lấy từ tab &quot;Hồ sơ nhân sự&quot;.
           </Typography>
@@ -654,7 +708,13 @@ function CreateContractDialog({
         <LoadingButton
           variant="contained"
           loading={saving}
-          disabled={!staffId || !templateId || !terms.startDate || (terms.contractType === 'Appendix' && !terms.parentContractId)}
+          disabled={
+            !staffId ||
+            !templateId ||
+            !terms.startDate ||
+            (terms.contractType === 'Appendix' && !terms.parentContractId) ||
+            missingCustom(selectedTemplate?.customFields, terms.customValues).length > 0
+          }
           onClick={save}
         >
           Soạn
@@ -764,8 +824,8 @@ function ContractDetailDialog({
           <Box sx={{ flex: 3, minWidth: 0 }}>
             {c.status === 'Draft' && c.missingFields.length > 0 && (
               <Alert severity="warning" sx={{ mb: 2 }}>
-                Còn thiếu: {c.missingFields.join(', ')}. Bổ sung ở tab &quot;Hồ sơ nhân sự&quot; (hoặc cấu hình lương), rồi bấm
-                &quot;Trộn lại&quot;.
+                Còn thiếu: {c.missingFields.join(', ')}. Bổ sung ở tab &quot;Hồ sơ nhân sự&quot;, cấu hình lương hoặc thông tin riêng
+                của mẫu bên phải, rồi bấm &quot;Lưu &amp; trộn lại&quot;.
               </Alert>
             )}
             {c.status === 'Draft' && c.bodyEdited && (
@@ -791,6 +851,11 @@ function ContractDetailDialog({
             {c.status === 'Draft' && terms && (
               <>
                 <TermsFields terms={terms} onChange={setTerms} />
+                <CustomValuesFields
+                  fields={c.customFields}
+                  values={terms.customValues}
+                  onChange={(customValues) => setTerms((prev) => (prev ? { ...prev, customValues } : prev))}
+                />
                 <Stack direction="row" spacing={1}>
                   <Button disabled={busy} onClick={() => run(() => updateContractDraft(c.id, terms), 'Đã trộn lại', 'Không lưu được')}>
                     Lưu & trộn lại
@@ -1294,6 +1359,9 @@ function TemplatesTab() {
       );
 
       if (editIdRef.current === result.template.id) setEdit(result.template);
+      // AI có thể tạo sẵn trường riêng của mẫu — nạp lại mẫu để bảng trường hiện đủ.
+      const fresh = (await getContractTemplates().catch(() => [] as IContractTemplate[])).find((t) => t.id === result.template.id);
+      if (fresh && editIdRef.current === fresh.id) setEdit(fresh);
       update((s) => ({ ...s, done: true }));
       if (result.warning) enqueueSnackbar(result.warning, { variant: 'warning' });
       else
@@ -1311,7 +1379,14 @@ function TemplatesTab() {
   };
 
   const saveDraft = (t: IContractTemplate) =>
-    updateContractTemplate(t.id, { code: t.code, name: t.name, contractType: t.contractType, body: t.body, isHtml: !!t.isHtml });
+    updateContractTemplate(t.id, {
+      code: t.code,
+      name: t.name,
+      contractType: t.contractType,
+      body: t.body,
+      isHtml: !!t.isHtml,
+      customFields: t.customFields ?? [],
+    });
 
   const save = async (publish: boolean) => {
     if (!edit) return;
@@ -1358,7 +1433,9 @@ function TemplatesTab() {
 
   const missingKeys = useMemo(() => {
     if (!edit) return [];
-    return fields.filter((f) => f.required && !edit.body.includes(`{{${f.key}}}`)).map((f) => f.label);
+    return [...fields, ...(edit.customFields ?? [])]
+      .filter((f) => f.required && !bodyUsesField(edit.body, f.key))
+      .map((f) => f.label);
   }, [edit, fields]);
 
   const fileInput = (draft: IContractTemplate | null) => (
@@ -1505,6 +1582,8 @@ function TemplatesTab() {
                   value={edit.body}
                   onChange={(body) => setEdit((prev) => (prev ? { ...prev, body } : prev))}
                   fields={fields}
+                  customFields={edit.customFields ?? []}
+                  onCustomFieldsChange={(customFields) => setEdit((prev) => (prev ? { ...prev, customFields } : prev))}
                   disabled={!!edit.publishedAt || (importing && importState?.templateId === edit.id)}
                 />
               ) : (

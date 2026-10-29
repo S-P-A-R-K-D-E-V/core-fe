@@ -35,6 +35,7 @@ const api = vi.hoisted(() => ({
   saveEmployeeProfile: vi.fn(),
   getContractTemplates: vi.fn(),
   getContractFields: vi.fn(),
+  createContract: vi.fn(),
   createContractTemplate: vi.fn(),
   uploadContractTemplateImport: vi.fn(),
   streamContractTemplateImport: vi.fn(),
@@ -48,7 +49,6 @@ vi.mock('src/api/hr', () => ({
   ...Object.fromEntries(Object.keys(api).map((k) => [k, (...a: any[]) => (api as any)[k](...a)])),
   contractImportType: (f: File) => (/\.(docx|pdf)$/i.test(f.name) ? 'application/octet-stream' : null),
   voidContract: vi.fn(),
-  createContract: vi.fn(),
   finalizeContract: vi.fn(),
   terminateContract: vi.fn(),
   markContractSigned: vi.fn(),
@@ -75,6 +75,7 @@ if (!(window as any).PointerEvent) {
 }
 
 // Imported after the mocks above.
+import { getActiveStaffUsers } from 'src/api/users';
 import HrContractsView, { buildPrintHtml, contractBodyHtml } from 'src/sections/hr/view/hr-contracts-view';
 
 const wrap = (node: React.ReactNode) => render(<ThemeProvider theme={createTheme()}>{node}</ThemeProvider>);
@@ -150,7 +151,12 @@ describe('HrContractsView', () => {
   it('admin uploads a .docx template: blank draft first, read content shows at once, then fields arrive as chips', async () => {
     auth.user.permissions = ['hr.contract.manage'];
     api.getContracts.mockResolvedValue([]);
-    api.getContractTemplates.mockResolvedValue([]);
+    let imported = false;
+    api.getContractTemplates.mockImplementation(async () =>
+      imported
+        ? [{ ...draft, body: '<p>Họ và tên: {{ho_ten}}, MST {{rieng_ma_so_thue}}</p>', customFields: [{ key: 'rieng_ma_so_thue', label: 'Mã số thuế', required: true }] }]
+        : []
+    );
     api.getContractFields.mockResolvedValue([{ key: 'ho_ten', label: 'Họ và tên', required: true }]);
     const draft = {
       id: 't9',
@@ -202,6 +208,7 @@ describe('HrContractsView', () => {
     expect(screen.getByText('AI đang gắn trường…')).toBeInTheDocument();
     expect(screen.getByText('✓ Đang đọc tệp…')).toBeInTheDocument();
 
+    imported = true;
     finish();
 
     // Kết quả: trường thành thẻ tên tiếng Việt trong trình soạn.
@@ -209,6 +216,64 @@ describe('HrContractsView', () => {
     expect(document.querySelector('.ProseMirror .merge-field[data-field="ho_ten"]')!.textContent).toBe('Họ và tên');
     expect(enqueueSnackbar).toHaveBeenCalledWith('AI chưa chắc chỗ điền ngày cấp CCCD', { variant: 'warning' });
     expect(screen.queryByText('AI đang gắn trường…')).toBeNull();
+    // AI tạo sẵn trường riêng của mẫu: nạp lại mẫu, trường hiện trong bảng và thẻ trong nội dung có tên.
+    expect(await screen.findByRole('button', { name: 'Chèn trường Mã số thuế' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('.ProseMirror .merge-field[data-field="rieng_ma_so_thue"]')?.textContent).toBe('Mã số thuế')
+    );
+  });
+
+  it('admin soạn từ mẫu có trường riêng: điền sẵn mặc định, thiếu trường bắt buộc thì chưa soạn, gửi kèm customValues', async () => {
+    auth.user.permissions = ['hr.contract.manage'];
+    api.getContracts.mockResolvedValue([]);
+    vi.mocked(getActiveStaffUsers).mockResolvedValueOnce([{ id: 'lan', fullName: 'Trần Lan' }] as any);
+    api.getContractTemplates.mockResolvedValue([
+      {
+        id: 't1',
+        code: 'hdld-hkd',
+        name: 'HĐLĐ hộ kinh doanh',
+        version: 2,
+        contractType: 'FixedTermUnder12Months',
+        body: '<p>MST {{rieng_ma_so_thue}}, đại diện {{rieng_nguoi_dai_dien}}</p>',
+        isActive: true,
+        publishedAt: '2026-10-29T03:00:00Z',
+        createdAt: '2026-10-29T03:00:00Z',
+        isHtml: true,
+        customFields: [
+          { key: 'rieng_ma_so_thue', label: 'Mã số thuế', required: true },
+          { key: 'rieng_nguoi_dai_dien', label: 'Người đại diện', required: false, defaultValue: 'Vũ Văn A' },
+        ],
+      },
+    ]);
+    api.createContract.mockResolvedValue(contract);
+    const user = userEvent.setup();
+
+    wrap(<HrContractsView />);
+    await user.click(await screen.findByRole('button', { name: 'Soạn hợp đồng' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('combobox', { name: 'Nhân viên' }));
+    await user.click(await screen.findByRole('option', { name: 'Trần Lan' }));
+    await user.click(within(dialog).getByRole('combobox', { name: 'Mẫu' }));
+    await user.click(await screen.findByRole('option', { name: 'HĐLĐ hộ kinh doanh · bản 2' }));
+    fireEvent.change(within(dialog).getByLabelText('Ngày bắt đầu'), { target: { value: '2026-11-01' } });
+
+    expect(within(dialog).getByText('Thông tin riêng của mẫu')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Người đại diện')).toHaveValue('Vũ Văn A');
+    expect(within(dialog).getByRole('button', { name: 'Soạn' })).toBeDisabled();
+
+    await user.type(within(dialog).getByLabelText(/Mã số thuế/), '0109876543');
+    await user.click(within(dialog).getByRole('button', { name: 'Soạn' }));
+
+    await waitFor(() =>
+      expect(api.createContract).toHaveBeenCalledWith(
+        'lan',
+        't1',
+        expect.objectContaining({
+          startDate: '2026-11-01',
+          customValues: { rieng_ma_so_thue: '0109876543', rieng_nguoi_dai_dien: 'Vũ Văn A' },
+        })
+      )
+    );
   });
 
   it('staff sign their awaiting contract: draw, agree, send strokes', async () => {
