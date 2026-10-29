@@ -178,6 +178,8 @@ export const PERMISSIONS = {
     orderCancel: 'sales.order.cancel',
     paymentAdd: 'sales.order.payment.add',
     priceOverride: 'sales.price.override',
+    /** Mẫu in hoá đơn / tem mã: soạn, xoá, chọn mẫu áp dụng (xem / in không cần quyền). */
+    printTemplateManage: 'sales.print-template.manage',
   },
   salesReturn: {
     read: 'sales-return.read',

@@ -24,6 +24,24 @@ vi.mock('src/api/bank-accounts', () => ({
   getBankAccounts: (...args: any[]) => getBankAccounts(...args),
 }));
 
+const getPrintTemplates = vi.fn();
+vi.mock('src/api/print-templates', () => ({
+  getPrintTemplates: (...args: any[]) => getPrintTemplates(...args),
+}));
+
+// Mẫu của cửa hàng trên giấy cuộn được đo chiều cao trong iframe — jsdom không dàn trang nên cho số đo cố định.
+vi.mock('src/sections/print-template/receipt/receipt-template-render', async (importOriginal) => {
+  const original =
+    await importOriginal<
+      typeof import('src/sections/print-template/receipt/receipt-template-render')
+    >();
+  return {
+    ...original,
+    renderReceiptTemplate: (template: any, receipt: any) =>
+      original.renderReceiptTemplate(template, receipt, { measure: async () => 100 }),
+  };
+});
+
 const printHtmlDocument = vi.fn((_html: string) => Promise.resolve());
 vi.mock('src/utils/print-html', async (importOriginal) => ({
   ...(await importOriginal<typeof import('src/utils/print-html')>()),
@@ -105,6 +123,7 @@ beforeEach(() => {
   window.localStorage.clear();
   getSalesOrderReceipt.mockResolvedValue(normalReceipt());
   getBankAccounts.mockResolvedValue([]);
+  getPrintTemplates.mockResolvedValue({ templates: [], assignments: [] });
 });
 
 afterEach(() => {
@@ -375,6 +394,85 @@ describe('ReceiptPrintDialog', () => {
     );
     expect(onClose).not.toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+
+  describe('mẫu in của cửa hàng', () => {
+    const template = (id: string, name: string, content: string, paper = '80') => ({
+      id,
+      kind: 'receipt',
+      name,
+      content,
+      settings: JSON.stringify({ paper }),
+      createdAt: '2026-10-29T00:00:00Z',
+      updatedAt: null,
+    });
+    const cell = (channel: string, paymentMethod: string, templateId: string) => ({
+      kind: 'receipt',
+      channel,
+      paymentMethod,
+      templateId,
+    });
+
+    beforeEach(() => {
+      getPrintTemplates.mockResolvedValue({
+        templates: [
+          template('t-default', 'Mẫu chung', '<p>MẪU CHUNG {{invoice_code}}</p>'),
+          template(
+            't-pos-cash',
+            'Quầy tiền mặt',
+            '<h2>QUẦY {{store_name}}</h2><p>{{item_name}}</p>',
+            '58'
+          ),
+        ],
+        assignments: [cell('*', '*', 't-default'), cell('pos', 'cash', 't-pos-cash')],
+      });
+    });
+
+    it('dùng mẫu áp dụng cho kênh × phương thức của hoá đơn, khổ giấy theo mẫu', async () => {
+      getSalesOrderReceipt.mockResolvedValue({
+        ...normalReceipt(),
+        channel: 'pos',
+        paymentMethod: 'cash',
+      });
+      renderDialog();
+
+      await waitFor(async () => expect(await previewHtml()).toContain('QUẦY'));
+      const doc = parse(await previewHtml());
+      expect(Array.from(doc.querySelectorAll('.rt p'), (p) => p.textContent)).toEqual([
+        'Áo thun cổ tròn trắng size M',
+        'Kẹp tóc nơ nhung đỏ',
+      ]);
+      expect(await previewHtml()).toContain('@page{size:58mm 104mm;margin:0}');
+      expect(screen.getByText(/Khổ giấy theo mẫu/)).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Khổ giấy' })).not.toBeInTheDocument();
+      expect(getPrintTemplates).toHaveBeenCalledWith('receipt');
+    });
+
+    it('hoá đơn không rõ kênh dùng mẫu mặc định; người in đổi được sang mẫu hệ thống', async () => {
+      const user = userEvent.setup({ delay: null });
+      renderDialog();
+
+      await waitFor(async () =>
+        expect(await previewHtml()).toContain('MẪU CHUNG HD-20261006-0001')
+      );
+      await choose(user, 'Mẫu in', 'Mẫu hệ thống');
+
+      await waitFor(async () =>
+        expect(parse(await previewHtml()).querySelector('.tl')?.textContent).toBe(
+          'PHIẾU THANH TOÁN'
+        )
+      );
+      await user.click(printButton());
+      expect(printHtmlDocument).toHaveBeenCalledWith(expect.stringContaining('PHIẾU THANH TOÁN'));
+    });
+
+    it('không tải được mẫu in: in bằng mẫu hệ thống như trước', async () => {
+      getPrintTemplates.mockRejectedValue(new Error('offline'));
+      renderDialog();
+
+      expect(parse(await previewHtml()).querySelector('.tl')?.textContent).toBe('PHIẾU THANH TOÁN');
+      expect(screen.queryByRole('combobox', { name: 'Mẫu in' })).not.toBeInTheDocument();
+    });
   });
 
   it('nút Đóng gọi onClose', async () => {

@@ -188,6 +188,10 @@ export const paths = {
       root: `${ROOTS.DASHBOARD}/store-settings`,
       // Thiết bị cửa hàng: máy quầy (app / web), kiosk chấm công, camera — chủ cửa hàng + quản lý.
       devices: `${ROOTS.DASHBOARD}/store-settings/devices`,
+      // Mẫu in hoá đơn / tem mã và mẫu đang áp dụng theo kênh × phương thức thanh toán.
+      printTemplates: `${ROOTS.DASHBOARD}/store-settings/print-templates`,
+      printTemplateNew: (kind: 'receipt' | 'label') => `${ROOTS.DASHBOARD}/store-settings/print-templates/new?kind=${kind}`,
+      printTemplateEdit: (id: string) => `${ROOTS.DASHBOARD}/store-settings/print-templates/${id}`,
     },
     // Thanh toán (một mục quản lý): đối soát giao dịch ngân hàng / cổng với thanh toán, đơn online từ trang bán online,
     // Cài đặt (phương thức theo kênh, bán online & giao hàng, tài khoản ngân hàng nhận tiền, báo có & kết nối S Payment).

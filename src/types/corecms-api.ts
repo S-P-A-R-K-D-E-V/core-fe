@@ -3330,6 +3330,10 @@ export interface ISalesOrderReceipt {
   /** Lời chào cuối phiếu (Cài đặt cửa hàng) */
   footer: string | null;
   printedAtLocal: string;
+  /** Kênh tạo hoá đơn để chọn mẫu in ("pos" | "fnb" | "online"); null = không rõ (hoá đơn đồng bộ KiotViet / cũ) */
+  channel?: string | null;
+  /** Phương thức để chọn mẫu in — chỉ khi trả bằng đúng một phương thức ("cash" | "transfer" | …) */
+  paymentMethod?: string | null;
 }
 
 // ========== QR Payment (VietQR Quick Link) ==========

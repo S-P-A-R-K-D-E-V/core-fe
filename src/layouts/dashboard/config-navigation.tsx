@@ -353,6 +353,14 @@ export function useNavData(
             icon: ICONS.tour,
             roles: ['Admin', 'Manager'],
           },
+          // MẪU IN: hoá đơn (soạn bằng trình soạn, kéo thả trường) và tem mã (thiết kế trên khung tem), mẫu áp dụng theo
+          // kênh × phương thức thanh toán.
+          {
+            title: 'Mẫu in',
+            path: paths.dashboard.storeSettings.printTemplates,
+            icon: ICONS.invoice,
+            permissions: [PERMISSIONS.sales.printTemplateManage],
+          },
 
           // ROLE MANAGEMENT
           {

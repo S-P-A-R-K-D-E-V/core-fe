@@ -17,7 +17,7 @@ const BACKEND_API_PREFIXES = [
   'kiotviet', 'notification', 'notifications', 'user-tours',
   'categories', 'unit-of-measures', 'units', 'variant-attributes', 'products',
   'warehouses', 'inventory', 'suppliers', 'purchase-orders', 'shift-stock-checks',
-  'customers', 'sales-orders', 'bank-accounts', 'payment', 'reports',
+  'customers', 'sales-orders', 'print-templates', 'bank-accounts', 'payment', 'reports',
   'chatbot', 'messenger', 'expenses', 'shareholders', 'cleaning', 'media-library',
   'admin', 'kiosk', 'kiosk-pairing', 'kiosk-devices', 'face-tracking',
   'auth-hub', 'store-settings', 'agent-keys', 'automation',

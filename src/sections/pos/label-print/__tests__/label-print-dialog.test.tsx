@@ -29,6 +29,16 @@ vi.mock('src/components/iconify', () => ({
   default: () => null,
 }));
 
+const getPrintTemplates = vi.fn();
+vi.mock('src/api/print-templates', () => ({
+  getPrintTemplates: (...args: any[]) => getPrintTemplates(...args),
+}));
+
+const getAllWarehouses = vi.fn();
+vi.mock('src/api/warehouses', () => ({
+  getAllWarehouses: (...args: any[]) => getAllWarehouses(...args),
+}));
+
 // Imported after the mocks above so the dialog picks up the mocked modules.
 import LabelPrintDialog from '../label-print-dialog';
 import { LABEL_SETTINGS_STORAGE_KEY, LABEL_CALIBRATION_STORAGE_KEY } from '../label-template';
@@ -89,6 +99,9 @@ async function setQuantity(user: ReturnType<typeof userEvent.setup>, name: strin
 
 beforeEach(() => {
   window.localStorage.clear();
+  // Mặc định cửa hàng chưa có mẫu tem → hộp thoại như trước.
+  getPrintTemplates.mockReturnValue(new Promise(() => {}));
+  getAllWarehouses.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -592,5 +605,81 @@ describe('LabelPrintDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Đóng hộp thoại' }));
 
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  describe('mẫu tem tự thiết kế', () => {
+    const design = {
+      version: 1,
+      presetId: '2x35x22-r74',
+      paper: { labelWidthMm: 35, labelHeightMm: 22, pageWidthMm: 74, columns: 2, columnGapMm: 2, marginLeftMm: 1, kind: 'roll' },
+      elements: [
+        { id: 'n', type: 'text', xMm: 1, yMm: 1, wMm: 33, hMm: 4, text: '{{product_name}}', fontPt: 7 },
+        { id: 'o', type: 'text', xMm: 1, yMm: 6, wMm: 33, hMm: 3, text: '{{original_price}}', fontPt: 6, strike: true },
+        { id: 'p', type: 'text', xMm: 1, yMm: 10, wMm: 33, hMm: 4, text: '{{final_price}}', fontPt: 9, bold: true },
+        { id: 'k', type: 'text', xMm: 1, yMm: 15, wMm: 33, hMm: 3, text: '{{warehouse_name}}', fontPt: 6 },
+      ],
+      priceSuffix: 'đ',
+      priceWithUnit: false,
+    };
+    const list = {
+      templates: [
+        {
+          id: 'tem-sale',
+          kind: 'label',
+          name: 'Tem giảm giá',
+          content: JSON.stringify(design),
+          settings: '{}',
+          createdAt: '2026-10-29T00:00:00Z',
+          updatedAt: null,
+        },
+      ],
+      assignments: [{ kind: 'label', channel: '*', paymentMethod: '*', templateId: 'tem-sale' }],
+    };
+
+    const texts = () => Array.from(preview().doc.querySelectorAll('.tx'), (el) => el.textContent);
+
+    it('mẫu đang áp dụng được chọn sẵn: khổ và nội dung theo mẫu, giảm giá chung / riêng, kho mặc định', async () => {
+      getPrintTemplates.mockResolvedValue(list);
+      getAllWarehouses.mockResolvedValue([
+        { id: 'w1', name: 'Kho phụ', isDefault: false, isActive: true, createdAt: '' },
+        { id: 'w2', name: 'Kho Chùa Láng', isDefault: true, isActive: true, createdAt: '' },
+      ]);
+      const user = userEvent.setup({ delay: null });
+      renderDialog([shirt, clip]);
+
+      expect(await screen.findByRole('combobox', { name: 'Mẫu tem' })).toHaveTextContent('Tem giảm giá');
+      expect(screen.queryByRole('combobox', { name: 'Loại giấy in tem' })).not.toBeInTheDocument();
+      expect(await screen.findByRole('combobox', { name: 'Kho in trên tem' })).toHaveTextContent('Kho Chùa Láng');
+      // Chưa giảm giá: giá gốc không in.
+      expect(texts()).toEqual([
+        'Áo thun cổ tròn trắng size M',
+        '185.000đ',
+        'Kho Chùa Láng',
+        'Áo thun cổ tròn trắng size M',
+        '185.000đ',
+        'Kho Chùa Láng',
+      ]);
+
+      await user.type(screen.getByLabelText('Giảm giá chung'), '20%');
+      await user.type(screen.getByLabelText('Giảm giá của Kẹp tóc nơ nhung đỏ'), '5.000');
+      expect(texts().slice(0, 4)).toEqual(['Áo thun cổ tròn trắng size M', '185.000đ', '148.000đ', 'Kho Chùa Láng']);
+
+      await user.click(screen.getByRole('button', { name: 'In 5 tem' }));
+      const printed = parse(printedHtml());
+      expect(Array.from(printed.querySelectorAll('.tx'), (el) => el.textContent)).toContain('30.000đ');
+      expect(getPrintTemplates).toHaveBeenCalledWith('label');
+    });
+
+    it('đổi sang khổ giấy hệ thống thì về hộp thoại như trước', async () => {
+      getPrintTemplates.mockResolvedValue(list);
+      const user = userEvent.setup({ delay: null });
+      renderDialog();
+
+      await screen.findByRole('combobox', { name: 'Mẫu tem' });
+      await choose(user, 'Mẫu tem', 'Khổ giấy hệ thống (chọn nội dung bên dưới)');
+
+      expect(screen.getByRole('combobox', { name: 'Loại giấy in tem' })).toHaveTextContent(ROLL_74);
+      expect(preview().doc.querySelector('.nm')?.textContent).toBe('Áo thun cổ tròn trắng size M');
+    });
   });
 });
