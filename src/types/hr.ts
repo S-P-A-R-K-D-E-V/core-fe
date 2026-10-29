@@ -135,7 +135,16 @@ export interface IWeeklyBonus {
   achievementPct: number;
   fund: number;
   totalHours: number;
-  shares: { userId: string; fullName: string; hours: number; amount: number }[];
+  shares: {
+    userId: string;
+    fullName: string;
+    hours: number;
+    amount: number;
+    /** Phần chia theo giờ trước khi áp điểm trừ; trống = cửa hàng không áp điểm trừ vào thưởng. */
+    baseAmount?: number | null;
+    appliedPct?: number | null;
+    deductionPoints?: number | null;
+  }[];
 }
 
 export const WEEKDAY_LABEL: Record<number, string> = {
@@ -642,6 +651,8 @@ export interface IViolationPolicy {
   noBonusFromPoints?: number | null;
   notCompleteFromPoints?: number | null;
   updatedAt: string;
+  /** Bật: thưởng doanh số tuần nhận theo % của ngưỡng điểm trừ (tính thử + bảng lương). */
+  appliesToBonus: boolean;
 }
 
 export interface IViolationRule {

@@ -449,7 +449,16 @@ function BonusTable({ weeks }: { weeks: IWeeklyBonus[] }) {
                   <TableRow key={s.userId}>
                     <TableCell>{s.fullName}</TableCell>
                     <TableCell align="right">{s.hours.toLocaleString('vi-VN')}</TableCell>
-                    <TableCell align="right">{fVnd(s.amount)}</TableCell>
+                    <TableCell align="right">
+                      {fVnd(s.amount)}
+                      {s.appliedPct != null && s.baseAmount != null && s.amount !== s.baseAmount && (
+                        <Typography variant="caption" display="block" color="text.secondary">
+                          {s.appliedPct < 100
+                            ? `Nhận ${s.appliedPct}% (điểm trừ ${s.deductionPoints ?? 0}) · chia theo giờ ${fVnd(s.baseAmount)}`
+                            : `Gồm phần chia lại ${fVnd(s.amount - s.baseAmount)}`}
+                        </Typography>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

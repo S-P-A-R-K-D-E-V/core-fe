@@ -623,6 +623,7 @@ export async function saveViolationPolicy(body: {
   halfBonusPct: number | null;
   noBonusFromPoints: number | null;
   notCompleteFromPoints: number | null;
+  appliesToBonus: boolean;
 }): Promise<IViolationPolicy> {
   const response = await axios.put<IViolationPolicy>(endpoints.hr.violationPolicy, body);
   return response.data;

@@ -61,6 +61,7 @@ const policy: IViolationPolicy = {
   noBonusFromPoints: 10,
   notCompleteFromPoints: 15,
   updatedAt: '2026-10-30T00:00:00Z',
+  appliesToBonus: true,
 };
 
 const summary = (over: Partial<IViolationSummary> = {}): IViolationSummary => ({
@@ -149,5 +150,25 @@ describe('Vi phạm & điểm trừ', () => {
     expect(bonusLabel({ weeklyBonusPct: null, notComplete: false, losesMonthlyBonus: false })).toBeNull();
     expect(bonusLabel({ weeklyBonusPct: 100, notComplete: false, losesMonthlyBonus: false })).toBe('Nhận đủ thưởng tuần');
     expect(bonusLabel({ weeklyBonusPct: 0, notComplete: false, losesMonthlyBonus: false })).toBe('Không nhận thưởng tuần');
+  });
+});
+
+describe('Công tắc tính vào thưởng', () => {
+  it('Admin bật / tắt nhanh ngay trên bảng điểm; tắt thì mức thưởng ghi "chưa tính vào thưởng"', async () => {
+    auth.user.permissions = ['hr.violation.manage', 'hr.rule.manage'];
+    api.getViolationSummary.mockResolvedValue({
+      month: '2026-11-01',
+      policy: { ...policy, appliesToBonus: false },
+      rows: [summary({ fullName: 'Mai', userId: 'mai' })],
+    });
+    api.getViolations.mockResolvedValue([]);
+    api.saveViolationPolicy.mockResolvedValue({ ...policy, appliesToBonus: true });
+    renderView();
+
+    expect(await screen.findByText('Nhận 50% thưởng tuần (chưa tính vào thưởng)')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: /Tính điểm trừ vào thưởng doanh số tuần/ }));
+    await waitFor(() =>
+      expect(api.saveViolationPolicy).toHaveBeenCalledWith(expect.objectContaining({ appliesToBonus: true, halfBonusFromPoints: 6 }))
+    );
   });
 });

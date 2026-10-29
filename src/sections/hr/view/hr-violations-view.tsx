@@ -108,6 +108,70 @@ function thresholdsText(p: IViolationPolicy | null): string | null {
   return parts.length ? `Tổng điểm trừ trong tháng — ${parts.join('; ')}.` : null;
 }
 
+/** Bật / tắt nhanh việc áp điểm trừ vào thưởng doanh số tuần (Admin); người khác chỉ thấy trạng thái. */
+function BonusToggle({
+  policy,
+  canEdit,
+  onChanged,
+}: {
+  policy: IViolationPolicy;
+  canEdit: boolean;
+  onChanged: () => void;
+}) {
+  const { enqueueSnackbar } = useSnackbar();
+  const [busy, setBusy] = useState(false);
+
+  const toggle = async (on: boolean) => {
+    setBusy(true);
+    try {
+      await saveViolationPolicy({
+        effectiveFrom: policy.effectiveFrom,
+        halfBonusFromPoints: policy.halfBonusFromPoints ?? null,
+        halfBonusPct: policy.halfBonusPct ?? null,
+        noBonusFromPoints: policy.noBonusFromPoints ?? null,
+        notCompleteFromPoints: policy.notCompleteFromPoints ?? null,
+        appliesToBonus: on,
+      });
+      enqueueSnackbar(on ? 'Đã bật: thưởng tuần nhận theo điểm trừ' : 'Đã tắt: điểm trừ chỉ để xem, thưởng tuần chia đủ theo giờ');
+      onChanged();
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không lưu được'), { variant: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!canEdit)
+    return (
+      <Chip
+        size="small"
+        color={policy.appliesToBonus ? 'warning' : 'default'}
+        label={policy.appliesToBonus ? 'Đang tính điểm trừ vào thưởng tuần' : 'Điểm trừ chưa tính vào thưởng tuần'}
+      />
+    );
+  return (
+    <FormControlLabel
+      control={<Switch checked={policy.appliesToBonus} disabled={busy} onChange={(e) => toggle(e.target.checked)} />}
+      label={
+        <Box>
+          <Typography variant="body2">Tính điểm trừ vào thưởng doanh số tuần</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Bật: mỗi người nhận % thưởng tuần theo ngưỡng điểm trừ của tháng, mất cả tuần / tháng theo vi phạm; phần không nhận chia
+            lại cho người nhận đủ theo giờ làm. Áp cho tính thử và bảng lương.
+          </Typography>
+        </Box>
+      }
+    />
+  );
+}
+
+/** Mức thưởng theo điểm trừ, kèm ghi chú khi cửa hàng chưa bật tính vào thưởng. */
+function bonusWithState(s: IViolationSummary, policy: IViolationPolicy | null): string | null {
+  const label = bonusLabel(s);
+  if (!label) return null;
+  return policy?.appliesToBonus ? label : `${label} (chưa tính vào thưởng)`;
+}
+
 export default function HrViolationsView({ initialTab }: { initialTab?: string }) {
   const settings = useSettingsContext();
   const { user } = useAuthContext();
@@ -145,7 +209,7 @@ export default function HrViolationsView({ initialTab }: { initialTab?: string }
       </Stack>
 
       {tab === 'mine' && <MyViolations month={month} />}
-      {tab === 'store' && canSeeStore && <StoreViolations month={month} canManage={canManage} />}
+      {tab === 'store' && canSeeStore && <StoreViolations month={month} canManage={canManage} canEditPolicy={canEditCatalog} />}
       {tab === 'catalog' && <Catalog canEdit={canEditCatalog} />}
     </Container>
   );
@@ -154,7 +218,7 @@ export default function HrViolationsView({ initialTab }: { initialTab?: string }
 // ----------------------------------------------------------------------
 
 function SummaryCard({ summary, policy }: { summary: IViolationSummary; policy: IViolationPolicy | null }) {
-  const bonus = bonusLabel(summary);
+  const bonus = bonusWithState(summary, policy);
   const thresholds = thresholdsText(policy);
   return (
     <Card sx={{ mb: 2 }}>
@@ -426,7 +490,7 @@ function MyViolations({ month }: { month: string }) {
 
 // ----------------------------------------------------------------------
 
-function StoreViolations({ month, canManage }: { month: string; canManage: boolean }) {
+function StoreViolations({ month, canManage, canEditPolicy }: { month: string; canManage: boolean; canEditPolicy: boolean }) {
   const { enqueueSnackbar } = useSnackbar();
   const [summary, setSummary] = useState<IViolationMonth | null>(null);
   const [entries, setEntries] = useState<IViolationEntry[]>([]);
@@ -538,6 +602,11 @@ function StoreViolations({ month, canManage }: { month: string; canManage: boole
               {thresholds}
             </Typography>
           )}
+          {summary?.policy && (
+            <Box sx={{ mt: 1 }}>
+              <BonusToggle policy={summary.policy} canEdit={canEditPolicy} onChanged={load} />
+            </Box>
+          )}
         </CardContent>
         <TableContainer>
           <Table size="small">
@@ -572,7 +641,7 @@ function StoreViolations({ month, canManage }: { month: string; canManage: boole
                     {r.count}
                     {r.disputed > 0 && <Chip size="small" color="warning" label={`${r.disputed} khiếu nại`} sx={{ ml: 1 }} />}
                   </TableCell>
-                  <TableCell>{bonusLabel(r) ?? '—'}</TableCell>
+                  <TableCell>{bonusWithState(r, summary?.policy ?? null) ?? '—'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -883,6 +952,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
         halfBonusPct: numOrNull(policyDraft.halfBonusPct),
         noBonusFromPoints: numOrNull(policyDraft.noBonusFromPoints),
         notCompleteFromPoints: numOrNull(policyDraft.notCompleteFromPoints),
+        appliesToBonus: policy?.appliesToBonus ?? false,
       });
       enqueueSnackbar('Đã lưu');
       setPolicyDraft(null);
@@ -925,6 +995,9 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                   <Typography variant="body2" color="text.secondary">
                     {thresholdsText(policy) ?? 'Không đặt ngưỡng tổng điểm trừ.'}
                   </Typography>
+                  <Box sx={{ mt: 1 }}>
+                    <BonusToggle policy={policy} canEdit={canEdit} onChanged={load} />
+                  </Box>
                 </>
               ) : (
                 <Typography variant="body2" color="text.secondary">
