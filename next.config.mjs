@@ -31,6 +31,8 @@ const BACKEND_API_PREFIXES = [
   'shift-leave', 'policy-documents', 'sales-targets', 'work-tasks', 'hr-records', 'performance', 'employment-contracts',
   // Bồi thường thiệt hại, ca hỗ trợ trên chợ ca (Phase 2).
   'hr-compensations', 'support-shifts',
+  // Luật nhân sự riêng của cửa hàng.
+  'hr-rule-settings',
   // Kết nối hãng vận chuyển (Thanh toán → Cài đặt → Bán online & giao hàng) — chuyển tiếp spark-shipping.
   'shipping',
   // API công khai của cửa hàng (thương hiệu, sản phẩm) — app mobile bản cửa hàng dùng để kiểm tra mã cửa hàng.

@@ -73,6 +73,11 @@ vi.mock('src/api/attendance', () => ({
   getShiftSchedulesByDateRange: (...a: any[]) => schedule.getShiftSchedulesByDateRange(...a),
 }));
 vi.mock('src/api/users', () => ({ getActiveStaffUsers: vi.fn().mockResolvedValue([]) }));
+// Luật của cửa hàng: báo trước 24 giờ khi xin nghỉ, ngưỡng biên bản 20.000đ (như CiCi).
+vi.mock('src/api/hr-rules', () => ({
+  useActiveHrRules: () => ({ leaveMinNoticeHours: 24, recordCashThreshold: 20_000, performanceEnabled: true }),
+  shortTime: (v: string | null) => (v ? v.slice(0, 5) : ''),
+}));
 
 // Imported after the mocks above.
 import HrLeaveView, { hoursUntil } from 'src/sections/hr/view/hr-leave-view';

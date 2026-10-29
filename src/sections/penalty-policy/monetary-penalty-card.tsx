@@ -102,10 +102,7 @@ export function MonetaryPenaltyCard() {
               (0đ); các chính sách bên dưới chỉ còn dùng để đếm vi phạm.
             </Alert>
           ) : (
-            <Alert severity="warning">
-              Bộ luật Lao động 2019 (Điều 127) cấm phạt tiền, cắt lương thay cho xử lý kỷ luật. Chọn ngày bắt đầu
-              ngừng trừ tiền — vi phạm vẫn được ghi nhận.
-            </Alert>
+            <Alert severity="info">Chọn ngày bắt đầu ngừng trừ tiền — vi phạm vẫn được ghi nhận.</Alert>
           )}
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>

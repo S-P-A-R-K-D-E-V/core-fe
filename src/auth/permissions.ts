@@ -101,7 +101,7 @@ export const PERMISSIONS = {
     leaveReview: 'shift.leave.review',
   },
   /**
-   * Nhân sự theo Quy chế / Nội quy: văn bản ký xác nhận, target tuần, nhiệm vụ, biên bản, điểm + xếp loại. Nhân viên xem /
+   * Nhân sự: văn bản ký xác nhận, target tuần, nhiệm vụ, biên bản, điểm + xếp loại. Nhân viên xem /
    * ký / nộp phần của mình không cần quyền.
    */
   hr: {
@@ -115,6 +115,8 @@ export const PERMISSIONS = {
     contractManage: 'hr.contract.manage',
     /** Duyệt / huỷ khoản bồi thường từ biên bản chênh lệch có lỗi cá nhân — chỉ Admin. */
     compensationManage: 'hr.compensation.manage',
+    /** Luật nhân sự riêng của cửa hàng (thưởng tuần, target, khiếu nại, ca hỗ trợ, xin nghỉ, biên bản, điểm, cảnh báo) — chỉ Admin. */
+    ruleManage: 'hr.rule.manage',
   },
   /** Hàng hoá — xem hàng, nhóm hàng, thương hiệu, đơn vị không cần quyền (màn bán hàng). Thêm / sửa cần kèm xem giá vốn. */
   products: {

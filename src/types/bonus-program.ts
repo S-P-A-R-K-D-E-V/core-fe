@@ -1,5 +1,5 @@
 // ----------------------------------------------------------------------
-// Chương trình thưởng theo đơn (Quy chế Điều 4, 14a.4 — hoa hồng đơn online; Điều 29 — công bố trước 15 ngày, không hồi tố).
+// Chương trình thưởng theo đơn do Admin cấu hình (nguồn đơn, cách tính, người nhận, hạn đổi trả, ngày trả vào lương).
 // ----------------------------------------------------------------------
 
 export type BonusSalesSource = 'KiotViet' | 'Pos' | 'Web' | 'Online';
@@ -50,10 +50,9 @@ export interface IBonusProgram {
   categoryRates: IBonusCategoryRate[];
   /** Đã trả vào lương — không sửa cách tính được nữa. */
   locked: boolean;
-  noticeWarning?: string | null;
 }
 
-export type ISaveBonusProgram = Omit<IBonusProgram, 'id' | 'locked' | 'noticeWarning'>;
+export type ISaveBonusProgram = Omit<IBonusProgram, 'id' | 'locked'>;
 
 export interface IBonusShare {
   userId: string;

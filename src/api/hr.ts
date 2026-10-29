@@ -164,6 +164,12 @@ export async function publishSalesTargets(from: string, to: string): Promise<num
   return response.data.published;
 }
 
+/** Thu hồi công bố các tuần trong [from, to] — nhân viên không thấy nữa cho tới khi công bố lại. */
+export async function unpublishSalesTargets(from: string, to: string): Promise<number> {
+  const response = await axios.post<{ unpublished: number }>(endpoints.hr.targetsUnpublish, { from, to });
+  return response.data.unpublished;
+}
+
 export async function getWeeklyBonus(from: string, to: string): Promise<IWeeklyBonus[]> {
   const response = await axios.get<IWeeklyBonus[]>(endpoints.hr.weeklyBonus, { params: { from, to } });
   return response.data;

@@ -46,14 +46,14 @@ import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
 import type { IHrRecord, HrRecordType, HrRecordStatus } from 'src/types/hr';
-import { HR_RECORD_TYPE_LABEL, CASH_RECORD_THRESHOLD, HR_RECORD_STATUS_LABEL } from 'src/types/hr';
+import { HR_RECORD_TYPE_LABEL, NEW_HR_RECORD_TYPES, HR_RECORD_STATUS_LABEL } from 'src/types/hr';
+import { useActiveHrRules } from 'src/api/hr-rules';
 
 import { fVnd, MonthField, monthStart, parseAmount, previousMonth } from '../hr-common';
 import { canCompensate, CompensationsPanel, CreateCompensationDialog } from '../compensations-panel';
 
 // ----------------------------------------------------------------------
-// Biên bản (Quy chế Chương VIII, Phụ lục C; Nội quy Điều 27): chênh lệch tiền / hàng, vi phạm nội quy, cảnh báo mức hoàn
-// thành công việc. Nhân viên đọc, ghi ý kiến, ký hoặc từ chối ký (ghi lý do). Biên bản chỉ ghi nhận — không trừ lương,
+// Biên bản: chênh lệch tiền / hàng, vi phạm (biên bản "cảnh báo hoàn thành công việc" cũ vẫn xem được, không lập mới). Nhân viên đọc, ghi ý kiến, ký hoặc từ chối ký (ghi lý do). Biên bản chỉ ghi nhận — không trừ lương,
 // không phạt tiền.
 // ----------------------------------------------------------------------
 
@@ -110,6 +110,9 @@ export default function HrRecordsView({ initialTab }: { initialTab?: string }) {
   const [records, setRecords] = useState<IHrRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState<{ id: string; name: string }[]>([]);
+  const rules = useActiveHrRules();
+  const cashThreshold = rules?.recordCashThreshold ?? null;
+  const performanceOn = rules?.performanceEnabled ?? false;
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [detail, setDetail] = useState<IHrRecord | null>(null);
@@ -148,13 +151,13 @@ export default function HrRecordsView({ initialTab }: { initialTab?: string }) {
   }, [canManage]);
 
   const amount = draft ? parseAmount(draft.amount) : null;
-  const belowThreshold = draft?.type === 'CashDiscrepancy' && amount !== null && Math.abs(amount) < CASH_RECORD_THRESHOLD;
+  const belowThreshold =
+    draft?.type === 'CashDiscrepancy' && amount !== null && cashThreshold != null && Math.abs(amount) < cashThreshold;
   const draftValid =
     !!draft &&
     !!draft.staffId &&
     !!draft.description.trim() &&
-    (!isDiscrepancy(draft.type) || (amount !== null && draft.personalFault !== '' && !belowThreshold)) &&
-    (draft.type !== 'Warning' || !!draft.improvementPlan.trim());
+    (!isDiscrepancy(draft.type) || (amount !== null && draft.personalFault !== '' && !belowThreshold));
 
   const create = async () => {
     if (!draft) return;
@@ -168,9 +171,9 @@ export default function HrRecordsView({ initialTab }: { initialTab?: string }) {
         description: draft.description.trim(),
         cause: draft.cause.trim() || null,
         personalFault: isDiscrepancy(draft.type) ? draft.personalFault === 'yes' : null,
-        violationLevel: draft.type === 'Violation' ? Number(draft.violationLevel) : null,
-        evaluatedMonth: draft.type === 'Warning' ? draft.evaluatedMonth : null,
-        improvementPlan: draft.type === 'Warning' ? draft.improvementPlan.trim() : null,
+        violationLevel: null,
+        evaluatedMonth: null,
+        improvementPlan: null,
       });
       enqueueSnackbar('Đã lập biên bản — nhân viên được báo để ký');
       setDraft(null);
@@ -332,7 +335,7 @@ export default function HrRecordsView({ initialTab }: { initialTab?: string }) {
                 value={draft.type}
                 onChange={(e) => setDraft({ ...draft, type: e.target.value as HrRecordType })}
               >
-                {(Object.keys(HR_RECORD_TYPE_LABEL) as HrRecordType[]).map((t) => (
+                {NEW_HR_RECORD_TYPES.map((t) => (
                   <MenuItem key={t} value={t}>
                     {HR_RECORD_TYPE_LABEL[t]}
                   </MenuItem>
@@ -361,7 +364,7 @@ export default function HrRecordsView({ initialTab }: { initialTab?: string }) {
                     error={belowThreshold}
                     helperText={
                       belowThreshold
-                        ? 'Dưới 20.000đ không lập biên bản — chỉ ghi chú vào phiếu đối soát ca (Quy chế Điều 25).'
+                        ? `Dưới ${fVnd(cashThreshold ?? 0)} không lập biên bản — chỉ ghi chú vào phiếu đối soát ca.`
                         : undefined
                     }
                   />
@@ -375,32 +378,13 @@ export default function HrRecordsView({ initialTab }: { initialTab?: string }) {
                       <FormControlLabel value="yes" control={<Radio />} label="Có" />
                       <FormControlLabel value="no" control={<Radio />} label="Không / chưa rõ" />
                     </RadioGroup>
-                    <Typography variant="caption" color="text.secondary">
-                      Chỉ chênh lệch có lỗi cá nhân mới trừ điểm đối soát (−5) và tính vào xếp loại (≥ 3 lần / tháng).
-                    </Typography>
+                    {performanceOn && (
+                      <Typography variant="caption" color="text.secondary">
+                        Chỉ chênh lệch có lỗi cá nhân mới tính vào điểm hiệu suất.
+                      </Typography>
+                    )}
                   </Box>
                 </>
-              )}
-              {draft.type === 'Violation' && (
-                <TextField
-                  select
-                  label="Mức vi phạm"
-                  value={draft.violationLevel}
-                  onChange={(e) => setDraft({ ...draft, violationLevel: e.target.value })}
-                >
-                  {['1', '2', '3', '4'].map((l) => (
-                    <MenuItem key={l} value={l}>
-                      Mức {l}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              )}
-              {draft.type === 'Warning' && (
-                <MonthField
-                  label="Tháng được đánh giá"
-                  value={draft.evaluatedMonth}
-                  onChange={(m) => setDraft({ ...draft, evaluatedMonth: m })}
-                />
               )}
               <TextField
                 label="Nội dung sự việc"
@@ -416,15 +400,6 @@ export default function HrRecordsView({ initialTab }: { initialTab?: string }) {
                 multiline
                 minRows={2}
               />
-              {draft.type === 'Warning' && (
-                <TextField
-                  label="Kế hoạch cải thiện (ca kèm cặp, chỉ tiêu tháng sau — Phụ lục C)"
-                  value={draft.improvementPlan}
-                  onChange={(e) => setDraft({ ...draft, improvementPlan: e.target.value })}
-                  multiline
-                  minRows={3}
-                />
-              )}
             </Stack>
           )}
         </DialogContent>

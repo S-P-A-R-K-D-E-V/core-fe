@@ -202,7 +202,7 @@ export default function HrContractsView({ initialTab }: { initialTab?: string })
       <CustomBreadcrumbs heading="Hợp đồng lao động" links={[{ name: 'Nhân sự' }, { name: 'Hợp đồng lao động' }]} sx={{ mb: 2 }} />
       <Alert severity="info" sx={{ mb: 2 }}>
         {canManage
-          ? 'Soạn từ mẫu → chốt (cấp số) → in, ký giấy với nhân viên, lưu bản giấy → tải ảnh / PDF bản đã ký lên. Nhân viên chỉ xem được hợp đồng của mình. Đây là hợp đồng giấy ký tay, không phải hợp đồng điện tử theo NĐ 337/2025.'
+          ? 'Soạn từ mẫu → chốt (cấp số) → in, ký giấy với nhân viên, lưu bản giấy → tải ảnh / PDF bản đã ký lên. Nhân viên chỉ xem được hợp đồng của mình. Đây là hợp đồng giấy ký tay.'
           : 'Hợp đồng lao động của bạn — chỉ để xem. Bản gốc ký tay do cửa hàng lưu giữ.'}
       </Alert>
       {canManage && (
@@ -451,7 +451,7 @@ function TermsFields({
       />
       <FormControlLabel
         control={<Checkbox checked={terms.isPartTime} onChange={(e) => onChange({ ...terms, isPartTime: e.target.checked })} />}
-        label="Không trọn thời gian (Quy chế Điều 16: 40–96 giờ / tháng)"
+        label="Không trọn thời gian"
       />
       {terms.isPartTime && (
         <Stack direction="row" spacing={2}>

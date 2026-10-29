@@ -202,7 +202,7 @@ export type HrRecordStatus = 'AwaitingSignature' | 'Signed' | 'RefusedToSign' | 
 export const HR_RECORD_TYPE_LABEL: Record<HrRecordType, string> = {
   CashDiscrepancy: 'Chênh lệch tiền',
   StockDiscrepancy: 'Chênh lệch hàng',
-  Violation: 'Vi phạm nội quy',
+  Violation: 'Vi phạm',
   Warning: 'Cảnh báo hoàn thành công việc',
 };
 
@@ -213,8 +213,8 @@ export const HR_RECORD_STATUS_LABEL: Record<HrRecordStatus, string> = {
   Voided: 'Đã huỷ',
 };
 
-/** Chênh lệch tiền dưới mức này không lập biên bản (Quy chế Điều 25). */
-export const CASH_RECORD_THRESHOLD = 20_000;
+/** Loại lập mới được — "Cảnh báo hoàn thành công việc" chỉ còn ở biên bản cũ (chủ tịch 2026-10-28). */
+export const NEW_HR_RECORD_TYPES: HrRecordType[] = ['CashDiscrepancy', 'StockDiscrepancy', 'Violation'];
 
 export interface IHrRecord {
   id: string;

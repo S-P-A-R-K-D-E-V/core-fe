@@ -150,7 +150,7 @@ export default function ShiftTemplateNewEditForm({ currentTemplate }: Props) {
                 label="Phút nghỉ giữa ca"
                 type="number"
                 placeholder="30"
-                helperText="Nội quy Điều 5: làm từ 6 giờ cần 30 phút nghỉ. Đặt ở đây thì hết cảnh báo khi xếp ca."
+                helperText="Phút nghỉ đã bố trí trong ca — dùng khi cảnh báo giờ làm lúc xếp ca."
               />
 
               {isExtra && (
@@ -168,7 +168,7 @@ export default function ShiftTemplateNewEditForm({ currentTemplate }: Props) {
                     type="number"
                     placeholder="1.5"
                     inputProps={{ step: 0.5 }}
-                    helperText="Có đi làm thì trả ít nhất số giờ này (quy chế: 1,5 giờ)."
+                    helperText="Có đi làm thì trả ít nhất số giờ này."
                   />
                 </>
               )}

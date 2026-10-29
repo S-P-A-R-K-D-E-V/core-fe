@@ -31,7 +31,15 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
-import { getWeeklyBonus, getSalesTargets, updateSalesTarget, generateSalesTargets, publishSalesTargets } from 'src/api/hr';
+import { useActiveHrRules } from 'src/api/hr-rules';
+import {
+  getWeeklyBonus,
+  getSalesTargets,
+  updateSalesTarget,
+  generateSalesTargets,
+  publishSalesTargets,
+  unpublishSalesTargets,
+} from 'src/api/hr';
 
 import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
@@ -43,9 +51,8 @@ import { WEEKDAY_LABEL } from 'src/types/hr';
 import { fPct, fVnd, monthEnd, MonthField, monthStart } from '../hr-common';
 
 // ----------------------------------------------------------------------
-// Target doanh thu tuần + khung giờ (Quy chế Chương III). Target tuần = cùng tuần năm trước × hệ số xu hướng × 1,05, không
-// thấp hơn sàn; chia xuống từng ca theo tỷ trọng 8 tuần gần nhất. Công bố trước ngày 1 của tháng (Điều 9). Nhân viên chỉ
-// thấy tuần đã công bố, không thấy doanh thu thực tế.
+// Target doanh thu tuần + khung giờ: tự tính (khi cửa hàng bật ở Cấu hình luật), sửa tay, công bố / thu hồi; chia xuống từng
+// ca theo tỷ trọng 8 tuần gần nhất. Nhân viên chỉ thấy tuần đã công bố, không thấy doanh thu thực tế.
 // ----------------------------------------------------------------------
 
 function nextMonth(): string {
@@ -64,6 +71,9 @@ export default function HrTargetsView() {
   const { enqueueSnackbar } = useSnackbar();
   const { user } = useAuthContext();
   const canManage = hasPermission(user, PERMISSIONS.hr.targetManage);
+  const rules = useActiveHrRules();
+  const autoTargets = rules?.targetGrowthPct != null;
+  const weeklyBonusOn = rules?.weeklyBonusEnabled ?? false;
 
   const [month, setMonth] = useState(canManage ? nextMonth() : monthStart());
   const [tab, setTab] = useState<'targets' | 'bonus'>('targets');
@@ -122,6 +132,19 @@ export default function HrTargetsView() {
     }
   };
 
+  const unpublish = async (weekStart: string) => {
+    setBusy(true);
+    try {
+      await unpublishSalesTargets(weekStart, weekStart);
+      enqueueSnackbar('Đã thu hồi — nhân viên không thấy target tuần này nữa');
+      load();
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không thu hồi được'), { variant: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const saveEdit = async (revert: boolean) => {
     if (!edit) return;
     setBusy(true);
@@ -148,9 +171,11 @@ export default function HrTargetsView() {
           canManage &&
           tab === 'targets' && (
             <Stack direction="row" spacing={1}>
-              <LoadingButton variant="outlined" loading={busy} onClick={generate}>
-                Tính target
-              </LoadingButton>
+              {autoTargets && (
+                <LoadingButton variant="outlined" loading={busy} onClick={generate}>
+                  Tính target
+                </LoadingButton>
+              )}
               <LoadingButton variant="contained" loading={busy} disabled={unpublished === 0} onClick={publish}>
                 Công bố {unpublished > 0 ? `(${unpublished} tuần)` : ''}
               </LoadingButton>
@@ -159,18 +184,18 @@ export default function HrTargetsView() {
         }
         sx={{ mb: 2 }}
       />
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {canManage
-          ? 'Target tuần = doanh thu cùng tuần năm trước × hệ số xu hướng (8 tuần gần nhất so với năm trước, bỏ tuần lễ) × 1,05, không thấp hơn trung vị 8 tuần × 1,05. Tuần Tết nên sửa tay theo lịch âm. Công bố trước ngày 1 của tháng.'
-          : 'Target từng ca để bạn xem trước khi đăng ký ca (Quy chế Điều 9). Đánh giá dùng tỷ lệ đạt target của các ca bạn làm, nên ca vắng không bị so sánh bất lợi với ca đông.'}
-      </Typography>
+      {!canManage && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Target từng ca để bạn xem trước khi đăng ký ca.
+        </Typography>
+      )}
 
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <MonthField value={month} onChange={setMonth} />
         {canManage && (
           <Tabs value={tab} onChange={(_, v) => setTab(v)}>
             <Tab value="targets" label="Target" />
-            <Tab value="bonus" label="Thưởng tuần (tính thử)" />
+            {weeklyBonusOn && <Tab value="bonus" label="Thưởng tuần" />}
           </Tabs>
         )}
       </Stack>
@@ -191,7 +216,11 @@ export default function HrTargetsView() {
         ) : tab === 'targets' ? (
           targets.length === 0 ? (
             <Typography color="text.secondary" sx={{ p: 3 }}>
-              {canManage ? 'Chưa có target — bấm "Tính target".' : 'Chưa có target đã công bố cho tháng này.'}
+              {canManage
+                ? autoTargets
+                  ? 'Chưa có target — bấm "Tính target".'
+                  : 'Chưa có target. Bật tự tính target ở Nhân sự → Cấu hình luật.'
+                : 'Chưa có target đã công bố cho tháng này.'}
             </Typography>
           ) : (
             <TableContainer>
@@ -258,6 +287,19 @@ export default function HrTargetsView() {
                                 }}
                               >
                                 Sửa
+                              </Button>
+                            )}
+                            {canManage && t.publishedAt && (
+                              <Button
+                                size="small"
+                                color="warning"
+                                disabled={busy}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  unpublish(t.weekStart);
+                                }}
+                              >
+                                Thu hồi
                               </Button>
                             )}
                           </TableCell>
@@ -380,9 +422,7 @@ function BonusTable({ weeks }: { weeks: IWeeklyBonus[] }) {
   return (
     <Stack spacing={2} sx={{ p: 2 }}>
       <Alert severity="info">
-        Theo Quy chế Điều 5: quỹ = 3% phần doanh thu 100–110% target + 5% phần trên 110%, chia theo giờ làm thực tế. Doanh
-        thu tính thưởng bỏ đơn online và dòng hàng giảm từ 30%. Chỉ vào bảng lương (kỳ cuối tháng) khi đã đặt ngày ở trang
-        Chính sách ngày lễ › Thưởng doanh số tuần vào lương.
+        Vào bảng lương (kỳ cuối tháng) khi đã đặt ngày ở trang Chính sách ngày lễ › Thưởng doanh số tuần vào lương.
       </Alert>
       {weeks.map((w) => (
         <Card key={w.weekStart} variant="outlined">

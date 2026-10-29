@@ -25,6 +25,7 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { getShiftSchedulesByDateRange } from 'src/api/attendance';
+import { shortTime, useActiveHrRules } from 'src/api/hr-rules';
 import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
 import {
   getSupportShifts,
@@ -52,10 +53,8 @@ import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
 // ----------------------------------------------------------------------
 // Ca hỗ trợ mở trên chợ ca (C11). Quản lý (shift.assignment.manage) đăng một lịch ca phụ vào một ngày, cần bao nhiêu
-// người; ai cũng nhận được; duyệt = ca vào lịch người nhận. Quy chế: không sau 22:00, tối đa 10 ca hỗ trợ / tháng / người.
+// người; ai cũng nhận được; duyệt = ca vào lịch người nhận. Giờ muộn nhất và số ca / tháng theo Cấu hình luật của cửa hàng.
 // ----------------------------------------------------------------------
-
-const LATEST_END = '22:00';
 
 const CLAIM_COLOR: Record<ISupportShiftClaim['status'], 'warning' | 'success' | 'default' | 'error'> = {
   Pending: 'warning',
@@ -77,6 +76,7 @@ function payText(o: ISupportShiftOpening) {
 // ── Đăng ca hỗ trợ ──────────────────────────────────────────────────────
 
 function CreateDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
+  const latestEnd = shortTime(useActiveHrRules()?.supportShiftLatestEnd) || null;
   const { enqueueSnackbar } = useSnackbar();
   const [date, setDate] = useState(todayStr());
   const [schedules, setSchedules] = useState<IShiftSchedule[]>([]);
@@ -100,7 +100,8 @@ function CreateDialog({ open, onClose, onCreated }: { open: boolean; onClose: ()
   }, [open, date, enqueueSnackbar]);
 
   const selected = schedules.find((s) => s.id === scheduleId);
-  const tooLate = !!selected && (hhmm(selected.endTime) > LATEST_END || selected.endTime <= selected.startTime);
+  const overnight = !!selected && selected.endTime <= selected.startTime;
+  const tooLate = !!selected && (overnight || (latestEnd != null && hhmm(selected.endTime) > latestEnd));
 
   const submit = async () => {
     setSaving(true);
@@ -150,7 +151,11 @@ function CreateDialog({ open, onClose, onCreated }: { open: boolean; onClose: ()
               </MenuItem>
             ))}
           </TextField>
-          {tooLate ? <Alert severity="error">Ca hỗ trợ không được kéo sau 22:00 (quy chế).</Alert> : null}
+          {tooLate ? (
+            <Alert severity="error">
+              {overnight ? 'Ca hỗ trợ phải kết thúc trong ngày.' : `Ca hỗ trợ không được kéo sau ${latestEnd}.`}
+            </Alert>
+          ) : null}
           <TextField
             type="number"
             label="Số người cần"

@@ -55,7 +55,7 @@ export function ProposedWarningsAlert({
   result,
   nameOf,
   shiftOf,
-  title = 'Cảnh báo theo Nội quy (chỉ cảnh báo, vẫn lưu được)',
+  title = 'Cảnh báo giờ làm (chỉ cảnh báo, vẫn lưu được)',
 }: {
   result: IProposedAssignmentWarnings[];
   nameOf: (staffId: string) => string;
