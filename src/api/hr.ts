@@ -383,6 +383,18 @@ export function contractImportType(file: File): string | null {
  * (có thể mất khoảng 1 phút). Nội dung bản nháp được thay bằng HTML đọc được.
  */
 export async function importContractTemplateFile(templateId: string, file: File): Promise<IContractTemplateImport> {
+  const upload = await uploadContractTemplateImport(templateId, file);
+  const response = await axios.post<IContractTemplateImport>(endpoints.hr.contractTemplateImport(templateId), upload, {
+    timeout: 180_000,
+  });
+  return response.data;
+}
+
+/** Bước 1 của tải mẫu: xin URL rồi PUT thẳng tệp lên kho riêng tư; trả object key để máy chủ đọc (import / import stream). */
+export async function uploadContractTemplateImport(
+  templateId: string,
+  file: File
+): Promise<{ objectKey: string; fileName: string }> {
   const contentType = contractImportType(file);
   if (!contentType) throw new Error('Chỉ nhận tệp .docx hoặc .pdf');
   const presign = await axios.post<{ objectKey: string; uploadUrl: string }>(
@@ -391,12 +403,7 @@ export async function importContractTemplateFile(templateId: string, file: File)
   );
   const put = await fetch(presign.data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file });
   if (!put.ok) throw new Error(`Tải tệp lên thất bại (${put.status})`);
-  const response = await axios.post<IContractTemplateImport>(
-    endpoints.hr.contractTemplateImport(templateId),
-    { objectKey: presign.data.objectKey, fileName: file.name },
-    { timeout: 180_000 }
-  );
-  return response.data;
+  return { objectKey: presign.data.objectKey, fileName: file.name };
 }
 
 /** Xem trước mẫu với hồ sơ + lương hiện tại của một nhân viên. */

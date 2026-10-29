@@ -2,6 +2,8 @@ import { useRef, useState, useCallback } from 'react';
 
 import axios from 'src/utils/axios';
 
+import { readSse } from './sse';
+
 // ----------------------------------------------------------------------
 // Lệnh AI viết bài dạng stream (Server-Sent Events) qua route /store-posts-ai/* của Next: nhận dần bước đang làm, suy nghĩ
 // của model (nếu có), chữ đang viết, rồi kết quả — trang hiện tiến trình thay vòng xoay.
@@ -46,38 +48,19 @@ export async function streamStorePostAi<T>(
     );
   }
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    // eslint-disable-next-line no-await-in-loop
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    let sep = buffer.indexOf('\n\n');
-    while (sep >= 0) {
-      const block = buffer.slice(0, sep);
-      buffer = buffer.slice(sep + 2);
-      sep = buffer.indexOf('\n\n');
-
-      let event = 'message';
-      let data = '';
-      block.split('\n').forEach((line) => {
-        if (line.startsWith('event:')) event = line.slice(6).trim();
-        else if (line.startsWith('data:')) data += line.slice(5).trim();
-      });
-      if (!data) continue; // ": ping" giữ kết nối
-
-      const payload = JSON.parse(data);
-      if (event === 'result') return payload as T;
-      if (event === 'error') throw new AiStreamError(payload.message ?? 'AI gặp lỗi — thử lại.');
-      if (event === 'step') onEvent({ type: 'step', key: payload.key, text: payload.text });
-      else if (event === 'thinking') onEvent({ type: 'thinking', text: payload.text ?? '' });
-      else if (event === 'delta') onEvent({ type: 'delta', text: payload.text ?? '' });
+  let result: T | undefined;
+  const finished = await readSse(res.body, (event, payload) => {
+    if (event === 'result') {
+      result = payload as T;
+      return true;
     }
-  }
+    if (event === 'error') throw new AiStreamError(payload.message ?? 'AI gặp lỗi — thử lại.');
+    if (event === 'step') onEvent({ type: 'step', key: payload.key, text: payload.text });
+    else if (event === 'thinking') onEvent({ type: 'thinking', text: payload.text ?? '' });
+    else if (event === 'delta') onEvent({ type: 'delta', text: payload.text ?? '' });
+    return false;
+  });
+  if (finished) return result as T;
   throw new AiStreamError('Kết nối tới AI bị ngắt giữa chừng — thử lại.');
 }
 
