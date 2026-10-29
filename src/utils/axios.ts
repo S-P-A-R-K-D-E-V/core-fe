@@ -531,7 +531,6 @@ export const endpoints = {
     create: '/payroll-cycles',
     update: (id: string) => `/payroll-cycles/${id}`,
     lock: (id: string) => `/payroll-cycles/${id}/lock`,
-    unlock: (id: string) => `/payroll-cycles/${id}/unlock`,
     visibility: (id: string) => `/payroll-cycles/${id}/visibility`,
   },
   salaryHistory: {

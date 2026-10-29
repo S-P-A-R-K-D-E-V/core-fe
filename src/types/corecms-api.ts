@@ -886,6 +886,8 @@ export interface IBatchPayrollResponse {
   successCount: number;
   skippedCount: number;
   records: IPayrollRecord[];
+  /** Tính lại cả kỳ: số bảng lương giữ nguyên vì đã chốt hoặc đã chi (không có trong records). */
+  keptCount?: number;
 }
 
 export interface IPayrollCycleDetailResponse {

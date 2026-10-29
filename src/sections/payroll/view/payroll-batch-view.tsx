@@ -292,15 +292,16 @@ export default function PayrollBatchView() {
       setRecalculating(true);
 
       if (userIds === null) {
-        // Chọn tất cả → tính lại toàn kỳ như cũ (recalculate-cycle).
+        // Chọn tất cả → tính lại toàn kỳ (recalculate-cycle): cập nhật tại chỗ, giữ nguyên bảng lương đã chốt / đã chi.
         const result: IBatchPayrollResponse = await recalculatePayrollByCycle(selectedCycleId);
-        enqueueSnackbar(`Tính lại thành công! ${result.successCount} nhân viên`, {
-          variant: 'success',
-        });
+        const kept = result.keptCount ?? 0;
+        enqueueSnackbar(
+          `Tính lại thành công! ${result.successCount} nhân viên${kept ? `, giữ nguyên ${kept} bảng lương đã chốt/đã chi` : ''}`,
+          { variant: 'success' }
+        );
       } else {
-        // Chọn một phần → tính lại TỪNG record của các NV được chọn.
-        // (Không dùng recalculate-cycle vì nó xoá và tính lại TẤT CẢ record,
-        // kể cả nhân viên không được chọn / đã chốt.)
+        // Chọn một phần → tính lại TỪNG record của các NV được chọn (recalculate-cycle tính cả kỳ). Record đã chốt
+        // sẽ bị bỏ chốt và phải duyệt lại; record đã chi bị BE từ chối (Payroll.RecordAlreadyPaid).
         const chosen = new Set(userIds);
         const seen = new Set<string>();
         const targets = (cycleDetail?.records ?? []).filter((r) => {

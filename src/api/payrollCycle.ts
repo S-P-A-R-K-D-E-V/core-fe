@@ -37,11 +37,12 @@ export async function updatePayrollCycle(
   return response.data;
 }
 
+// Khoá và mở khoá dùng chung PUT /payroll-cycles/{id}/lock với { isLocked } (BE không có POST …/lock hay …/unlock).
 export async function lockPayrollCycle(
   id: string,
   data: ILockPayrollCycleRequest
 ): Promise<IPayrollCycle> {
-  const response = await axios.post<IPayrollCycle>(endpoints.payrollCycle.lock(id), data);
+  const response = await axios.put<IPayrollCycle>(endpoints.payrollCycle.lock(id), data);
   return response.data;
 }
 
@@ -49,7 +50,7 @@ export async function unlockPayrollCycle(
   id: string,
   data: ILockPayrollCycleRequest
 ): Promise<IPayrollCycle> {
-  const response = await axios.post<IPayrollCycle>(endpoints.payrollCycle.unlock(id), data);
+  const response = await axios.put<IPayrollCycle>(endpoints.payrollCycle.lock(id), data);
   return response.data;
 }
 
