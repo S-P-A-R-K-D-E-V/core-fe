@@ -431,6 +431,7 @@ export function useNavData(
               { title: t('hrPolicies'), path: paths.dashboard.hr.policies },
               { title: t('hrTargets'), path: paths.dashboard.hr.targets },
               { title: t('hrRecords'), path: paths.dashboard.hr.records },
+              { title: t('hrViolations'), path: paths.dashboard.hr.violations },
               { title: t('hrPerformance'), path: paths.dashboard.hr.performance },
               { title: t('hrContracts'), path: paths.dashboard.hr.contracts },
               { title: t('hrRules'), path: paths.dashboard.hr.rules, permissions: [PERMISSIONS.hr.ruleManage] },
