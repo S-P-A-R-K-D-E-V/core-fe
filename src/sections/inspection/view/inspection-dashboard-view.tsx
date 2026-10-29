@@ -120,8 +120,8 @@ export default function InspectionDashboardView() {
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
       <CustomBreadcrumbs
-        heading="Kiểm tra cửa hàng"
-        links={[{ name: 'Tổng quan' }]}
+        heading="Kiểm tra ca"
+        links={[{ name: 'Công việc', href: paths.dashboard.cleaning.myChecklist }, { name: 'Kiểm tra ca' }]}
         action={
           <Button variant="outlined" component={RouterLink} href={paths.dashboard.inspection.myFaults}>
             Lỗi tôi phụ trách
@@ -203,7 +203,7 @@ export default function InspectionDashboardView() {
               <CardHeader
                 title="Sửa tận gốc sắp đến hạn"
                 action={
-                  <Button size="small" component={RouterLink} href={paths.dashboard.inspection.correctiveActions}>
+                  <Button size="small" component={RouterLink} href={paths.dashboard.cleaning.assigned}>
                     Xem hết
                   </Button>
                 }

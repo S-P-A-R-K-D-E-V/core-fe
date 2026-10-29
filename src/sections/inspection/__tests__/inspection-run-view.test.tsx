@@ -45,7 +45,8 @@ import InspectionRunView, { buildRows } from 'src/sections/inspection/view/inspe
 
 const item = (over: Partial<IInspectionTemplateItem>): IInspectionTemplateItem => ({
   id: 'i', code: 'Q', groupName: null, title: 'Mục', passCriteria: 'tiêu chí', level: 'Mandatory', zones: ['A'],
-  perStaff: false, observationsPerStaff: 1, requiresPhotoOnFail: true, requiresFix: true, sortOrder: 1, ...over,
+  perStaff: false, observationsPerStaff: 1, requiresPhotoOnFail: true, requiresFix: true, sortOrder: 1, staffDoes: false,
+  weekdays: null, blocks: null, ...over,
 });
 
 const inspection = (): IInspection => ({
@@ -68,6 +69,7 @@ const inspection = (): IInspection => ({
     ],
   },
   results: [],
+  completions: [],
 });
 
 function renderView() {
@@ -93,6 +95,29 @@ describe('buildRows', () => {
 });
 
 describe('InspectionRunView', () => {
+  it('shows who did a staff item and their photo, and flags staff items not done yet', async () => {
+    const data = inspection();
+    data.template.items = [
+      item({ id: 'v01', code: 'V01', title: 'Lau kính', staffDoes: true, sortOrder: 1 }),
+      item({ id: 'v02', code: 'V02', title: 'Quét sàn', staffDoes: true, sortOrder: 2 }),
+    ];
+    data.completions = [
+      {
+        itemId: 'v01',
+        completion: {
+          id: 'c1', completedByUserId: 'mai', completedByName: 'Mai', completedAt: '2026-11-02T11:30:00Z', note: null,
+          photos: [{ id: 'p1', kind: 'Fault', url: 'https://media/x.jpg', uploadedAt: '2026-11-02T11:30:00Z' }],
+        },
+      },
+    ];
+    getInspection.mockResolvedValue(data);
+    renderView();
+
+    expect(await screen.findByText(/Đã làm: Mai/)).toBeTruthy();
+    expect(screen.getByAltText('Ảnh đã làm')).toBeTruthy();
+    expect(screen.getAllByText('Chưa làm')).toHaveLength(1);
+  });
+
   it('blocks submit until everything is scored and the fault has a photo, then saves before submitting', async () => {
     getInspection.mockResolvedValue(inspection());
     uploadInspectionPhotos.mockResolvedValue(['inspections/insp-1/1.jpg']);

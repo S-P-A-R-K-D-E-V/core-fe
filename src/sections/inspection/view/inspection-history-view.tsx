@@ -116,7 +116,7 @@ export default function InspectionHistoryView() {
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
       <CustomBreadcrumbs
         heading="Lịch sử kiểm"
-        links={[{ name: 'Kiểm tra cửa hàng', href: paths.dashboard.inspection.root }, { name: 'Lịch sử kiểm' }]}
+        links={[{ name: 'Kiểm tra ca', href: paths.dashboard.inspection.root }, { name: 'Lịch sử kiểm' }]}
         sx={{ mb: 3 }}
       />
       <Card>

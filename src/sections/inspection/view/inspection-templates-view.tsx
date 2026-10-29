@@ -40,6 +40,7 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import {
   getInspectionTemplates,
+  importCleaningIntoTemplate,
   publishInspectionTemplate,
   saveInspectionTemplateDraft,
   createInspectionTemplateDraft,
@@ -53,19 +54,44 @@ import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
 import type {
+  WorkBlock,
   InspectionType,
   IInspectionTemplate,
   InspectionZoneCode,
   IInspectionTemplateItemInput,
 } from 'src/types/inspection';
-import { INSPECTION_ZONES, INSPECTION_TYPE_LABEL } from 'src/types/inspection';
+import {
+  WORK_BLOCKS,
+  WEEKDAY_SHORT,
+  INSPECTION_ZONES,
+  WORK_BLOCK_LABEL,
+  INSPECTION_TYPE_LABEL,
+} from 'src/types/inspection';
 
 import { LevelChip, ZoneChips, toDateInput } from '../inspection-common';
 
 // ----------------------------------------------------------------------
-// Bảng kiểm có phiên bản: tạo bản nháp (từ bảng kiểm mẫu hoặc chép bản mới nhất) → sửa mục → công bố. Bản đã công bố
-// không sửa được — sửa nội dung là tạo phiên bản mới có ngày hiệu lực, lượt kiểm cũ vẫn hiện đúng bản lúc kiểm.
+// Hạng mục & lịch: một danh sách hạng mục cho cả việc nhân viên làm trong ca lẫn kiểm tra. Có phiên bản: tạo bản nháp
+// (từ mẫu hoặc chép bản mới nhất) → sửa mục → công bố. Bản đã công bố không sửa được — sửa nội dung là tạo phiên bản mới
+// có ngày hiệu lực, lượt kiểm cũ vẫn hiện đúng bản lúc kiểm. Hạng mục "nhân viên tự làm" (chỉ bảng mỗi ca) hiện ở Việc
+// của tôi của người trong ca theo thứ / ca đã chọn.
 // ----------------------------------------------------------------------
+
+const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
+
+/** Bật / tắt một giá trị trong lịch; bỏ hết = null (mọi ngày / mọi ca). */
+function toggleIn<T>(list: T[] | null, value: T, order: T[]): T[] | null {
+  const current = list ?? [];
+  const next = current.includes(value) ? current.filter((v) => v !== value) : order.filter((v) => v === value || current.includes(v));
+  return next.length === 0 ? null : next;
+}
+
+/** "T2, T4 · Sáng" — tóm tắt lịch của hạng mục; trống = mọi ngày, mọi ca. */
+export function scheduleLabel(weekdays: number[] | null, blocks: WorkBlock[] | null): string {
+  const days = weekdays?.length ? weekdays.map((d) => WEEKDAY_SHORT[d]).join(', ') : 'Mọi ngày';
+  const shifts = blocks?.length ? blocks.map((b) => WORK_BLOCK_LABEL[b]).join(', ') : 'mọi ca';
+  return `${days} · ${shifts}`;
+}
 
 export function toInput(t: IInspectionTemplate): IInspectionTemplateItemInput[] {
   return [...t.items]
@@ -81,6 +107,9 @@ export function toInput(t: IInspectionTemplate): IInspectionTemplateItemInput[] 
       observationsPerStaff: i.observationsPerStaff,
       requiresPhotoOnFail: i.requiresPhotoOnFail,
       requiresFix: i.requiresFix,
+      staffDoes: i.staffDoes ?? false,
+      weekdays: i.weekdays?.length ? i.weekdays : null,
+      blocks: i.blocks?.length ? i.blocks : null,
     }));
 }
 
@@ -148,11 +177,32 @@ function TemplateEditorDialog({ template, readOnly, onClose, onSaved }: EditorPr
       enqueueSnackbar('Đã lưu bản nháp', { variant: 'success' });
       onSaved(saved);
     } catch (err) {
-      enqueueSnackbar(apiErrorMessage(err, 'Không lưu được bảng kiểm'), { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(err, 'Không lưu được hạng mục'), { variant: 'error' });
     } finally {
       setSaving(false);
     }
   };
+
+  // Lưu những gì đang sửa trước, rồi thêm hạng mục "nhân viên tự làm" từ lịch vệ sinh đang dùng vào bản nháp.
+  const importCleaning = async () => {
+    if (!template) return;
+    setSaving(true);
+    try {
+      if (items.length > 0) await saveInspectionTemplateDraft(template.id, name, effectiveFrom, items);
+      const updated = await importCleaningIntoTemplate(template.id);
+      const added = updated.items.length - items.length;
+      setItems(toInput(updated));
+      enqueueSnackbar(added > 0 ? `Đã thêm ${added} hạng mục từ lịch vệ sinh` : 'Lịch vệ sinh không có việc nào mới để thêm', {
+        variant: added > 0 ? 'success' : 'info',
+      });
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không lấy được lịch vệ sinh'), { variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isShiftQuick = template?.type === 'ShiftQuick';
 
   return (
     <Dialog open={!!template} onClose={() => !saving && onClose()} fullWidth maxWidth="lg" fullScreen={smDown}>
@@ -178,7 +228,26 @@ function TemplateEditorDialog({ template, readOnly, onClose, onSaved }: EditorPr
             <Alert severity="info">
               Mức B: không đạt thì người phụ trách khu sửa trong 15 phút. Mức T: sửa trong ca. Khu: lỗi giao người giữ khu đầu
               tiên có người trong ca; không chọn khu thì giao trưởng ca. Chấm theo người: mỗi người trong ca × số lượt.
+              {isShiftQuick &&
+                ' Nhân viên tự làm: người trong ca làm và chụp ảnh ở Việc của tôi, trưởng ca chấm khi kiểm. Thứ / ca bỏ trống = mọi ngày / mọi ca.'}
             </Alert>
+          )}
+          {!readOnly && isShiftQuick && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <LoadingButton
+                size="small"
+                variant="outlined"
+                loading={saving}
+                disabled={!!duplicate || incomplete || !name.trim() || !effectiveFrom}
+                startIcon={<Iconify icon="solar:import-bold" />}
+                onClick={importCleaning}
+              >
+                Lấy từ lịch vệ sinh
+              </LoadingButton>
+              <Typography variant="caption" color="text.secondary">
+                Thêm các việc trong lịch vệ sinh đang dùng thành hạng mục &quot;nhân viên tự làm&quot;, giữ thứ và ca.
+              </Typography>
+            </Stack>
           )}
           {items.map((item, index) => (
             <Stack key={index} spacing={1.5}>
@@ -295,6 +364,48 @@ function TemplateEditorDialog({ template, readOnly, onClose, onSaved }: EditorPr
                   label="Phải sửa"
                 />
               </Stack>
+              {isShiftQuick && (
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                  <FormControlLabel
+                    disabled={readOnly}
+                    control={
+                      <Switch size="small" checked={item.staffDoes} onChange={(e) => patch(index, { staffDoes: e.target.checked })} />
+                    }
+                    label="Nhân viên tự làm"
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    Thứ:
+                  </Typography>
+                  {WEEKDAYS.map((d) => (
+                    <Chip
+                      key={d}
+                      size="small"
+                      label={WEEKDAY_SHORT[d]}
+                      disabled={readOnly}
+                      color={item.weekdays?.includes(d) ? 'primary' : 'default'}
+                      variant={item.weekdays?.includes(d) ? 'filled' : 'outlined'}
+                      onClick={() => patch(index, { weekdays: toggleIn(item.weekdays, d, WEEKDAYS) })}
+                    />
+                  ))}
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                    Ca:
+                  </Typography>
+                  {WORK_BLOCKS.map((b) => (
+                    <Chip
+                      key={b}
+                      size="small"
+                      label={WORK_BLOCK_LABEL[b]}
+                      disabled={readOnly}
+                      color={item.blocks?.includes(b) ? 'primary' : 'default'}
+                      variant={item.blocks?.includes(b) ? 'filled' : 'outlined'}
+                      onClick={() => patch(index, { blocks: toggleIn(item.blocks, b, WORK_BLOCKS) })}
+                    />
+                  ))}
+                  <Typography variant="caption" color="text.secondary">
+                    {scheduleLabel(item.weekdays, item.blocks)}
+                  </Typography>
+                </Stack>
+              )}
               <Divider />
             </Stack>
           ))}
@@ -315,6 +426,9 @@ function TemplateEditorDialog({ template, readOnly, onClose, onSaved }: EditorPr
                     observationsPerStaff: 1,
                     requiresPhotoOnFail: true,
                     requiresFix: true,
+                    staffDoes: false,
+                    weekdays: null,
+                    blocks: null,
                   },
                 ])
               }
@@ -360,7 +474,7 @@ export default function InspectionTemplatesView() {
     try {
       setTemplates(await getInspectionTemplates(type));
     } catch (err) {
-      enqueueSnackbar(apiErrorMessage(err, 'Không tải được bảng kiểm'), { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(err, 'Không tải được hạng mục'), { variant: 'error' });
     } finally {
       setLoading(false);
     }
@@ -392,7 +506,7 @@ export default function InspectionTemplatesView() {
     const ok = await confirm({
       title: `Công bố phiên bản ${t.version}?`,
       content:
-        `Từ ${fDate(t.effectiveFrom)}, mọi lượt kiểm mới dùng bảng kiểm này (${t.items.length} mục).\n` +
+        `Từ ${fDate(t.effectiveFrom)}, việc trong ca và lượt kiểm mới dùng phiên bản này (${t.items.length} mục).\n` +
         'Sau khi công bố không sửa được — muốn đổi thì tạo phiên bản mới.',
       confirmText: 'Công bố',
       cancelText: 'Huỷ',
@@ -432,8 +546,8 @@ export default function InspectionTemplatesView() {
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
       <CustomBreadcrumbs
-        heading="Bảng kiểm"
-        links={[{ name: 'Kiểm tra cửa hàng', href: paths.dashboard.inspection.root }, { name: 'Bảng kiểm' }]}
+        heading="Hạng mục & lịch"
+        links={[{ name: 'Công việc', href: paths.dashboard.cleaning.myChecklist }, { name: 'Hạng mục & lịch' }]}
         action={
           <Stack direction="row" spacing={1}>
             <LoadingButton variant="outlined" loading={busy} onClick={() => createDraft(true)}>
@@ -450,14 +564,15 @@ export default function InspectionTemplatesView() {
       />
 
       <Tabs value={type} onChange={(_, v) => setType(v)} sx={{ mb: 2 }}>
-        <Tab value="ShiftQuick" label="Kiểm nhanh mỗi ca" />
+        <Tab value="ShiftQuick" label="Mỗi ca (làm + kiểm nhanh)" />
         <Tab value="WeeklyFull" label="Kiểm đầy đủ hằng tuần" />
       </Tabs>
 
       {!loading && !current && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          Chưa có bảng kiểm {INSPECTION_TYPE_LABEL[type].toLowerCase()} nào đang dùng. Bấm &quot;Tạo nháp từ mẫu&quot;, xem lại
-          các mục rồi công bố — chưa công bố thì không bắt đầu kiểm được và hệ thống không nhắc kiểm.
+          Chưa có hạng mục {INSPECTION_TYPE_LABEL[type].toLowerCase()} nào đang dùng. Bấm &quot;Tạo nháp từ mẫu&quot;, xem lại
+          các mục rồi công bố — chưa công bố thì nhân viên không thấy việc trong ca, không bắt đầu kiểm được và hệ thống không
+          nhắc kiểm.
         </Alert>
       )}
 
@@ -547,6 +662,9 @@ export default function InspectionTemplatesView() {
                   </Typography>
                   {!i.perStaff && <ZoneChips zones={i.zones} />}
                   {i.perStaff && <Chip size="small" variant="outlined" label={`Theo người × ${i.observationsPerStaff}`} />}
+                  {i.staffDoes && (
+                    <Chip size="small" color="info" variant="outlined" label={`Nhân viên làm · ${scheduleLabel(i.weekdays, i.blocks)}`} />
+                  )}
                 </Stack>
               ))}
           </Stack>

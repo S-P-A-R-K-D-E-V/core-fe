@@ -18,15 +18,17 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { fDateTime } from 'src/utils/format-time';
+import { fDate, fDateTime } from 'src/utils/format-time';
 import { apiErrorMessage } from 'src/utils/api-error';
 
 import { reviewWorkTask, submitWorkTask, getMyWorkTasks, uploadWorkTaskPhotos } from 'src/api/hr';
+import { getMyCorrectiveActions, markCorrectiveActionDone } from 'src/api/inspection';
 
 import { useSnackbar } from 'src/components/snackbar';
 
 import type { IWorkTask, WorkTaskStatus } from 'src/types/hr';
 import { WORK_TASK_STATUS_LABEL } from 'src/types/hr';
+import type { ICorrectiveAction } from 'src/types/inspection';
 
 import { MonthField, monthStart } from 'src/sections/hr/hr-common';
 
@@ -324,5 +326,114 @@ export function ReviewTaskDialog({
         )}
       </DialogActions>
     </Dialog>
+  );
+}
+
+// ----------------------------------------------------------------------
+
+/** Việc sửa tận gốc đang mở giao cho tôi — làm xong bấm "Xong" (ghi chú tuỳ chọn). Không có việc nào thì không hiện. */
+export function MyCorrectiveActions() {
+  const { enqueueSnackbar } = useSnackbar();
+  const [actions, setActions] = useState<ICorrectiveAction[]>([]);
+  const [doneFor, setDoneFor] = useState<ICorrectiveAction | null>(null);
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setActions(await getMyCorrectiveActions());
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không tải được việc sửa tận gốc'), { variant: 'error' });
+      setActions([]);
+    }
+  }, [enqueueSnackbar]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const save = async () => {
+    if (!doneFor) return;
+    setSaving(true);
+    try {
+      await markCorrectiveActionDone(doneFor.id, note.trim() || null);
+      enqueueSnackbar('Đã báo xong');
+      setDoneFor(null);
+      load();
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Chưa lưu được'), { variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (actions.length === 0) return null;
+
+  return (
+    <Stack spacing={1.5}>
+      <Typography variant="h6">Sửa tận gốc giao cho tôi</Typography>
+      {actions.map((a) => (
+        <Card key={a.id}>
+          <CardContent>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between">
+              <Box sx={{ minWidth: 0 }}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }} flexWrap="wrap" useFlexGap>
+                  <Typography variant="subtitle1">{a.title}</Typography>
+                  {a.itemCode && <Chip size="small" variant="outlined" label={a.itemCode} />}
+                </Stack>
+                {a.rootCause && (
+                  <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
+                    Nguyên nhân: {a.rootCause}
+                  </Typography>
+                )}
+                {a.action && (
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
+                    Cách sửa: {a.action}
+                  </Typography>
+                )}
+                {a.dueDate && (
+                  <Typography variant="caption" color="text.secondary">
+                    Hạn {fDate(a.dueDate)}
+                  </Typography>
+                )}
+              </Box>
+              <Button
+                variant="contained"
+                sx={{ alignSelf: 'flex-start', flexShrink: 0 }}
+                onClick={() => {
+                  setNote('');
+                  setDoneFor(a);
+                }}
+              >
+                Xong
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+      ))}
+
+      <Dialog open={!!doneFor} onClose={() => !saving && setDoneFor(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Xong: {doneFor?.title ?? ''}</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Đã làm gì (tuỳ chọn)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            multiline
+            minRows={2}
+            fullWidth
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDoneFor(null)} disabled={saving}>
+            Đóng
+          </Button>
+          <LoadingButton variant="contained" loading={saving} onClick={save}>
+            Báo xong
+          </LoadingButton>
+        </DialogActions>
+      </Dialog>
+    </Stack>
   );
 }

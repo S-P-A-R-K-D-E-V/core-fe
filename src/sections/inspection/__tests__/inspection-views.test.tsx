@@ -137,7 +137,8 @@ const template = (over: Partial<IInspectionTemplate>): IInspectionTemplate => ({
   inUse: false,
   items: [
     { id: 'i1', code: 'Q01', groupName: null, title: 'Lối vào', passCriteria: 'Xe xếp 2 bên', level: 'Mandatory', zones: ['A'],
-      perStaff: false, observationsPerStaff: 1, requiresPhotoOnFail: true, requiresFix: true, sortOrder: 1 },
+      perStaff: false, observationsPerStaff: 1, requiresPhotoOnFail: true, requiresFix: true, sortOrder: 1,
+      staffDoes: false, weekdays: null, blocks: null },
   ],
   ...over,
 });
@@ -149,7 +150,7 @@ describe('InspectionTemplatesView', () => {
     api.createInspectionTemplateDraft.mockResolvedValue(template({}));
     wrap(<InspectionTemplatesView />);
 
-    expect(await screen.findByText(/Chưa có bảng kiểm kiểm nhanh nào đang dùng/)).toBeTruthy();
+    expect(await screen.findByText(/Chưa có hạng mục kiểm nhanh nào đang dùng/)).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Tạo nháp từ mẫu' }));
 
     await waitFor(() => expect(api.createInspectionTemplateDraft).toHaveBeenCalledWith('ShiftQuick', true, expect.any(String)));

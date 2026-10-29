@@ -129,7 +129,7 @@ export default function InspectionHeatmapView() {
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
       <CustomBreadcrumbs
         heading="Bản đồ lỗi"
-        links={[{ name: 'Kiểm tra cửa hàng', href: paths.dashboard.inspection.root }, { name: 'Bản đồ lỗi' }]}
+        links={[{ name: 'Kiểm tra ca', href: paths.dashboard.inspection.root }, { name: 'Bản đồ lỗi' }]}
         action={
           <TextField select size="small" label="Khoảng" value={weeks} onChange={(e) => setWeeks(Number(e.target.value))}>
             <MenuItem value={8}>8 tuần</MenuItem>

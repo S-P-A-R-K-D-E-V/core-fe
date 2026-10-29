@@ -454,8 +454,8 @@ describe('useNavData — tính năng tắt theo nền tảng', () => {
     expect(navPaths('Staff', FEATURES, [], ['payroll.self'])).not.toContain(paths.dashboard.payroll.myPayroll);
   });
 
-  it('kiểm quầy, checklist vệ sinh, bán hàng, báo cáo ẩn theo đúng tính năng bị tắt', () => {
-    const FEATURES = ['commerce.retail.pos', 'workforce.cleaning'];
+  it('kiểm quầy, việc của tôi, bán hàng, báo cáo ẩn theo đúng tính năng bị tắt', () => {
+    const FEATURES = ['commerce.retail.pos', 'workforce.shift-scheduling'];
     const all = navPaths('Admin', FEATURES, []);
     expect(all).toEqual(
       expect.arrayContaining([
@@ -478,8 +478,8 @@ describe('useNavData — tính năng tắt theo nền tảng', () => {
     expect(blocked).not.toContain(paths.dashboard.pos.sale.root);
     expect(blocked).not.toContain(paths.dashboard.pos.salesOrder.new);
     expect(blocked).not.toContain(paths.dashboard.pos.report.root);
-    // Quản lý vệ sinh và danh sách hoá đơn không thuộc tính năng nào.
-    expect(blocked).toContain(paths.dashboard.cleaning.review);
+    // Hạng mục & lịch và danh sách hoá đơn không thuộc tính năng nào.
+    expect(blocked).toContain(paths.dashboard.inspection.templates);
     expect(blocked).toContain(paths.dashboard.pos.salesOrder.list);
   });
 });

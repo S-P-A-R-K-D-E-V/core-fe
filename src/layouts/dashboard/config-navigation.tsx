@@ -67,7 +67,6 @@ const ICONS = {
 const PAYROLL = PERMISSIONS.payroll;
 const SHIFT = PERMISSIONS.shift;
 const ATTENDANCE = PERMISSIONS.attendance;
-const CLEANING = PERMISSIONS.cleaning;
 const INSPECTION = PERMISSIONS.inspection;
 const PRODUCTS = PERMISSIONS.products;
 
@@ -393,43 +392,29 @@ export function useNavData(
             ],
           },
 
-          // VIỆC ĐƯỢC GIAO (việc của tôi: mọi nhân viên; giao việc: hr.task.manage hoặc cleaning.template.manage; còn lại theo
-          // quyền cleaning.*, mặc định Admin/Manager)
+          // CÔNG VIỆC: một tính năng cho làm việc trong ca, kiểm tra, sửa lỗi, giao việc và sửa tận gốc. Việc của tôi: mọi
+          // nhân viên; trưởng ca kiểm ca mình từ "Kiểm tra ca" khi có quyền / app; còn lại theo quyền inspection.* /
+          // hr.task.manage (mặc định Admin/Manager). Trang vệ sinh cũ (cleaning/*) không còn trong menu, đường dẫn giữ.
           {
-            title: t('cleaning'),
-            path: paths.dashboard.cleaning.root,
-            icon: ICONS.calendar,
-            roles: ['Admin', 'Manager', 'Staff'],
-            featureKey: 'workforce.cleaning',
-            children: [
-              { title: t('cleaningMyChecklist'), path: paths.dashboard.cleaning.myChecklist, platformFeature: PLATFORM_FEATURES.cleaningTasks },
-              { title: t('cleaningAssigned'), path: paths.dashboard.cleaning.assigned, permissions: [PERMISSIONS.hr.taskManage, CLEANING.templateManage] },
-              { title: t('cleaningWeekBuilder'), path: paths.dashboard.cleaning.weekBuilder, permissions: [CLEANING.templateManage] },
-              { title: t('cleaningTaskLibrary'), path: paths.dashboard.cleaning.taskLibrary, permissions: [CLEANING.templateManage] },
-              { title: t('cleaningTemplates'), path: paths.dashboard.cleaning.templates, permissions: [CLEANING.templateManage] },
-              { title: t('cleaningReview'), path: paths.dashboard.cleaning.review, permissions: [CLEANING.read] },
-              { title: t('cleaningWeekOverview'), path: paths.dashboard.cleaning.weekOverview, permissions: [CLEANING.read] },
-            ],
-          },
-
-          // KIỂM TRA CỬA HÀNG (lỗi của tôi: mọi nhân viên; trưởng ca kiểm ca mình từ "Tổng quan" khi có quyền / app;
-          // còn lại theo quyền inspection.*, mặc định Admin/Manager). Mọi cửa hàng có phân ca.
-          {
-            title: t('inspection'),
+            title: t('work'),
             path: paths.dashboard.inspection.root,
             icon: ICONS.kanban,
             roles: ['Admin', 'Manager', 'Staff'],
             featureKey: 'workforce.shift-scheduling',
             children: [
-              // Tổng quan: quản lý thấy số liệu; trưởng ca / nhân viên thấy ca mình hôm nay + nút bắt đầu kiểm nhanh.
-              { title: t('inspectionOverview'), path: paths.dashboard.inspection.root },
-              { title: t('inspectionMyFaults'), path: paths.dashboard.inspection.myFaults },
+              { title: t('workMine'), path: paths.dashboard.cleaning.myChecklist, platformFeature: PLATFORM_FEATURES.cleaningTasks },
+              // Kiểm tra ca: quản lý thấy số liệu; trưởng ca / nhân viên thấy ca mình hôm nay + nút bắt đầu kiểm nhanh.
+              { title: t('workInspection'), path: paths.dashboard.inspection.root },
+              {
+                title: t('workAssigned'),
+                path: paths.dashboard.cleaning.assigned,
+                permissions: [PERMISSIONS.hr.taskManage, INSPECTION.read, INSPECTION.correctiveActionManage],
+              },
               // Kiểm hàng khu vực mỗi ca: người làm ca đếm phiếu ca mình; quản lý (stocktake.read) xem chênh lệch.
               { title: 'Kiểm hàng ca', path: paths.dashboard.pos.inventory.shiftChecks },
               { title: t('inspectionHistory'), path: paths.dashboard.inspection.history, permissions: [INSPECTION.read] },
               { title: t('inspectionHeatmap'), path: paths.dashboard.inspection.heatmap, permissions: [INSPECTION.read] },
-              { title: t('inspectionCorrectiveActions'), path: paths.dashboard.inspection.correctiveActions, permissions: [INSPECTION.read] },
-              { title: t('inspectionTemplates'), path: paths.dashboard.inspection.templates, permissions: [INSPECTION.templateManage] },
+              { title: t('workItems'), path: paths.dashboard.inspection.templates, permissions: [INSPECTION.templateManage] },
             ],
           },
 

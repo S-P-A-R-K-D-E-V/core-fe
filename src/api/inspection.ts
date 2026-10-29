@@ -12,6 +12,8 @@ import type {
   IInspectionTemplate,
   IInspectionTemplateItemInput,
   IPagedResult,
+  IShiftWorkItem,
+  IShiftWorkShift,
   CorrectiveActionStatus,
   InspectionStatus,
   InspectionType,
@@ -56,6 +58,12 @@ export async function publishInspectionTemplate(id: string): Promise<IInspection
 
 export async function deleteInspectionTemplateDraft(id: string): Promise<void> {
   await axios.delete(endpoints.inspections.template(id));
+}
+
+/** Bản nháp kiểm nhanh: thêm hạng mục "nhân viên tự làm" lấy từ lịch vệ sinh đang dùng (gộp trùng tên, giữ thứ / ca). */
+export async function importCleaningIntoTemplate(id: string): Promise<IInspectionTemplate> {
+  const response = await axios.post<IInspectionTemplate>(endpoints.inspections.importCleaning(id));
+  return response.data;
 }
 
 // ── Ca, tổng quan, thống kê ────────────────────────────────────────────
@@ -175,5 +183,53 @@ export async function updateCorrectiveAction(
   input: CorrectiveActionInput & { status: CorrectiveActionStatus }
 ): Promise<ICorrectiveAction> {
   const response = await axios.put<ICorrectiveAction>(endpoints.correctiveActions.details(id), input);
+  return response.data;
+}
+
+/** Việc sửa tận gốc đang mở giao cho tôi. */
+export async function getMyCorrectiveActions(): Promise<ICorrectiveAction[]> {
+  const response = await axios.get<ICorrectiveAction[]>(endpoints.correctiveActions.mine);
+  return response.data;
+}
+
+/** Người được giao (hoặc quản lý) báo đã xong việc sửa tận gốc. */
+export async function markCorrectiveActionDone(id: string, note: string | null): Promise<ICorrectiveAction> {
+  const response = await axios.put<ICorrectiveAction>(endpoints.correctiveActions.done(id), { note });
+  return response.data;
+}
+
+// ── Việc trong ca ──────────────────────────────────────────────────────
+
+/** Hạng mục nhân viên tự làm của các ca của tôi trong ngày ("yyyy-MM-dd"). */
+export async function getMyShiftWork(date: string): Promise<IShiftWorkShift[]> {
+  const response = await axios.get<IShiftWorkShift[]>(endpoints.shiftWork.mine, { params: { date } });
+  return response.data;
+}
+
+/** Tải ảnh "đã làm" lên kho riêng tư của ca, trả object key. */
+export async function uploadShiftWorkPhotos(shiftScheduleId: string, date: string, files: File[]): Promise<string[]> {
+  if (files.length === 0) return [];
+  const presign = await axios.post<{ objectKey: string; uploadUrl: string }[]>(endpoints.shiftWork.presign, {
+    shiftScheduleId,
+    date,
+    files: files.map((f) => ({ contentType: f.type })),
+  });
+  await Promise.all(
+    presign.data.map(async (p, i) => {
+      const put = await fetch(p.uploadUrl, { method: 'PUT', headers: { 'Content-Type': files[i].type }, body: files[i] });
+      if (!put.ok) throw new Error(`Tải ảnh lên thất bại (${put.status})`);
+    })
+  );
+  return presign.data.map((p) => p.objectKey);
+}
+
+export async function completeShiftWork(input: {
+  date: string;
+  shiftScheduleId: string;
+  itemId: string;
+  note: string | null;
+  photoKeys: string[];
+}): Promise<IShiftWorkItem> {
+  const response = await axios.post<IShiftWorkItem>(endpoints.shiftWork.complete, input);
   return response.data;
 }

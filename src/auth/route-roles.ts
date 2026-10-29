@@ -20,7 +20,8 @@ import { ADMIN_ROLES, MANAGER_ROLES } from './roles';
 //     mặc định Admin, Manager). Danh sách hàng (pos/product/list) mở cho mọi nhân viên; trang sửa hàng tự chặn.
 //   - pos/purchase-order, pos/supplier: theo quyền purchase.* / supplier.* (mặc định Admin, Manager); trang sửa đơn nhập,
 //     sửa nhà cung cấp tự chặn.
-//   - cleaning/assigned (Giao việc): hr.task.manage hoặc cleaning.template.manage; cleaning/tasks, templates,
+//   - cleaning/assigned (Giao việc & sửa tận gốc): hr.task.manage, inspection.read hoặc corrective-action.manage;
+//     cleaning/tasks, templates,
 //     week-builder, review, week-overview: theo quyền cleaning.* (mặc định Admin, Manager);
 //     checklist của mình mở cho mọi nhân viên
 //   - user               : UsersController quản trị người khác — quyền user.* (mặc định Admin, Manager), trừ trang tài
@@ -89,7 +90,11 @@ export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   { prefix: paths.dashboard.pos.supplier.root, roles: null, permissions: [PERMISSIONS.supplier.read] },
   { prefix: paths.dashboard.pos.supplier.new, roles: null, permissions: [PERMISSIONS.supplier.manage] },
 
-  { prefix: paths.dashboard.cleaning.assigned, roles: null, permissions: [PERMISSIONS.hr.taskManage, CLEANING.templateManage] },
+  {
+    prefix: paths.dashboard.cleaning.assigned,
+    roles: null,
+    permissions: [PERMISSIONS.hr.taskManage, PERMISSIONS.inspection.read, PERMISSIONS.inspection.correctiveActionManage],
+  },
   { prefix: paths.dashboard.cleaning.taskLibrary, roles: null, permissions: [CLEANING.templateManage] },
   { prefix: paths.dashboard.cleaning.templates, roles: null, permissions: [CLEANING.templateManage] },
   { prefix: paths.dashboard.cleaning.weekBuilder, roles: null, permissions: [CLEANING.templateManage] },

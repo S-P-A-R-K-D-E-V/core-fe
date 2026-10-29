@@ -34,6 +34,7 @@ import type {
   InspectionOutcome,
   IInspectionResultInput,
   IInspectionTemplateItem,
+  IShiftWorkCompletion,
 } from 'src/types/inspection';
 import { INSPECTION_TYPE_LABEL } from 'src/types/inspection';
 
@@ -44,6 +45,7 @@ import {
   PhotoPicker,
   OutcomeButtons,
   InspectionPhotoRules,
+  ShiftWorkDoneInfo,
 } from '../inspection-common';
 
 // ----------------------------------------------------------------------
@@ -134,6 +136,14 @@ export default function InspectionRunView({ id }: Props) {
     const map: Record<string, IInspectionResult> = {};
     inspection?.results.forEach((r) => {
       map[entryKey(r.itemId, r.observedStaffId, r.observationIndex)] = r;
+    });
+    return map;
+  }, [inspection]);
+  // Hạng mục nhân viên tự làm: ai đã làm, ảnh — người kiểm xem khi chấm.
+  const completionByItem = useMemo(() => {
+    const map: Record<string, IShiftWorkCompletion> = {};
+    (inspection?.completions ?? []).forEach((c) => {
+      map[c.itemId] = c.completion;
     });
     return map;
   }, [inspection]);
@@ -252,7 +262,7 @@ export default function InspectionRunView({ id }: Props) {
       <CustomBreadcrumbs
         heading={`${INSPECTION_TYPE_LABEL[summary.type]}${summary.isSpotCheck ? ' (đột xuất)' : ''} — ${summary.shiftName} ${fDate(summary.date)}`}
         links={[
-          { name: 'Kiểm tra cửa hàng', href: paths.dashboard.inspection.root },
+          { name: 'Kiểm tra ca', href: paths.dashboard.inspection.root },
           { name: `${summary.startTime}–${summary.endTime}` },
         ]}
         sx={{ mb: 3 }}
@@ -323,6 +333,9 @@ export default function InspectionRunView({ id }: Props) {
                       <Typography variant="body2" color="text.secondary">
                         Đạt khi: {row.item.passCriteria}
                       </Typography>
+                    )}
+                    {firstOfItem && row.item.staffDoes && (
+                      <ShiftWorkDoneInfo completion={completionByItem[row.item.id]} showPending={!isSubmitted} />
                     )}
                     {row.item.perStaff && (
                       <Typography variant="body2">
