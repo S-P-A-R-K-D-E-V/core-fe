@@ -3,7 +3,7 @@ import { CleaningReviewView } from 'src/sections/cleaning/view';
 // ----------------------------------------------------------------------
 
 export const metadata = {
-  title: 'Dashboard: Đánh giá vệ sinh',
+  title: 'Dashboard: Chấm việc theo ca',
 };
 
 export default function CleaningReviewPage() {

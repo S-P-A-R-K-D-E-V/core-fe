@@ -37,7 +37,7 @@ export default function CleaningReviewDialog({ open, date, block, onClose, onCha
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
-        Checklist vệ sinh — {format(date, 'dd/MM/yyyy')} · {CLEANING_BLOCK_LABELS[block] || block}
+        Việc theo ca — {format(date, 'dd/MM/yyyy')} · {CLEANING_BLOCK_LABELS[block] || block}
       </DialogTitle>
       <DialogContent dividers>
         {/* Mount only while open so each cell click starts a fresh fetch for its date/block */}

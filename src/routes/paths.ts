@@ -224,6 +224,7 @@ export const paths = {
     cleaning: {
       root: `${ROOTS.DASHBOARD}/cleaning`,
       myChecklist: `${ROOTS.DASHBOARD}/cleaning/my-checklist`,
+      assigned: `${ROOTS.DASHBOARD}/cleaning/assigned`,
       taskLibrary: `${ROOTS.DASHBOARD}/cleaning/tasks`,
       templates: `${ROOTS.DASHBOARD}/cleaning/templates`,
       weekBuilder: `${ROOTS.DASHBOARD}/cleaning/week-builder`,

@@ -3,7 +3,7 @@ import { CleaningTemplateListView } from 'src/sections/cleaning/view';
 // ----------------------------------------------------------------------
 
 export const metadata = {
-  title: 'Dashboard: Checklist vệ sinh',
+  title: 'Dashboard: Danh sách việc theo ca',
 };
 
 export default function CleaningTemplateListPage() {

@@ -62,14 +62,14 @@ export function MonetaryPenaltyCard() {
         ? {
             title: `Ngừng phạt tiền từ ${fDate(value)}?`,
             content:
-              'Kỳ lương bắt đầu từ ngày này chỉ ghi nhận vi phạm (0đ), không trừ lương; không thêm được phạt vệ sinh hay phạt thủ công có tiền cho kỳ đó.\n' +
+              'Kỳ lương bắt đầu từ ngày này chỉ ghi nhận vi phạm (0đ), không trừ lương; không thêm được phạt việc theo ca không đạt hay phạt thủ công có tiền cho kỳ đó.\n' +
               'Kỳ trước ngày này giữ nguyên. Tính lại chu kỳ lương để bảng lương áp dụng.',
             confirmText: 'Ngừng phạt tiền',
             cancelText: 'Huỷ',
           }
         : {
             title: 'Phạt tiền lại như cũ?',
-            content: 'Bảng lương tính lại sẽ trừ tiền theo chính sách chế tài bên dưới, phạt vệ sinh và phạt thủ công.',
+            content: 'Bảng lương tính lại sẽ trừ tiền theo chính sách chế tài bên dưới, phạt việc theo ca không đạt và phạt thủ công.',
             confirmText: 'Bỏ ngày ngừng',
             cancelText: 'Huỷ',
             destructive: true,

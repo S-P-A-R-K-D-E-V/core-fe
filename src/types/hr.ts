@@ -148,14 +148,12 @@ export const WEEKDAY_LABEL: Record<number, string> = {
   7: 'CN',
 };
 
-// ── Nhiệm vụ ───────────────────────────────────────────────────────────
+// ── Việc giao riêng ─────────────────────────────────────────────────────
 
 export type WorkTaskGroup = 'Content' | 'Inbox' | 'Packing' | 'Display' | 'Initiative' | 'Other';
 export type WorkTaskStatus = 'Assigned' | 'Submitted' | 'Approved' | 'Rejected' | 'Cancelled';
 
-/** Nhóm quản lý giao được (sáng kiến do nhân viên tự tạo). */
-export const ASSIGNABLE_TASK_GROUPS: WorkTaskGroup[] = ['Content', 'Inbox', 'Packing', 'Display', 'Other'];
-
+/** Nhóm của việc cũ (giao diện không còn chọn nhóm khi giao). */
 export const WORK_TASK_GROUP_LABEL: Record<WorkTaskGroup, string> = {
   Content: 'Đăng nội dung',
   Inbox: 'Trả lời khách',

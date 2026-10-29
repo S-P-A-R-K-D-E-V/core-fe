@@ -1144,8 +1144,8 @@ export default function AttendanceCheckinView() {
                     }}
                   >
                     {cleaningIncompleteCount > 0
-                      ? `Nhiệm vụ vệ sinh: còn ${cleaningIncompleteCount} chưa hoàn thành`
-                      : `Đã hoàn thành nhiệm vụ vệ sinh (${currentShiftCleaning.tasks.length}/${currentShiftCleaning.tasks.length})`}
+                      ? `Việc theo ca: còn ${cleaningIncompleteCount} việc chưa xong`
+                      : `Đã xong việc theo ca (${currentShiftCleaning.tasks.length}/${currentShiftCleaning.tasks.length})`}
                   </Button>
                 )}
 
@@ -1851,7 +1851,7 @@ export default function AttendanceCheckinView() {
       <Dialog open={cleaningDialogOpen} onClose={() => setCleaningDialogOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span>
-            Checklist vệ sinh
+            Việc theo ca
             {currentShiftCleaning ? ` — Ca ${currentShiftCleaning.shiftName}` : ''}
           </span>
           <IconButton onClick={() => setCleaningDialogOpen(false)} size="small">

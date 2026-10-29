@@ -82,7 +82,7 @@ export default function CleaningWeekBuilderView() {
       setShiftTemplates(shifts);
     } catch (error) {
       console.error('Error loading week builder:', error);
-      enqueueSnackbar('Không thể tải dữ liệu checklist tuần', { variant: 'error' });
+      enqueueSnackbar('Không thể tải lịch việc theo ca', { variant: 'error' });
     } finally {
       setLoading(false);
     }
@@ -121,7 +121,7 @@ export default function CleaningWeekBuilderView() {
 
     if (matchingShiftTemplateIds.length === 0) {
       enqueueSnackbar(
-        'Chưa có ca làm việc nào cấu hình khung ca vệ sinh này — vào trang "Checklist vệ sinh" để tạo đầu việc và chọn ca áp dụng thủ công.',
+        'Chưa có ca làm việc nào gắn khung ca này — vào Ca làm việc chọn "Khung ca giao việc", hoặc tạo đầu việc ở trang "Danh sách việc theo ca".',
         { variant: 'error' }
       );
       return;
@@ -149,7 +149,7 @@ export default function CleaningWeekBuilderView() {
       fetchAll();
     } catch (error: any) {
       enqueueSnackbar(
-        error?.title || 'Không thể xoá — đầu việc đã có lịch sử, hãy vào trang Checklist để chuyển sang Ngưng áp dụng',
+        error?.title || 'Không thể xoá — đầu việc đã có lịch sử, hãy vào trang Danh sách việc theo ca để chuyển sang Ngưng áp dụng',
         { variant: 'error' }
       );
     }
@@ -162,7 +162,7 @@ export default function CleaningWeekBuilderView() {
       enqueueSnackbar(
         createdCount > 0
           ? `Đã nhân bản ${createdCount} đầu việc sang tuần sau`
-          : 'Tuần sau đã có đủ checklist (các đầu việc lặp vô thời hạn không cần nhân bản)'
+          : 'Tuần sau đã có đủ việc (các đầu việc lặp vô thời hạn không cần nhân bản)'
       );
     } catch (error: any) {
       enqueueSnackbar(error?.title || 'Không thể nhân bản', { variant: 'error' });
@@ -183,7 +183,7 @@ export default function CleaningWeekBuilderView() {
         cacheBust: true,
       });
       const link = document.createElement('a');
-      link.download = `checklist-ve-sinh-${weekStartStr}.png`;
+      link.download = `lich-viec-theo-ca-${weekStartStr}.png`;
       link.href = dataUrl;
       link.click();
     } catch (error) {
@@ -197,11 +197,11 @@ export default function CleaningWeekBuilderView() {
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
       <CustomBreadcrumbs
-        heading="Xây dựng checklist tuần"
+        heading="Lịch việc theo ca"
         links={[
           { name: 'Dashboard', href: paths.dashboard.root },
-          { name: 'Vệ sinh', href: paths.dashboard.cleaning.root },
-          { name: 'Xây dựng checklist' },
+          { name: 'Việc được giao', href: paths.dashboard.cleaning.root },
+          { name: 'Lịch việc theo ca' },
         ]}
         action={
           <Stack direction="row" spacing={1.5}>
@@ -333,7 +333,7 @@ export default function CleaningWeekBuilderView() {
                     variant="subtitle1"
                     sx={{ gridColumn: '1 / -1', textAlign: 'center', mb: 1 }}
                   >
-                    Checklist vệ sinh: {format(weekStart, 'dd/MM/yyyy')} – {format(addDays(weekStart, 6), 'dd/MM/yyyy')}
+                    Lịch việc theo ca: {format(weekStart, 'dd/MM/yyyy')} – {format(addDays(weekStart, 6), 'dd/MM/yyyy')}
                   </Typography>
                   <Box />
                   {days.map((day) => (

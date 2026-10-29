@@ -361,7 +361,7 @@ export default function CleaningReviewChecklist({ date, block, onChanged }: Prop
 
       {/* Penalty dialog */}
       <Dialog open={penaltyDialog.open} onClose={handleClosePenalty} maxWidth="sm" fullWidth>
-        <DialogTitle>Phạt vệ sinh: {penaltyDialog.task?.name}</DialogTitle>
+        <DialogTitle>Phạt việc không đạt: {penaltyDialog.task?.name}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 2 }}>
             <Typography variant="subtitle2">Chọn nhân viên trong ca</Typography>

@@ -456,7 +456,6 @@ export const endpoints = {
     tasks: '/work-tasks',
     tasksMine: '/work-tasks/mine',
     task: (id: string) => `/work-tasks/${id}`,
-    taskInitiative: '/work-tasks/initiative',
     taskPresign: (id: string) => `/work-tasks/${id}/photos/presign`,
     taskSubmit: (id: string) => `/work-tasks/${id}/submit`,
     taskReview: (id: string) => `/work-tasks/${id}/review`,

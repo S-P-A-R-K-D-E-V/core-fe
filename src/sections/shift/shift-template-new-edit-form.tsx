@@ -138,7 +138,7 @@ export default function ShiftTemplateNewEditForm({ currentTemplate }: Props) {
                 InputLabelProps={{ shrink: true }}
               />
 
-              <RHFSelect name="cleaningBlock" label="Khung ca vệ sinh">
+              <RHFSelect name="cleaningBlock" label="Khung ca giao việc">
                 <MenuItem value="">Không áp dụng</MenuItem>
                 <MenuItem value="Morning">Sáng</MenuItem>
                 <MenuItem value="Afternoon">Chiều</MenuItem>
