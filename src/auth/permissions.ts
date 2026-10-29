@@ -117,6 +117,8 @@ export const PERMISSIONS = {
     compensationManage: 'hr.compensation.manage',
     /** Luật nhân sự riêng của cửa hàng (thưởng tuần, target, khiếu nại, ca hỗ trợ, xin nghỉ, biên bản, điểm, cảnh báo) — chỉ Admin. */
     ruleManage: 'hr.rule.manage',
+    /** Ghi nhận / huỷ vi phạm theo danh mục điểm trừ, trả lời khiếu nại, xem điểm trừ của mọi người. */
+    violationManage: 'hr.violation.manage',
   },
   /** Hàng hoá — xem hàng, nhóm hàng, thương hiệu, đơn vị không cần quyền (màn bán hàng). Thêm / sửa cần kèm xem giá vốn. */
   products: {
