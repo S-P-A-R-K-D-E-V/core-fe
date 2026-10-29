@@ -383,7 +383,29 @@ export interface IContractTemplate {
   updatedAt?: string | null;
   /** Tên tệp mẫu Word (.docx) đã gắn — khi chốt sinh bản Word giữ định dạng gốc. */
   docxFileName?: string | null;
+  /** Nội dung là HTML (soạn bằng trình soạn / tải mẫu lên); false = mẫu chữ cũ. */
+  isHtml?: boolean;
 }
+
+/** Kết quả tải mẫu (.docx / .pdf) lên: bản nháp đã thay nội dung, AI có gắn được trường không, cảnh báo nếu có. */
+export interface IContractTemplateImport {
+  template: IContractTemplate;
+  fieldsPlacedByAi: boolean;
+  warning?: string | null;
+}
+
+/** Xem trước mẫu với hồ sơ một nhân viên. */
+export interface IContractPreview {
+  body: string;
+  isHtml: boolean;
+  missingFields: string[];
+}
+
+/** Hai trường chữ ký — không trộn ở máy chủ, thay khi hiển thị (ảnh chữ ký / chỗ trống để ký). */
+export const SIGNATURE_FIELD_KEYS = ['chu_ky_nguoi_lao_dong', 'chu_ky_cua_hang'] as const;
+
+/** Lời cam kết khi nhân viên ký hợp đồng (máy chủ lưu đúng câu này). */
+export const CONTRACT_SIGN_CONSENT = 'Tôi cam kết thông tin hồ sơ là đúng và đồng ý với nội dung hợp đồng.';
 
 export interface IEmployeeProfile {
   userId: string;
@@ -447,6 +469,16 @@ export interface IEmploymentContract {
   files: { id: string; url: string; contentType: string; uploadedAt: string }[];
   /** Bản Word đã trộn (mẫu có tệp .docx) — link có chữ ký. */
   docxUrl?: string | null;
+  /** Nội dung đã trộn là HTML (mẫu HTML / đã sửa tay). */
+  isHtml?: boolean;
+  /** Admin đã sửa tay nội dung — đổi điều khoản không trộn lại. */
+  bodyEdited?: boolean;
+  /** Nhân viên đã ký trên app / web (chữ ký vẽ). */
+  employeeSignedAt?: string | null;
+  /** Chữ ký nhân viên dạng SVG (máy chủ dựng từ nét vẽ). */
+  employeeSignatureSvg?: string | null;
+  /** Chữ thuần từ nội dung HTML (app hiển thị). */
+  bodyText?: string | null;
 }
 
 // ── Ca hỗ trợ mở trên chợ ca ─────────────────────────────────────────────

@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, within, screen, waitFor, fireEvent } from '@testing-library/react';
 
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 import type { IEmployeeProfile, IEmploymentContract } from 'src/types/hr';
+import { CONTRACT_SIGN_CONSENT } from 'src/types/hr';
 
 // ----------------------------------------------------------------------
 // Hợp đồng lao động: chỉ Admin (hr.contract.manage) thấy các tab quản lý; nhân viên chỉ xem hợp đồng của mình; trang in
@@ -34,9 +35,13 @@ const api = vi.hoisted(() => ({
   saveEmployeeProfile: vi.fn(),
   getContractTemplates: vi.fn(),
   getContractFields: vi.fn(),
+  createContractTemplate: vi.fn(),
+  importContractTemplateFile: vi.fn(),
+  signContract: vi.fn(),
 }));
 vi.mock('src/api/hr', () => ({
   ...Object.fromEntries(Object.keys(api).map((k) => [k, (...a: any[]) => (api as any)[k](...a)])),
+  contractImportType: (f: File) => (/\.(docx|pdf)$/i.test(f.name) ? 'application/octet-stream' : null),
   voidContract: vi.fn(),
   createContract: vi.fn(),
   finalizeContract: vi.fn(),
@@ -44,11 +49,25 @@ vi.mock('src/api/hr', () => ({
   markContractSigned: vi.fn(),
   updateContractDraft: vi.fn(),
   uploadContractFiles: vi.fn(),
-  createContractTemplate: vi.fn(),
   deleteContractTemplate: vi.fn(),
   updateContractTemplate: vi.fn(),
   publishContractTemplate: vi.fn(),
+  saveContractBody: vi.fn(),
+  getEditableContractBody: vi.fn(),
+  previewContractTemplate: vi.fn(),
 }));
+
+// jsdom chưa có PointerEvent: dựng từ MouseEvent để khung ký nhận toạ độ.
+if (!(window as any).PointerEvent) {
+  (window as any).PointerEvent = class extends MouseEvent {
+    pointerId: number;
+
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init);
+      this.pointerId = init.pointerId ?? 1;
+    }
+  };
+}
 
 // Imported after the mocks above.
 import HrContractsView, { buildPrintHtml, contractBodyHtml } from 'src/sections/hr/view/hr-contracts-view';
@@ -121,6 +140,89 @@ describe('HrContractsView', () => {
     await waitFor(() =>
       expect(api.saveEmployeeProfile).toHaveBeenCalledWith('lan', expect.objectContaining({ idNumber: '001304012345', gender: null }))
     );
+  });
+
+  it('admin uploads a .docx template: blank draft first, then the AI import fills the editor', async () => {
+    auth.user.permissions = ['hr.contract.manage'];
+    api.getContracts.mockResolvedValue([]);
+    api.getContractTemplates.mockResolvedValue([]);
+    api.getContractFields.mockResolvedValue([{ key: 'ho_ten', label: 'Họ và tên', required: true }]);
+    const draft = {
+      id: 't9',
+      code: 'mau-hop-dong',
+      name: 'Mẫu hợp đồng mới',
+      version: 1,
+      contractType: 'FixedTermUnder12Months',
+      body: '<p></p>',
+      isActive: false,
+      createdAt: '2026-10-29T03:00:00Z',
+      isHtml: true,
+    };
+    api.createContractTemplate.mockResolvedValue(draft);
+    api.importContractTemplateFile.mockResolvedValue({
+      template: { ...draft, body: '<h2>HỢP ĐỒNG LAO ĐỘNG</h2><p>Họ và tên: {{ho_ten}}</p>' },
+      fieldsPlacedByAi: true,
+      warning: 'AI chưa chắc chỗ điền ngày cấp CCCD',
+    });
+    const user = userEvent.setup();
+
+    wrap(<HrContractsView />);
+    await user.click(await screen.findByRole('tab', { name: 'Mẫu hợp đồng' }));
+    expect(screen.queryByText('Tạo từ mẫu dựng sẵn')).toBeNull();
+    const file = new File(['docx'], 'hop-dong.docx');
+    const input = screen.getByText('Tải mẫu lên (.docx / .pdf)').closest('label')!.querySelector('input[type="file"]')!;
+    await user.upload(input as HTMLInputElement, file);
+
+    await waitFor(() => expect(api.importContractTemplateFile).toHaveBeenCalledWith('t9', file));
+    expect(api.createContractTemplate).toHaveBeenCalledWith(null);
+    expect(await screen.findByText('HỢP ĐỒNG LAO ĐỘNG')).toBeInTheDocument();
+    expect(enqueueSnackbar).toHaveBeenCalledWith('AI chưa chắc chỗ điền ngày cấp CCCD', { variant: 'warning' });
+  });
+
+  it('staff sign their awaiting contract: draw, agree, send strokes', async () => {
+    const awaiting: IEmploymentContract = {
+      ...contract,
+      id: 'c2',
+      status: 'AwaitingSignature',
+      signedOn: null,
+      files: [],
+      isHtml: true,
+      renderedBody: '<p>Người lao động: Trần Lan</p><p>{{chu_ky_nguoi_lao_dong}}</p>',
+      employeeSignedAt: null,
+    };
+    api.getMyContracts.mockResolvedValue([awaiting]);
+    api.signContract.mockResolvedValue({
+      ...awaiting,
+      employeeSignedAt: '2026-10-29T08:00:00Z',
+      employeeSignatureSvg: '<svg xmlns="http://www.w3.org/2000/svg"/>',
+    });
+    const user = userEvent.setup();
+
+    wrap(<HrContractsView />);
+    await user.click(await screen.findByRole('button', { name: 'Ký hợp đồng' }));
+    const dialog = await screen.findByRole('dialog');
+    const submit = within(dialog).getByRole('button', { name: 'Ký hợp đồng' });
+    expect(submit).toBeDisabled();
+
+    const pad = within(dialog).getByTestId('signature-pad');
+    fireEvent.pointerDown(pad, { clientX: 10, clientY: 20, pointerId: 1 });
+    fireEvent.pointerMove(pad, { clientX: 40, clientY: 30, pointerId: 1 });
+    fireEvent.pointerMove(pad, { clientX: 80, clientY: 60, pointerId: 1 });
+    fireEvent.pointerUp(pad, { pointerId: 1 });
+    expect(submit).toBeDisabled(); // chưa tích cam kết
+    await user.click(within(dialog).getByLabelText(CONTRACT_SIGN_CONSENT));
+    await user.click(submit);
+
+    await waitFor(() =>
+      expect(api.signContract).toHaveBeenCalledWith('c2', {
+        strokes: [[[10, 20], [40, 30], [80, 60]]],
+        width: 600,
+        height: 200,
+      })
+    );
+    expect(await screen.findByText(/Bạn đã ký lúc/)).toBeInTheDocument();
+    expect(screen.getByText('Nhân viên đã ký — chờ cửa hàng ký')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Ký hợp đồng' })).toBeNull());
   });
 });
 
