@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -29,9 +29,25 @@ import { useBoolean } from 'src/hooks/use-boolean';
 
 import { printHtmlDocument } from 'src/utils/print-html';
 
+import { getAllWarehouses } from 'src/api/warehouses';
+import { getPrintTemplates } from 'src/api/print-templates';
+
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 import { useStoreBrand } from 'src/components/branding';
+
+import { resolveAppliedTemplate } from 'src/sections/print-template/print-template-resolve';
+import { paperSummary, parseLabelDesign } from 'src/sections/print-template/label/label-design';
+import {
+  designErrors,
+  parseDiscount,
+  planDesignSheet,
+  renderDesignSheetHtml,
+} from 'src/sections/print-template/label/label-design-render';
+
+import type { IWarehouse } from 'src/types/corecms-api';
+import type { IPrintTemplateList } from 'src/types/print-template';
+import type { DesignPrintJob } from 'src/sections/print-template/label/label-design-render';
 
 import { SYMBOLOGY_LABEL } from './barcode';
 import { formatMm, dotsToMm, pageSizeMm } from './label-geometry';
@@ -79,7 +95,15 @@ import type {
 // không giao diện cùng thư mục; ô xem trước hiện ĐÚNG tài liệu HTML sẽ gửi cho máy in.
 // Loại giấy đã chọn, tuỳ chọn và căn chỉnh được nhớ theo trình duyệt (localStorage) — mỗi máy tính ở
 // quầy căn một lần cho máy in của nó.
+// Cửa hàng có mẫu tem tự thiết kế (Mẫu in): chọn "Mẫu tem" thì khổ giấy và nội dung theo bố cục của mẫu (mẫu đang áp
+// dụng được chọn sẵn); nhập giảm giá (chung / từng dòng) khi mẫu có trường giá giảm, chọn kho khi mẫu có trường kho.
+// Căn chỉnh nhớ riêng cho từng mẫu ("design:<id>").
 // ----------------------------------------------------------------------
+
+const NO_TEMPLATES: IPrintTemplateList = { templates: [], assignments: [] };
+
+const DISCOUNT_TOKEN = /\{\{\s*(final_price|original_price|discount_percent|discount_amount)\s*\}\}/;
+const WAREHOUSE_TOKEN = /\{\{\s*warehouse_(name|address|phone)\s*\}\}/;
 
 const PX_PER_MM = 96 / 25.4;
 const PREVIEW_WIDTH_PX = 640;
@@ -146,8 +170,55 @@ function LabelPrintContent({ sources, onClose }: Omit<Props, 'open'>) {
     loadCalibration(settings.templateId)
   );
 
-  const template = useMemo(() => resolveTemplate(settings), [settings]);
-  const isCustom = settings.templateId === CUSTOM_TEMPLATE_ID;
+  // Mẫu tem tự thiết kế của cửa hàng; '' = khổ giấy hệ thống (như trước).
+  const [labelTemplates, setLabelTemplates] = useState<IPrintTemplateList | null>(null);
+  const [designId, setDesignId] = useState('');
+  const [discountAll, setDiscountAll] = useState('');
+  const [discounts, setDiscounts] = useState<Record<string, string>>({});
+  const [warehouses, setWarehouses] = useState<IWarehouse[] | null>(null);
+  const [warehouseId, setWarehouseId] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    getPrintTemplates('label')
+      .then((list) => {
+        if (!active) return;
+        setLabelTemplates(list);
+        const applied = resolveAppliedTemplate(list, 'label');
+        if (applied) {
+          setDesignId(applied.id);
+          setCalibration(loadCalibration(`design:${applied.id}`));
+        }
+      })
+      .catch(() => {
+        if (active) setLabelTemplates(NO_TEMPLATES);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const designTemplate = labelTemplates?.templates.find((item) => item.id === designId) ?? null;
+  const design = useMemo(() => (designTemplate ? parseLabelDesign(designTemplate.content) : null), [designTemplate]);
+  const designText = design ? design.elements.map((element) => element.text ?? '').join(' ') : '';
+  const usesDiscount = DISCOUNT_TOKEN.test(designText);
+  const usesWarehouse = WAREHOUSE_TOKEN.test(designText);
+  const calibrationKey = design ? `design:${designId}` : settings.templateId;
+
+  // Danh sách kho chỉ tải khi mẫu có trường kho; kho mặc định được chọn sẵn.
+  useEffect(() => {
+    if (!usesWarehouse || warehouses) return;
+    getAllWarehouses()
+      .then((list) => {
+        const usable = (list ?? []).filter((item) => item.isActive !== false);
+        setWarehouses(usable);
+        setWarehouseId((current) => current || (usable.find((item) => item.isDefault) ?? usable[0])?.id || '');
+      })
+      .catch(() => setWarehouses([]));
+  }, [usesWarehouse, warehouses]);
+
+  const template = useMemo(() => (design ? design.paper : resolveTemplate(settings)), [design, settings]);
+  const isCustom = !design && settings.templateId === CUSTOM_TEMPLATE_ID;
   const isSheet = template.kind === 'sheet';
   const { options } = settings;
 
@@ -171,13 +242,21 @@ function LabelPrintContent({ sources, onClose }: Omit<Props, 'open'>) {
     setCalibration(loadCalibration(templateId));
   };
 
+  const handleChangeDesign = (id: string) => {
+    setDesignId(id);
+    setCalibration(loadCalibration(id ? `design:${id}` : settings.templateId));
+  };
+
   const changeCalibration = (next: LabelCalibration) => {
     const normalized = normalizeCalibration(next, calibration);
     setCalibration(normalized);
-    saveCalibration(settings.templateId, normalized);
+    saveCalibration(calibrationKey, normalized);
   };
 
-  const templateErrors = useMemo(() => validateLabelTemplate(template), [template]);
+  const templateErrors = useMemo(
+    () => (design ? designErrors(design) : validateLabelTemplate(template)),
+    [design, template]
+  );
 
   const job: LabelPrintJob = useMemo(
     () => ({
@@ -188,26 +267,51 @@ function LabelPrintContent({ sources, onClose }: Omit<Props, 'open'>) {
     [rows, quantities, options, brandName]
   );
 
-  const plan = useMemo(
-    () => (templateErrors.length > 0 ? null : planLabelSheet(job, template, calibration)),
-    [templateErrors, job, template, calibration]
+  const warehouse = (warehouses ?? []).find((item) => item.id === warehouseId) ?? null;
+  const designJob: DesignPrintJob = useMemo(
+    () => ({
+      items: job.items.map((item) => ({ ...item, discount: parseDiscount(discounts[item.key]) })),
+      context: {
+        storeName: brandName,
+        discount: parseDiscount(discountAll),
+        warehouse: warehouse ? { name: warehouse.name, address: warehouse.address, phone: warehouse.phone } : null,
+      },
+    }),
+    [job, discounts, discountAll, brandName, warehouse]
   );
 
-  const planErrors = [plan?.layoutError, plan?.limitError].filter((error): error is string => !!error);
+  const plan = useMemo(
+    () => (templateErrors.length > 0 || design ? null : planLabelSheet(job, template, calibration)),
+    [templateErrors, design, job, template, calibration]
+  );
+  const designPlan = useMemo(
+    () => (design && templateErrors.length === 0 ? planDesignSheet(designJob, design) : null),
+    [design, templateErrors, designJob]
+  );
+
+  const planErrors = [plan?.layoutError, plan?.limitError, designPlan?.limitError].filter(
+    (error): error is string => !!error
+  );
   const blockingErrors = templateErrors.length > 0 ? templateErrors : planErrors;
-  const labelCount = plan?.labelCount ?? 0;
-  const pageCount = plan?.pageCount ?? 0;
+  const labelCount = (design ? designPlan?.labelCount : plan?.labelCount) ?? 0;
+  const pageCount = (design ? designPlan?.pageCount : plan?.pageCount) ?? 0;
   const canPrint = blockingErrors.length === 0 && labelCount > 0;
   const hasRowsToExport = job.items.some((item) => item.quantity > 0);
 
-  const previewHtml = useMemo(
-    () => (canPrint ? renderLabelSheetHtml(job, template, calibration, { maxPages: 1 }) : ''),
-    [canPrint, job, template, calibration]
+  const renderSheet = useCallback(
+    (maxPages?: number) =>
+      design
+        ? renderDesignSheetHtml(designJob, design, calibration, { maxPages })
+        : renderLabelSheetHtml(job, template, calibration, { maxPages }),
+    [design, designJob, job, template, calibration]
   );
 
-  const problemByKey = new Map((plan?.problems ?? []).map((problem) => [problem.key, problem]));
+  const previewHtml = useMemo(() => (canPrint ? renderSheet(1) : ''), [canPrint, renderSheet]);
+
+  const problems = (design ? designPlan?.problems : plan?.problems) ?? [];
+  const problemByKey = new Map(problems.map((problem) => [problem.key, problem]));
   const labelByKey = new Map((plan?.labels ?? []).map((label) => [label.source.key, label]));
-  const notes = (plan?.labels ?? []).filter((label) => label.note);
+  const notes = ((design ? designPlan?.labels : plan?.labels) ?? []).filter((label) => label.note);
 
   const print = (html: string) => {
     printHtmlDocument(html).catch((error) => {
@@ -217,7 +321,7 @@ function LabelPrintContent({ sources, onClose }: Omit<Props, 'open'>) {
   };
 
   const handlePrint = () => {
-    if (canPrint) print(renderLabelSheetHtml(job, template, calibration));
+    if (canPrint) print(renderSheet());
   };
 
   const handlePrintCalibration = () => {
@@ -266,6 +370,11 @@ function LabelPrintContent({ sources, onClose }: Omit<Props, 'open'>) {
                   <TableRow>
                     <TableCell>Tên hàng</TableCell>
                     <TableCell>Mã in vạch</TableCell>
+                    {design && usesDiscount && (
+                      <TableCell align="right" sx={{ width: 110 }}>
+                        Giảm giá
+                      </TableCell>
+                    )}
                     <TableCell align="right" sx={{ width: 110 }}>
                       Số tem
                     </TableCell>
@@ -296,6 +405,19 @@ function LabelPrintContent({ sources, onClose }: Omit<Props, 'open'>) {
                           )}
                           {problem && <Chip size="small" color="error" variant="outlined" label="Không in được" />}
                         </TableCell>
+                        {design && usesDiscount && (
+                          <TableCell align="right">
+                            <TextField
+                              size="small"
+                              value={discounts[row.key] ?? ''}
+                              placeholder={discountAll || '—'}
+                              error={!!discounts[row.key] && !parseDiscount(discounts[row.key])}
+                              onChange={(event) => setDiscounts((prev) => ({ ...prev, [row.key]: event.target.value }))}
+                              inputProps={{ 'aria-label': `Giảm giá của ${row.name}`, style: { textAlign: 'right' } }}
+                              sx={{ width: 90 }}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell align="right">
                           <TextField
                             size="small"
@@ -326,13 +448,13 @@ function LabelPrintContent({ sources, onClose }: Omit<Props, 'open'>) {
               mẫu giấy lớn hơn hoặc rút ngắn mã hàng. Mã có dấu tiếng Việt không in được thành mã vạch.
             </Typography>
 
-            {plan && plan.problems.length > 0 && (
+            {problems.length > 0 && (
               <Alert severity="warning">
                 <Typography variant="subtitle2">
-                  {plan.problems.length} mã hàng không in được — các mã còn lại vẫn in bình thường
+                  {problems.length} mã hàng không in được — các mã còn lại vẫn in bình thường
                 </Typography>
                 <Box component="ul" aria-label="Mã hàng không in được" sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
-                  {plan.problems.map((problem) => (
+                  {problems.map((problem) => (
                     <li key={problem.key}>
                       <Typography variant="body2">
                         <strong>{problem.name}</strong>
@@ -348,7 +470,8 @@ function LabelPrintContent({ sources, onClose }: Omit<Props, 'open'>) {
               <Alert severity="info">
                 {notes.map((label) => (
                   <Typography key={label.source.key} variant="body2">
-                    <strong>{label.source.name}</strong> ({label.barcode.value}): {label.note}
+                    <strong>{label.source.name}</strong>
+                    {'barcode' in label ? ` (${label.barcode.value})` : ''}: {label.note}
                   </Typography>
                 ))}
               </Alert>
@@ -411,137 +534,194 @@ function LabelPrintContent({ sources, onClose }: Omit<Props, 'open'>) {
 
           {/* Cột phải: loại giấy, nội dung, căn chỉnh, hướng dẫn */}
           <Stack spacing={2.5}>
-            <TextField
-              select
-              size="small"
-              label="Loại giấy in tem"
-              value={settings.templateId}
-              onChange={(event) => handleChangeTemplate(event.target.value)}
-            >
-              {LABEL_TEMPLATES.map((item) => (
-                <MenuItem key={item.id} value={item.id}>
-                  {item.name}
-                </MenuItem>
-              ))}
-              <MenuItem value={CUSTOM_TEMPLATE_ID}>Tuỳ chỉnh…</MenuItem>
-            </TextField>
-
-            {isCustom && (
-              <Box display="grid" gap={1.5} gridTemplateColumns="repeat(2, minmax(0, 1fr))">
-                <TextField
-                  select
-                  size="small"
-                  label="Kiểu giấy"
-                  value={settings.customTemplate.kind}
-                  onChange={(event) => changeCustomTemplate({ kind: event.target.value as LabelPaperKind })}
-                >
-                  <MenuItem value="roll">Giấy cuộn — mỗi hàng một trang</MenuItem>
-                  <MenuItem value="sheet">Giấy tờ (A4, A5…) — nhiều hàng</MenuItem>
-                </TextField>
-                <TextField
-                  select
-                  size="small"
-                  label="Bố cục tem"
-                  value={settings.customTemplate.layout}
-                  onChange={(event) =>
-                    changeCustomTemplate({ layout: event.target.value as LabelContentLayout })
-                  }
-                >
-                  <MenuItem value="stacked">Xếp dọc: tên, mã vạch, giá</MenuItem>
-                  <MenuItem value="split">Tem dài: mã vạch trái, tên và giá phải</MenuItem>
-                </TextField>
-                {TEMPLATE_NUMBER_FIELDS.filter((field) => isSheet || !field.sheetOnly).map((field) => {
-                  const value = settings.customTemplate[field.key];
-                  return (
-                    <TextField
-                      key={field.key}
-                      size="small"
-                      type="number"
-                      label={`${(isSheet && field.sheetLabel) || field.label} (${field.unit})`}
-                      value={Number.isFinite(value) ? value : ''}
-                      onChange={(event) =>
-                        changeCustomTemplate({
-                          [field.key]: event.target.value === '' ? NaN : Number(event.target.value),
-                        })
-                      }
-                      inputProps={{ min: field.min, max: field.max, step: field.step }}
-                    />
-                  );
-                })}
-              </Box>
-            )}
-
-            <Stack spacing={0.5}>
-              <Typography variant="subtitle2">Nội dung tem</Typography>
+            {(labelTemplates?.templates.length ?? 0) > 0 && (
               <TextField
                 select
                 size="small"
-                label="Mã để in vạch"
-                value={options.valueSource}
-                onChange={(event) =>
-                  changeOptions({ valueSource: event.target.value as LabelValueSource })
-                }
-                sx={{ my: 1 }}
+                label="Mẫu tem"
+                value={designId}
+                onChange={(event) => handleChangeDesign(event.target.value)}
+                SelectProps={{ displayEmpty: true }}
+                InputLabelProps={{ shrink: true }}
               >
-                <MenuItem value="barcode-or-code">Mã vạch — không có thì dùng mã hàng</MenuItem>
-                <MenuItem value="code">Mã hàng</MenuItem>
+                <MenuItem value="">Khổ giấy hệ thống (chọn nội dung bên dưới)</MenuItem>
+                {(labelTemplates?.templates ?? []).map((item) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {item.name}
+                  </MenuItem>
+                ))}
               </TextField>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={options.showName}
-                    onChange={(event) => changeOptions({ showName: event.target.checked })}
+            )}
+
+            {design ? (
+              <Stack spacing={1.5}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  Khổ giấy và nội dung theo mẫu: <strong>{paperSummary(design.paper)}</strong>
+                </Typography>
+                {usesDiscount && (
+                  <TextField
+                    size="small"
+                    label="Giảm giá chung"
+                    value={discountAll}
+                    onChange={(event) => setDiscountAll(event.target.value)}
+                    error={!!discountAll && !parseDiscount(discountAll)}
+                    placeholder="Vd. 20% hoặc 15.000"
+                    helperText="Áp cho dòng không nhập giảm giá riêng. Trống = không giảm (giá gốc / % giảm không in ra)."
                   />
-                }
-                label="In tên hàng (tối đa 2 dòng)"
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={options.showStoreName}
-                    onChange={(event) => changeOptions({ showStoreName: event.target.checked })}
-                  />
-                }
-                label={`In tên cửa hàng (${brandName})`}
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={options.showPrice}
-                    onChange={(event) => changeOptions({ showPrice: event.target.checked })}
-                  />
-                }
-                label="In giá bán"
-              />
-              {options.showPrice && (
-                <>
+                )}
+                {usesWarehouse && (
                   <TextField
                     select
                     size="small"
-                    label="Chữ sau giá"
-                    value={options.priceSuffix}
-                    onChange={(event) =>
-                      changeOptions({ priceSuffix: event.target.value as LabelPriceSuffix })
-                    }
-                    helperText={`Giá sẽ in dạng: ${priceExample}`}
-                    sx={{ mt: 1 }}
+                    label="Kho in trên tem"
+                    value={warehouseId}
+                    onChange={(event) => setWarehouseId(event.target.value)}
+                    disabled={!warehouses || warehouses.length === 0}
+                    helperText={warehouses && warehouses.length === 0 ? 'Không tải được danh sách kho.' : undefined}
                   >
-                    <MenuItem value="đ">đ</MenuItem>
-                    <MenuItem value="VND">VND</MenuItem>
-                    <MenuItem value="none">Không ghi</MenuItem>
+                    {(warehouses ?? []).map((item) => (
+                      <MenuItem key={item.id} value={item.id}>
+                        {item.name}
+                      </MenuItem>
+                    ))}
                   </TextField>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={options.showUnit}
-                        onChange={(event) => changeOptions({ showUnit: event.target.checked })}
-                      />
+                )}
+              </Stack>
+            ) : (
+              <>
+              <TextField
+                select
+                size="small"
+                label="Loại giấy in tem"
+                value={settings.templateId}
+                onChange={(event) => handleChangeTemplate(event.target.value)}
+              >
+                {LABEL_TEMPLATES.map((item) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {item.name}
+                  </MenuItem>
+                ))}
+                <MenuItem value={CUSTOM_TEMPLATE_ID}>Tuỳ chỉnh…</MenuItem>
+              </TextField>
+
+              {isCustom && (
+                <Box display="grid" gap={1.5} gridTemplateColumns="repeat(2, minmax(0, 1fr))">
+                  <TextField
+                    select
+                    size="small"
+                    label="Kiểu giấy"
+                    value={settings.customTemplate.kind}
+                    onChange={(event) => changeCustomTemplate({ kind: event.target.value as LabelPaperKind })}
+                  >
+                    <MenuItem value="roll">Giấy cuộn — mỗi hàng một trang</MenuItem>
+                    <MenuItem value="sheet">Giấy tờ (A4, A5…) — nhiều hàng</MenuItem>
+                  </TextField>
+                  <TextField
+                    select
+                    size="small"
+                    label="Bố cục tem"
+                    value={settings.customTemplate.layout}
+                    onChange={(event) =>
+                      changeCustomTemplate({ layout: event.target.value as LabelContentLayout })
                     }
-                    label="Kèm đơn vị tính (hàng có đơn vị)"
-                  />
-                </>
+                  >
+                    <MenuItem value="stacked">Xếp dọc: tên, mã vạch, giá</MenuItem>
+                    <MenuItem value="split">Tem dài: mã vạch trái, tên và giá phải</MenuItem>
+                  </TextField>
+                  {TEMPLATE_NUMBER_FIELDS.filter((field) => isSheet || !field.sheetOnly).map((field) => {
+                    const value = settings.customTemplate[field.key];
+                    return (
+                      <TextField
+                        key={field.key}
+                        size="small"
+                        type="number"
+                        label={`${(isSheet && field.sheetLabel) || field.label} (${field.unit})`}
+                        value={Number.isFinite(value) ? value : ''}
+                        onChange={(event) =>
+                          changeCustomTemplate({
+                            [field.key]: event.target.value === '' ? NaN : Number(event.target.value),
+                          })
+                        }
+                        inputProps={{ min: field.min, max: field.max, step: field.step }}
+                      />
+                    );
+                  })}
+                </Box>
               )}
-            </Stack>
+
+              <Stack spacing={0.5}>
+                <Typography variant="subtitle2">Nội dung tem</Typography>
+                <TextField
+                  select
+                  size="small"
+                  label="Mã để in vạch"
+                  value={options.valueSource}
+                  onChange={(event) =>
+                    changeOptions({ valueSource: event.target.value as LabelValueSource })
+                  }
+                  sx={{ my: 1 }}
+                >
+                  <MenuItem value="barcode-or-code">Mã vạch — không có thì dùng mã hàng</MenuItem>
+                  <MenuItem value="code">Mã hàng</MenuItem>
+                </TextField>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={options.showName}
+                      onChange={(event) => changeOptions({ showName: event.target.checked })}
+                    />
+                  }
+                  label="In tên hàng (tối đa 2 dòng)"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={options.showStoreName}
+                      onChange={(event) => changeOptions({ showStoreName: event.target.checked })}
+                    />
+                  }
+                  label={`In tên cửa hàng (${brandName})`}
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={options.showPrice}
+                      onChange={(event) => changeOptions({ showPrice: event.target.checked })}
+                    />
+                  }
+                  label="In giá bán"
+                />
+                {options.showPrice && (
+                  <>
+                    <TextField
+                      select
+                      size="small"
+                      label="Chữ sau giá"
+                      value={options.priceSuffix}
+                      onChange={(event) =>
+                        changeOptions({ priceSuffix: event.target.value as LabelPriceSuffix })
+                      }
+                      helperText={`Giá sẽ in dạng: ${priceExample}`}
+                      sx={{ mt: 1 }}
+                    >
+                      <MenuItem value="đ">đ</MenuItem>
+                      <MenuItem value="VND">VND</MenuItem>
+                      <MenuItem value="none">Không ghi</MenuItem>
+                    </TextField>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={options.showUnit}
+                          onChange={(event) => changeOptions({ showUnit: event.target.checked })}
+                        />
+                      }
+                      label="Kèm đơn vị tính (hàng có đơn vị)"
+                    />
+                  </>
+                )}
+              </Stack>
+              </>
+            )}
 
             <Stack spacing={1}>
               <Typography variant="subtitle2">Căn chỉnh máy in (nhớ riêng cho loại giấy này)</Typography>
@@ -575,22 +755,24 @@ function LabelPrintContent({ sources, onClose }: Omit<Props, 'open'>) {
                   }
                 />
               )}
-              <TextField
-                select
-                size="small"
-                label="Độ rộng vạch"
-                value={calibration.moduleDots}
-                onChange={(event) =>
-                  changeCalibration({ ...calibration, moduleDots: Number(event.target.value) as ModuleDots })
-                }
-                sx={{ mt: 1 }}
-              >
-                {([1, 2, 3] as ModuleDots[]).map((dots) => (
-                  <MenuItem key={dots} value={dots}>
-                    {moduleChoiceLabel(template.kind, dots)}
-                  </MenuItem>
-                ))}
-              </TextField>
+              {!design && (
+                <TextField
+                  select
+                  size="small"
+                  label="Độ rộng vạch"
+                  value={calibration.moduleDots}
+                  onChange={(event) =>
+                    changeCalibration({ ...calibration, moduleDots: Number(event.target.value) as ModuleDots })
+                  }
+                  sx={{ mt: 1 }}
+                >
+                  {([1, 2, 3] as ModuleDots[]).map((dots) => (
+                    <MenuItem key={dots} value={dots}>
+                      {moduleChoiceLabel(template.kind, dots)}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
               <Stack direction="row" spacing={1}>
                 <Button
                   size="small"
@@ -669,7 +851,7 @@ function LabelPrintContent({ sources, onClose }: Omit<Props, 'open'>) {
       <DialogActions>
         <Typography variant="body2" sx={{ flexGrow: 1, pl: 1, color: 'text.secondary' }}>
           {labelCount > 0
-            ? `${groupThousands(labelCount)} tem · ${groupThousands(pageCount)} ${pageWord} · ${template.name}`
+            ? `${groupThousands(labelCount)} tem · ${groupThousands(pageCount)} ${pageWord} · ${designTemplate?.name ?? template.name}`
             : 'Chưa có tem nào để in'}
         </Typography>
         <Button color="inherit" onClick={handleExport} disabled={!hasRowsToExport}>

@@ -56,6 +56,13 @@ describe('requiredRolesFor', () => {
 describe('requiredPermissionsFor', () => {
   const P = PERMISSIONS.payroll;
 
+  it('mẫu in nằm dưới Cài đặt cửa hàng nhưng theo quyền sales.print-template.manage', () => {
+    [paths.dashboard.storeSettings.printTemplates, paths.dashboard.storeSettings.printTemplateEdit('t1')].forEach((path) => {
+      expect(requiredPermissionsFor(path)).toEqual([PERMISSIONS.sales.printTemplateManage]);
+      expect(requiredRolesFor(path)).toBeNull();
+    });
+  });
+
   it.each([
     [paths.dashboard.salary.configuration, [P.salaryConfigRead]],
     [paths.dashboard.salary.history, [P.salaryConfigRead]],

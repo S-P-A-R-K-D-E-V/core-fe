@@ -670,6 +670,11 @@ export const endpoints = {
     units: (id: string) => `/products/${id}/units`,
     purchaseHistory: (id: string) => `/products/${id}/purchase-history`,
   },
+  printTemplates: {
+    list: '/print-templates',
+    details: (id: string) => `/print-templates/${id}`,
+    assignments: (kind: string) => `/print-templates/assignments/${kind}`,
+  },
   warehouses: {
     list: '/warehouses',
     create: '/warehouses',

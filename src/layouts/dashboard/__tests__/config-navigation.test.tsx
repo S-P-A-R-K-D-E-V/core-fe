@@ -179,6 +179,14 @@ describe('useNavData — camera, giám sát, báo cáo chỉ Admin', () => {
     expect(navPaths('Manager', features)).toContain(paths.dashboard.storeSettings.devices);
     expect(navPaths('Staff', features)).not.toContain(paths.dashboard.storeSettings.devices);
   });
+
+  // Mẫu in hoá đơn / tem mã: theo quyền sales.print-template.manage (mặc định Admin, Manager).
+  it('Mẫu in: theo quyền sales.print-template.manage', () => {
+    const printTemplates = paths.dashboard.storeSettings.printTemplates;
+    expect(navPaths('Admin', features)).toContain(printTemplates);
+    expect(navPaths('Manager', features, ['sales.print-template.manage'])).toContain(printTemplates);
+    expect(navPaths('Staff', features, [])).not.toContain(printTemplates);
+  });
 });
 
 // Mục Thanh toán gom đối soát, đơn online, Cài đặt (phương thức theo kênh, bán online, tài khoản, báo có) — mỗi trang theo
