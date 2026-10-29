@@ -415,6 +415,7 @@ export const endpoints = {
     templates: '/inspections/templates',
     template: (id: string) => `/inspections/templates/${id}`,
     publishTemplate: (id: string) => `/inspections/templates/${id}/publish`,
+    importCleaning: (id: string) => `/inspections/templates/${id}/import-cleaning`,
     shifts: '/inspections/shifts',
     dashboard: '/inspections/dashboard',
     stats: '/inspections/stats',
@@ -428,6 +429,14 @@ export const endpoints = {
   correctiveActions: {
     list: '/corrective-actions',
     details: (id: string) => `/corrective-actions/${id}`,
+    mine: '/corrective-actions/mine',
+    done: (id: string) => `/corrective-actions/${id}/done`,
+  },
+  // Việc trong ca: hạng mục nhân viên tự làm và chụp ảnh (bảng kiểm nhanh mỗi ca).
+  shiftWork: {
+    mine: '/shift-work/mine',
+    presign: '/shift-work/photos/presign',
+    complete: '/shift-work/complete',
   },
   // Nhân sự theo Quy chế / Nội quy CiCi.
   hr: {

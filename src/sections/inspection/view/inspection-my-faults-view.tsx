@@ -99,6 +99,129 @@ export function FaultCard({ fault, onFix }: { fault: IInspectionFault; onFix?: (
   );
 }
 
+/** Đánh dấu đã sửa một lỗi: ảnh sau khi sửa (bắt buộc khi hạng mục cần ảnh) + ghi chú. */
+export function FixFaultDialog({
+  fault,
+  onClose,
+  onDone,
+}: {
+  fault: IInspectionFault | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const { enqueueSnackbar } = useSnackbar();
+  const [fixNote, setFixNote] = useState('');
+  const [fixFiles, setFixFiles] = useState<File[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setFixNote('');
+    setFixFiles([]);
+  }, [fault]);
+
+  const needPhoto = !!fault?.requiresPhotoOnFail && fixFiles.length === 0;
+
+  const submitFix = async () => {
+    if (!fault) return;
+    setSaving(true);
+    try {
+      const keys = await uploadInspectionPhotos(fault.inspectionId, fixFiles);
+      await fixInspectionResult(fault.resultId, fixNote.trim() || null, keys);
+      enqueueSnackbar('Đã đánh dấu đã sửa', { variant: 'success' });
+      onDone();
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Chưa lưu được'), { variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!fault} onClose={() => !saving && onClose()} fullWidth maxWidth="sm">
+      <DialogTitle>Đánh dấu đã sửa</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ pt: 1 }}>
+          <Typography variant="subtitle2">
+            {fault?.itemCode} · {fault?.itemTitle}
+          </Typography>
+          <InspectionPhotoRules />
+          <PhotoPicker
+            photos={[]}
+            files={fixFiles}
+            disabled={saving}
+            onAdd={(files) => setFixFiles((prev) => [...prev, ...files])}
+            onRemove={(i) => setFixFiles((prev) => prev.filter((_, idx) => idx !== i))}
+          />
+          {fault?.requiresPhotoOnFail && (
+            <Typography variant="caption" color={needPhoto ? 'warning.main' : 'text.secondary'}>
+              Cần ít nhất 1 ảnh sau khi sửa.
+            </Typography>
+          )}
+          <TextField label="Ghi chú" value={fixNote} onChange={(e) => setFixNote(e.target.value)} multiline minRows={2} />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={saving}>
+          Huỷ
+        </Button>
+        <LoadingButton variant="contained" loading={saving} disabled={needPhoto} onClick={submitFix}>
+          Lưu
+        </LoadingButton>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** Lỗi đang mở mình phụ trách — dùng trong Việc của tôi. Không có lỗi thì báo ngắn. */
+export function MyOpenFaults() {
+  const { enqueueSnackbar } = useSnackbar();
+  const [faults, setFaults] = useState<IInspectionFault[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fixing, setFixing] = useState<IInspectionFault | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setFaults(await getOpenInspectionFaults('mine'));
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không tải được lỗi cần sửa'), { variant: 'error' });
+      setFaults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [enqueueSnackbar]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <Stack spacing={1.5}>
+      <Typography variant="h6">Lỗi cần sửa</Typography>
+      {loading ? (
+        <Stack alignItems="center" sx={{ py: 3 }}>
+          <CircularProgress size={28} />
+        </Stack>
+      ) : faults.length === 0 ? (
+        <Card>
+          <Typography variant="body2" color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>
+            Không có lỗi nào bạn cần sửa.
+          </Typography>
+        </Card>
+      ) : (
+        faults.map((f) => <FaultCard key={f.resultId} fault={f} onFix={setFixing} />)
+      )}
+      <FixFaultDialog
+        fault={fixing}
+        onClose={() => setFixing(null)}
+        onDone={() => {
+          setFixing(null);
+          load();
+        }}
+      />
+    </Stack>
+  );
+}
+
 export default function InspectionMyFaultsView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
@@ -110,9 +233,6 @@ export default function InspectionMyFaultsView() {
   const [faults, setFaults] = useState<IInspectionFault[]>([]);
   const [loading, setLoading] = useState(true);
   const [fixing, setFixing] = useState<IInspectionFault | null>(null);
-  const [fixNote, setFixNote] = useState('');
-  const [fixFiles, setFixFiles] = useState<File[]>([]);
-  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -130,30 +250,6 @@ export default function InspectionMyFaultsView() {
     load();
   }, [load]);
 
-  const openFix = (fault: IInspectionFault) => {
-    setFixing(fault);
-    setFixNote('');
-    setFixFiles([]);
-  };
-
-  const needPhoto = !!fixing?.requiresPhotoOnFail && fixFiles.length === 0;
-
-  const submitFix = async () => {
-    if (!fixing) return;
-    setSaving(true);
-    try {
-      const keys = await uploadInspectionPhotos(fixing.inspectionId, fixFiles);
-      await fixInspectionResult(fixing.resultId, fixNote.trim() || null, keys);
-      enqueueSnackbar('Đã đánh dấu đã sửa', { variant: 'success' });
-      setFixing(null);
-      load();
-    } catch (err) {
-      enqueueSnackbar(apiErrorMessage(err, 'Chưa lưu được'), { variant: 'error' });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   // Tab "mọi lỗi": chỉ người có quyền sửa lượt kiểm mới đánh dấu thay được.
   const mayFix = tab === 'open' || (tab === 'all' && canManage);
 
@@ -161,7 +257,7 @@ export default function InspectionMyFaultsView() {
     <Container maxWidth={settings.themeStretch ? false : 'lg'}>
       <CustomBreadcrumbs
         heading="Lỗi tôi phụ trách"
-        links={[{ name: 'Kiểm tra cửa hàng', href: paths.dashboard.inspection.root }, { name: 'Lỗi tôi phụ trách' }]}
+        links={[{ name: 'Kiểm tra ca', href: paths.dashboard.inspection.root }, { name: 'Lỗi tôi phụ trách' }]}
         sx={{ mb: 2 }}
       />
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -186,43 +282,19 @@ export default function InspectionMyFaultsView() {
       ) : (
         <Stack spacing={2} sx={{ mb: 4 }}>
           {faults.map((f) => (
-            <FaultCard key={f.resultId} fault={f} onFix={mayFix ? openFix : undefined} />
+            <FaultCard key={f.resultId} fault={f} onFix={mayFix ? setFixing : undefined} />
           ))}
         </Stack>
       )}
 
-      <Dialog open={!!fixing} onClose={() => !saving && setFixing(null)} fullWidth maxWidth="sm">
-        <DialogTitle>Đánh dấu đã sửa</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ pt: 1 }}>
-            <Typography variant="subtitle2">
-              {fixing?.itemCode} · {fixing?.itemTitle}
-            </Typography>
-            <InspectionPhotoRules />
-            <PhotoPicker
-              photos={[]}
-              files={fixFiles}
-              disabled={saving}
-              onAdd={(files) => setFixFiles((prev) => [...prev, ...files])}
-              onRemove={(i) => setFixFiles((prev) => prev.filter((_, idx) => idx !== i))}
-            />
-            {fixing?.requiresPhotoOnFail && (
-              <Typography variant="caption" color={needPhoto ? 'warning.main' : 'text.secondary'}>
-                Cần ít nhất 1 ảnh sau khi sửa.
-              </Typography>
-            )}
-            <TextField label="Ghi chú" value={fixNote} onChange={(e) => setFixNote(e.target.value)} multiline minRows={2} />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setFixing(null)} disabled={saving}>
-            Huỷ
-          </Button>
-          <LoadingButton variant="contained" loading={saving} disabled={needPhoto} onClick={submitFix}>
-            Lưu
-          </LoadingButton>
-        </DialogActions>
-      </Dialog>
+      <FixFaultDialog
+        fault={fixing}
+        onClose={() => setFixing(null)}
+        onDone={() => {
+          setFixing(null);
+          load();
+        }}
+      />
     </Container>
   );
 }

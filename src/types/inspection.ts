@@ -13,6 +13,16 @@ export type InspectionZoneCode = 'A' | 'B' | 'C' | 'D';
 
 export const INSPECTION_ZONES: InspectionZoneCode[] = ['A', 'B', 'C', 'D'];
 
+/** Khung ca của ca làm (ShiftTemplate.CleaningBlock) — lịch của hạng mục. */
+export type WorkBlock = 'Morning' | 'Afternoon' | 'Evening';
+
+export const WORK_BLOCKS: WorkBlock[] = ['Morning', 'Afternoon', 'Evening'];
+
+export const WORK_BLOCK_LABEL: Record<WorkBlock, string> = { Morning: 'Sáng', Afternoon: 'Chiều', Evening: 'Tối' };
+
+/** Thứ trong tuần của lịch hạng mục: 1 = Thứ 2 … 7 = Chủ nhật. */
+export const WEEKDAY_SHORT: Record<number, string> = { 1: 'T2', 2: 'T3', 3: 'T4', 4: 'T5', 5: 'T6', 6: 'T7', 7: 'CN' };
+
 export const INSPECTION_TYPE_LABEL: Record<InspectionType, string> = {
   ShiftQuick: 'Kiểm nhanh',
   WeeklyFull: 'Kiểm tuần',
@@ -49,6 +59,12 @@ export interface IInspectionTemplateItem {
   requiresPhotoOnFail: boolean;
   requiresFix: boolean;
   sortOrder: number;
+  /** Nhân viên trong ca tự làm và chụp ảnh (chỉ bảng kiểm nhanh mỗi ca). */
+  staffDoes: boolean;
+  /** 1 = Thứ 2 … 7 = Chủ nhật; null / rỗng = mọi ngày. */
+  weekdays: number[] | null;
+  /** null / rỗng = mọi ca. */
+  blocks: WorkBlock[] | null;
 }
 
 export interface IInspectionTemplate {
@@ -73,6 +89,9 @@ export interface IInspectionTemplateItemInput {
   observationsPerStaff: number;
   requiresPhotoOnFail: boolean;
   requiresFix: boolean;
+  staffDoes: boolean;
+  weekdays: number[] | null;
+  blocks: WorkBlock[] | null;
 }
 
 export interface IInspectionStaff {
@@ -139,6 +158,8 @@ export interface IInspection {
   zoneOwners: IInspectionZoneOwners;
   template: IInspectionTemplate;
   results: IInspectionResult[];
+  /** Hạng mục nhân viên đã làm trong ca (ai làm, ảnh) — người kiểm xem khi chấm. */
+  completions: IShiftWorkCompletionItem[];
 }
 
 export interface IInspectionResultInput {
@@ -204,6 +225,7 @@ export interface ICorrectiveAction {
   failCount: number | null;
   createdAt: string;
   completedAt: string | null;
+  ownerName: string | null;
 }
 
 export interface IInspectionDashboard {
@@ -246,4 +268,43 @@ export interface IPagedResult<T> {
   totalCount: number;
   page: number;
   pageSize: number;
+}
+
+// ── Việc trong ca (shift-work) ─────────────────────────────────────────
+
+export interface IShiftWorkCompletion {
+  id: string;
+  completedByUserId: string;
+  completedByName: string;
+  completedAt: string;
+  note: string | null;
+  photos: IInspectionPhoto[];
+}
+
+export interface IShiftWorkCompletionItem {
+  itemId: string;
+  completion: IShiftWorkCompletion;
+}
+
+export interface IShiftWorkItem {
+  itemId: string;
+  code: string;
+  groupName: string | null;
+  title: string;
+  passCriteria: string;
+  zones: InspectionZoneCode[];
+  requiresPhoto: boolean;
+  completion: IShiftWorkCompletion | null;
+  /** Kết quả kiểm của ca cho hạng mục này; null = chưa kiểm. */
+  outcome: InspectionOutcome | null;
+}
+
+export interface IShiftWorkShift {
+  date: string;
+  shiftScheduleId: string;
+  shiftName: string;
+  startTime: string;
+  endTime: string;
+  block: WorkBlock | null;
+  items: IShiftWorkItem[];
 }

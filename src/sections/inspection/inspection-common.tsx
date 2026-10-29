@@ -10,6 +10,7 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 
+import { fDateTime } from 'src/utils/format-time';
 import { getStorageUrl } from 'src/utils/storage';
 
 import Iconify from 'src/components/iconify';
@@ -17,6 +18,7 @@ import Lightbox, { useLightBox } from 'src/components/lightbox';
 
 import type {
   IInspectionPhoto,
+  IShiftWorkCompletion,
   InspectionLevel,
   InspectionOutcome,
   InspectionStatus,
@@ -209,4 +211,43 @@ export function toDateInput(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+/** "Đã làm: tên giờ" + ảnh nhân viên chụp khi làm hạng mục trong ca. Chưa làm thì hiện nhãn "Chưa làm" khi cần. */
+export function ShiftWorkDoneInfo({
+  completion,
+  showPending,
+}: {
+  completion: IShiftWorkCompletion | null | undefined;
+  showPending?: boolean;
+}) {
+  const slides = (completion?.photos ?? []).map((p) => ({ src: getStorageUrl(p.url) }));
+  const lightbox = useLightBox(slides);
+
+  if (!completion) {
+    return showPending ? <Chip size="small" variant="outlined" color="warning" label="Chưa làm" sx={{ alignSelf: 'flex-start' }} /> : null;
+  }
+  return (
+    <Stack spacing={0.75}>
+      <Typography variant="caption" color="success.main">
+        Đã làm: {completion.completedByName} · {fDateTime(completion.completedAt, 'HH:mm dd/MM')}
+        {completion.note ? ` — ${completion.note}` : ''}
+      </Typography>
+      {completion.photos.length > 0 && (
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          {completion.photos.map((p) => (
+            <Box
+              key={p.id}
+              component="img"
+              src={getStorageUrl(p.url)}
+              alt="Ảnh đã làm"
+              onClick={() => lightbox.onOpen(getStorageUrl(p.url))}
+              sx={{ width: 56, height: 56, borderRadius: 1, objectFit: 'cover', cursor: 'pointer', border: 1, borderColor: 'divider' }}
+            />
+          ))}
+          <Lightbox index={lightbox.selected} slides={slides} open={lightbox.open} close={lightbox.onClose} />
+        </Stack>
+      )}
+    </Stack>
+  );
 }

@@ -1,12 +1,12 @@
-import { format } from 'date-fns';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor } from '@testing-library/react';
 
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 // ----------------------------------------------------------------------
-// Giao việc: "Cho cả ca" tạo đầu việc theo ca chỉ áp dụng đúng ngày đã chọn; "Cho một người" giao việc riêng không có nhóm.
+// Giao việc & sửa tận gốc: một danh sách cho việc giao riêng và việc sửa tận gốc; hộp "Giao việc" giao cho một người
+// (không nhóm) hoặc tạo việc sửa tận gốc.
 // ----------------------------------------------------------------------
 
 vi.mock('next/font/google', () => {
@@ -33,8 +33,9 @@ const api = vi.hoisted(() => ({
   getWorkTasks: vi.fn(),
   assignWorkTask: vi.fn(),
   cancelWorkTask: vi.fn(),
-  createCleaningTaskTemplate: vi.fn(),
-  getAllShiftTemplates: vi.fn(),
+  getCorrectiveActions: vi.fn(),
+  createCorrectiveAction: vi.fn(),
+  updateCorrectiveAction: vi.fn(),
   getActiveStaffUsers: vi.fn(),
 }));
 vi.mock('src/api/hr', () => ({
@@ -46,10 +47,13 @@ vi.mock('src/api/hr', () => ({
   getMyWorkTasks: vi.fn(),
   uploadWorkTaskPhotos: vi.fn(),
 }));
-vi.mock('src/api/cleaning', () => ({
-  createCleaningTaskTemplate: (...a: any[]) => api.createCleaningTaskTemplate(...a),
+vi.mock('src/api/inspection', () => ({
+  getCorrectiveActions: (...a: any[]) => api.getCorrectiveActions(...a),
+  createCorrectiveAction: (...a: any[]) => api.createCorrectiveAction(...a),
+  updateCorrectiveAction: (...a: any[]) => api.updateCorrectiveAction(...a),
+  getMyCorrectiveActions: vi.fn(),
+  markCorrectiveActionDone: vi.fn(),
 }));
-vi.mock('src/api/attendance', () => ({ getAllShiftTemplates: () => api.getAllShiftTemplates() }));
 vi.mock('src/api/users', () => ({ getActiveStaffUsers: () => api.getActiveStaffUsers() }));
 
 // Imported after the mocks above.
@@ -57,62 +61,44 @@ import CleaningAssignedView from 'src/sections/cleaning/view/cleaning-assigned-v
 
 const wrap = (ui: React.ReactElement) => render(<ThemeProvider theme={createTheme()}>{ui}</ThemeProvider>);
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  api.getWorkTasks.mockResolvedValue([]);
+  api.getCorrectiveActions.mockResolvedValue([]);
+  api.getActiveStaffUsers.mockResolvedValue([{ id: 'u-lan', fullName: 'Lan' }]);
+});
+
 describe('CleaningAssignedView', () => {
-  it('Cho cả ca: tạo đầu việc chỉ đúng ngày đã chọn', async () => {
-    api.getWorkTasks.mockResolvedValue([]);
-    api.getActiveStaffUsers.mockResolvedValue([]);
-    api.getAllShiftTemplates.mockResolvedValue([{ id: 's1', isActive: true, cleaningBlock: 'Afternoon' }]);
-    api.createCleaningTaskTemplate.mockResolvedValue({});
+  it('một danh sách: việc giao riêng và gợi ý sửa tận gốc cùng bảng', async () => {
+    api.getWorkTasks.mockResolvedValue([
+      {
+        id: 't1', group: 'Other', title: 'Đóng gói đơn online', description: null, assigneeId: 'u-lan', assigneeName: 'Lan',
+        assignedBy: 'u-admin', dueAt: null, status: 'Submitted', submittedAt: '2026-10-29T03:00:00Z', submissionNote: null,
+        reviewedBy: null, reviewedAt: null, reviewNote: null, implemented: false, onTime: true,
+        createdAt: '2026-10-29T01:00:00Z', photos: [],
+      },
+    ]);
+    api.getCorrectiveActions.mockResolvedValue([
+      {
+        id: 'c1', itemCode: 'Q07', title: 'Lỗi lặp Q07', rootCause: null, action: null, ownerUserId: null, dueDate: null,
+        status: 'Suggested', suggestedForWeek: '2026-10-26', failCount: 4, createdAt: '2026-09-01T00:00:00Z',
+        completedAt: null, ownerName: null,
+      },
+    ]);
     wrap(<CleaningAssignedView />);
 
-    expect(await screen.findByText(/Chưa giao việc riêng/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Giao việc' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Cho cả ca' }));
-    await userEvent.type(screen.getByLabelText('Việc cần làm'), 'Kiểm hàng khu B');
-    await userEvent.click(screen.getByLabelText('Ca'));
-    await userEvent.click(await screen.findByRole('option', { name: 'Chiều' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Giao' }));
-
-    const today = format(new Date(), 'yyyy-MM-dd');
-    await waitFor(() =>
-      expect(api.createCleaningTaskTemplate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Kiểm hàng khu B',
-          cleaningBlock: 'Afternoon',
-          fromDate: today,
-          toDate: today,
-          dayOfWeek: format(new Date(`${today}T00:00:00`), 'EEEE'),
-        })
-      )
-    );
-    expect(api.assignWorkTask).not.toHaveBeenCalled();
-  });
-
-  it('Cho cả ca: ca chưa gắn khung thì không tạo', async () => {
-    api.getWorkTasks.mockResolvedValue([]);
-    api.getActiveStaffUsers.mockResolvedValue([]);
-    api.getAllShiftTemplates.mockResolvedValue([{ id: 's1', isActive: true, cleaningBlock: 'Evening' }]);
-    api.createCleaningTaskTemplate.mockClear();
-    wrap(<CleaningAssignedView />);
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Giao việc' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Cho cả ca' }));
-    await userEvent.type(screen.getByLabelText('Việc cần làm'), 'Lau kính');
-    await userEvent.click(screen.getByRole('button', { name: 'Giao' }));
-
-    await waitFor(() =>
-      expect(enqueueSnackbar).toHaveBeenCalledWith(expect.stringMatching(/Khung ca giao việc/), { variant: 'error' })
-    );
-    expect(api.createCleaningTaskTemplate).not.toHaveBeenCalled();
+    expect(await screen.findByText('Đóng gói đơn online')).toBeInTheDocument();
+    expect(screen.getByText('Lỗi lặp Q07')).toBeInTheDocument();
+    expect(screen.getByText('Gợi ý sửa tận gốc')).toBeInTheDocument();
+    expect(screen.getByText('4 lần không đạt')).toBeInTheDocument();
   });
 
   it('Cho một người: gửi việc không có nhóm', async () => {
-    api.getWorkTasks.mockResolvedValue([]);
-    api.getActiveStaffUsers.mockResolvedValue([{ id: 'u-lan', fullName: 'Lan' }]);
     api.assignWorkTask.mockResolvedValue({});
     wrap(<CleaningAssignedView />);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Giao việc' }));
+    expect(await screen.findByText('Không có việc nào.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Giao việc' }));
     await userEvent.type(screen.getByLabelText('Việc cần làm'), 'Đóng gói đơn online');
     await userEvent.click(screen.getByLabelText('Người làm'));
     await userEvent.click(await screen.findByRole('option', { name: 'Lan' }));
@@ -126,5 +112,30 @@ describe('CleaningAssignedView', () => {
         dueAt: null,
       })
     );
+    expect(api.createCorrectiveAction).not.toHaveBeenCalled();
+  });
+
+  it('Sửa tận gốc: tạo việc với mã hạng mục và nguyên nhân, chưa cần người làm', async () => {
+    api.createCorrectiveAction.mockResolvedValue({});
+    wrap(<CleaningAssignedView />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Giao việc' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sửa tận gốc' }));
+    await userEvent.type(screen.getByLabelText('Việc cần làm'), 'Thêm kệ để túi');
+    await userEvent.type(screen.getByLabelText('Mã hạng mục bị lỗi lặp (nếu có)'), 'Q03');
+    await userEvent.type(screen.getByLabelText('Nguyên nhân gốc'), 'Quầy không có chỗ để túi');
+    await userEvent.click(screen.getByRole('button', { name: 'Giao' }));
+
+    await waitFor(() =>
+      expect(api.createCorrectiveAction).toHaveBeenCalledWith({
+        title: 'Thêm kệ để túi',
+        itemCode: 'Q03',
+        rootCause: 'Quầy không có chỗ để túi',
+        action: null,
+        ownerUserId: null,
+        dueDate: null,
+      })
+    );
+    expect(api.assignWorkTask).not.toHaveBeenCalled();
   });
 });

@@ -159,7 +159,7 @@ export default function InspectionCorrectiveActionsView() {
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
       <CustomBreadcrumbs
         heading="Sửa tận gốc"
-        links={[{ name: 'Kiểm tra cửa hàng', href: paths.dashboard.inspection.root }, { name: 'Sửa tận gốc' }]}
+        links={[{ name: 'Kiểm tra ca', href: paths.dashboard.inspection.root }, { name: 'Sửa tận gốc' }]}
         action={
           canManage && (
             <Button variant="contained" onClick={() => setDraft({ ...emptyDraft })}>
