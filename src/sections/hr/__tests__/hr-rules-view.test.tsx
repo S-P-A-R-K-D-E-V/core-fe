@@ -36,6 +36,8 @@ const OFF: IHrRules = {
   weeklyBonusExcludeDiscountPct: null,
   weeklyBonusExcludeOnline: false,
   targetGrowthPct: null,
+  targetYears: null,
+  targetFloorPct: null,
   complaintWorkingDays: null,
   supportShiftMonthlyCap: null,
   supportShiftLatestEnd: null,

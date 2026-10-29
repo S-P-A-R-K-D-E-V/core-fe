@@ -192,11 +192,18 @@ export default function HrRulesView() {
             </Rule>
             <Divider />
             <Rule
-              title="Tự tính target tuần theo cùng kỳ năm trước"
+              title="Tự tính target tuần theo cùng kỳ"
               on={isOn('targetGrowthPct')}
               onToggle={(on) => toggleNumber('targetGrowthPct', on, 0)}
             >
-              {num('targetGrowthPct', 'Tăng trưởng thêm (%)')}
+              {num('targetYears', 'Số năm lấy cùng kỳ (1–5)')}
+              {num('targetGrowthPct', 'Hệ số target: thêm (%)')}
+              {num('targetFloorPct', 'Hệ số sàn: thêm (%)')}
+              <Typography variant="caption" color="text.secondary" sx={{ flexBasis: '100%' }}>
+                Target = trung bình cùng tuần các năm × hệ số quy đổi (8 tuần gần nhất so với cùng kỳ) × (1 + % target). Sàn =
+                trung vị 8 tuần gần nhất, bỏ tuần có ngày lễ, × (1 + % sàn). Tuần Tết và 4 tuần trước Tết so theo Tết âm lịch.
+                Bỏ trống số năm = 1 năm; bỏ trống % sàn = dùng % target.
+              </Typography>
             </Rule>
           </CardContent>
         </Card>

@@ -14,8 +14,12 @@ export interface IHrRules {
   /** Bỏ dòng hàng giảm từ % này khỏi doanh thu tính thưởng; trống = không bỏ. */
   weeklyBonusExcludeDiscountPct: number | null;
   weeklyBonusExcludeOnline: boolean;
-  /** Target tự tính = cùng tuần năm trước × xu hướng × (1 + %); trống = không tự tính. */
+  /** Target tự tính = trung bình cùng tuần `targetYears` năm × hệ số quy đổi 8 tuần × (1 + %); trống = không tự tính. */
   targetGrowthPct: number | null;
+  /** Số năm lấy cùng kỳ (1–5); trống = 1 năm. */
+  targetYears: number | null;
+  /** Sàn = trung vị 8 tuần không có ngày lễ × (1 + %); trống = dùng % của target. */
+  targetFloorPct: number | null;
   complaintWorkingDays: number | null;
   supportShiftMonthlyCap: number | null;
   /** "HH:mm:ss" */

@@ -232,8 +232,8 @@ export default function HrTargetsView() {
                     {canManage && (
                       <>
                         <TableCell align="right">Tự tính</TableCell>
-                        <TableCell align="right">Năm trước</TableCell>
-                        <TableCell align="right">Hệ số</TableCell>
+                        <TableCell align="right">Cùng kỳ (TB)</TableCell>
+                        <TableCell align="right">Hệ số quy đổi</TableCell>
                         <TableCell align="right">Sàn</TableCell>
                         <TableCell align="right">Doanh thu</TableCell>
                         <TableCell align="right">Đạt</TableCell>
