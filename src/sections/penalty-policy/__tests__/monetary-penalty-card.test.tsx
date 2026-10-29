@@ -39,12 +39,12 @@ afterEach(() => {
 });
 
 describe('MonetaryPenaltyCard', () => {
-  it('chưa đặt ngày: cảnh báo luật, lưu ngày đã chọn sau khi xác nhận', async () => {
+  it('chưa đặt ngày: hướng dẫn chọn ngày, lưu ngày đã chọn sau khi xác nhận', async () => {
     getMonetaryPenaltySettings.mockResolvedValue({ monetaryPenaltiesDisabledFrom: null, updatedAt: null });
     updateMonetaryPenaltySettings.mockResolvedValue({ monetaryPenaltiesDisabledFrom: '2026-11-01', updatedAt: 'x' });
     renderCard();
 
-    expect(await screen.findByText(/Điều 127/)).toBeTruthy();
+    expect(await screen.findByText(/Chọn ngày bắt đầu ngừng trừ tiền/)).toBeTruthy();
     const input = screen.getByLabelText('Ngừng phạt tiền từ ngày') as HTMLInputElement;
     await userEvent.clear(input);
     await userEvent.type(input, '2026-11-01');
@@ -75,6 +75,6 @@ describe('MonetaryPenaltyCard', () => {
     await confirmInDialog('Bỏ ngày ngừng');
 
     await waitFor(() => expect(updateMonetaryPenaltySettings).toHaveBeenCalledWith(null));
-    expect(await screen.findByText(/Điều 127/)).toBeTruthy();
+    expect(await screen.findByText(/Chọn ngày bắt đầu ngừng trừ tiền/)).toBeTruthy();
   });
 });

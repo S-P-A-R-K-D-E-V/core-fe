@@ -185,7 +185,7 @@ function CleaningPhotosTab() {
       setItems(result.items);
       setTotalCount(result.totalCount);
     } catch (error) {
-      enqueueSnackbar('Không thể tải ảnh vệ sinh', { variant: 'error' });
+      enqueueSnackbar('Không thể tải ảnh việc theo ca', { variant: 'error' });
     } finally {
       setLoading(false);
     }
@@ -620,7 +620,7 @@ export default function MediaLibraryView() {
         />
 
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3 }}>
-          <Tab value="cleaning" label="Ảnh vệ sinh" />
+          <Tab value="cleaning" label="Ảnh việc theo ca" />
           <Tab value="chat" label="Ảnh/tệp chat" />
           <Tab value="avatars" label="Avatar" />
           <Tab value="idCards" label="CCCD" />

@@ -92,7 +92,7 @@ export default function CleaningWeekOverviewView() {
         heading="Theo dõi tuần"
         links={[
           { name: 'Dashboard', href: paths.dashboard.root },
-          { name: 'Vệ sinh', href: paths.dashboard.cleaning.root },
+          { name: 'Việc được giao', href: paths.dashboard.cleaning.root },
           { name: 'Theo dõi tuần' },
         ]}
         sx={{ mb: { xs: 3, md: 5 } }}

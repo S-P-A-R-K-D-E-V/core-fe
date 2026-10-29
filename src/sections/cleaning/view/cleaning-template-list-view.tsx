@@ -136,7 +136,7 @@ export default function CleaningTemplateListView() {
       setTemplates(data);
     } catch (error) {
       console.error('Error fetching cleaning templates:', error);
-      enqueueSnackbar('Không thể tải checklist vệ sinh', { variant: 'error' });
+      enqueueSnackbar('Không thể tải danh sách việc theo ca', { variant: 'error' });
     } finally {
       setLoading(false);
     }
@@ -233,11 +233,11 @@ export default function CleaningTemplateListView() {
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
       {confirmDialog}
       <CustomBreadcrumbs
-        heading="Checklist vệ sinh"
+        heading="Danh sách việc theo ca"
         links={[
           { name: 'Dashboard', href: paths.dashboard.root },
-          { name: 'Vệ sinh', href: paths.dashboard.cleaning.root },
-          { name: 'Checklist' },
+          { name: 'Việc được giao', href: paths.dashboard.cleaning.root },
+          { name: 'Danh sách việc theo ca' },
         ]}
         action={
           canManageTemplates && (
@@ -305,7 +305,7 @@ export default function CleaningTemplateListView() {
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <FormProvider methods={methods} onSubmit={onSubmit}>
-          <DialogTitle>{editingTemplate ? 'Cập nhật' : 'Thêm'} đầu việc vệ sinh</DialogTitle>
+          <DialogTitle>{editingTemplate ? 'Cập nhật' : 'Thêm'} đầu việc theo ca</DialogTitle>
           <DialogContent>
             <Stack spacing={3} sx={{ mt: 2 }}>
               <RHFSelect name="dayOfWeek" label="Thứ trong tuần">

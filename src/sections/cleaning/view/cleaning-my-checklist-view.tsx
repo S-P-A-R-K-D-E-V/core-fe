@@ -19,11 +19,14 @@ import { useSnackbar } from 'src/components/snackbar';
 
 import { parseDateStr, toDateStr } from 'src/utils/format-time';
 
+import { MyAssignedTasks } from 'src/sections/cleaning/assigned-tasks';
 import { BLOCK_LABEL, TaskRow } from 'src/sections/cleaning/cleaning-task-row';
 
 import type { IMyCleaningChecklist } from 'src/types/corecms-api';
 import { completeCleaningTask, getMyCleaningChecklist } from 'src/api/cleaning';
 
+// ----------------------------------------------------------------------
+// Việc của tôi: việc theo ca của ngày đã chọn (ai làm ca đó đều thấy) + việc giao riêng cho tôi trong tháng.
 // ----------------------------------------------------------------------
 
 export default function CleaningMyChecklistView() {
@@ -44,7 +47,7 @@ export default function CleaningMyChecklistView() {
       setShifts(data);
     } catch (error) {
       console.error('Error fetching my cleaning checklist:', error);
-      enqueueSnackbar('Không thể tải checklist vệ sinh', { variant: 'error' });
+      enqueueSnackbar('Không thể tải việc theo ca', { variant: 'error' });
     } finally {
       setLoading(false);
     }
@@ -58,7 +61,7 @@ export default function CleaningMyChecklistView() {
     setBusyTaskId(taskId);
     try {
       await completeCleaningTask(taskId, files);
-      enqueueSnackbar('Đã ghi nhận hoàn thành, chờ Quản lý chấm điểm.');
+      enqueueSnackbar('Đã ghi nhận xong, chờ quản lý chấm.');
       fetchChecklist();
     } catch (error: any) {
       enqueueSnackbar(error?.title || 'Có lỗi xảy ra', { variant: 'error' });
@@ -70,15 +73,18 @@ export default function CleaningMyChecklistView() {
   return (
     <Container maxWidth={settings.themeStretch ? false : 'md'}>
       <CustomBreadcrumbs
-        heading="Checklist vệ sinh của tôi"
+        heading="Việc của tôi"
         links={[
           { name: 'Dashboard', href: paths.dashboard.root },
-          { name: 'Vệ sinh', href: paths.dashboard.cleaning.root },
-          { name: 'Checklist của tôi' },
+          { name: 'Việc được giao', href: paths.dashboard.cleaning.root },
+          { name: 'Việc của tôi' },
         ]}
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
+      <Typography variant="h6" sx={{ mb: 1.5 }}>
+        Việc theo ca
+      </Typography>
       <Card sx={{ mb: 3, p: 2 }}>
         <DatePicker
           label="Ngày"
@@ -96,7 +102,7 @@ export default function CleaningMyChecklistView() {
       ) : shifts.length === 0 ? (
         <Card sx={{ p: 3, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary">
-            Không có checklist vệ sinh cho ca nào của bạn trong ngày này.
+            Không có việc theo ca nào của bạn trong ngày này.
           </Typography>
         </Card>
       ) : (
@@ -121,6 +127,10 @@ export default function CleaningMyChecklistView() {
           ))}
         </Stack>
       )}
+
+      <Box sx={{ mt: 5 }}>
+        <MyAssignedTasks />
+      </Box>
     </Container>
   );
 }

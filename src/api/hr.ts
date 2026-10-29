@@ -175,7 +175,7 @@ export async function getWeeklyBonus(from: string, to: string): Promise<IWeeklyB
   return response.data;
 }
 
-// ── Nhiệm vụ ───────────────────────────────────────────────────────────
+// ── Việc giao riêng (Việc được giao → cho một người) ──────────────────
 
 export async function getWorkTasks(params: { month?: string; assigneeId?: string; status?: WorkTaskStatus }): Promise<IWorkTask[]> {
   const response = await axios.get<IWorkTask[]>(endpoints.hr.tasks, { params });
@@ -188,7 +188,6 @@ export async function getMyWorkTasks(month?: string): Promise<IWorkTask[]> {
 }
 
 export async function assignWorkTask(body: {
-  group: WorkTaskGroup;
   title: string;
   description?: string | null;
   assigneeId: string;
@@ -198,12 +197,7 @@ export async function assignWorkTask(body: {
   return response.data;
 }
 
-export async function createInitiative(title: string, description: string): Promise<IWorkTask> {
-  const response = await axios.post<IWorkTask>(endpoints.hr.taskInitiative, { title, description });
-  return response.data;
-}
-
-/** Tải ảnh nghiệm thu lên kho riêng tư của nhiệm vụ, trả object key để gửi khi nộp. */
+/** Tải ảnh nghiệm thu lên kho riêng tư của việc, trả object key để gửi khi nộp. */
 export async function uploadWorkTaskPhotos(taskId: string, files: File[]): Promise<string[]> {
   if (files.length === 0) return [];
   const presign = await axios.post<{ objectKey: string; uploadUrl: string }[]>(endpoints.hr.taskPresign(taskId), {
@@ -223,8 +217,8 @@ export async function submitWorkTask(id: string, note: string | null, photoKeys:
   return response.data;
 }
 
-export async function reviewWorkTask(id: string, approve: boolean, note: string | null, implemented = false): Promise<IWorkTask> {
-  const response = await axios.put<IWorkTask>(endpoints.hr.taskReview(id), { approve, note, implemented });
+export async function reviewWorkTask(id: string, approve: boolean, note: string | null): Promise<IWorkTask> {
+  const response = await axios.put<IWorkTask>(endpoints.hr.taskReview(id), { approve, note });
   return response.data;
 }
 

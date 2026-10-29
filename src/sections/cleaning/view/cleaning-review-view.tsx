@@ -42,10 +42,10 @@ export default function CleaningReviewView() {
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>
       <CustomBreadcrumbs
-        heading="Đánh giá vệ sinh"
+        heading="Chấm việc theo ca"
         links={[
           { name: 'Dashboard', href: paths.dashboard.root },
-          { name: 'Vệ sinh', href: paths.dashboard.cleaning.root },
+          { name: 'Việc được giao', href: paths.dashboard.cleaning.root },
           { name: 'Đánh giá' },
         ]}
         sx={{ mb: { xs: 3, md: 5 } }}

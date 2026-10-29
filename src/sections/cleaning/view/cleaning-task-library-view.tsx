@@ -144,7 +144,7 @@ export default function CleaningTaskLibraryView() {
         heading="Thư viện đầu việc"
         links={[
           { name: 'Dashboard', href: paths.dashboard.root },
-          { name: 'Vệ sinh', href: paths.dashboard.cleaning.root },
+          { name: 'Việc được giao', href: paths.dashboard.cleaning.root },
           { name: 'Thư viện đầu việc' },
         ]}
         action={

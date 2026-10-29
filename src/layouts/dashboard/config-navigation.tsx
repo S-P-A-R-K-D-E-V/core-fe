@@ -393,7 +393,8 @@ export function useNavData(
             ],
           },
 
-          // CLEANING SCHEDULE (checklist của tôi: mọi nhân viên - còn lại theo quyền cleaning.*, mặc định Admin/Manager)
+          // VIỆC ĐƯỢC GIAO (việc của tôi: mọi nhân viên; giao việc: hr.task.manage hoặc cleaning.template.manage; còn lại theo
+          // quyền cleaning.*, mặc định Admin/Manager)
           {
             title: t('cleaning'),
             path: paths.dashboard.cleaning.root,
@@ -402,8 +403,9 @@ export function useNavData(
             featureKey: 'workforce.cleaning',
             children: [
               { title: t('cleaningMyChecklist'), path: paths.dashboard.cleaning.myChecklist, platformFeature: PLATFORM_FEATURES.cleaningTasks },
-              { title: t('cleaningTaskLibrary'), path: paths.dashboard.cleaning.taskLibrary, permissions: [CLEANING.templateManage] },
+              { title: t('cleaningAssigned'), path: paths.dashboard.cleaning.assigned, permissions: [PERMISSIONS.hr.taskManage, CLEANING.templateManage] },
               { title: t('cleaningWeekBuilder'), path: paths.dashboard.cleaning.weekBuilder, permissions: [CLEANING.templateManage] },
+              { title: t('cleaningTaskLibrary'), path: paths.dashboard.cleaning.taskLibrary, permissions: [CLEANING.templateManage] },
               { title: t('cleaningTemplates'), path: paths.dashboard.cleaning.templates, permissions: [CLEANING.templateManage] },
               { title: t('cleaningReview'), path: paths.dashboard.cleaning.review, permissions: [CLEANING.read] },
               { title: t('cleaningWeekOverview'), path: paths.dashboard.cleaning.weekOverview, permissions: [CLEANING.read] },
@@ -443,7 +445,6 @@ export function useNavData(
               { title: t('hrLeave'), path: paths.dashboard.hr.leave },
               { title: t('hrPolicies'), path: paths.dashboard.hr.policies },
               { title: t('hrTargets'), path: paths.dashboard.hr.targets },
-              { title: t('hrTasks'), path: paths.dashboard.hr.tasks },
               { title: t('hrRecords'), path: paths.dashboard.hr.records },
               { title: t('hrPerformance'), path: paths.dashboard.hr.performance },
               { title: t('hrContracts'), path: paths.dashboard.hr.contracts },

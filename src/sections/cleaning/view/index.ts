@@ -1,3 +1,4 @@
+export { default as CleaningAssignedView } from './cleaning-assigned-view';
 export { default as CleaningMyChecklistView } from './cleaning-my-checklist-view';
 export { default as CleaningReviewView } from './cleaning-review-view';
 export { default as CleaningTaskLibraryView } from './cleaning-task-library-view';

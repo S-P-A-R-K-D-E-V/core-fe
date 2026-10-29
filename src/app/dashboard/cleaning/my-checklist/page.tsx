@@ -6,12 +6,12 @@ import { CleaningMyChecklistView } from 'src/sections/cleaning/view';
 // ----------------------------------------------------------------------
 
 export const metadata = {
-  title: 'Dashboard: Checklist vệ sinh của tôi',
+  title: 'Dashboard: Việc của tôi',
 };
 
 export default function CleaningMyChecklistPage() {
   return (
-    <PlatformFeatureGuard feature={PLATFORM_FEATURES.cleaningTasks} label="Làm việc vệ sinh">
+    <PlatformFeatureGuard feature={PLATFORM_FEATURES.cleaningTasks} label="Làm việc được giao">
       <CleaningMyChecklistView />
     </PlatformFeatureGuard>
   );

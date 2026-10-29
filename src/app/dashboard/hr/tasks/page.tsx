@@ -1,13 +1,12 @@
-import { HrTasksView } from 'src/sections/hr/view';
+import { redirect } from 'next/navigation';
+
+import { paths } from 'src/routes/paths';
 
 // ----------------------------------------------------------------------
-
-export const metadata = {
-  title: 'Dashboard: Nhiệm vụ',
-};
+// Nhiệm vụ đã gộp vào Việc được giao — link cũ (thông báo, dấu trang) chuyển sang trang mới.
 
 type Props = { searchParams?: { tab?: string } };
 
 export default function HrTasksPage({ searchParams }: Props) {
-  return <HrTasksView initialTab={searchParams?.tab} />;
+  redirect(searchParams?.tab === 'mine' ? paths.dashboard.cleaning.myChecklist : paths.dashboard.cleaning.assigned);
 }
