@@ -322,6 +322,8 @@ export interface IPerformanceScore {
   reviewResponse?: string | null;
   reviewRespondedAt?: string | null;
   reviewDeadline?: string | null;
+  /** Tổng điểm trừ theo danh mục vi phạm; null = tháng tính theo công thức cũ. */
+  deductionPoints?: number | null;
 }
 
 export interface IPerformanceMonth {
@@ -594,4 +596,137 @@ export interface ICompensation {
   approvedAt: string;
   cancelledAt?: string | null;
   cancelReason?: string | null;
+}
+
+// ----------------------------------------------------------------------
+// Danh mục vi phạm + điểm trừ (/hr-violations). Chỉ có điểm — không có khoản tiền.
+
+export type ViolationComponent = 'Discipline' | 'Reconciliation';
+export type ViolationAutoSource =
+  | 'None'
+  | 'Late'
+  | 'EarlyLeave'
+  | 'MissingCheck'
+  | 'NoShow'
+  | 'LateNoticeLeave'
+  | 'InspectionFault'
+  | 'Discrepancy';
+export type ViolationEntryStatus = 'Active' | 'Disputed' | 'Cancelled';
+
+export const VIOLATION_COMPONENT_LABEL: Record<ViolationComponent, string> = {
+  Discipline: 'Kỷ luật',
+  Reconciliation: 'Đối soát',
+};
+
+export const VIOLATION_AUTO_SOURCE_LABEL: Record<ViolationAutoSource, string> = {
+  None: 'Quản lý ghi tay',
+  Late: 'Tự ghi: đi muộn trên … phút',
+  EarlyLeave: 'Tự ghi: về sớm trên … phút',
+  MissingCheck: 'Tự ghi: quên chấm công vào / ra',
+  NoShow: 'Tự ghi: không đến ca, không có đơn nghỉ',
+  LateNoticeLeave: 'Tự ghi: đơn nghỉ báo muộn được duyệt',
+  InspectionFault: 'Tự ghi: mỗi mục bảng kiểm không đạt',
+  Discrepancy: 'Tự ghi: biên bản chênh lệch có lỗi cá nhân',
+};
+
+export const VIOLATION_STATUS_LABEL: Record<ViolationEntryStatus, string> = {
+  Active: 'Đang tính',
+  Disputed: 'Đang khiếu nại',
+  Cancelled: 'Đã huỷ',
+};
+
+export interface IViolationPolicy {
+  effectiveFrom: string;
+  halfBonusFromPoints?: number | null;
+  halfBonusPct?: number | null;
+  noBonusFromPoints?: number | null;
+  notCompleteFromPoints?: number | null;
+  updatedAt: string;
+}
+
+export interface IViolationRule {
+  id: string;
+  groupName: string;
+  name: string;
+  points: number;
+  component: ViolationComponent;
+  autoSource: ViolationAutoSource;
+  thresholdMinutes?: number | null;
+  losesWeeklyBonus: boolean;
+  losesMonthlyBonus: boolean;
+  extraAction?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface IViolationCatalog {
+  policy: IViolationPolicy | null;
+  rules: IViolationRule[];
+}
+
+export interface ISaveViolationRule {
+  groupName: string;
+  name: string;
+  points: number;
+  component: ViolationComponent;
+  autoSource: ViolationAutoSource;
+  thresholdMinutes: number | null;
+  losesWeeklyBonus: boolean;
+  losesMonthlyBonus: boolean;
+  extraAction: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface IViolationEntry {
+  id: string;
+  ruleId: string;
+  userId: string;
+  fullName: string;
+  occurredOn: string;
+  shiftName?: string | null;
+  quantity: number;
+  points: number;
+  ruleName: string;
+  groupName: string;
+  component: ViolationComponent;
+  losesWeeklyBonus: boolean;
+  losesMonthlyBonus: boolean;
+  note?: string | null;
+  isAuto: boolean;
+  status: ViolationEntryStatus;
+  complaintText?: string | null;
+  complainedAt?: string | null;
+  resolutionNote?: string | null;
+  resolvedAt?: string | null;
+  createdAt: string;
+  complaintDeadline?: string | null;
+}
+
+export interface IViolationSummary {
+  userId: string;
+  fullName: string;
+  points: number;
+  disciplinePoints: number;
+  reconciliationPoints: number;
+  count: number;
+  disputed: number;
+  /** % thưởng doanh số tuần theo ngưỡng; null = cửa hàng không đặt ngưỡng. */
+  weeklyBonusPct?: number | null;
+  notComplete: boolean;
+  losesMonthlyBonus: boolean;
+  weeksWithoutBonus: string[];
+}
+
+export interface IViolationMonth {
+  month: string;
+  policy: IViolationPolicy | null;
+  rows: IViolationSummary[];
+}
+
+export interface IMyViolations {
+  month: string;
+  policy: IViolationPolicy | null;
+  summary: IViolationSummary;
+  entries: IViolationEntry[];
 }

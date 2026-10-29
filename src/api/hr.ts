@@ -32,6 +32,14 @@ import type {
   IProposedAssignment,
   IProposedAssignmentWarnings,
   ICompensation,
+  IViolationRule,
+  IMyViolations,
+  IViolationEntry,
+  IViolationMonth,
+  IViolationPolicy,
+  IViolationCatalog,
+  ISaveViolationRule,
+  ViolationEntryStatus,
 } from 'src/types/hr';
 
 // ----------------------------------------------------------------------
@@ -599,5 +607,84 @@ export async function createCompensation(body: { hrRecordId: string; amount: num
 
 export async function cancelCompensation(id: string, reason: string): Promise<ICompensation> {
   const response = await axios.put<ICompensation>(endpoints.hr.compensationCancel(id), { reason });
+  return response.data;
+}
+
+// ── Danh mục vi phạm + điểm trừ ─────────────────────────────────────
+
+export async function getViolationCatalog(): Promise<IViolationCatalog> {
+  const response = await axios.get<IViolationCatalog>(endpoints.hr.violationCatalog);
+  return response.data;
+}
+
+export async function saveViolationPolicy(body: {
+  effectiveFrom: string;
+  halfBonusFromPoints: number | null;
+  halfBonusPct: number | null;
+  noBonusFromPoints: number | null;
+  notCompleteFromPoints: number | null;
+}): Promise<IViolationPolicy> {
+  const response = await axios.put<IViolationPolicy>(endpoints.hr.violationPolicy, body);
+  return response.data;
+}
+
+export async function saveViolationRule(id: string | null, body: ISaveViolationRule): Promise<IViolationRule> {
+  const response = id
+    ? await axios.put<IViolationRule>(endpoints.hr.violationRule(id), body)
+    : await axios.post<IViolationRule>(endpoints.hr.violationRules, body);
+  return response.data;
+}
+
+export async function archiveViolationRule(id: string): Promise<void> {
+  await axios.delete(endpoints.hr.violationRule(id));
+}
+
+export async function getViolations(params: {
+  month: string;
+  userId?: string;
+  status?: ViolationEntryStatus;
+}): Promise<IViolationEntry[]> {
+  const response = await axios.get<IViolationEntry[]>(endpoints.hr.violations, { params });
+  return response.data;
+}
+
+export async function getViolationSummary(month: string): Promise<IViolationMonth> {
+  const response = await axios.get<IViolationMonth>(endpoints.hr.violationSummary, { params: { month } });
+  return response.data;
+}
+
+export async function getMyViolations(month: string): Promise<IMyViolations> {
+  const response = await axios.get<IMyViolations>(endpoints.hr.violationsMine, { params: { month } });
+  return response.data;
+}
+
+export async function createViolations(body: {
+  ruleId: string;
+  userIds: string[];
+  occurredOn: string;
+  quantity: number;
+  note: string;
+}): Promise<IViolationEntry[]> {
+  const response = await axios.post<IViolationEntry[]>(endpoints.hr.violations, body);
+  return response.data;
+}
+
+export async function cancelViolation(id: string, note: string): Promise<IViolationEntry> {
+  const response = await axios.put<IViolationEntry>(endpoints.hr.violationCancel(id), { note });
+  return response.data;
+}
+
+export async function resolveViolation(id: string, keep: boolean, note: string): Promise<IViolationEntry> {
+  const response = await axios.put<IViolationEntry>(endpoints.hr.violationResolve(id), { keep, note });
+  return response.data;
+}
+
+export async function complainViolation(id: string, text: string): Promise<IViolationEntry> {
+  const response = await axios.post<IViolationEntry>(endpoints.hr.violationComplaint(id), { text });
+  return response.data;
+}
+
+export async function syncViolations(): Promise<{ created: number; updated: number; cancelled: number }> {
+  const response = await axios.post<{ created: number; updated: number; cancelled: number }>(endpoints.hr.violationsSync);
   return response.data;
 }
