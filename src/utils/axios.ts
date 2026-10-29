@@ -715,6 +715,12 @@ export const endpoints = {
     order: (salesOrderId: string) => `/bonus-programs/orders/${salesOrderId}`,
     mine: '/bonus-programs/mine',
   },
+  // Agent AI tính thưởng theo mô tả (chạy = stream qua route /ai-bonus-stream của Next).
+  aiBonus: {
+    runs: '/ai-bonus/runs',
+    apply: (id: string) => `/ai-bonus/runs/${id}/apply`,
+    discard: (id: string) => `/ai-bonus/runs/${id}/discard`,
+  },
   // Purchasing
   suppliers: {
     list: '/suppliers',
