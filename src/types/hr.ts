@@ -364,10 +364,27 @@ export const CONTRACT_STATUS_LABEL: Record<EmploymentContractStatus, string> = {
 
 export const GENDER_LABEL: Record<Gender, string> = { Male: 'Nam', Female: 'Nữ', Other: 'Khác' };
 
+/** Định dạng trường ngày: ngay (29) · thang (10) · nam (2026) · nam2 (26) · chu ("ngày 29 tháng 10 năm 2026"). */
+export interface IContractFieldFormat {
+  code: string;
+  label: string;
+}
+
 export interface IContractField {
   key: string;
   label: string;
   required: boolean;
+  /** Trường ngày — thẻ trong trình soạn chọn được định dạng (`{{ma:dinh_dang}}`). */
+  isDate?: boolean;
+  formats?: IContractFieldFormat[] | null;
+}
+
+/** Trường riêng của một mẫu (mã `rieng_…`): nhập khi soạn hợp đồng; mặc định dùng cho mọi hợp đồng soạn từ mẫu. */
+export interface IContractCustomField {
+  key: string;
+  label: string;
+  required: boolean;
+  defaultValue?: string | null;
 }
 
 export interface IContractTemplate {
@@ -385,6 +402,8 @@ export interface IContractTemplate {
   docxFileName?: string | null;
   /** Nội dung là HTML (soạn bằng trình soạn / tải mẫu lên); false = mẫu chữ cũ. */
   isHtml?: boolean;
+  /** Trường riêng của mẫu (MST, người đại diện…) — AI tải mẫu có thể tạo sẵn. */
+  customFields?: IContractCustomField[] | null;
 }
 
 /** Kết quả tải mẫu (.docx / .pdf) lên: bản nháp đã thay nội dung, AI có gắn được trường không, cảnh báo nếu có. */
@@ -435,6 +454,8 @@ export interface IContractTerms {
   isPartTime: boolean;
   minHoursPerMonth?: number | null;
   maxHoursPerMonth?: number | null;
+  /** Giá trị trường riêng của mẫu (mã → giá trị); null = giữ / lấy mặc định của mẫu. */
+  customValues?: Record<string, string> | null;
 }
 
 export interface IEmploymentContract {
@@ -479,6 +500,9 @@ export interface IEmploymentContract {
   employeeSignatureSvg?: string | null;
   /** Chữ thuần từ nội dung HTML (app hiển thị). */
   bodyText?: string | null;
+  /** Trường riêng của mẫu (định nghĩa) và giá trị đã nhập cho hợp đồng này. */
+  customFields?: IContractCustomField[] | null;
+  customValues?: Record<string, string> | null;
 }
 
 // ── Ca hỗ trợ mở trên chợ ca ─────────────────────────────────────────────

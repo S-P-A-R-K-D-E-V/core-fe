@@ -18,6 +18,7 @@ import type {
   IPerformanceScore,
   IPolicyAcknowledgementStatus,
   IContractField,
+  IContractCustomField,
   IContractTerms,
   IEmployeeProfile,
   IContractPreview,
@@ -331,10 +332,18 @@ export async function createContractTemplate(copyFromId: string | null): Promise
   return response.data;
 }
 
-/** isHtml = true: body là HTML từ trình soạn (máy chủ lọc thẻ). */
+/** isHtml = true: body là HTML từ trình soạn (máy chủ lọc thẻ). customFields = trường riêng của mẫu. */
 export async function updateContractTemplate(
   id: string,
-  body: { code: string; name: string; contractType: EmploymentContractType; body: string; isHtml?: boolean }
+  body: {
+    code: string;
+    name: string;
+    contractType: EmploymentContractType;
+    body: string;
+    isHtml?: boolean;
+    /** Trường riêng của mẫu; không gửi = giữ nguyên. */
+    customFields?: IContractCustomField[];
+  }
 ): Promise<IContractTemplate> {
   const response = await axios.put<IContractTemplate>(endpoints.hr.contractTemplate(id), body);
   return response.data;
@@ -432,8 +441,14 @@ export async function getMyContracts(): Promise<IEmploymentContract[]> {
   return response.data;
 }
 
+/** Giá trị trường riêng của mẫu đi trong terms.customValues (gửi kèm cả ở ngoài cho chắc). */
 export async function createContract(staffId: string, templateId: string, terms: IContractTerms): Promise<IEmploymentContract> {
-  const response = await axios.post<IEmploymentContract>(endpoints.hr.contracts, { staffId, templateId, terms });
+  const response = await axios.post<IEmploymentContract>(endpoints.hr.contracts, {
+    staffId,
+    templateId,
+    terms,
+    customValues: terms.customValues ?? null,
+  });
   return response.data;
 }
 

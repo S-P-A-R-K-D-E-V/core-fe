@@ -7,7 +7,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import Underline from '@tiptap/extension-underline';
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, type ReactNode } from 'react';
 import TableCell from '@tiptap/extension-table-cell';
 import TextAlign from '@tiptap/extension-text-align';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -15,22 +15,36 @@ import TableHeader from '@tiptap/extension-table-header';
 import { Node, nodePasteRule, nodeInputRule, mergeAttributes } from '@tiptap/core';
 
 import Box from '@mui/material/Box';
+import Menu from '@mui/material/Menu';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import Switch from '@mui/material/Switch';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import FormControlLabel from '@mui/material/FormControlLabel';
 
 import Iconify from 'src/components/iconify';
 
-import type { IContractField } from 'src/types/hr';
+import type { IContractField, IContractCustomField } from 'src/types/hr';
 
 import { CONTRACT_CSS } from './contract-render';
 import {
   fieldToken,
   fieldChipText,
+  customFieldKey,
   FIELD_DRAG_TYPE,
+  CUSTOM_FIELD_KEY,
+  DATE_FORMAT_LABEL,
   tokensToFieldNodes,
   fieldNodesToTokens,
 } from './contract-fields-html';
@@ -55,17 +69,23 @@ const PageBreak = Node.create({
   },
 });
 
-type ChipResolver = (key: string) => { text: string; unknown: boolean };
+type ChipResolver = (key: string, format?: string | null) => { text: string; unknown: boolean };
 
-function paintFieldChip(dom: HTMLElement, key: string, resolve: ChipResolver) {
-  const { text, unknown } = resolve(key);
+/** Bấm thẻ trường (trình soạn mở menu định dạng nếu là trường ngày). */
+type ChipClick = (args: { key: string; format: string | null; pos: number; anchor: HTMLElement }) => void;
+
+function paintFieldChip(dom: HTMLElement, key: string, format: string | null | undefined, resolve: ChipResolver) {
+  const { text, unknown } = resolve(key, format);
   dom.textContent = text;
-  dom.title = fieldToken(key);
+  dom.title = fieldToken(key, format);
   dom.classList.toggle('merge-field--unknown', unknown);
 }
 
-/** Trường trộn: thẻ nội dòng, không gõ được bên trong, kéo được để chuyển chỗ. */
-export const MergeField = Node.create<{ resolve: ChipResolver }>({
+/**
+ * Trường trộn: thẻ nội dòng, không gõ được bên trong, kéo được để chuyển chỗ. Trường ngày có thêm định dạng (`format`:
+ * ngay / thang / nam / nam2 / chu) — lưu ra `{{ma:dinh_dang}}`.
+ */
+export const MergeField = Node.create<{ resolve: ChipResolver; onChipClick?: ChipClick }>({
   name: 'mergeField',
   group: 'inline',
   inline: true,
@@ -74,7 +94,7 @@ export const MergeField = Node.create<{ resolve: ChipResolver }>({
   draggable: true,
 
   addOptions() {
-    return { resolve: (key: string) => ({ text: key, unknown: false }) };
+    return { resolve: (key: string, format?: string | null) => ({ text: fieldToken(key, format), unknown: false }) };
   },
 
   addAttributes() {
@@ -84,6 +104,11 @@ export const MergeField = Node.create<{ resolve: ChipResolver }>({
         parseHTML: (element) => element.getAttribute('data-field'),
         renderHTML: (attributes) => ({ 'data-field': attributes.key }),
       },
+      format: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-format') || null,
+        renderHTML: (attributes) => (attributes.format ? { 'data-format': attributes.format } : {}),
+      },
     };
   },
 
@@ -92,31 +117,49 @@ export const MergeField = Node.create<{ resolve: ChipResolver }>({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    return ['span', mergeAttributes(HTMLAttributes, { class: 'merge-field' }), fieldToken(node.attrs.key)];
+    return ['span', mergeAttributes(HTMLAttributes, { class: 'merge-field' }), fieldToken(node.attrs.key, node.attrs.format)];
   },
 
   renderText({ node }) {
-    return fieldToken(node.attrs.key);
+    return fieldToken(node.attrs.key, node.attrs.format);
   },
 
   addNodeView() {
-    const { resolve } = this.options;
-    return ({ node }) => {
+    const { resolve, onChipClick } = this.options;
+    return ({ node, getPos }) => {
       const dom = document.createElement('span');
       dom.className = 'merge-field';
       dom.dataset.field = node.attrs.key;
+      if (node.attrs.format) dom.dataset.format = node.attrs.format;
       dom.contentEditable = 'false';
-      paintFieldChip(dom, node.attrs.key, resolve);
+      paintFieldChip(dom, node.attrs.key, node.attrs.format, resolve);
+      if (onChipClick)
+        dom.addEventListener('click', () => {
+          const pos = typeof getPos === 'function' ? getPos() : undefined;
+          if (typeof pos === 'number') onChipClick({ key: node.attrs.key, format: node.attrs.format, pos, anchor: dom });
+        });
       return { dom };
     };
   },
 
   addInputRules() {
-    return [nodeInputRule({ find: /\{\{([a-z0-9_]+)\}\}$/, type: this.type, getAttributes: (m) => ({ key: m[1] }) })];
+    return [
+      nodeInputRule({
+        find: /\{\{([a-z0-9_]+)(?::([a-z0-9_]+))?\}\}$/,
+        type: this.type,
+        getAttributes: (m) => ({ key: m[1], format: m[2] ?? null }),
+      }),
+    ];
   },
 
   addPasteRules() {
-    return [nodePasteRule({ find: /\{\{([a-z0-9_]+)\}\}/g, type: this.type, getAttributes: (m) => ({ key: m[1] }) })];
+    return [
+      nodePasteRule({
+        find: /\{\{([a-z0-9_]+)(?::([a-z0-9_]+))?\}\}/g,
+        type: this.type,
+        getAttributes: (m) => ({ key: m[1], format: m[2] ?? null }),
+      }),
+    ];
   },
 });
 
@@ -274,6 +317,161 @@ function Toolbar({ editor }: { editor: Editor }) {
   );
 }
 
+/** Một dòng trường trong bảng trường: kéo thả vào nội dung hoặc bấm để chèn ở con trỏ. */
+function FieldRow({
+  fieldKey,
+  label,
+  required,
+  disabled,
+  onInsert,
+  action,
+}: {
+  fieldKey: string;
+  label: string;
+  required: boolean;
+  disabled?: boolean;
+  onInsert: () => void;
+  action?: ReactNode;
+}) {
+  return (
+    <Stack direction="row" alignItems="center" spacing={0.5}>
+      <ButtonBase
+        disabled={disabled}
+        draggable={!disabled}
+        onDragStart={(e) => {
+          e.dataTransfer.setData(FIELD_DRAG_TYPE, fieldKey);
+          e.dataTransfer.setData('text/plain', fieldToken(fieldKey));
+          e.dataTransfer.effectAllowed = 'copy';
+        }}
+        onClick={onInsert}
+        aria-label={`Chèn trường ${label}`}
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          justifyContent: 'flex-start',
+          textAlign: 'left',
+          gap: 1,
+          px: 1,
+          py: 0.75,
+          borderRadius: 1,
+          border: 1,
+          borderColor: 'divider',
+          cursor: disabled ? 'default' : 'grab',
+          '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.light' },
+          '&.Mui-disabled': { opacity: 0.5 },
+        }}
+      >
+        <Iconify icon="mdi:drag" width={18} sx={{ color: 'text.disabled', flexShrink: 0 }} />
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="body2" sx={{ lineHeight: 1.4 }}>
+            {fieldKey.startsWith('chu_ky_') ? `✍ ${label}` : label}
+            {required && (
+              <Box component="span" sx={{ color: 'error.main' }}>
+                {' *'}
+              </Box>
+            )}
+          </Typography>
+          <Typography
+            variant="caption"
+            component="div"
+            sx={{ color: 'text.disabled', fontFamily: 'monospace', wordBreak: 'break-all' }}
+          >
+            {fieldToken(fieldKey)}
+          </Typography>
+        </Box>
+      </ButtonBase>
+      {action}
+    </Stack>
+  );
+}
+
+type CustomDraft = IContractCustomField & { index: number | null; keyTouched: boolean };
+
+/** Thêm / sửa một trường riêng của mẫu: nhãn → mã tự sinh `rieng_…` (sửa được), bắt buộc, giá trị mặc định. */
+function CustomFieldDialog({
+  draft,
+  takenKeys,
+  onClose,
+  onSave,
+}: {
+  draft: CustomDraft | null;
+  takenKeys: string[];
+  onClose: () => void;
+  onSave: (field: IContractCustomField, index: number | null) => void;
+}) {
+  const [value, setValue] = useState<CustomDraft | null>(draft);
+
+  useEffect(() => setValue(draft), [draft]);
+
+  if (!value) return null;
+  const others = takenKeys.filter((k) => value.index === null || k !== draft?.key);
+  const keyProblem = !CUSTOM_FIELD_KEY.test(value.key)
+    ? 'Mã dạng rieng_ + chữ thường không dấu, số, gạch dưới (tối đa 40 ký tự)'
+    : others.includes(value.key)
+      ? 'Mã đã có'
+      : null;
+  const hasLabel = !!value.label.trim();
+
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>{value.index === null ? 'Thêm trường riêng' : 'Sửa trường riêng'}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ pt: 1 }}>
+          <TextField
+            label="Nhãn"
+            value={value.label}
+            autoFocus
+            placeholder="Vd: Mã số thuế"
+            onChange={(e) => {
+              const label = e.target.value;
+              setValue({ ...value, label, key: value.keyTouched ? value.key : customFieldKey(label, others) });
+            }}
+          />
+          <TextField
+            label="Mã"
+            value={value.key}
+            error={!!keyProblem && hasLabel}
+            helperText={hasLabel ? keyProblem ?? `Dùng trong nội dung: ${fieldToken(value.key)}` : ' '}
+            onChange={(e) => setValue({ ...value, key: e.target.value.trim().toLowerCase(), keyTouched: true })}
+            inputProps={{ style: { fontFamily: 'monospace' } }}
+          />
+          <FormControlLabel
+            control={<Switch checked={value.required} onChange={(e) => setValue({ ...value, required: e.target.checked })} />}
+            label="Bắt buộc nhập khi soạn hợp đồng"
+          />
+          <TextField
+            label="Giá trị mặc định"
+            value={value.defaultValue ?? ''}
+            placeholder="Dùng cho mọi hợp đồng soạn từ mẫu"
+            onChange={(e) => setValue({ ...value, defaultValue: e.target.value })}
+            multiline
+            maxRows={3}
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Đóng</Button>
+        <Button
+          variant="contained"
+          disabled={!hasLabel || !!keyProblem}
+          onClick={() =>
+            onSave(
+              {
+                key: value.key,
+                label: value.label.trim(),
+                required: value.required,
+                defaultValue: value.defaultValue?.trim() ? value.defaultValue.trim() : null,
+              },
+              value.index
+            )
+          }
+        >
+          Lưu
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
 
 type Props = {
   value: string;
@@ -282,13 +480,39 @@ type Props = {
   fields?: IContractField[];
   /** Chỉ để hiện tên tiếng Việt trên thẻ trường khi không có bảng trường (sửa nội dung một hợp đồng). */
   labelFields?: IContractField[];
+  /** Trường riêng của mẫu: hiện trong bảng trường (thêm / sửa / xoá khi có onCustomFieldsChange). */
+  customFields?: IContractCustomField[];
+  onCustomFieldsChange?: (fields: IContractCustomField[]) => void;
   disabled?: boolean;
   minHeight?: number;
 };
 
-export function ContractEditor({ value, onChange, fields, labelFields, disabled, minHeight = 480 }: Props) {
+type FormatMenu = { key: string; format: string | null; pos: number; anchor: HTMLElement };
+
+const DEFAULT_DATE_FORMATS = Object.entries(DATE_FORMAT_LABEL).map(([code, label]) => ({ code, label }));
+
+export function ContractEditor({
+  value,
+  onChange,
+  fields,
+  labelFields,
+  customFields,
+  onCustomFieldsChange,
+  disabled,
+  minHeight = 480,
+}: Props) {
   const labelsRef = useRef(new Map<string, string>());
-  const resolve = useCallback<ChipResolver>((key) => fieldChipText(key, labelsRef.current), []);
+  // Trường ngày → các định dạng chọn được (bấm thẻ trường ngày trong nội dung mở menu).
+  const dateFormatsRef = useRef(new Map<string, { code: string; label: string }[]>());
+  const disabledRef = useRef(!!disabled);
+  const [formatMenu, setFormatMenu] = useState<FormatMenu | null>(null);
+  const [customDraft, setCustomDraft] = useState<CustomDraft | null>(null);
+
+  disabledRef.current = !!disabled;
+  const resolve = useCallback<ChipResolver>((key, format) => fieldChipText(key, labelsRef.current, format), []);
+  const onChipClick = useCallback<ChipClick>((args) => {
+    if (!disabledRef.current && dateFormatsRef.current.has(args.key)) setFormatMenu(args);
+  }, []);
 
   const editor = useEditor({
     extensions: [
@@ -300,7 +524,7 @@ export function ContractEditor({ value, onChange, fields, labelFields, disabled,
       TableHeader,
       TableCell,
       PageBreak,
-      MergeField.configure({ resolve }),
+      MergeField.configure({ resolve, onChipClick }),
     ],
     content: tokensToFieldNodes(value),
     editable: !disabled,
@@ -319,20 +543,57 @@ export function ContractEditor({ value, onChange, fields, labelFields, disabled,
     if (editor && !editor.isDestroyed) editor.setEditable(!disabled);
   }, [editor, disabled]);
 
-  // Danh sách trường về sau khi trình soạn đã dựng: ghi lại tên trên các thẻ đang hiện.
+  // Danh sách trường (cả trường riêng) về sau khi trình soạn đã dựng: ghi lại tên trên các thẻ đang hiện.
   const known = fields ?? labelFields;
   useEffect(() => {
-    labelsRef.current = new Map((known ?? []).map((f) => [f.key, f.label]));
+    labelsRef.current = new Map([
+      ...(known ?? []).map((f) => [f.key, f.label] as [string, string]),
+      ...(customFields ?? []).map((f) => [f.key, f.label] as [string, string]),
+    ]);
+    dateFormatsRef.current = new Map(
+      (known ?? []).filter((f) => f.isDate).map((f) => [f.key, f.formats?.length ? f.formats : DEFAULT_DATE_FORMATS])
+    );
     if (!editor || editor.isDestroyed) return;
     editor.view.dom.querySelectorAll<HTMLElement>('span.merge-field[data-field]').forEach((el) => {
-      paintFieldChip(el, el.dataset.field ?? '', resolve);
+      paintFieldChip(el, el.dataset.field ?? '', el.dataset.format ?? null, resolve);
     });
-  }, [editor, known, resolve]);
+  }, [editor, known, customFields, resolve]);
 
   const insertField = (key: string) => {
     if (!editor || disabled) return;
     editor.chain().focus().insertContent({ type: 'mergeField', attrs: { key } }).run();
   };
+
+  /** Đổi định dạng của thẻ trường ngày vừa bấm (null = dd/MM/yyyy). */
+  const setFormat = (format: string | null) => {
+    if (!editor || !formatMenu) return;
+    const { pos, key } = formatMenu;
+    setFormatMenu(null);
+    editor
+      .chain()
+      .focus()
+      .command(({ tr }) => {
+        const node = tr.doc.nodeAt(pos);
+        if (!node || node.type.name !== 'mergeField' || node.attrs.key !== key) return false;
+        tr.setNodeMarkup(pos, undefined, { ...node.attrs, format });
+        return true;
+      })
+      .run();
+  };
+
+  const saveCustom = (field: IContractCustomField, index: number | null) => {
+    const list = [...(customFields ?? [])];
+    if (index === null) list.push(field);
+    else list[index] = field;
+    onCustomFieldsChange?.(list);
+    setCustomDraft(null);
+  };
+
+  const removeCustom = (index: number) => onCustomFieldsChange?.((customFields ?? []).filter((_, i) => i !== index));
+
+  const canEditCustom = !!onCustomFieldsChange && !disabled;
+  const showCustom = !!onCustomFieldsChange || (customFields?.length ?? 0) > 0;
+  const formatOptions = formatMenu ? (dateFormatsRef.current.get(formatMenu.key) ?? []) : [];
 
   return (
     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="stretch">
@@ -399,62 +660,99 @@ export function ContractEditor({ value, onChange, fields, labelFields, disabled,
       </Paper>
 
       {fields && (
-        <Stack spacing={1} sx={{ width: { md: 260 }, flexShrink: 0 }}>
+        <Stack spacing={1} sx={{ width: { md: 280 }, flexShrink: 0 }}>
           <Typography variant="subtitle2">Trường thông tin</Typography>
           <Typography variant="caption" color="text.secondary">
-            Kéo trường thả vào chỗ cần điền, hoặc đặt con trỏ rồi bấm trường. Trường bắt buộc (*) còn trống thì không chốt
-            được hợp đồng. Hai trường chữ ký hiện ảnh chữ ký khi nhân viên đã ký.
+            Kéo trường thả vào chỗ cần điền, hoặc đặt con trỏ rồi bấm trường. Bấm thẻ trường ngày trong nội dung để chọn
+            định dạng (ngày / tháng / năm riêng). Trường bắt buộc (*) còn trống thì không chốt được hợp đồng.
           </Typography>
           <Stack spacing={0.5} sx={{ maxHeight: '60vh', overflow: 'auto', pr: 0.5 }}>
+            {showCustom && (
+              <>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ pt: 0.5 }}>
+                  <Typography variant="overline" color="text.secondary">
+                    Trường riêng của mẫu
+                  </Typography>
+                  {canEditCustom && (
+                    <Button
+                      size="small"
+                      startIcon={<Iconify icon="mingcute:add-line" width={16} />}
+                      onClick={() =>
+                        setCustomDraft({ key: '', label: '', required: true, defaultValue: null, index: null, keyTouched: false })
+                      }
+                    >
+                      Thêm
+                    </Button>
+                  )}
+                </Stack>
+                {(customFields?.length ?? 0) === 0 && (
+                  <Typography variant="caption" color="text.disabled" sx={{ px: 0.5 }}>
+                    Chưa có — thêm cho thông tin riêng của mẫu (mã số thuế, người đại diện…); nhập khi soạn hợp đồng.
+                  </Typography>
+                )}
+                {(customFields ?? []).map((f, index) => (
+                  <FieldRow
+                    key={f.key}
+                    fieldKey={f.key}
+                    label={f.label}
+                    required={f.required}
+                    disabled={disabled}
+                    onInsert={() => insertField(f.key)}
+                    action={
+                      canEditCustom && (
+                        <Stack>
+                          <IconButton
+                            size="small"
+                            aria-label={`Sửa trường ${f.label}`}
+                            onClick={() => setCustomDraft({ ...f, index, keyTouched: true })}
+                          >
+                            <Iconify icon="solar:pen-bold" width={16} />
+                          </IconButton>
+                          <IconButton size="small" aria-label={`Xoá trường ${f.label}`} onClick={() => removeCustom(index)}>
+                            <Iconify icon="solar:trash-bin-trash-bold" width={16} />
+                          </IconButton>
+                        </Stack>
+                      )
+                    }
+                  />
+                ))}
+                <Divider sx={{ my: 0.5 }} />
+                <Typography variant="overline" color="text.secondary">
+                  Trường hệ thống
+                </Typography>
+              </>
+            )}
             {fields.map((f) => (
-              <ButtonBase
+              <FieldRow
                 key={f.key}
+                fieldKey={f.key}
+                label={f.label}
+                required={f.required}
                 disabled={disabled}
-                draggable={!disabled}
-                onDragStart={(e) => {
-                  e.dataTransfer.setData(FIELD_DRAG_TYPE, f.key);
-                  e.dataTransfer.setData('text/plain', fieldToken(f.key));
-                  e.dataTransfer.effectAllowed = 'copy';
-                }}
-                onClick={() => insertField(f.key)}
-                aria-label={`Chèn trường ${f.label}`}
-                sx={{
-                  justifyContent: 'flex-start',
-                  textAlign: 'left',
-                  gap: 1,
-                  px: 1,
-                  py: 0.75,
-                  borderRadius: 1,
-                  border: 1,
-                  borderColor: 'divider',
-                  cursor: disabled ? 'default' : 'grab',
-                  '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.light' },
-                  '&.Mui-disabled': { opacity: 0.5 },
-                }}
-              >
-                <Iconify icon="mdi:drag" width={18} sx={{ color: 'text.disabled', flexShrink: 0 }} />
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="body2" sx={{ lineHeight: 1.4 }}>
-                    {f.key.startsWith('chu_ky_') ? `✍ ${f.label}` : f.label}
-                    {f.required && (
-                      <Box component="span" sx={{ color: 'error.main' }}>
-                        {' *'}
-                      </Box>
-                    )}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    component="div"
-                    sx={{ color: 'text.disabled', fontFamily: 'monospace', wordBreak: 'break-all' }}
-                  >
-                    {fieldToken(f.key)}
-                  </Typography>
-                </Box>
-              </ButtonBase>
+                onInsert={() => insertField(f.key)}
+              />
             ))}
           </Stack>
         </Stack>
       )}
+
+      <Menu open={!!formatMenu} anchorEl={formatMenu?.anchor} onClose={() => setFormatMenu(null)}>
+        <MenuItem selected={!formatMenu?.format} onClick={() => setFormat(null)}>
+          Đầy đủ (dd/MM/yyyy)
+        </MenuItem>
+        {formatOptions.map((o) => (
+          <MenuItem key={o.code} selected={formatMenu?.format === o.code} onClick={() => setFormat(o.code)}>
+            {o.label}
+          </MenuItem>
+        ))}
+      </Menu>
+
+      <CustomFieldDialog
+        draft={customDraft}
+        takenKeys={(customFields ?? []).map((f) => f.key)}
+        onClose={() => setCustomDraft(null)}
+        onSave={saveCustom}
+      />
     </Stack>
   );
 }
