@@ -33,6 +33,8 @@ const BACKEND_API_PREFIXES = [
   'hr-compensations', 'support-shifts',
   // Luật nhân sự riêng của cửa hàng; danh mục vi phạm + điểm trừ.
   'hr-rule-settings', 'hr-violations',
+  // Agent AI tính thưởng (danh sách, áp dụng, bỏ; chạy đi qua route /ai-bonus-stream).
+  'ai-bonus',
   // Kết nối hãng vận chuyển (Thanh toán → Cài đặt → Bán online & giao hàng) — chuyển tiếp spark-shipping.
   'shipping',
   // API công khai của cửa hàng (thương hiệu, sản phẩm) — app mobile bản cửa hàng dùng để kiểm tra mã cửa hàng.

@@ -67,6 +67,8 @@ import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
+import AiBonusTab from './ai-bonus-tab';
+
 import { fVnd, parseAmount } from '../hr/hr-common';
 
 // ----------------------------------------------------------------------
@@ -692,7 +694,7 @@ function OrdersTab() {
 export function BonusProgramsView() {
   const settings = useSettingsContext();
   const { enqueueSnackbar } = useSnackbar();
-  const [tab, setTab] = useState<'programs' | 'month' | 'orders'>('programs');
+  const [tab, setTab] = useState<'programs' | 'month' | 'orders' | 'ai'>('programs');
   const [programs, setPrograms] = useState<IBonusProgram[]>([]);
 
   const load = useCallback(async () => {
@@ -723,10 +725,12 @@ export function BonusProgramsView() {
           <Tab value="programs" label="Chương trình" />
           <Tab value="month" label="Kết quả tháng" />
           <Tab value="orders" label="Đánh dấu đơn" />
+          <Tab value="ai" label="Agent AI tính thưởng" />
         </Tabs>
         {tab === 'programs' && <ProgramsTab programs={programs} onChanged={load} />}
         {tab === 'month' && <MonthTab programs={programs} />}
         {tab === 'orders' && <OrdersTab />}
+        {tab === 'ai' && <AiBonusTab />}
       </Card>
     </Container>
   );
