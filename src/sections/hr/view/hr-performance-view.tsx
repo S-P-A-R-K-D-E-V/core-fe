@@ -57,7 +57,8 @@ import type { IShiftSchedule } from 'src/types/corecms-api';
 import type { IExcludedShift, IPerformanceMonth, IPerformanceScore } from 'src/types/hr';
 import { WORK_TASK_GROUP_LABEL, PERFORMANCE_RATING_COLOR, PERFORMANCE_RATING_LABEL } from 'src/types/hr';
 
-import { fPct, fVnd, monthEnd, MonthField, monthStart, previousMonth } from '../hr-common';
+import { MyProvisionalScoreCard } from '../hr-score-cards';
+import { fPct, fVnd, monthEnd, MonthField, monthStart, rankScores, previousMonth } from '../hr-common';
 
 // ----------------------------------------------------------------------
 // Điểm hiệu suất (Quy chế Chương V) + xếp loại hoàn thành công việc (Chương VI). Xếp loại theo tỷ lệ đạt target chuẩn hoá
@@ -191,7 +192,7 @@ export default function HrPerformanceView({ initialTab }: { initialTab?: string 
               <LoadingButton variant="outlined" loading={busy} disabled={published} onClick={compute}>
                 Tính điểm
               </LoadingButton>
-              <LoadingButton variant="contained" loading={busy} disabled={published || !data?.computedAt} onClick={publish}>
+              <LoadingButton variant="contained" loading={busy} disabled={published || !data?.computedAt || month >= monthStart()} onClick={publish}>
                 Công bố
               </LoadingButton>
             </Stack>
@@ -213,7 +214,9 @@ export default function HrPerformanceView({ initialTab }: { initialTab?: string 
             {data.publishedAt
               ? `Đã công bố ${fDateTime(data.publishedAt, 'HH:mm dd/MM')}`
               : data.computedAt
-                ? `Tính lúc ${fDateTime(data.computedAt, 'HH:mm dd/MM')} · chưa công bố`
+                ? month >= monthStart()
+                  ? `Tạm tính tới hôm qua · cập nhật ${fDateTime(data.computedAt, 'HH:mm dd/MM')}`
+                  : `Tính lúc ${fDateTime(data.computedAt, 'HH:mm dd/MM')} · chưa công bố`
                 : 'Chưa tính'}
           </Typography>
         )}
@@ -224,6 +227,12 @@ export default function HrPerformanceView({ initialTab }: { initialTab?: string 
           Tháng {fDate(month, 'MM/yyyy')} là tháng chạy thử — kết quả để nhân viên làm quen, chưa dùng làm căn cứ cảnh báo hay
           chấm dứt hợp đồng.
         </Alert>
+      )}
+
+      {tab === 'mine' && (
+        <Box sx={{ mb: 2 }}>
+          <MyProvisionalScoreCard />
+        </Box>
       )}
 
       {loading ? (
@@ -256,6 +265,7 @@ export default function HrPerformanceView({ initialTab }: { initialTab?: string 
                 <Table size="small">
                   <TableHead>
                     <TableRow>
+                      <TableCell>Hạng</TableCell>
                       <TableCell>Nhân viên</TableCell>
                       <TableCell align="right">Ca</TableCell>
                       <TableCell align="right">Đạt target</TableCell>
@@ -269,8 +279,11 @@ export default function HrPerformanceView({ initialTab }: { initialTab?: string 
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {data.scores.map((s) => (
+                    {rankScores(data.scores).map(({ score: s, rank }) => (
                       <TableRow key={s.id} hover sx={{ cursor: 'pointer' }} onClick={() => setDetail(s)}>
+                        <TableCell>
+                          <strong>{rank ?? '—'}</strong>
+                        </TableCell>
                         <TableCell>
                           {s.fullName}
                           {s.reviewRequestedAt && !s.reviewResponse && (

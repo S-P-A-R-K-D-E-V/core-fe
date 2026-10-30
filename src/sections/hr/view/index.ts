@@ -1,3 +1,4 @@
+export { default as HrOverviewView } from './hr-overview-view';
 export { default as HrLeaveView } from './hr-leave-view';
 export { default as HrRecordsView } from './hr-records-view';
 export { default as HrTargetsView } from './hr-targets-view';

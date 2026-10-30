@@ -212,6 +212,14 @@ export function useNavData(
             roles: ['Admin'],
             featureKey: 'store.camera',
           },
+          // Xếp hạng theo điểm tháng (quản lý) + điểm của tôi (mọi nhân viên).
+          {
+            title: 'Tổng quan nhân sự',
+            path: paths.dashboard.hr.overview,
+            icon: ICONS.job,
+            roles: ['Admin', 'Manager', 'Staff'],
+            featureKey: 'workforce.shift-scheduling',
+          },
           // SHIFT CASH (Kiểm tiền quầy)
           {
             title: t('shiftCash'),

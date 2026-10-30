@@ -477,6 +477,7 @@ export const endpoints = {
     recordRefuse: (id: string) => `/hr-records/${id}/refuse`,
     performance: '/performance',
     performanceMine: '/performance/mine',
+    performanceMineCurrent: '/performance/mine/current',
     performanceCompute: '/performance/compute',
     performancePublish: '/performance/publish',
     excludedShifts: '/performance/excluded-shifts',

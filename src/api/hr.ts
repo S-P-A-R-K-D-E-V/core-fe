@@ -16,6 +16,7 @@ import type {
   ShiftLeaveStatus,
   IPerformanceMonth,
   IPerformanceScore,
+  IMyProvisionalPerformance,
   IPolicyAcknowledgementStatus,
   IContractField,
   IContractCustomField,
@@ -310,6 +311,11 @@ export async function addExcludedShift(date: string, shiftScheduleId: string, re
 
 export async function removeExcludedShift(id: string): Promise<void> {
   await axios.delete(endpoints.hr.excludedShift(id));
+}
+
+export async function getMyProvisionalPerformance(): Promise<IMyProvisionalPerformance> {
+  const response = await axios.get<IMyProvisionalPerformance>(endpoints.hr.performanceMineCurrent);
+  return response.data;
 }
 
 export async function requestPerformanceReview(id: string, note: string): Promise<IPerformanceScore> {

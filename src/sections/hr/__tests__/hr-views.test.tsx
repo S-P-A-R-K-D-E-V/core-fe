@@ -54,6 +54,8 @@ const api = vi.hoisted(() => ({
   signHrRecord: vi.fn(),
   refuseHrRecord: vi.fn(),
   getMyPerformance: vi.fn(),
+  getMyViolations: vi.fn(),
+  getMyProvisionalPerformance: vi.fn(),
   getPerformanceMonth: vi.fn(),
   getExcludedShifts: vi.fn(),
   computePerformance: vi.fn(),
@@ -284,6 +286,8 @@ describe('HrPerformanceView', () => {
       computedAt: '2026-11-01T00:00:00Z',
       reviewDeadline: new Date(Date.now() + 86_400_000).toISOString(),
     };
+    api.getMyProvisionalPerformance.mockResolvedValue({ month: '2026-11-01', computedAt: null, score: null });
+    api.getMyViolations.mockResolvedValue({ summary: { points: 0 } });
     api.getMyPerformance.mockResolvedValue([base, { ...base, id: 's0', month: '2026-09-01', reviewDeadline: '2026-10-05T17:00:00Z' }]);
     api.requestPerformanceReview.mockResolvedValue({});
     const user = userEvent.setup();

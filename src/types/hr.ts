@@ -342,6 +342,13 @@ export interface IPerformanceMonth {
   scores: IPerformanceScore[];
 }
 
+/** Điểm tạm tính tháng này của tôi: số liệu tới hôm qua, chưa công bố; chưa tính được thì score = null. */
+export interface IMyProvisionalPerformance {
+  month: string;
+  computedAt?: string | null;
+  score?: IPerformanceScore | null;
+}
+
 export interface IExcludedShift {
   id: string;
   date: string;
