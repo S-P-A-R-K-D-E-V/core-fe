@@ -49,17 +49,27 @@ export function previousMonth(month: string): string {
   return monthStart(new Date(y, m - 2, 1));
 }
 
-/** Xếp hạng theo tổng điểm, bằng điểm cùng hạng. Chưa có ca hoặc điểm mặc định (người mới) không có hạng, đứng cuối. */
+/** Chưa làm ca nào thì không có điểm để xem: tổng điểm lúc đó chỉ còn kỷ luật + đối soát quy đổi lên 100. */
+export function fScoreTotal(s: IPerformanceScore): string {
+  return s.shiftCount > 0 ? s.total.toLocaleString('vi-VN', { maximumFractionDigits: 1 }) : '—';
+}
+
+/** Xếp hạng theo tổng điểm, bằng điểm cùng hạng. Chỉ người đã có xếp loại mới có hạng (không tính điểm mặc định của người mới); người còn lại đứng sau, người chưa làm ca nào đứng cuối. */
 export function rankScores(scores: IPerformanceScore[]): { score: IPerformanceScore; rank: number | null }[] {
-  const isRanked = (s: IPerformanceScore) => s.shiftCount > 0 && !s.isDefaultScore;
-  const ranked = scores.filter(isRanked).sort((a, b) => b.total - a.total);
+  const isRanked = (s: IPerformanceScore) => s.rating !== 'NotRated' && !s.isDefaultScore;
+  const byTotal = (a: IPerformanceScore, b: IPerformanceScore) => b.total - a.total;
+  const ranked = scores.filter(isRanked).sort(byTotal);
+  const others = scores.filter((s) => !isRanked(s));
   let rank = 0;
   return [
     ...ranked.map((score, i) => {
       if (i === 0 || score.total !== ranked[i - 1].total) rank = i + 1;
       return { score, rank };
     }),
-    ...scores.filter((s) => !isRanked(s)).map((score) => ({ score, rank: null })),
+    ...[...others.filter((s) => s.shiftCount > 0).sort(byTotal), ...others.filter((s) => s.shiftCount === 0)].map((score) => ({
+      score,
+      rank: null,
+    })),
   ];
 }
 

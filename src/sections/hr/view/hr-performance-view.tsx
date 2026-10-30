@@ -58,7 +58,7 @@ import type { IExcludedShift, IPerformanceMonth, IPerformanceScore } from 'src/t
 import { WORK_TASK_GROUP_LABEL, PERFORMANCE_RATING_COLOR, PERFORMANCE_RATING_LABEL } from 'src/types/hr';
 
 import { MyProvisionalScoreCard } from '../hr-score-cards';
-import { fPct, fVnd, monthEnd, MonthField, monthStart, rankScores, previousMonth } from '../hr-common';
+import { fPct, fVnd, monthEnd, MonthField, monthStart, rankScores, fScoreTotal, previousMonth } from '../hr-common';
 
 // ----------------------------------------------------------------------
 // Điểm hiệu suất (Quy chế Chương V) + xếp loại hoàn thành công việc (Chương VI). Xếp loại theo tỷ lệ đạt target chuẩn hoá
@@ -72,10 +72,8 @@ const TRIAL_MONTHS = ['2026-11-01', '2026-12-01'];
 const COMPONENTS: { key: keyof IPerformanceScore; label: string; max: string }[] = [
   { key: 'salesPoints', label: 'Doanh số', max: '40 (tối đa 48)' },
   { key: 'qualityPoints', label: 'Chất lượng bán', max: '15' },
-  { key: 'taskPoints', label: 'Nhiệm vụ', max: '20' },
   { key: 'disciplinePoints', label: 'Kỷ luật', max: '15' },
   { key: 'reconciliationPoints', label: 'Đối soát', max: '10' },
-  { key: 'initiativePoints', label: 'Sáng kiến', max: '+5' },
 ];
 
 export default function HrPerformanceView({ initialTab }: { initialTab?: string }) {
@@ -298,7 +296,7 @@ export default function HrPerformanceView({ initialTab }: { initialTab?: string 
                           </TableCell>
                         ))}
                         <TableCell align="right">
-                          <strong>{s.total.toLocaleString('vi-VN')}</strong>
+                          <strong>{fScoreTotal(s)}</strong>
                           {s.isDefaultScore && (
                             <Typography component="span" variant="caption" color="text.secondary">
                               {' '}
@@ -477,7 +475,7 @@ function ScoreDetails({
   return (
     <Stack spacing={2}>
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-        <Typography variant="h4">{s.total.toLocaleString('vi-VN')}</Typography>
+        <Typography variant="h4">{fScoreTotal(s)}</Typography>
         <Chip color={PERFORMANCE_RATING_COLOR[s.rating]} label={PERFORMANCE_RATING_LABEL[s.rating]} />
         {s.isDefaultScore && <Chip variant="outlined" label="Điểm mặc định nhân viên mới" />}
         {s.consecutiveNotComplete && <Chip color="error" variant="outlined" label="Không hoàn thành 2 tháng liên tiếp" />}
