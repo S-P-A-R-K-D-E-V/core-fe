@@ -4,7 +4,7 @@
 // sự kiện afterprint.
 //
 // Tài liệu phải tự đặt khổ giấy: `@page { size: <rộng>mm <cao>mm; margin: 0 }`, CSS nằm trong <style>,
-// không tải tài nguyên ngoài (print() được gọi ngay, không chờ ảnh / font mạng).
+// không tải font / CSS ngoài. Ảnh (logo, ảnh trong mẫu in) được chờ tải xong (tối đa 5 giây) rồi mới gọi print().
 // Hỗ trợ Chrome và Edge trên máy tính.
 // ----------------------------------------------------------------------
 
@@ -23,7 +23,11 @@ export const PRINT_FRAME_ATTRIBUTE = 'data-print-html-frame';
 export type PrintHtmlOptions = {
   /** Chờ bao lâu (ms) sau khi ghi tài liệu rồi mới gọi print() — để trình duyệt dàn trang xong. */
   delayMs?: number;
+  /** Tài liệu có ảnh (logo, ảnh trong mẫu in): chờ ảnh tải xong tối đa bấy nhiêu ms rồi mới in. */
+  imageTimeoutMs?: number;
 };
+
+const IMAGE_TIMEOUT_MS = 5000;
 
 /**
  * Mở hộp thoại in cho `html` (cả tài liệu, từ <!DOCTYPE html>).
@@ -73,13 +77,39 @@ export function printHtmlDocument(html: string, options: PrintHtmlOptions = {}):
     // Gắn sau document.open(): open() xoá mọi listener có sẵn trên window của iframe.
     frameWindow.addEventListener('afterprint', () => finish());
 
-    window.setTimeout(() => {
-      try {
-        frameWindow.focus();
-        frameWindow.print();
-      } catch (error) {
-        finish(error ?? new Error('Không gọi được lệnh in.'));
-      }
-    }, options.delayMs ?? 50);
+    const schedulePrint = () =>
+      window.setTimeout(() => {
+        try {
+          frameWindow.focus();
+          frameWindow.print();
+        } catch (error) {
+          finish(error ?? new Error('Không gọi được lệnh in.'));
+        }
+      }, options.delayMs ?? 50);
+
+    // Ảnh (logo, ảnh trong mẫu in) phải tải xong trước khi in, không thì bản in thiếu ảnh. Ảnh lỗi / quá thời gian vẫn in
+    // tiếp. Không có ảnh nào đang tải → hẹn in ngay như trước.
+    const pending = Array.from(frameDocument.images ?? []).filter((image) => !image.complete);
+    if (pending.length === 0) {
+      schedulePrint();
+      return;
+    }
+    let left = pending.length;
+    let started = false;
+    const start = () => {
+      if (started) return;
+      started = true;
+      window.clearTimeout(guard);
+      schedulePrint();
+    };
+    const guard = window.setTimeout(start, options.imageTimeoutMs ?? IMAGE_TIMEOUT_MS);
+    pending.forEach((image) => {
+      const done = () => {
+        left -= 1;
+        if (left === 0) start();
+      };
+      image.addEventListener('load', done, { once: true });
+      image.addEventListener('error', done, { once: true });
+    });
   });
 }

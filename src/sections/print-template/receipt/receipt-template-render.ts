@@ -6,6 +6,8 @@ import { barcodeBars, barcodeWidthDots } from 'src/sections/pos/label-print/labe
 
 import type { ISalesOrderReceipt } from 'src/types/corecms-api';
 
+import { isSafeLogoSrc, isSafeImageSrc, parseImageWidth } from '../print-image';
+
 import {
   isItemField,
   isPaymentField,
@@ -38,6 +40,8 @@ import type { ReceiptTemplateSettings } from './receipt-template-settings';
 
 const TOKEN = /\{\{\s*([a-z0-9_]+)\s*\}\}/g;
 
+export const STORE_LOGO_CLASS = 'store-logo';
+
 const ALLOWED_TAGS = new Set([
   'P',
   'BR',
@@ -68,6 +72,18 @@ const ALLOWED_TAGS = new Set([
   'TD',
   'COLGROUP',
   'COL',
+  'IMG',
+]);
+
+/** Lớp được giữ: khối chia cột (columns-node) và ảnh logo cửa hàng — như PrintTemplateHtmlService của core-be. */
+const ALLOWED_CLASSES = new Set([
+  'cols',
+  'cols-2',
+  'cols-3',
+  'cols-12',
+  'cols-21',
+  'col',
+  STORE_LOGO_CLASS,
 ]);
 
 // Bỏ cả nội dung (không chỉ thẻ): mã chạy, nhúng, đồ hoạ ngoài, biểu mẫu.
@@ -86,7 +102,6 @@ const DROPPED_TAGS = new Set([
   'META',
   'TITLE',
   'HEAD',
-  'IMG',
   'PICTURE',
   'VIDEO',
   'AUDIO',
@@ -111,7 +126,7 @@ const FONT_SIZE_RANGES: Record<string, [number, number]> = {
 };
 const TEXT_ALIGN = /^(left|center|right|justify)$/;
 
-/** style="…" → chỉ text-align và font-size hợp lệ (cỡ chữ trong khoảng đọc được). */
+/** style="…" → chỉ text-align, font-size hợp lệ (cỡ chữ trong khoảng đọc được) và bề rộng ảnh theo %. */
 function cleanStyle(style: string): string {
   const kept: string[] = [];
   style.split(';').forEach((declaration) => {
@@ -128,6 +143,10 @@ function cleanStyle(style: string): string {
       const range = match ? FONT_SIZE_RANGES[match[2]] : null;
       const size = match ? Number(match[1]) : NaN;
       if (range && size >= range[0] && size <= range[1]) kept.push(`font-size:${value}`);
+    }
+    if (property === 'width') {
+      const width = parseImageWidth(value);
+      if (width) kept.push(`width:${width}%`);
     }
   });
   return kept.join(';');
@@ -147,7 +166,17 @@ function sanitizeElement(element: Element) {
     }
     Array.from(child.attributes).forEach((attribute) => {
       const name = attribute.name.toLowerCase();
-      if (name === 'style') {
+      if (name === 'class') {
+        const kept = Array.from(
+          new Set(attribute.value.split(/\s+/).filter((c) => ALLOWED_CLASSES.has(c)))
+        );
+        if (kept.length > 0) child.setAttribute('class', kept.join(' '));
+        else child.removeAttribute('class');
+      } else if (tag === 'IMG' && name === 'src') {
+        if (!isSafeImageSrc(attribute.value)) child.removeAttribute('src');
+      } else if (tag === 'IMG' && name === 'alt') {
+        child.setAttribute('alt', attribute.value.slice(0, 120));
+      } else if (name === 'style') {
         const style = cleanStyle(attribute.value);
         if (style) child.setAttribute('style', style);
         else child.removeAttribute('style');
@@ -157,6 +186,11 @@ function sanitizeElement(element: Element) {
         child.removeAttribute(attribute.name);
       }
     });
+    // Ảnh: chỉ ảnh của cửa hàng; logo không mang src (điền khi trộn dữ liệu).
+    if (tag === 'IMG') {
+      if (child.classList.contains(STORE_LOGO_CLASS)) child.removeAttribute('src');
+      else if (!child.getAttribute('src')) child.remove();
+    }
   });
   // Chú thích HTML không in ra nhưng có thể chứa token — bỏ.
   Array.from(element.childNodes)
@@ -360,11 +394,31 @@ export function mergeReceiptTemplate(
     return { text: '' };
   };
 
+  fillStoreLogo(body, receipt.store?.logoUrl);
   expandRepeats(body, isItemField, (receipt.lines ?? []).map(receiptItemValues), global);
   expandRepeats(body, isPaymentField, (receipt.payments ?? []).map(receiptPaymentValues), global);
   fill(body, global);
   removeEmptyContainers(body);
   return body.innerHTML;
+}
+
+/**
+ * Ảnh logo (<img class="store-logo">) lấy logo hiện tại của cửa hàng. Cửa hàng chưa có logo → bỏ ảnh; đoạn chỉ có logo
+ * thì bỏ luôn đoạn (không để lại dòng trống).
+ */
+function fillStoreLogo(body: Element, logoUrl: string | null | undefined) {
+  body.querySelectorAll(`img.${STORE_LOGO_CLASS}`).forEach((img) => {
+    if (logoUrl && isSafeLogoSrc(logoUrl)) {
+      img.setAttribute('src', logoUrl.trim());
+      img.setAttribute('alt', 'Logo');
+      return;
+    }
+    const parent = img.parentElement;
+    img.remove();
+    if (parent && parent !== body && !parent.textContent?.trim() && parent.children.length === 0) {
+      parent.remove();
+    }
+  });
 }
 
 // ── Tài liệu in ───────────────────────────────────────────────────────────
@@ -393,6 +447,12 @@ export function receiptTemplateContentCss(settings: ReceiptTemplateSettings): st
     '.rt tr{break-inside:avoid;page-break-inside:avoid}',
     '.rt .cx{display:block;border:0.5mm solid #000;padding:0.8mm 0;margin:1mm 0;text-align:center;font-size:14pt;font-weight:700;letter-spacing:0.5mm;white-space:nowrap}',
     '.rt svg.qc,.rt svg.bc{display:inline-block;vertical-align:middle;margin:0.5mm 0}',
+    // Ảnh nằm trong đoạn (căn theo đoạn), bề rộng % của khối chứa.
+    '.rt img{max-width:100%;height:auto;vertical-align:middle}',
+    // Khối chia cột: 2 / 3 cột đều, 1/3–2/3, 2/3–1/3.
+    '.rt .cols{display:flex;align-items:flex-start;column-gap:2mm}',
+    '.rt .col{flex:1 1 0;min-width:0}',
+    '.rt .cols-12>.col:last-child,.rt .cols-21>.col:first-child{flex-grow:2}',
   ];
   if (settings.tableBorder === 'rows') rules.push(`.rt td,.rt th{border-bottom:${border}}`);
   if (settings.tableBorder === 'all') rules.push(`.rt td,.rt th{border:${border}}`);
@@ -518,6 +578,11 @@ export function estimateReceiptBodyHeightMm(
   });
   body.querySelectorAll('svg').forEach((svg) => {
     height += parseFloat(svg.getAttribute('height') ?? '0') + 1;
+  });
+  // Ảnh chưa biết tỉ lệ: coi như vuông theo bề rộng đặt trong mẫu (mặc định nửa khổ) — dư hơn là thiếu.
+  body.querySelectorAll('img').forEach((img) => {
+    const percent = parseImageWidth((img as HTMLElement).style?.width) ?? 50;
+    height += (width * percent) / 100 + 1;
   });
   return height;
 }

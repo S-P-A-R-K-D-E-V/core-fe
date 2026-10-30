@@ -27,6 +27,8 @@ import type { EncodedBarcode } from 'src/sections/pos/label-print/barcode';
 import type { LabelSource, LabelProblem } from 'src/sections/pos/label-print/label-sheet';
 import type { ModuleDots, LabelCalibration } from 'src/sections/pos/label-print/label-template';
 
+import { isSafeLogoSrc, isSafeImageSrc } from '../print-image';
+
 import type { LabelDesign, LabelElement } from './label-design';
 
 // ----------------------------------------------------------------------
@@ -49,6 +51,8 @@ export type DesignPrintContext = {
   discount?: LabelDiscount;
   /** "29/10/2026"; không truyền = hôm nay. */
   printDate?: string;
+  /** Logo hiện tại của cửa hàng — cho phần tử ảnh logo. */
+  logoUrl?: string | null;
 };
 
 export type DesignPrintJob = { items: DesignLabelSource[]; context: DesignPrintContext };
@@ -232,9 +236,18 @@ export type RenderedElement = { html: string } | { problem: string } | null;
 export function renderElement(
   element: LabelElement,
   source: DesignLabelSource,
-  values: Record<string, string>
+  values: Record<string, string>,
+  assets: Pick<DesignPrintContext, 'logoUrl'> = {}
 ): RenderedElement {
   const open = `<div class="el" style="${boxStyle(element)}">`;
+
+  if (element.type === 'image') {
+    // Ảnh vừa khung, giữ tỉ lệ. Logo: cửa hàng chưa có logo thì không in.
+    const src = element.logo ? assets.logoUrl : element.src;
+    const safe = element.logo ? isSafeLogoSrc(src) : isSafeImageSrc(src);
+    if (!src || !safe) return null;
+    return { html: `${open}<img class="im" src="${escapeHtml(src.trim())}" alt=""></div>` };
+  }
 
   if (element.type === 'text') {
     const text = fillText(element.text ?? '', values);
@@ -291,7 +304,7 @@ export function renderLabelInner(
   const values = labelFieldValues(source, design, context);
   const parts: string[] = [];
   for (let i = 0; i < design.elements.length; i += 1) {
-    const rendered = renderElement(design.elements[i], source, values);
+    const rendered = renderElement(design.elements[i], source, values, context);
     if (rendered && 'problem' in rendered) return { problem: rendered.problem };
     if (rendered) parts.push(rendered.html);
   }
@@ -393,6 +406,7 @@ export const LABEL_ELEMENT_CSS = [
   '.lb .bt{position:absolute;left:0;right:0;text-align:center;line-height:1.1;letter-spacing:0.1mm;white-space:nowrap;overflow:hidden}',
   '.lb .qw{position:absolute}',
   '.lb .qw svg{display:block}',
+  '.lb .im{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain}',
 ].join('\n');
 
 function sheetCss(design: LabelDesign): string {

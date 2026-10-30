@@ -109,7 +109,7 @@ function initialDraft(kind: PrintTemplateKind): Draft {
 export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
-  const { brandName } = useStoreBrand();
+  const { brandName, logoUrl } = useStoreBrand();
   const isNew = id === 'new';
 
   const [kind, setKind] = useState<PrintTemplateKind>(kindParam === 'label' ? 'label' : 'receipt');
@@ -179,11 +179,12 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
   const labelContext: DesignPrintContext = useMemo(
     () => ({
       storeName: brandName,
+      logoUrl,
       warehouse: { name: 'Kho chính', address: '21 Chùa Láng, Đống Đa', phone: '0901 234 567' },
     }),
-    [brandName]
+    [brandName, logoUrl]
   );
-  const sample = useMemo(() => sampleReceipt(brandName), [brandName]);
+  const sample = useMemo(() => sampleReceipt(brandName, logoUrl), [brandName, logoUrl]);
 
   const handleSave = async () => {
     const name = draft.name.trim();
@@ -339,6 +340,7 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
             onChange={onHtmlChange}
             settings={draft.receiptSettings}
             zoom={zoom}
+            logoUrl={logoUrl}
           />
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Tabs value={panel} onChange={(_, next) => setPanel(next)} sx={{ mb: 2 }}>

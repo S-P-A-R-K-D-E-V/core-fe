@@ -155,6 +155,9 @@ describe('mergeReceiptTemplate', () => {
     expect(all).toContain('Đã giảm 20.000đ');
     expect(all.some((text) => text.startsWith('Thu khác'))).toBe(false);
     expect(all.some((text) => text.includes('{{'))).toBe(false);
+    // Mẫu chuẩn có logo; phiếu mẫu chưa có logo → không còn ảnh, không còn dòng trống ở đầu.
+    expect(root.querySelector('img')).toBeNull();
+    expect(root.firstElementChild?.tagName).toBe('H2');
   });
 });
 

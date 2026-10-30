@@ -674,6 +674,7 @@ export const endpoints = {
     list: '/print-templates',
     details: (id: string) => `/print-templates/${id}`,
     assignments: (kind: string) => `/print-templates/assignments/${kind}`,
+    images: '/print-templates/images',
   },
   warehouses: {
     list: '/warehouses',

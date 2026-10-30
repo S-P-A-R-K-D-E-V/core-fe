@@ -158,7 +158,7 @@ export default function LabelPrintDialog({ open, onClose, sources }: Props) {
 
 function LabelPrintContent({ sources, onClose }: Omit<Props, 'open'>) {
   const { enqueueSnackbar } = useSnackbar();
-  const { brandName } = useStoreBrand();
+  const { brandName, logoUrl } = useStoreBrand();
   const help = useBoolean();
 
   const [rows] = useState<LabelSource[]>(() => sources);
@@ -273,11 +273,12 @@ function LabelPrintContent({ sources, onClose }: Omit<Props, 'open'>) {
       items: job.items.map((item) => ({ ...item, discount: parseDiscount(discounts[item.key]) })),
       context: {
         storeName: brandName,
+        logoUrl,
         discount: parseDiscount(discountAll),
         warehouse: warehouse ? { name: warehouse.name, address: warehouse.address, phone: warehouse.phone } : null,
       },
     }),
-    [job, discounts, discountAll, brandName, warehouse]
+    [job, discounts, discountAll, brandName, logoUrl, warehouse]
   );
 
   const plan = useMemo(
