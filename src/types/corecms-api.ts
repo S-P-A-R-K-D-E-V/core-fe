@@ -3374,6 +3374,24 @@ export interface IPosPaymentConnection {
   bankName?: string | null;
 }
 
+/** Khả năng tự đối soát của một tài khoản ngân hàng ở quầy (GET /payment/qr/account-capabilities). */
+export interface IPosAccountCapability {
+  bankAccountId: string;
+  /** auto: tiền về tự xác nhận · auto_paid: tự xác nhận nhưng ApiPay đã hết hạn mức (tính phí) · manual: thu ngân tự kiểm tra */
+  confirmation: 'auto' | 'auto_paid' | 'manual';
+  /** bank_direct (Open Banking) | bank_feed (ApiPay, SePay, Casso) — null khi manual */
+  kind: 'bank_direct' | 'bank_feed' | null;
+  provider: string | null;
+  quota: { used: number; pending: number; limit: number; remaining: number; state: string } | null;
+  /** no_connection | apipay_quota_exceeded */
+  reason: string | null;
+}
+
+export interface IPosAccountCapabilitiesResponse {
+  enabled: boolean;
+  accounts: IPosAccountCapability[];
+}
+
 export interface IPosPaymentConnectionsResponse {
   /** Dịch vụ thanh toán (spark-payment) đang bật */
   enabled: boolean;

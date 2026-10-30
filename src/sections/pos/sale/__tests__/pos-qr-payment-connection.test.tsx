@@ -23,6 +23,8 @@ vi.mock('src/api/payment-qr', () => ({
   getQrPaymentStatus: api.getQrPaymentStatus,
   cancelQrPayment: api.cancelQrPayment,
   getPosPaymentConnections: api.getPosPaymentConnections,
+  // Nhãn tự xác nhận theo tài khoản (S Payment) — tắt trong các test này.
+  getPosAccountCapabilities: () => Promise.resolve({ enabled: false, accounts: [] }),
 }));
 
 vi.mock('src/api/bank-accounts', () => ({

@@ -17,6 +17,10 @@ import { alpha, useTheme } from '@mui/material/styles';
 
 import Iconify from 'src/components/iconify';
 import PaymentQrInfo, { useQrImageSrc, useExpirySeconds } from 'src/components/payment-qr-info';
+import AccountCapabilityHint, {
+  AccountCapabilityTag,
+  useAccountCapabilities,
+} from 'src/components/account-capability';
 import PaymentConnectionSelect, {
   usePosPaymentConnections,
 } from 'src/components/payment-connection-select';
@@ -77,6 +81,8 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     loaded: connectionsLoaded,
     allowBankAccount,
   } = usePosPaymentConnections();
+  // Tài khoản nào tiền về được tự xác nhận (S Payment) — nhãn + gợi ý đổi tài khoản.
+  const capabilities = useAccountCapabilities();
 
   const [debouncedAmount, setDebouncedAmount] = useState(amount);
   const [qrState, setQrState] = useState<QrState>('idle');
@@ -370,6 +376,7 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
             <span>
               {acc.shortName || acc.bankName || acc.code} - {acc.accountNumber}
             </span>
+            <AccountCapabilityTag capability={capabilities[acc.id]} />
           </Stack>
         </MenuItem>
       ))}
@@ -387,6 +394,15 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
         allowBankAccount={allowBankAccount}
       />
       {!connection && allowBankAccount && bankAccounts.length > 0 && bankSelector}
+      {!connection && allowBankAccount && (
+        <AccountCapabilityHint
+          accounts={bankAccounts}
+          selectedId={selectedAccountId}
+          capabilities={capabilities}
+          onSelect={setSelectedAccountId}
+          disabled={qrState === 'completed'}
+        />
+      )}
     </>
   );
 
