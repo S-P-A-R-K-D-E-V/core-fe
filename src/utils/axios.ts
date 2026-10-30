@@ -827,6 +827,8 @@ export const endpoints = {
     status: (id: string) => `/payment/qr/${id}/status`,
     /** Nguồn xác nhận chuyển khoản cho POS (StoreStaff) */
     connections: '/payment/qr/connections',
+    /** Tài khoản nào tự xác nhận được (Open Banking / ApiPay còn hạn mức) — S Payment */
+    accountCapabilities: '/payment/qr/account-capabilities',
   },
   // Dịch vụ thanh toán (spark-payment) qua core-be: kết nối SePay/Casso/payOS/VNPay/ngân hàng trực tiếp (Admin), đối
   // soát (Admin, Manager).

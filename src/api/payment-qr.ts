@@ -4,6 +4,7 @@ import {
   IQrPaymentResponse,
   IQrPaymentStatusResponse,
   IPosPaymentConnectionsResponse,
+  IPosAccountCapabilitiesResponse,
 } from 'src/types/corecms-api';
 
 export async function createQrPayment(data: ICreateQrPaymentRequest): Promise<IQrPaymentResponse> {
@@ -18,6 +19,14 @@ export async function getQrPaymentStatus(id: string): Promise<IQrPaymentStatusRe
 
 export async function cancelQrPayment(id: string): Promise<void> {
   await axios.delete(endpoints.paymentQr.cancel(id));
+}
+
+/** Tài khoản ngân hàng nào tiền về được tự xác nhận (S Payment: Open Banking, ApiPay còn hạn mức). */
+export async function getPosAccountCapabilities(): Promise<IPosAccountCapabilitiesResponse> {
+  const response = await axios.get<IPosAccountCapabilitiesResponse>(
+    endpoints.paymentQr.accountCapabilities
+  );
+  return response.data;
 }
 
 /** Kết nối thu ngân chọn làm nguồn xác nhận chuyển khoản (ApiPay, SePay, ngân hàng trực tiếp...). */

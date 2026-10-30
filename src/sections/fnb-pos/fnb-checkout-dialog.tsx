@@ -30,6 +30,10 @@ import { qrTarget } from 'src/utils/payment-connection';
 import { qrOutcome, isEventForQr, paymentProviderLabel } from 'src/utils/payment-status';
 
 import { getBankAccounts } from 'src/api/bank-accounts';
+import AccountCapabilityHint, {
+  AccountCapabilityTag,
+  useAccountCapabilities,
+} from 'src/components/account-capability';
 import { cancelQrPayment, createQrPayment, getQrPaymentStatus } from 'src/api/payment-qr';
 
 import PaymentQrInfo, { useQrImageSrc, useExpirySeconds } from 'src/components/payment-qr-info';
@@ -86,6 +90,9 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
   const fnbMethods = allowedPosMethods(FNB_METHODS, methods);
   const firstMethod = fnbMethods[0].value;
   // Lựa chọn gắn tài khoản của cửa hàng (vd VietinBank VietQR Pay — tài khoản VietinBank) → ô tài khoản theo luôn.
+  // Tài khoản nào tiền về được tự xác nhận (S Payment) — nhãn + gợi ý đổi tài khoản.
+  const capabilities = useAccountCapabilities();
+
   const selectSource = (key: string) => {
     setSelectionKey(key);
     const chosen = connections.find((c) => (c.key || c.id) === key);
@@ -285,11 +292,20 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
               >
                 <MenuItem value="">— Không chọn —</MenuItem>
                 {accounts.map((a) => (
-                  <MenuItem key={a.id} value={a.id}>
+                  <MenuItem key={a.id} value={a.id} sx={{ gap: 1 }}>
                     {[a.shortName || a.bankName, a.accountNumber, a.description].filter(Boolean).join(' · ')}
+                    <AccountCapabilityTag capability={capabilities[a.id]} />
                   </MenuItem>
                 ))}
               </TextField>
+              {!connection && (
+                <AccountCapabilityHint
+                  accounts={accounts}
+                  selectedId={accountId}
+                  capabilities={capabilities}
+                  onSelect={setAccountId}
+                />
+              )}
               <PaymentConnectionSelect
                 connections={connections}
                 value={selectionKey}
