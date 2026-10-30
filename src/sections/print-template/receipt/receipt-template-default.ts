@@ -5,8 +5,9 @@ import { defaultReceiptSettings } from './receipt-template-settings';
 import type { ReceiptTemplatePaper, ReceiptTemplateSettings } from './receipt-template-settings';
 
 // ----------------------------------------------------------------------
-// Mẫu hoá đơn khởi đầu (giống phiếu thanh toán hệ thống: đầu phiếu, thông tin hoá đơn, từng món hai hàng, tổng tiền, các
-// khoản thu, mã QR chuyển khoản, lời chào) và một phiếu mẫu để xem trước khi chưa chọn hoá đơn thật.
+// Mẫu hoá đơn khởi đầu (giống phiếu thanh toán hệ thống, thêm logo cửa hàng: đầu phiếu, thông tin hoá đơn, từng món
+// hai hàng, tổng tiền, các khoản thu, mã QR chuyển khoản, lời chào) và một phiếu mẫu để xem trước khi chưa chọn hoá đơn
+// thật.
 // ----------------------------------------------------------------------
 
 const center = (inner: string) => `<p style="text-align: center">${inner}</p>`;
@@ -17,6 +18,8 @@ const totalRow = (label: string, value: string) =>
   `<tr><td><p>${label}</p></td><td>${right(value)}</td></tr>`;
 
 export const DEFAULT_RECEIPT_TEMPLATE_HTML = [
+  // Logo hiện tại của cửa hàng; chưa có logo thì dòng này tự bỏ khi in.
+  center('<img class="store-logo" style="width: 40%" alt="Logo">'),
   '<h2 style="text-align: center">{{store_name}}</h2>',
   center('{{branch_name}}'),
   center('{{store_address}}'),
@@ -82,7 +85,10 @@ const SAMPLE_VIETQR =
   '00020101021238540010A00000072701240006970436011001234567890208QRIBFTTA53037045405500005802VN62200816HD 20261006 00016304CCA9';
 
 /** Phiếu mẫu: 3 món (một món có giảm giá), trả một phần tiền mặt, còn nợ có mã QR. */
-export function sampleReceipt(storeName = 'Cửa hàng của bạn'): ISalesOrderReceipt {
+export function sampleReceipt(
+  storeName = 'Cửa hàng của bạn',
+  logoUrl: string | null = null
+): ISalesOrderReceipt {
   return {
     title: 'PHIẾU THANH TOÁN',
     store: {
@@ -90,7 +96,7 @@ export function sampleReceipt(storeName = 'Cửa hàng của bạn'): ISalesOrde
       address: '21 Chùa Láng, Đống Đa, Hà Nội',
       phone: '0901 234 567',
       taxCode: '0101234567',
-      logoUrl: null,
+      logoUrl,
     },
     branch: null,
     invoice: {

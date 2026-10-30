@@ -1,6 +1,7 @@
 'use client';
 
 import type { Editor } from '@tiptap/react';
+import type { EditorView } from '@tiptap/pm/view';
 
 import StarterKit from '@tiptap/starter-kit';
 import Table from '@tiptap/extension-table';
@@ -10,7 +11,7 @@ import TableCell from '@tiptap/extension-table-cell';
 import TextAlign from '@tiptap/extension-text-align';
 import { useEditor, EditorContent } from '@tiptap/react';
 import TableHeader from '@tiptap/extension-table-header';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Menu from '@mui/material/Menu';
@@ -23,6 +24,7 @@ import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
+import LinearProgress from '@mui/material/LinearProgress';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { MergeField, handleFieldDrop } from 'src/sections/hr/contract-editor';
@@ -34,8 +36,14 @@ import {
 } from 'src/sections/hr/contract-fields-html';
 
 import Iconify from 'src/components/iconify';
+import { useSnackbar } from 'src/components/snackbar';
+
+import { imageFilesOf } from '../print-image';
+import { uploadTemplateImage } from '../print-image-upload';
 
 import { FontSize, FONT_SIZE_CHOICES } from './font-size-mark';
+import { TemplateImage } from './template-image-node';
+import { Column, Columns, COLUMN_LAYOUTS } from './columns-node';
 import { receiptTemplateContentCss } from './receipt-template-render';
 import { RECEIPT_TEMPLATE_PAPERS } from './receipt-template-settings';
 import {
@@ -52,7 +60,15 @@ import type { ReceiptTemplateSettings } from './receipt-template-settings';
 // căn lề, danh sách, kẻ ngang, bảng (thêm / bớt hàng, cột). Trường là thẻ: kéo từ bảng trường thả vào chỗ cần, hoặc bấm
 // để chèn ở con trỏ; gõ / dán `{{ma}}` cũng thành thẻ. Lưu ra chữ `{{ma}}` (contract-fields-html).
 // Thẻ trường dòng hàng / thanh toán có dấu ⟳: khối chứa chúng được lặp theo từng món / khoản thu khi in.
+// Ảnh: kéo file ảnh từ máy thả vào phiếu (hoặc dán, hoặc nút Ảnh) → nén, tải lên, chèn đúng chỗ; kéo nút ở góc ảnh để đổi
+// cỡ, căn bằng nút căn lề của đoạn. Logo cửa hàng là ảnh đặc biệt: khi in lấy logo hiện tại. Chia cột: 2 / 3 cột đều,
+// 1/3–2/3, 2/3–1/3 — mỗi cột soạn như thân phiếu.
 // ----------------------------------------------------------------------
+
+/** Kéo "Logo cửa hàng" từ bảng bên trái thả vào phiếu. */
+const LOGO_DRAG_TYPE = 'application/x-template-logo';
+
+const IMAGE_WIDTH_PRESETS = [25, 40, 50, 75, 100];
 
 const PX_PER_MM = 96 / 25.4;
 
@@ -153,10 +169,14 @@ function ToolButton({
   );
 }
 
-function Toolbar({ editor }: { editor: Editor }) {
+function Toolbar({ editor, onPickImage }: { editor: Editor; onPickImage: () => void }) {
   const [presetAnchor, setPresetAnchor] = useState<HTMLElement | null>(null);
+  const [columnsAnchor, setColumnsAnchor] = useState<HTMLElement | null>(null);
   const run = () => editor.chain().focus();
   const inTable = editor.isActive('table');
+  const inColumns = editor.isActive('columns');
+  const imageSelected = editor.isActive('templateImage');
+  const imageWidth = (editor.getAttributes('templateImage').width as number | null) ?? null;
   const fontSize = (editor.getAttributes('fontSize').size as string | undefined) ?? '';
 
   return (
@@ -309,6 +329,69 @@ function Toolbar({ editor }: { editor: Editor }) {
       />
       <Divider orientation="vertical" flexItem />
       <ToolButton
+        title="Chèn ảnh từ máy (hoặc kéo thả / dán ảnh vào phiếu)"
+        icon="solar:gallery-add-bold"
+        onClick={onPickImage}
+      />
+      <ToolButton
+        title="Logo cửa hàng (chèn ở con trỏ)"
+        label="Logo"
+        onClick={() => run().insertTemplateImage({ logo: true, width: 40 }).run()}
+      />
+      <ToolButton
+        title="Chia cột"
+        label="▥ Cột"
+        active={inColumns}
+        onClick={(event) => setColumnsAnchor(event.currentTarget)}
+      />
+      <Menu open={!!columnsAnchor} anchorEl={columnsAnchor} onClose={() => setColumnsAnchor(null)}>
+        {COLUMN_LAYOUTS.map((layout) => (
+          <MenuItem
+            key={layout.value}
+            selected={inColumns && editor.getAttributes('columns').layout === layout.value}
+            onClick={() => {
+              setColumnsAnchor(null);
+              run().setColumns(layout.value).run();
+            }}
+          >
+            {layout.label}
+          </MenuItem>
+        ))}
+        <MenuItem
+          disabled={!inColumns}
+          onClick={() => {
+            setColumnsAnchor(null);
+            run().unsetColumns().run();
+          }}
+        >
+          Bỏ chia cột (giữ nội dung)
+        </MenuItem>
+      </Menu>
+      {imageSelected && (
+        <>
+          <Divider orientation="vertical" flexItem />
+          <Typography variant="caption" color="text.secondary" sx={{ px: 0.5 }}>
+            Cỡ ảnh
+          </Typography>
+          {IMAGE_WIDTH_PRESETS.map((width) => (
+            <ToolButton
+              key={width}
+              title={`Rộng ${width}% khối chứa`}
+              label={`${width}%`}
+              active={imageWidth === width}
+              onClick={() => run().setTemplateImageWidth(width).run()}
+            />
+          ))}
+          <ToolButton
+            title="Cỡ gốc của ảnh (không quá khổ)"
+            label="Gốc"
+            active={imageWidth === null}
+            onClick={() => run().setTemplateImageWidth(null).run()}
+          />
+        </>
+      )}
+      <Divider orientation="vertical" flexItem />
+      <ToolButton
         title="Chèn khối dựng sẵn"
         label="+ Khối"
         onClick={(event) => setPresetAnchor(event.currentTarget)}
@@ -343,12 +426,29 @@ function Toolbar({ editor }: { editor: Editor }) {
   );
 }
 
+const PALETTE_ITEM_SX = (disabled?: boolean) => ({
+  justifyContent: 'flex-start',
+  textAlign: 'left',
+  gap: 1,
+  px: 1,
+  py: 0.5,
+  borderRadius: 1,
+  border: 1,
+  borderColor: 'divider',
+  cursor: disabled ? 'default' : 'grab',
+  '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.light' },
+});
+
 /** Bảng trường: tìm, kéo thả vào tờ phiếu hoặc bấm để chèn ở con trỏ. */
 function FieldPalette({
   onInsert,
+  onInsertLogo,
+  onPickImage,
   disabled,
 }: {
   onInsert: (key: string) => void;
+  onInsertLogo: () => void;
+  onPickImage: () => void;
   disabled?: boolean;
 }) {
   const [query, setQuery] = useState('');
@@ -378,6 +478,58 @@ function FieldPalette({
         spacing={1.5}
         sx={{ overflow: 'auto', pr: 0.5, maxHeight: { md: 'calc(100vh - 300px)' } }}
       >
+        {!needle && (
+          <Box>
+            <Typography variant="overline" color="text.secondary">
+              Ảnh &amp; logo
+            </Typography>
+            <Typography variant="caption" component="div" color="text.disabled" sx={{ mb: 0.5 }}>
+              Kéo ảnh từ máy thả thẳng vào phiếu; bấm ảnh rồi kéo nút ở góc để đổi cỡ.
+            </Typography>
+            <Stack spacing={0.5}>
+              <ButtonBase
+                disabled={disabled}
+                draggable={!disabled}
+                onDragStart={(event) => {
+                  event.dataTransfer.setData(LOGO_DRAG_TYPE, '1');
+                  event.dataTransfer.effectAllowed = 'copy';
+                }}
+                onClick={onInsertLogo}
+                aria-label="Chèn logo cửa hàng"
+                sx={PALETTE_ITEM_SX(disabled)}
+              >
+                <Iconify
+                  icon="solar:shop-bold"
+                  width={16}
+                  sx={{ color: 'text.disabled', flexShrink: 0 }}
+                />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="body2" sx={{ lineHeight: 1.4 }}>
+                    Logo cửa hàng
+                  </Typography>
+                  <Typography variant="caption" component="div" color="text.disabled">
+                    Khi in lấy logo hiện tại (Cài đặt cửa hàng)
+                  </Typography>
+                </Box>
+              </ButtonBase>
+              <ButtonBase
+                disabled={disabled}
+                onClick={onPickImage}
+                aria-label="Chèn ảnh từ máy"
+                sx={PALETTE_ITEM_SX(disabled)}
+              >
+                <Iconify
+                  icon="solar:gallery-add-bold"
+                  width={16}
+                  sx={{ color: 'text.disabled', flexShrink: 0 }}
+                />
+                <Typography variant="body2" sx={{ lineHeight: 1.4 }}>
+                  Ảnh từ máy…
+                </Typography>
+              </ButtonBase>
+            </Stack>
+          </Box>
+        )}
         {RECEIPT_FIELD_GROUPS.map((group) => {
           const fields = RECEIPT_FIELDS.filter(
             (field) =>
@@ -413,18 +565,7 @@ function FieldPalette({
                     }}
                     onClick={() => onInsert(field.key)}
                     aria-label={`Chèn trường ${field.label}`}
-                    sx={{
-                      justifyContent: 'flex-start',
-                      textAlign: 'left',
-                      gap: 1,
-                      px: 1,
-                      py: 0.5,
-                      borderRadius: 1,
-                      border: 1,
-                      borderColor: 'divider',
-                      cursor: disabled ? 'default' : 'grab',
-                      '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.light' },
-                    }}
+                    sx={PALETTE_ITEM_SX(disabled)}
                   >
                     <Iconify
                       icon="mdi:drag"
@@ -458,11 +599,25 @@ type Props = {
   settings: ReceiptTemplateSettings;
   /** Phóng to tờ phiếu (1 = cỡ thật trên màn hình 96 dpi). */
   zoom: number;
+  /** Logo hiện tại của cửa hàng — hiện trên ảnh logo trong trình soạn. */
+  logoUrl?: string | null;
   disabled?: boolean;
 };
 
-export function ReceiptTemplateEditor({ value, onChange, settings, zoom, disabled }: Props) {
+export function ReceiptTemplateEditor({
+  value,
+  onChange,
+  settings,
+  zoom,
+  logoUrl,
+  disabled,
+}: Props) {
+  const { enqueueSnackbar } = useSnackbar();
   const resolve = useCallback((key: string) => resolveChip(key), []);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(0);
+  // editorProps được giữ từ lúc tạo trình soạn → gọi hàm mới nhất qua ref.
+  const insertImagesRef = useRef<(files: File[], pos: number | null) => void>(() => {});
 
   const editor = useEditor({
     extensions: [
@@ -480,11 +635,23 @@ export function ReceiptTemplateEditor({ value, onChange, settings, zoom, disable
       TableHeader,
       TableCell,
       MergeField.configure({ resolve }),
+      TemplateImage.configure({ logoUrl: logoUrl ?? null }),
+      Columns,
+      Column,
     ],
     content: tokensToFieldNodes(value),
     editable: !disabled,
     immediatelyRender: false,
-    editorProps: { handleDrop: (view, event) => handleFieldDrop(view, event) },
+    editorProps: {
+      handleDrop: (view, event) => handleFieldDrop(view, event) || handleMediaDrop(view, event),
+      handlePaste: (_view, event) => {
+        const files = imageFilesOf(event.clipboardData);
+        if (files.length === 0) return false;
+        event.preventDefault();
+        insertImagesRef.current(files, null);
+        return true;
+      },
+    },
     onUpdate: ({ editor: e }) => onChange(fieldNodesToTokens(e.getHTML())),
   });
 
@@ -503,6 +670,67 @@ export function ReceiptTemplateEditor({ value, onChange, settings, zoom, disable
     editor.chain().focus().insertContent({ type: 'mergeField', attrs: { key } }).run();
   };
 
+  const insertLogo = () => {
+    if (!editor || disabled) return;
+    editor.chain().focus().insertTemplateImage({ logo: true, width: 40 }).run();
+  };
+
+  /** Thả logo từ bảng bên trái, hoặc file ảnh từ máy, vào đúng chỗ thả. */
+  function handleMediaDrop(view: EditorView, event: DragEvent): boolean {
+    const data = event.dataTransfer;
+    const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
+    if (data?.getData(LOGO_DRAG_TYPE)) {
+      if (!at) return false;
+      event.preventDefault();
+      const type = view.state.schema.nodes.templateImage;
+      view.dispatch(
+        view.state.tr.insert(at.pos, type.create({ logo: true, width: 40 })).scrollIntoView()
+      );
+      view.focus();
+      return true;
+    }
+    const files = imageFilesOf(data);
+    if (files.length === 0) return false;
+    event.preventDefault();
+    insertImagesRef.current(files, at?.pos ?? null);
+    return true;
+  }
+
+  // Tải từng ảnh lên rồi chèn ở chỗ thả (hoặc con trỏ); chỗ thả không đặt được ảnh thì thêm đoạn mới ở cuối.
+  insertImagesRef.current = (files, pos) => {
+    if (!editor || disabled) return;
+    files.forEach(async (file) => {
+      setUploading((count) => count + 1);
+      try {
+        const src = await uploadTemplateImage(file);
+        if (editor.isDestroyed) return;
+        const attrs = { src, width: 50 };
+        const at = pos === null ? undefined : Math.min(pos, editor.state.doc.content.size);
+        const inserted = editor.chain().focus().insertTemplateImage(attrs, at).run();
+        if (!inserted) {
+          // Chỗ thả không đặt được ảnh nội dòng (giữa hai khối) → thêm đoạn mới chứa ảnh ở cuối.
+          editor
+            .chain()
+            .focus()
+            .insertContentAt(editor.state.doc.content.size, {
+              type: 'paragraph',
+              content: [{ type: 'templateImage', attrs }],
+            })
+            .run();
+        }
+      } catch (error) {
+        enqueueSnackbar(
+          error instanceof Error && error.message ? error.message : 'Không tải được ảnh lên',
+          {
+            variant: 'error',
+          }
+        );
+      } finally {
+        setUploading((count) => count - 1);
+      }
+    });
+  };
+
   const paper = RECEIPT_TEMPLATE_PAPERS[settings.paper];
   const css = useMemo(() => receiptTemplateContentCss(settings), [settings]);
   const paperWidthPx = paper.widthMm * PX_PER_MM;
@@ -515,11 +743,33 @@ export function ReceiptTemplateEditor({ value, onChange, settings, zoom, disable
       alignItems="start"
     >
       <Paper variant="outlined" sx={{ p: 1.5, position: { md: 'sticky' }, top: { md: 80 } }}>
-        <FieldPalette onInsert={insertField} disabled={disabled} />
+        <FieldPalette
+          onInsert={insertField}
+          onInsertLogo={insertLogo}
+          onPickImage={() => fileInputRef.current?.click()}
+          disabled={disabled}
+        />
       </Paper>
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        hidden
+        multiple
+        accept="image/png,image/jpeg,image/webp"
+        aria-label="Chọn ảnh để chèn vào phiếu"
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          event.target.value = '';
+          if (files.length > 0) insertImagesRef.current(files, null);
+        }}
+      />
+
       <Paper variant="outlined" sx={{ overflow: 'hidden', minWidth: 0 }}>
-        {editor && !disabled && <Toolbar editor={editor} />}
+        {editor && !disabled && (
+          <Toolbar editor={editor} onPickImage={() => fileInputRef.current?.click()} />
+        )}
+        {uploading > 0 && <LinearProgress aria-label="Đang tải ảnh lên" />}
         <Box
           sx={{
             p: 3,
@@ -592,6 +842,58 @@ export function ReceiptTemplateEditor({ value, onChange, settings, zoom, disable
               '& .ProseMirror hr.ProseMirror-selectednode': {
                 outline: '2px solid',
                 outlineColor: 'primary.main',
+              },
+              // Ảnh: nút đổi cỡ ở góc dưới phải khi chọn / rê chuột.
+              '& .ProseMirror .tpl-img': {
+                display: 'inline-block',
+                position: 'relative',
+                maxWidth: '100%',
+                verticalAlign: 'middle',
+                lineHeight: 0,
+                cursor: disabled ? 'default' : 'grab',
+              },
+              '& .ProseMirror .tpl-img img': { maxWidth: '100%', height: 'auto', display: 'block' },
+              '& .ProseMirror .tpl-img.ProseMirror-selectednode': {
+                outline: '2px solid',
+                outlineColor: 'primary.main',
+              },
+              '& .ProseMirror .tpl-img-handle': {
+                display: 'none',
+                position: 'absolute',
+                right: -5,
+                bottom: -5,
+                width: 10,
+                height: 10,
+                bgcolor: '#fff',
+                border: '1.5px solid',
+                borderColor: 'primary.main',
+                borderRadius: '2px',
+                cursor: 'nwse-resize',
+              },
+              '& .ProseMirror .tpl-img.ProseMirror-selectednode .tpl-img-handle, & .ProseMirror .tpl-img:hover .tpl-img-handle':
+                { display: disabled ? 'none' : 'block' },
+              '& .ProseMirror .tpl-img-placeholder': {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: 60,
+                height: 40,
+                border: '1px dashed',
+                borderColor: 'text.disabled',
+                color: 'text.secondary',
+                bgcolor: 'background.neutral',
+                fontFamily: 'sans-serif',
+                fontSize: 11,
+                lineHeight: 1.2,
+              },
+              // Khối chia cột: viền mờ để thấy ranh giới cột khi soạn (không in ra).
+              '& .ProseMirror .cols': {
+                outline: '1px dashed rgba(0, 120, 255, 0.35)',
+                outlineOffset: 2,
+              },
+              '& .ProseMirror .col': {
+                outline: '1px dotted rgba(145, 158, 171, 0.8)',
+                minHeight: '1.4em',
               },
             }}
           >

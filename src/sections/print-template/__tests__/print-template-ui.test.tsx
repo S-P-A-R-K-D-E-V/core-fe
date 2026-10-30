@@ -55,6 +55,11 @@ vi.mock('src/api/sales-orders', () => ({
   getSalesOrderReceipt: vi.fn(),
 }));
 
+const uploadTemplateImage = vi.fn();
+vi.mock('../print-image-upload', () => ({
+  uploadTemplateImage: (...args: any[]) => uploadTemplateImage(...args),
+}));
+
 // jsdom không dàn trang: số đo chiều cao giấy cuộn cố định.
 vi.mock('../receipt/receipt-template-render', async (importOriginal) => {
   const original = await importOriginal<typeof import('../receipt/receipt-template-render')>();
@@ -125,6 +130,93 @@ describe('ReceiptTemplateEditor', () => {
   });
 });
 
+describe('ReceiptTemplateEditor — ảnh, logo, chia cột', () => {
+  const IMG = 'https://cici.vn/media/print-templates/img-1-abcd1234.png';
+
+  function renderEditor(value = '<p>Đầu phiếu</p>') {
+    const onChange = vi.fn();
+    wrap(
+      <ReceiptTemplateEditor
+        value={value}
+        onChange={onChange}
+        settings={defaultReceiptSettings('80')}
+        zoom={1}
+        logoUrl="https://cici.vn/media/branding/logo.png"
+      />
+    );
+    return onChange;
+  }
+
+  const lastHtml = (onChange: ReturnType<typeof vi.fn>) => onChange.mock.calls.at(-1)![0] as string;
+
+  it('chia cột rồi đổi bố cục, bỏ chia cột vẫn giữ nội dung', async () => {
+    const onChange = renderEditor();
+    const user = userEvent.setup();
+    await screen.findByText('Đầu phiếu');
+
+    await user.click(screen.getByRole('button', { name: 'Chia cột' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Chia ba (3 cột đều)' }));
+    await waitFor(() => expect(lastHtml(onChange)).toContain('<div class="cols cols-3">'));
+    expect(lastHtml(onChange).match(/class="col"/g)).toHaveLength(3);
+
+    await user.click(screen.getByRole('button', { name: 'Chia cột' }));
+    await user.click(await screen.findByRole('menuitem', { name: '1/3 trái – 2/3 phải' }));
+    await waitFor(() => expect(lastHtml(onChange)).toContain('<div class="cols cols-12">'));
+    expect(lastHtml(onChange).match(/class="col"/g)).toHaveLength(2);
+
+    await user.click(screen.getByRole('button', { name: 'Chia cột' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Bỏ chia cột (giữ nội dung)' }));
+    await waitFor(() => expect(lastHtml(onChange)).not.toContain('cols'));
+    expect(lastHtml(onChange)).toContain('Đầu phiếu');
+  });
+
+  it('chèn logo (không lưu src) và ảnh tải lên, đổi cỡ ảnh bằng nút %', async () => {
+    uploadTemplateImage.mockResolvedValue(IMG);
+    const onChange = renderEditor();
+    const user = userEvent.setup();
+    await screen.findByText('Đầu phiếu');
+
+    await user.click(screen.getByRole('button', { name: 'Chèn logo cửa hàng' }));
+    await waitFor(() =>
+      expect(lastHtml(onChange)).toMatch(/<img class="store-logo" style="width: 40%;?" alt="Logo">/)
+    );
+    // Trong trình soạn, logo hiện bằng logo hiện tại của cửa hàng.
+    expect(document.querySelector('.ProseMirror .tpl-img--logo img')?.getAttribute('src')).toBe(
+      'https://cici.vn/media/branding/logo.png'
+    );
+
+    const file = new File([new Uint8Array([1, 2, 3])], 'anh.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Chọn ảnh để chèn vào phiếu'), file);
+    await waitFor(() =>
+      expect(lastHtml(onChange)).toMatch(new RegExp(`<img src="${IMG}" style="width: 50%;?"`))
+    );
+    expect(uploadTemplateImage).toHaveBeenCalledWith(file);
+
+    // Ảnh vừa chèn được chọn sẵn → thanh công cụ có nút cỡ ảnh.
+    await user.click(await screen.findByRole('button', { name: 'Rộng 75% khối chứa' }));
+    await waitFor(() =>
+      expect(lastHtml(onChange)).toMatch(new RegExp(`<img src="${IMG}" style="width: 75%;?"`))
+    );
+  });
+
+  it('tải ảnh lỗi thì báo, không chèn gì', async () => {
+    uploadTemplateImage.mockRejectedValue(new Error('Ảnh tối đa 2 MB.'));
+    const onChange = renderEditor();
+    const user = userEvent.setup();
+    await screen.findByText('Đầu phiếu');
+
+    await user.upload(
+      screen.getByLabelText('Chọn ảnh để chèn vào phiếu'),
+      new File([new Uint8Array([1])], 'to.png', { type: 'image/png' })
+    );
+
+    await waitFor(() =>
+      expect(enqueueSnackbar).toHaveBeenCalledWith('Ảnh tối đa 2 MB.', { variant: 'error' })
+    );
+    expect(onChange.mock.calls.some(([html]) => String(html).includes('<img'))).toBe(false);
+  });
+});
+
 describe('LabelDesigner', () => {
   function Harness({ onDesign }: { onDesign: (design: LabelDesign) => void }) {
     const [design, setDesign] = useState<LabelDesign>({
@@ -142,6 +234,30 @@ describe('LabelDesigner', () => {
       />
     );
   }
+
+  it('thêm logo cửa hàng và ảnh tải lên vào tem', async () => {
+    uploadTemplateImage.mockResolvedValue(
+      'https://cici.vn/media/print-templates/img-2-abcd1234.png'
+    );
+    const onDesign = vi.fn();
+    const user = userEvent.setup();
+    wrap(<Harness onDesign={onDesign} />);
+
+    await user.click(screen.getByRole('button', { name: 'Thêm Logo cửa hàng' }));
+    const last = () => onDesign.mock.calls.at(-1)![0] as LabelDesign;
+    expect(last().elements[0]).toMatchObject({ type: 'image', logo: true });
+    expect(screen.getByRole('heading', { name: 'Ảnh' })).toBeInTheDocument();
+
+    await user.upload(
+      screen.getByLabelText('Chọn ảnh để thêm vào tem'),
+      new File([new Uint8Array([1])], 'a.png', { type: 'image/png' })
+    );
+    await waitFor(() => expect(last().elements).toHaveLength(2));
+    expect(last().elements[1]).toMatchObject({
+      type: 'image',
+      src: 'https://cici.vn/media/print-templates/img-2-abcd1234.png',
+    });
+  });
 
   it('thêm phần tử từ bảng, sửa vị trí, nhích bằng phím, xoá', async () => {
     const onDesign = vi.fn();

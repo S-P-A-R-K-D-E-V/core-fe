@@ -64,3 +64,13 @@ export async function setPrintTemplateAssignments(
   );
   return response.data ?? [];
 }
+
+/** Tải một ảnh (đã nén) để chèn vào mẫu; trả địa chỉ https://<tên miền>/media/print-templates/…. */
+export async function uploadPrintTemplateImage(file: Blob, fileName: string): Promise<string> {
+  const form = new FormData();
+  form.append('image', file, fileName);
+  const response = await axios.post<{ url: string }>(endpoints.printTemplates.images, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data.url;
+}

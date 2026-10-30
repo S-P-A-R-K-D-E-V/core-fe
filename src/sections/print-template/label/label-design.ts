@@ -7,6 +7,8 @@ import {
 
 import type { LabelTemplate } from 'src/sections/pos/label-print/label-template';
 
+import { isSafeImageSrc } from '../print-image';
+
 // ----------------------------------------------------------------------
 // Bố cục tem mã tự thiết kế (lưu ở `content` của mẫu tem, dạng JSON):
 //  - `paper`: khổ giấy + lưới tem — đúng kiểu LabelTemplate của in tem hệ thống (giấy cuộn / giấy tờ, số cột, khe, lề),
@@ -16,7 +18,7 @@ import type { LabelTemplate } from 'src/sections/pos/label-print/label-template'
 // Không React / DOM — kiểu dữ liệu, trường, bố cục gợi ý và chuẩn hoá JSON đọc về.
 // ----------------------------------------------------------------------
 
-export type LabelElementType = 'text' | 'barcode' | 'qrcode' | 'line' | 'box';
+export type LabelElementType = 'text' | 'barcode' | 'qrcode' | 'line' | 'box' | 'image';
 
 export type LabelTextAlign = 'left' | 'center' | 'right';
 
@@ -50,6 +52,10 @@ export type LabelElement = {
   moduleDots?: LabelElementModuleDots;
   /** Đường kẻ / khung: độ dày nét (mm). */
   strokeMm?: number;
+  /** Ảnh tải lên (https://<tên miền>/media/print-templates/…). */
+  src?: string;
+  /** Ảnh là logo cửa hàng: không lưu src, khi in lấy logo hiện tại. */
+  logo?: boolean;
 };
 
 export type LabelPriceSuffix = 'đ' | 'VND' | 'none';
@@ -312,6 +318,7 @@ export function createElement(
     qrcode: { w: Math.min(paper.labelHeightMm - 1, 14), h: Math.min(paper.labelHeightMm - 1, 14) },
     line: { w: Math.min(paper.labelWidthMm - 1, 20), h: 0.3 },
     box: { w: Math.min(paper.labelWidthMm - 1, 20), h: Math.min(paper.labelHeightMm - 1, 8) },
+    image: { w: Math.min(paper.labelWidthMm - 1, 12), h: Math.min(paper.labelHeightMm - 1, 8) },
   };
   const size = sizes[type];
   const element: LabelElement = {
@@ -361,7 +368,7 @@ export function clampElement(
 const num = (value: unknown, fallback: number) =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 
-const TYPES: LabelElementType[] = ['text', 'barcode', 'qrcode', 'line', 'box'];
+const TYPES: LabelElementType[] = ['text', 'barcode', 'qrcode', 'line', 'box', 'image'];
 
 function normalizePaper(raw: unknown, presetId: string): LabelTemplate {
   const base = presetPaper(presetId);
@@ -416,6 +423,13 @@ function normalizeElement(raw: unknown, paper: LabelTemplate): LabelElement | nu
     element.moduleDots = input.moduleDots;
   if (typeof input.strokeMm === 'number')
     element.strokeMm = Math.min(3, Math.max(0.1, input.strokeMm));
+  if (type === 'image') {
+    // Chỉ ảnh của cửa hàng; logo không mang src. Ảnh không hợp lệ thì bỏ phần tử.
+    if (input.logo === true) element.logo = true;
+    else if (typeof input.src === 'string' && isSafeImageSrc(input.src))
+      element.src = input.src.trim();
+    else return null;
+  }
   return clampElement(element, paper);
 }
 

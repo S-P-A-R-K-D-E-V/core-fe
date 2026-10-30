@@ -121,4 +121,39 @@ describe('printHtmlDocument', () => {
     vi.advanceTimersByTime(1);
     expect(print).toHaveBeenCalledTimes(1);
   });
+
+  it('tài liệu có ảnh: chờ ảnh tải xong rồi mới gọi print()', () => {
+    printHtmlDocument(
+      HTML.replace('</body>', '<img src="https://cici.vn/media/branding/logo.png"></body>')
+    );
+    const [frame] = frames();
+    const print = stubFramePrint(frame);
+
+    vi.advanceTimersByTime(1000);
+    expect(print).not.toHaveBeenCalled();
+
+    frame.contentDocument?.images[0].dispatchEvent(new Event('load'));
+    vi.advanceTimersByTime(50);
+    expect(print).toHaveBeenCalledTimes(1);
+  });
+
+  it('ảnh tải mãi không xong (hoặc lỗi): vẫn in sau imageTimeoutMs', () => {
+    printHtmlDocument(
+      HTML.replace(
+        '</body>',
+        '<img src="https://cici.vn/media/a.png"><img src="https://cici.vn/media/b.png"></body>'
+      ),
+      {
+        imageTimeoutMs: 2000,
+      }
+    );
+    const [frame] = frames();
+    const print = stubFramePrint(frame);
+
+    frame.contentDocument?.images[0].dispatchEvent(new Event('error'));
+    vi.advanceTimersByTime(1999);
+    expect(print).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1 + 50);
+    expect(print).toHaveBeenCalledTimes(1);
+  });
 });

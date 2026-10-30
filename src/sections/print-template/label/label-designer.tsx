@@ -16,11 +16,13 @@ import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
+import LinearProgress from '@mui/material/LinearProgress';
 import ToggleButton from '@mui/material/ToggleButton';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import Iconify from 'src/components/iconify';
+import { useSnackbar } from 'src/components/snackbar';
 
 import {
   LABEL_TEMPLATES,
@@ -45,6 +47,9 @@ import {
   suggestedElements,
   LABEL_FIELD_GROUPS,
 } from './label-design';
+
+import { imageFilesOf } from '../print-image';
+import { uploadTemplateImage } from '../print-image-upload';
 
 import type { DesignLabelSource, DesignPrintContext } from './label-design-render';
 import type {
@@ -93,6 +98,7 @@ const TYPE_LABEL: Record<LabelElementType, string> = {
   qrcode: 'Mã QR',
   line: 'Đường kẻ',
   box: 'Khung viền',
+  image: 'Ảnh',
 };
 
 type Handle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
@@ -116,7 +122,12 @@ type Props = {
 };
 
 export function LabelDesigner({ value, onChange, context, disabled }: Props) {
+  const { enqueueSnackbar } = useSnackbar();
   const { paper } = value;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Ảnh chọn từ máy: thêm phần tử mới (null) hoặc thay ảnh của phần tử đang chọn (id).
+  const pickTarget = useRef<string | null>(null);
+  const [uploading, setUploading] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [snap, setSnap] = useState(true);
   const fitZoom = Math.min(
@@ -143,9 +154,9 @@ export function LabelDesigner({ value, onChange, context, disabled }: Props) {
     () =>
       value.elements.map((element) => ({
         element,
-        result: renderElement(element, SAMPLE_SOURCE, sampleValues),
+        result: renderElement(element, SAMPLE_SOURCE, sampleValues, context),
       })),
-    [value.elements, sampleValues]
+    [value.elements, sampleValues, context]
   );
   const errors = useMemo(() => designErrors(value), [value]);
 
@@ -161,17 +172,67 @@ export function LabelDesigner({ value, onChange, context, disabled }: Props) {
   const addElement = (
     type: LabelElementType,
     fieldKey?: string,
-    at?: { xMm: number; yMm: number }
+    at?: { xMm: number; yMm: number },
+    extra?: Partial<LabelElement>,
+    base: LabelElement[] = value.elements
   ) => {
     if (disabled) return;
-    const element = createElement(
-      type,
-      paper,
-      at ?? { xMm: paper.paddingMm, yMm: paper.paddingMm },
-      fieldKey
-    );
-    setElements([...value.elements, element]);
+    const element = {
+      ...createElement(type, paper, at ?? { xMm: paper.paddingMm, yMm: paper.paddingMm }, fieldKey),
+      ...extra,
+    };
+    setElements([...base, element]);
     setSelectedId(element.id);
+  };
+
+  // Tải ảnh lên rồi thêm phần tử ảnh (hoặc thay ảnh của phần tử đang chọn). Dùng onChange với bố cục mới nhất qua ref
+  // vì việc tải lên chạy bất đồng bộ.
+  const latest = useRef(value);
+  latest.current = value;
+  const uploadImages = (files: File[], at?: { xMm: number; yMm: number }) => {
+    const replaceId = pickTarget.current;
+    pickTarget.current = null;
+    files.forEach(async (file) => {
+      setUploading((count) => count + 1);
+      try {
+        const src = await uploadTemplateImage(file);
+        const current = latest.current;
+        if (replaceId) {
+          onChange({
+            ...current,
+            elements: current.elements.map((element) =>
+              element.id === replaceId ? { ...element, src, logo: false } : element
+            ),
+          });
+        } else {
+          const element = {
+            ...createElement(
+              'image',
+              current.paper,
+              at ?? { xMm: current.paper.paddingMm, yMm: current.paper.paddingMm }
+            ),
+            src,
+          };
+          onChange({ ...current, elements: [...current.elements, element] });
+          setSelectedId(element.id);
+        }
+      } catch (error) {
+        enqueueSnackbar(
+          error instanceof Error && error.message ? error.message : 'Không tải được ảnh lên',
+          {
+            variant: 'error',
+          }
+        );
+      } finally {
+        setUploading((count) => count - 1);
+      }
+    });
+  };
+
+  const pickImage = (replaceId: string | null) => {
+    if (disabled) return;
+    pickTarget.current = replaceId;
+    fileInputRef.current?.click();
   };
 
   const removeSelected = () => {
@@ -281,17 +342,31 @@ export function LabelDesigner({ value, onChange, context, disabled }: Props) {
   };
 
   const onDrop = (event: React.DragEvent) => {
-    const raw = event.dataTransfer.getData(DRAG_TYPE);
-    if (!raw || disabled) return;
-    event.preventDefault();
+    if (disabled) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
+    const at = {
+      xMm: snapValue((event.clientX - rect.left) / scale),
+      yMm: snapValue((event.clientY - rect.top) / scale),
+    };
+    // File ảnh kéo từ máy thả thẳng vào tem.
+    const files = imageFilesOf(event.dataTransfer);
+    if (files.length > 0) {
+      event.preventDefault();
+      pickTarget.current = null;
+      uploadImages(files, at);
+      return;
+    }
+    const raw = event.dataTransfer.getData(DRAG_TYPE);
+    if (!raw) return;
+    event.preventDefault();
     try {
-      const { type, field } = JSON.parse(raw) as { type: LabelElementType; field?: string };
-      addElement(type, field, {
-        xMm: snapValue((event.clientX - rect.left) / scale),
-        yMm: snapValue((event.clientY - rect.top) / scale),
-      });
+      const { type, field, logo } = JSON.parse(raw) as {
+        type: LabelElementType;
+        field?: string;
+        logo?: boolean;
+      };
+      addElement(type, field, at, logo ? { logo: true } : undefined);
     } catch {
       /* dữ liệu kéo lạ — bỏ qua */
     }
@@ -339,6 +414,21 @@ export function LabelDesigner({ value, onChange, context, disabled }: Props) {
       gridTemplateColumns={{ xs: 'minmax(0, 1fr)', lg: '220px minmax(0, 1fr) 320px' }}
       alignItems="start"
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        hidden
+        multiple
+        accept="image/png,image/jpeg,image/webp"
+        aria-label="Chọn ảnh để thêm vào tem"
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          event.target.value = '';
+          if (files.length > 0) uploadImages(files);
+          else pickTarget.current = null;
+        }}
+      />
+
       {/* Bảng phần tử */}
       <Paper variant="outlined" sx={{ p: 1.5 }}>
         <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
@@ -367,6 +457,31 @@ export function LabelDesigner({ value, onChange, context, disabled }: Props) {
                   onClick={() => addElement(tool.type)}
                 />
               ))}
+            </Stack>
+          </Box>
+          <Box>
+            <Typography variant="overline" color="text.secondary">
+              Ảnh &amp; logo
+            </Typography>
+            <Typography variant="caption" color="text.disabled" component="div" sx={{ mb: 0.5 }}>
+              Kéo ảnh từ máy thả thẳng vào tem.
+            </Typography>
+            <Stack spacing={0.5}>
+              <PaletteItem
+                label="Logo cửa hàng"
+                hint="Khi in lấy logo hiện tại"
+                icon="solar:shop-bold"
+                disabled={disabled}
+                payload={{ type: 'image', logo: true }}
+                onClick={() => addElement('image', undefined, undefined, { logo: true })}
+              />
+              <PaletteItem
+                label="Ảnh từ máy…"
+                icon="solar:gallery-add-bold"
+                disabled={disabled}
+                payload={null}
+                onClick={() => pickImage(null)}
+              />
             </Stack>
           </Box>
           {LABEL_FIELD_GROUPS.map((group) => (
@@ -462,6 +577,8 @@ export function LabelDesigner({ value, onChange, context, disabled }: Props) {
           />
         </Stack>
 
+        {uploading > 0 && <LinearProgress aria-label="Đang tải ảnh lên" />}
+
         <Box
           sx={{ p: 4, bgcolor: '#dfe3e8', overflow: 'auto', minHeight: 320, display: 'flex' }}
           onPointerDown={() => setSelectedId(null)}
@@ -475,7 +592,11 @@ export function LabelDesigner({ value, onChange, context, disabled }: Props) {
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onDragOver={(event) => {
-              if (event.dataTransfer.types.includes(DRAG_TYPE)) event.preventDefault();
+              if (
+                event.dataTransfer.types.includes(DRAG_TYPE) ||
+                event.dataTransfer.types.includes('Files')
+              )
+                event.preventDefault();
             }}
             onDrop={onDrop}
             sx={{
@@ -673,6 +794,7 @@ export function LabelDesigner({ value, onChange, context, disabled }: Props) {
             onDuplicate={duplicateSelected}
             onLayer={moveLayer}
             onDeselect={() => setSelectedId(null)}
+            onReplaceImage={() => pickImage(selected.id)}
           />
         ) : (
           <Stack spacing={2}>
@@ -805,15 +927,17 @@ function PaletteItem({
   label: string;
   hint?: string;
   icon: string;
-  payload: { type: LabelElementType; field?: string };
+  /** null = chỉ bấm (không kéo được). */
+  payload: { type: LabelElementType; field?: string; logo?: boolean } | null;
   disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <ButtonBase
       disabled={disabled}
-      draggable={!disabled}
+      draggable={!disabled && !!payload}
       onDragStart={(event) => {
+        if (!payload) return;
         event.dataTransfer.setData(DRAG_TYPE, JSON.stringify(payload));
         event.dataTransfer.effectAllowed = 'copy';
       }}
@@ -886,6 +1010,7 @@ function ElementProperties({
   onDuplicate,
   onLayer,
   onDeselect,
+  onReplaceImage,
 }: {
   element: LabelElement;
   disabled?: boolean;
@@ -894,6 +1019,7 @@ function ElementProperties({
   onDuplicate: () => void;
   onLayer: (direction: 1 | -1) => void;
   onDeselect: () => void;
+  onReplaceImage: () => void;
 }) {
   return (
     <Stack spacing={2}>
@@ -1148,6 +1274,25 @@ function ElementProperties({
         <Typography variant="caption" color="text.secondary">
           Độ dày đường kẻ = chiều cao (kẻ ngang) hoặc chiều rộng (kẻ dọc) của khung.
         </Typography>
+      )}
+      {element.type === 'image' && (
+        <Stack spacing={1}>
+          <Typography variant="caption" color="text.secondary">
+            {element.logo
+              ? 'Logo cửa hàng: khi in lấy logo hiện tại (Cài đặt cửa hàng → Thông tin). Ảnh vừa khung, giữ tỉ lệ.'
+              : 'Ảnh vừa khung, giữ tỉ lệ. Máy in nhiệt in ảnh trắng đen — ảnh nét đậm, ít chi tiết in rõ nhất.'}
+          </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            color="inherit"
+            disabled={disabled}
+            onClick={onReplaceImage}
+            startIcon={<Iconify icon="solar:gallery-add-bold" />}
+          >
+            {element.logo ? 'Thay bằng ảnh từ máy…' : 'Đổi ảnh…'}
+          </Button>
+        </Stack>
       )}
     </Stack>
   );

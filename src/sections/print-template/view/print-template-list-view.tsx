@@ -126,7 +126,7 @@ function cellLabel(channel: string, method: string): string {
 export function PrintTemplateListView() {
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
-  const { brandName } = useStoreBrand();
+  const { brandName, logoUrl } = useStoreBrand();
   const [kind, setKind] = useState<PrintTemplateKind>('receipt');
   const [data, setData] = useState<IPrintTemplateList | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -178,9 +178,9 @@ export function PrintTemplateListView() {
     try {
       const html =
         template.kind === 'receipt'
-          ? (await renderReceiptTemplate(template, sampleReceipt(brandName))).html
+          ? (await renderReceiptTemplate(template, sampleReceipt(brandName, logoUrl))).html
           : renderDesignSheetHtml(
-              { items: SAMPLE_LABELS, context: { storeName: brandName } },
+              { items: SAMPLE_LABELS, context: { storeName: brandName, logoUrl } },
               parseLabelDesign(template.content),
               DEFAULT_CALIBRATION
             );
