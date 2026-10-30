@@ -73,14 +73,15 @@ afterEach(() => {
 });
 
 describe('rankScores', () => {
-  it('xếp theo điểm, bằng điểm cùng hạng, người chưa có ca hoặc điểm mặc định không có hạng', () => {
+  it('chỉ người đã xếp loại có hạng, bằng điểm cùng hạng; chưa xếp loại đứng sau, chưa có ca đứng cuối', () => {
     const rows = rankScores([
       score({ id: 'moi', total: 90, isDefaultScore: true }),
       score({ id: 'b', total: 80 }),
       score({ id: 'a', total: 85 }),
       score({ id: 'c', total: 80 }),
       score({ id: 'd', total: 60 }),
-      score({ id: 'khongca', total: 95, shiftCount: 0 }),
+      score({ id: 'khongca', total: 100, shiftCount: 0, rating: 'NotRated' }),
+      score({ id: 'itca', total: 101, shiftCount: 2, rating: 'NotRated' }),
     ]);
 
     expect(rows.map((r) => [r.score.id, r.rank])).toEqual([
@@ -88,6 +89,7 @@ describe('rankScores', () => {
       ['b', 2],
       ['c', 2],
       ['d', 4],
+      ['itca', null],
       ['moi', null],
       ['khongca', null],
     ]);

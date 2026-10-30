@@ -29,7 +29,7 @@ import { getMyViolations, getMyPerformance, getPerformanceMonth, getMyProvisiona
 import type { IPerformanceMonth, IPerformanceScore, IMyProvisionalPerformance } from 'src/types/hr';
 import { PERFORMANCE_RATING_COLOR, PERFORMANCE_RATING_LABEL } from 'src/types/hr';
 
-import { fPct, MonthField, monthStart, previousMonth, rankScores } from './hr-common';
+import { fPct, MonthField, monthStart, fScoreTotal, previousMonth, rankScores } from './hr-common';
 
 // ----------------------------------------------------------------------
 // Thẻ điểm ở Tổng quan nhân sự: xếp hạng cả cửa hàng (hr.performance.read) và điểm của tôi. Tháng đang chạy là điểm tạm tính:
@@ -74,7 +74,8 @@ export function MyProvisionalScoreCard({ hideWhenEmpty = false }: { hideWhenEmpt
   if (!data) return null;
 
   const { current, lastPublished, deductions } = data;
-  const { score } = current;
+  // Có dòng điểm nhưng chưa làm ca nào trong tháng thì coi như chưa có điểm.
+  const score = current.score && current.score.shiftCount > 0 ? current.score : null;
   if (hideWhenEmpty && !score && !lastPublished) return null;
 
   return (
@@ -221,7 +222,7 @@ export function StaffRankingCard() {
                   </TableCell>
                   <TableCell>{s.fullName}</TableCell>
                   <TableCell align="right">
-                    <strong>{fPoints(s.total)}</strong>
+                    <strong>{fScoreTotal(s)}</strong>
                     {s.isDefaultScore && (
                       <Typography component="span" variant="caption" color="text.secondary">
                         {' '}

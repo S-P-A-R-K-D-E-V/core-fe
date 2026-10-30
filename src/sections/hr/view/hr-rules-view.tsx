@@ -231,7 +231,13 @@ export default function HrRulesView() {
               title="Chấm điểm hiệu suất và xếp loại hằng tháng"
               on={rules.performanceEnabled}
               onToggle={(on) => set('performanceEnabled', on)}
-            />
+            >
+              {num('targetShiftCapPct', 'Trần mỗi ca (%)')}
+              <Typography variant="caption" color="text.secondary" sx={{ flexBasis: '100%' }}>
+                Khi tính tỷ lệ đạt target của tháng, một ca chỉ được tính tối đa mức này, để một ca đột biến không quyết định xếp loại.
+                Chi tiết từng ca vẫn hiện % thật. Bỏ trống = không có trần. Đổi xong bấm "Tính điểm" để áp dụng cho tháng chưa công bố.
+              </Typography>
+            </Rule>
           </CardContent>
         </Card>
 

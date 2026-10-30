@@ -38,6 +38,7 @@ const OFF: IHrRules = {
   targetGrowthPct: null,
   targetYears: null,
   targetFloorPct: null,
+  targetShiftCapPct: null,
   complaintWorkingDays: null,
   supportShiftMonthlyCap: null,
   supportShiftLatestEnd: null,

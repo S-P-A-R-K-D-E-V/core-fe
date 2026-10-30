@@ -20,6 +20,8 @@ export interface IHrRules {
   targetYears: number | null;
   /** Sàn = trung vị 8 tuần không có ngày lễ × (1 + %); trống = dùng % của target. */
   targetFloorPct: number | null;
+  /** Trần % đạt target của một ca khi tính tỷ lệ đạt tháng; trống = không có trần. */
+  targetShiftCapPct: number | null;
   complaintWorkingDays: number | null;
   supportShiftMonthlyCap: number | null;
   /** "HH:mm:ss" */
