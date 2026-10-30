@@ -5,7 +5,7 @@ import Alert from '@mui/material/Alert';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 
-import type { IHourWarning, IPersonHourWarnings } from 'src/types/hr';
+import type { IHourWarning, IPerformanceScore, IPersonHourWarnings } from 'src/types/hr';
 import { HOUR_WARNING_SEVERE } from 'src/types/hr';
 
 // ----------------------------------------------------------------------
@@ -47,6 +47,20 @@ export function monthEnd(month: string): string {
 export function previousMonth(month: string): string {
   const [y, m] = month.split('-').map(Number);
   return monthStart(new Date(y, m - 2, 1));
+}
+
+/** Xếp hạng theo tổng điểm, bằng điểm cùng hạng. Chưa có ca hoặc điểm mặc định (người mới) không có hạng, đứng cuối. */
+export function rankScores(scores: IPerformanceScore[]): { score: IPerformanceScore; rank: number | null }[] {
+  const isRanked = (s: IPerformanceScore) => s.shiftCount > 0 && !s.isDefaultScore;
+  const ranked = scores.filter(isRanked).sort((a, b) => b.total - a.total);
+  let rank = 0;
+  return [
+    ...ranked.map((score, i) => {
+      if (i === 0 || score.total !== ranked[i - 1].total) rank = i + 1;
+      return { score, rank };
+    }),
+    ...scores.filter((s) => !isRanked(s)).map((score) => ({ score, rank: null })),
+  ];
 }
 
 export function MonthField({ value, onChange, label = 'Tháng' }: { value: string; onChange: (month: string) => void; label?: string }) {
