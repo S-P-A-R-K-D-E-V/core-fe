@@ -451,11 +451,10 @@ function BonusTable({ weeks }: { weeks: IWeeklyBonus[] }) {
                     <TableCell align="right">{s.hours.toLocaleString('vi-VN')}</TableCell>
                     <TableCell align="right">
                       {fVnd(s.amount)}
-                      {s.appliedPct != null && s.baseAmount != null && s.amount !== s.baseAmount && (
+                      {/* Phần bị trừ theo điểm giữ lại cho cửa hàng (chủ tịch 2026-11-01) — không còn "phần chia lại". */}
+                      {s.appliedPct != null && s.baseAmount != null && s.appliedPct < 100 && (
                         <Typography variant="caption" display="block" color="text.secondary">
-                          {s.appliedPct < 100
-                            ? `Nhận ${s.appliedPct}% (điểm trừ ${s.deductionPoints ?? 0}) · chia theo giờ ${fVnd(s.baseAmount)}`
-                            : `Gồm phần chia lại ${fVnd(s.amount - s.baseAmount)}`}
+                          Nhận {s.appliedPct}% (điểm trừ {s.deductionPoints ?? 0}) · chia theo giờ {fVnd(s.baseAmount)}
                         </Typography>
                       )}
                     </TableCell>

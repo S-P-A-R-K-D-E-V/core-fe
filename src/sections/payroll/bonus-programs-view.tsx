@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
 
+import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
@@ -99,7 +100,11 @@ const emptyProgram = (): ISaveBonusProgram => ({
   endOn: null,
   payFrom: null,
   categoryRates: [],
+  violationPointsFrom: null,
 });
+
+/** "2026-11-01" → "2026-11" cho ô tháng; ngược lại thêm "-01". */
+const toMonthInput = (d?: string | null) => (d ? d.slice(0, 7) : '');
 
 // ── Thêm / sửa chương trình ─────────────────────────────────────────────
 
@@ -345,6 +350,34 @@ function ProgramDialog({
             onChange={(e) => set('payFrom', e.target.value || null)}
             InputLabelProps={{ shrink: true }}
           />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={!!form.violationPointsFrom}
+                onChange={(e) => set('violationPointsFrom', e.target.checked ? `${fDate(new Date(), 'yyyy-MM')}-01` : null)}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2">Tính điểm trừ vào thưởng này</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Mỗi người nhận % theo ngưỡng điểm trừ của tháng (cùng ngưỡng ở Vi phạm &amp; điểm trừ: vd 6–9 điểm 50%, từ 10 điểm
+                  0%, vi phạm mất thưởng tháng 0%). Phần bị trừ giữ lại cho cửa hàng.
+                  {locked ? ' Đã trả vào lương: chỉ bật / đổi được từ tháng này.' : ''}
+                </Typography>
+              </Box>
+            }
+          />
+          {form.violationPointsFrom && (
+            <TextField
+              type="month"
+              label="Áp điểm trừ từ tháng"
+              value={toMonthInput(form.violationPointsFrom)}
+              onChange={(e) => set('violationPointsFrom', e.target.value ? `${e.target.value}-01` : null)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ maxWidth: 240 }}
+            />
+          )}
           <TextField label="Ghi chú" value={form.note ?? ''} onChange={(e) => set('note', e.target.value || null)} multiline minRows={2} />
           <FormControlLabel control={<Switch checked={form.isActive} onChange={(e) => set('isActive', e.target.checked)} />} label="Đang dùng" />
         </Stack>
@@ -436,6 +469,11 @@ function ProgramsTab({ programs, onChanged }: { programs: IBonusProgram[]; onCha
                     ) : (
                       <Chip size="small" label="Tính thử" />
                     )}
+                    {p.violationPointsFrom && (
+                      <Typography variant="caption" color="warning.main" display="block">
+                        Áp điểm trừ từ {fDate(p.violationPointsFrom, 'MM/yyyy')}
+                      </Typography>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -492,6 +530,8 @@ function MonthTab({ programs }: { programs: IBonusProgram[] }) {
           <Alert severity="info">
             Đơn hết hạn đổi trả trong tháng: tổng {fVnd(result.total)}, trong đó vào lương {fVnd(result.paidTotal)} (phần còn lại là
             tính thử).
+            {result.people.some((p) => p.appliedPct != null) &&
+              ' Đã áp điểm trừ tháng: số tiền là sau khi trừ, phần bị trừ giữ lại cho cửa hàng.'}
           </Alert>
           <TableContainer>
             <Table size="small">
@@ -508,7 +548,14 @@ function MonthTab({ programs }: { programs: IBonusProgram[] }) {
                   <TableRow key={p.userId}>
                     <TableCell>{p.name}</TableCell>
                     <TableCell align="right">{p.orders}</TableCell>
-                    <TableCell align="right">{fVnd(p.amount)}</TableCell>
+                    <TableCell align="right">
+                      {fVnd(p.amount)}
+                      {p.appliedPct != null && p.appliedPct < 100 && (
+                        <Typography variant="caption" color="warning.main" display="block">
+                          {p.appliedPct}% của {fVnd(p.baseAmount ?? 0)} · {p.deductionPoints ?? 0} điểm trừ
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell align="right">{fVnd(p.paidAmount)}</TableCell>
                   </TableRow>
                 ))}

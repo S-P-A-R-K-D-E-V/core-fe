@@ -73,7 +73,9 @@ import { MonthField, monthStart } from '../hr-common';
 
 // ----------------------------------------------------------------------
 // Vi phạm & điểm trừ: danh mục riêng của cửa hàng (Admin sửa), các lần ghi nhận (hệ thống tự ghi phần có dữ liệu chấm công /
-// bảng kiểm / biên bản, quản lý ghi tay phần còn lại), điểm trừ tháng từng người, khiếu nại. Chỉ có điểm — không phạt tiền.
+// bảng kiểm / biên bản, quản lý ghi tay phần còn lại), điểm trừ tháng từng người, khiếu nại, bậc tái phạm. Tiền chỉ là mô phỏng
+// (đơn giá / điểm hoặc số tiền riêng của hành vi) để thấy mức độ — không phạt tiền, không trừ lương; hậu quả thật là giảm / mất
+// thưởng theo tổng điểm tháng.
 // ----------------------------------------------------------------------
 
 type TabKey = 'mine' | 'store' | 'catalog';
@@ -85,6 +87,27 @@ const STATUS_COLOR: Record<ViolationEntryStatus, 'default' | 'warning' | 'error'
 };
 
 const MINUTE_SOURCES: ViolationAutoSource[] = ['Late', 'EarlyLeave'];
+
+/** Tiền mô phỏng kiểu "150.000đ". */
+export function money(n: number): string {
+  return `${Math.round(n).toLocaleString('vi-VN')}đ`;
+}
+
+/** Tiền mô phỏng mỗi lần của một hành vi; null = không hiện (cửa hàng chưa đặt đơn giá, hoặc hành vi không quy ra tiền). */
+export function ruleMoney(r: Pick<IViolationRule, 'points' | 'simulatedAmount'>, p: IViolationPolicy | null, qty = 1): number | null {
+  if (r.simulatedAmount != null) return r.simulatedAmount * qty;
+  if (p?.simulatedAmountPerPoint != null) return r.points * qty * p.simulatedAmountPerPoint;
+  return null;
+}
+
+/** "Lần 2 trong tháng · Khiển trách" — chỉ khi hành vi có bậc tái phạm. */
+export function occurrenceLabel(
+  e: Pick<IViolationEntry, 'occurrence' | 'occurrenceWindowMonths' | 'escalationAction'>
+): string | null {
+  if (e.occurrence == null) return null;
+  const window = e.occurrenceWindowMonths === 1 ? 'trong tháng' : `trong ${e.occurrenceWindowMonths ?? 1} tháng`;
+  return `Lần ${e.occurrence} ${window}${e.escalationAction ? ` · ${e.escalationAction}` : ''}`;
+}
 
 function today(): string {
   const d = new Date();
@@ -131,6 +154,7 @@ function BonusToggle({
         noBonusFromPoints: policy.noBonusFromPoints ?? null,
         notCompleteFromPoints: policy.notCompleteFromPoints ?? null,
         appliesToBonus: on,
+        simulatedAmountPerPoint: policy.simulatedAmountPerPoint ?? null,
       });
       enqueueSnackbar(on ? 'Đã bật: thưởng tuần nhận theo điểm trừ' : 'Đã tắt: điểm trừ chỉ để xem, thưởng tuần chia đủ theo giờ');
       onChanged();
@@ -156,8 +180,8 @@ function BonusToggle({
         <Box>
           <Typography variant="body2">Tính điểm trừ vào thưởng doanh số tuần</Typography>
           <Typography variant="caption" color="text.secondary">
-            Bật: mỗi người nhận % thưởng tuần theo ngưỡng điểm trừ của tháng, mất cả tuần / tháng theo vi phạm; phần không nhận chia
-            lại cho người nhận đủ theo giờ làm. Áp cho tính thử và bảng lương.
+            Bật: mỗi người nhận % thưởng tuần theo ngưỡng điểm trừ của tháng, mất cả tuần / tháng theo vi phạm; phần bị trừ giữ
+            lại cho cửa hàng. Áp cho tính thử và bảng lương. Chương trình thưởng theo đơn bật riêng ở từng chương trình.
           </Typography>
         </Box>
       }
@@ -194,9 +218,9 @@ export default function HrViolationsView({ initialTab }: { initialTab?: string }
         sx={{ mb: 2 }}
       />
       <Alert severity="info" sx={{ mb: 2 }}>
-        Mỗi lần vi phạm chỉ trừ điểm theo danh mục của cửa hàng — không phạt tiền, không trừ lương. Hệ thống tự ghi phần có dữ
-        liệu (chấm công, bảng kiểm, đơn nghỉ, biên bản); phần còn lại quản lý ghi kèm căn cứ. Nhân viên xem từng lần và khiếu
-        nại được.
+        Mỗi lần vi phạm trừ điểm theo danh mục của cửa hàng. Tiền hiện kèm chỉ là mô phỏng để thấy mức độ — không phạt tiền, không
+        trừ lương; tổng điểm trong tháng quyết định % thưởng được nhận. Hệ thống tự ghi phần có dữ liệu (chấm công, bảng kiểm, đơn
+        nghỉ, biên bản); phần còn lại quản lý ghi kèm căn cứ. Nhân viên xem từng lần và khiếu nại được.
       </Alert>
 
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
@@ -254,6 +278,14 @@ function SummaryCard({ summary, policy }: { summary: IViolationSummary; policy: 
                 Thưởng doanh số
               </Typography>
               <Typography variant="h6">{bonus}</Typography>
+            </Box>
+          )}
+          {(policy?.simulatedAmountPerPoint != null || (summary.simulatedAmount ?? 0) > 0) && (
+            <Box>
+              <Typography variant="caption" color="text.secondary">
+                Tiền mô phỏng (không trừ lương)
+              </Typography>
+              <Typography variant="h5">{money(summary.simulatedAmount ?? 0)}</Typography>
             </Box>
           )}
         </Stack>
@@ -321,11 +353,25 @@ function EntriesTable({
                   {e.losesWeeklyBonus ? ' · mất thưởng tuần' : ''}
                   {e.losesMonthlyBonus ? ' · mất thưởng tháng' : ''}
                 </Typography>
+                {occurrenceLabel(e) && (
+                  <Chip
+                    size="small"
+                    variant="soft"
+                    color={e.escalationAction ? 'error' : 'default'}
+                    label={occurrenceLabel(e)}
+                    sx={{ mt: 0.5, display: 'flex', width: 'fit-content' }}
+                  />
+                )}
               </TableCell>
               <TableCell align="right">
                 <Typography variant="subtitle2" color={e.status === 'Cancelled' ? 'text.disabled' : 'error.main'}>
                   −{e.points}
                 </Typography>
+                {e.simulatedAmount != null && e.simulatedAmount > 0 && (
+                  <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                    ~{money(e.simulatedAmount)}
+                  </Typography>
+                )}
               </TableCell>
               <TableCell sx={{ maxWidth: 320 }}>
                 <Typography variant="body2">{e.note || '—'}</Typography>
@@ -575,6 +621,8 @@ function StoreViolations({ month, canManage, canEditPolicy }: { month: string; c
     );
 
   const thresholds = thresholdsText(summary?.policy ?? null);
+  const showMoney =
+    summary?.policy?.simulatedAmountPerPoint != null || (summary?.rows ?? []).some((r) => (r.simulatedAmount ?? 0) > 0);
 
   return (
     <>
@@ -617,6 +665,7 @@ function StoreViolations({ month, canManage, canEditPolicy }: { month: string; c
                 <TableCell align="right">Kỷ luật</TableCell>
                 <TableCell align="right">Đối soát</TableCell>
                 <TableCell align="right">Số lần</TableCell>
+                {showMoney && <TableCell align="right">Tiền mô phỏng</TableCell>}
                 <TableCell>Thưởng doanh số</TableCell>
               </TableRow>
             </TableHead>
@@ -641,6 +690,7 @@ function StoreViolations({ month, canManage, canEditPolicy }: { month: string; c
                     {r.count}
                     {r.disputed > 0 && <Chip size="small" color="warning" label={`${r.disputed} khiếu nại`} sx={{ ml: 1 }} />}
                   </TableCell>
+                  {showMoney && <TableCell align="right">{(r.simulatedAmount ?? 0) > 0 ? money(r.simulatedAmount ?? 0) : '—'}</TableCell>}
                   <TableCell>{bonusWithState(r, summary?.policy ?? null) ?? '—'}</TableCell>
                 </TableRow>
               ))}
@@ -733,6 +783,7 @@ function StoreViolations({ month, canManage, canEditPolicy }: { month: string; c
 function CreateViolationDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const { enqueueSnackbar } = useSnackbar();
   const [rules, setRules] = useState<IViolationRule[]>([]);
+  const [policy, setPolicy] = useState<IViolationPolicy | null>(null);
   const [staff, setStaff] = useState<{ id: string; name: string }[]>([]);
   const [rule, setRule] = useState<IViolationRule | null>(null);
   const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
@@ -743,7 +794,10 @@ function CreateViolationDialog({ onClose, onCreated }: { onClose: () => void; on
 
   useEffect(() => {
     getViolationCatalog()
-      .then((c) => setRules(c.rules.filter((r) => r.isActive)))
+      .then((c) => {
+        setRules(c.rules.filter((r) => r.isActive));
+        setPolicy(c.policy);
+      })
       .catch(() => setRules([]));
     getActiveStaffUsers()
       .then((users) => setStaff(users.map((u) => ({ id: u.id, name: u.fullName }))))
@@ -788,6 +842,12 @@ function CreateViolationDialog({ onClose, onCreated }: { onClose: () => void; on
               Xử lý thêm (ghi chú): {rule.extraAction}
             </Typography>
           )}
+          {rule?.escalationSteps && (
+            <Typography variant="body2" color="text.secondary">
+              Tái phạm trong {rule.escalationWindowMonths ?? 1} tháng: {rule.escalationSteps.split('\n').join('; ')} — hệ thống báo
+              quản lý khi chạm bậc.
+            </Typography>
+          )}
           <Autocomplete
             multiple
             options={staff}
@@ -819,7 +879,8 @@ function CreateViolationDialog({ onClose, onCreated }: { onClose: () => void; on
           />
           {rule && valid && (
             <Typography variant="body2">
-              Trừ {rule.points * qty} điểm cho mỗi người ({people.length} người).
+              Trừ {rule.points * qty} điểm cho mỗi người ({people.length} người)
+              {(ruleMoney(rule, policy, qty) ?? 0) > 0 ? ` — mô phỏng ${money(ruleMoney(rule, policy, qty) ?? 0)}, không trừ lương` : ''}.
             </Typography>
           )}
         </Stack>
@@ -847,6 +908,9 @@ type RuleDraft = {
   losesWeeklyBonus: boolean;
   losesMonthlyBonus: boolean;
   extraAction: string;
+  simulatedAmount: string;
+  escalationSteps: string;
+  escalationWindowMonths: string;
   sortOrder: string;
   isActive: boolean;
 };
@@ -863,12 +927,17 @@ function toDraft(r: IViolationRule | null, nextOrder: number): RuleDraft {
     losesWeeklyBonus: r?.losesWeeklyBonus ?? false,
     losesMonthlyBonus: r?.losesMonthlyBonus ?? false,
     extraAction: r?.extraAction ?? '',
+    simulatedAmount: r?.simulatedAmount != null ? String(r.simulatedAmount) : '',
+    escalationSteps: r?.escalationSteps ?? '',
+    escalationWindowMonths: r?.escalationWindowMonths != null ? String(r.escalationWindowMonths) : '',
     sortOrder: String(r?.sortOrder ?? nextOrder),
     isActive: r?.isActive ?? true,
   };
 }
 
 const numOrNull = (s: string): number | null => (s.trim() === '' ? null : Number(s));
+
+const ESCALATION_WINDOWS = [1, 3, 6, 12];
 
 function Catalog({ canEdit }: { canEdit: boolean }) {
   const { enqueueSnackbar } = useSnackbar();
@@ -898,6 +967,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
   }, [load]);
 
   const groups = useMemo(() => [...new Set(rules.map((r) => r.groupName))], [rules]);
+  const showMoney = policy?.simulatedAmountPerPoint != null || rules.some((r) => r.simulatedAmount != null);
   const nextOrder = (rules.reduce((m, r) => Math.max(m, r.sortOrder), 0) || 0) + 10;
 
   const saveRule = async () => {
@@ -914,6 +984,9 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
         losesWeeklyBonus: draft.losesWeeklyBonus,
         losesMonthlyBonus: draft.losesMonthlyBonus,
         extraAction: draft.extraAction.trim() || null,
+        simulatedAmount: numOrNull(draft.simulatedAmount),
+        escalationSteps: draft.escalationSteps.trim() || null,
+        escalationWindowMonths: draft.escalationSteps.trim() ? numOrNull(draft.escalationWindowMonths) : null,
         sortOrder: Number(draft.sortOrder || 0),
         isActive: draft.isActive,
       });
@@ -953,6 +1026,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
         noBonusFromPoints: numOrNull(policyDraft.noBonusFromPoints),
         notCompleteFromPoints: numOrNull(policyDraft.notCompleteFromPoints),
         appliesToBonus: policy?.appliesToBonus ?? false,
+        simulatedAmountPerPoint: numOrNull(policyDraft.simulatedAmountPerPoint),
       });
       enqueueSnackbar('Đã lưu');
       setPolicyDraft(null);
@@ -977,7 +1051,8 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
     !!draft.name.trim() &&
     Number.isInteger(Number(draft.points)) &&
     Number(draft.points) >= 0 &&
-    Number(draft.points) <= 100;
+    Number(draft.points) <= 100 &&
+    (!draft.escalationSteps.trim() || ESCALATION_WINDOWS.includes(Number(draft.escalationWindowMonths)));
 
   return (
     <>
@@ -994,6 +1069,11 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {thresholdsText(policy) ?? 'Không đặt ngưỡng tổng điểm trừ.'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {policy.simulatedAmountPerPoint != null
+                      ? `Tiền mô phỏng: ${money(policy.simulatedAmountPerPoint)} / điểm — chỉ để thấy mức độ, không trừ lương.`
+                      : 'Không hiện tiền mô phỏng.'}
                   </Typography>
                   <Box sx={{ mt: 1 }}>
                     <BonusToggle policy={policy} canEdit={canEdit} onChanged={load} />
@@ -1015,6 +1095,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                     halfBonusPct: policy.halfBonusPct?.toString() ?? '',
                     noBonusFromPoints: policy.noBonusFromPoints?.toString() ?? '',
                     notCompleteFromPoints: policy.notCompleteFromPoints?.toString() ?? '',
+                    simulatedAmountPerPoint: policy.simulatedAmountPerPoint?.toString() ?? '',
                   })
                 }
               >
@@ -1043,6 +1124,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                 <TableCell>Nhóm</TableCell>
                 <TableCell>Hành vi</TableCell>
                 <TableCell align="right">Điểm trừ / lần</TableCell>
+                {showMoney && <TableCell align="right">Tiền mô phỏng / lần</TableCell>}
                 <TableCell>Ghi nhận</TableCell>
                 <TableCell>Xử lý thêm</TableCell>
                 {canEdit && <TableCell align="right" />}
@@ -1057,6 +1139,11 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                     {!r.isActive && <Chip size="small" label="Đang tắt" sx={{ ml: 1 }} />}
                   </TableCell>
                   <TableCell align="right">{r.points}</TableCell>
+                  {showMoney && (
+                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                      {r.simulatedAmount === 0 ? 'Không quy ra tiền' : money(ruleMoney(r, policy) ?? 0)}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Typography variant="body2">
                       {VIOLATION_AUTO_SOURCE_LABEL[r.autoSource].replace('…', String(r.thresholdMinutes ?? 0))}
@@ -1073,6 +1160,12 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                     ]
                       .filter(Boolean)
                       .join('; ') || '—'}
+                    {r.escalationSteps && (
+                      <Typography variant="caption" display="block" color="warning.main">
+                        Tái phạm ({r.escalationWindowMonths === 1 ? 'trong tháng' : `trong ${r.escalationWindowMonths} tháng`}):{' '}
+                        {r.escalationSteps.split('\n').join('; ')}
+                      </Typography>
+                    )}
                   </TableCell>
                   {canEdit && (
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
@@ -1172,6 +1265,42 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                 value={draft.extraAction}
                 onChange={(e) => setDraft({ ...draft, extraAction: e.target.value })}
               />
+              <TextField
+                type="number"
+                label="Tiền mô phỏng mỗi lần (đ)"
+                helperText={
+                  policy?.simulatedAmountPerPoint != null
+                    ? `Để trống = điểm × ${money(policy.simulatedAmountPerPoint)}. Nhập 0 = không quy ra tiền (vd chênh lệch bồi thường thật). Không trừ lương.`
+                    : 'Để trống = theo đơn giá / điểm của cửa hàng (đang tắt). Nhập 0 = không quy ra tiền. Không trừ lương.'
+                }
+                value={draft.simulatedAmount}
+                onChange={(e) => setDraft({ ...draft, simulatedAmount: e.target.value })}
+                inputProps={{ min: 0, max: 10000000, step: 1000 }}
+              />
+              <TextField
+                label="Xử lý theo lần tái phạm"
+                multiline
+                minRows={2}
+                placeholder={'1: Khiển trách\n2: Kéo dài thời hạn nâng lương\n3: Sa thải'}
+                helperText="Mỗi dòng “lần: việc cần làm”; lần lớn hơn dòng cuối lấy dòng cuối. Hệ thống chỉ báo quản lý, không tự kỷ luật."
+                value={draft.escalationSteps}
+                onChange={(e) => setDraft({ ...draft, escalationSteps: e.target.value })}
+              />
+              {draft.escalationSteps.trim() && (
+                <TextField
+                  select
+                  label="Đếm số lần trong"
+                  value={draft.escalationWindowMonths}
+                  onChange={(e) => setDraft({ ...draft, escalationWindowMonths: e.target.value })}
+                  sx={{ maxWidth: 240 }}
+                >
+                  {ESCALATION_WINDOWS.map((m) => (
+                    <MenuItem key={m} value={String(m)}>
+                      {m === 1 ? 'Trong tháng' : `${m} tháng gần nhất`}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
               <Stack direction="row" spacing={2} alignItems="center">
                 <TextField
                   type="number"
@@ -1224,7 +1353,10 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                 onChange={(e) => setPolicyDraft({ ...policyDraft, effectiveFrom: e.target.value })}
                 InputLabelProps={{ shrink: true }}
               />
-              <Typography variant="subtitle2">Ngưỡng tổng điểm trừ trong tháng (để trống = không dùng)</Typography>
+              <Typography variant="subtitle2">
+                Ngưỡng tổng điểm trừ trong tháng (để trống = không dùng) — áp cho thưởng tuần (khi bật) và chương trình thưởng theo đơn
+                có bật áp điểm trừ
+              </Typography>
               <Stack direction="row" spacing={2}>
                 <TextField
                   type="number"
@@ -1251,6 +1383,14 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                 label="Từ … điểm: xếp loại Không hoàn thành"
                 value={policyDraft.notCompleteFromPoints}
                 onChange={(e) => setPolicyDraft({ ...policyDraft, notCompleteFromPoints: e.target.value })}
+              />
+              <TextField
+                type="number"
+                label="Tiền mô phỏng mỗi điểm (đ)"
+                helperText="Chỉ hiển thị để nhân viên thấy mức độ (vd 10.000đ / điểm) — không trừ lương. Để trống = không hiện tiền."
+                value={policyDraft.simulatedAmountPerPoint}
+                onChange={(e) => setPolicyDraft({ ...policyDraft, simulatedAmountPerPoint: e.target.value })}
+                inputProps={{ min: 0, max: 10000000, step: 1000 }}
               />
             </Stack>
           </DialogContent>
