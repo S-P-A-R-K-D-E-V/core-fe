@@ -1,12 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 // ----------------------------------------------------------------------
 // core-be chỉ mở /admin/workers cho Admin của cửa hàng CiCi (cửa hàng khác 404):
-// cửa hàng khác mở System Jobs thấy "không áp dụng", không gọi API, không toast lỗi;
-// Admin CiCi vẫn tải danh sách worker như cũ.
+// cửa hàng khác mở System Jobs chỉ thấy job của cửa hàng mình, không gọi /admin/workers, không toast lỗi;
+// Admin CiCi tải danh sách worker như cũ và thấy job của mọi cửa hàng.
 // ----------------------------------------------------------------------
 
 vi.mock('src/auth/hooks', () => ({
@@ -46,10 +46,15 @@ vi.mock('src/components/label', () => ({
 const getWorkers = vi.fn();
 const runWorkerNow = vi.fn();
 const setWorkerEnabled = vi.fn();
+const getSyncJobMonitor = vi.fn();
 vi.mock('src/api/system-jobs', () => ({
   getWorkers: (...args: any[]) => getWorkers(...args),
   runWorkerNow: (...args: any[]) => runWorkerNow(...args),
   setWorkerEnabled: (...args: any[]) => setWorkerEnabled(...args),
+  getSyncJobMonitor: (...args: any[]) => getSyncJobMonitor(...args),
+  cancelSyncJob: vi.fn(),
+  forceCancelSyncJob: vi.fn(),
+  retrySyncJob: vi.fn(),
 }));
 
 // Imported after the mocks above so the view picks up the mocked modules.
@@ -63,21 +68,24 @@ function renderView() {
   );
 }
 
+beforeEach(() => {
+  getSyncJobMonitor.mockResolvedValue({ jobs: [], failedStores: [] });
+});
+
 afterEach(() => {
   vi.clearAllMocks();
   brand.isCiCi = true;
 });
 
 describe('SystemJobsView', () => {
-  it('cửa hàng khác CiCi: báo không áp dụng, không gọi /admin/workers, không toast', async () => {
+  it('cửa hàng khác CiCi: chỉ job của cửa hàng mình, không gọi /admin/workers, không toast', async () => {
     brand.isCiCi = false;
 
     renderView();
 
-    expect(screen.getByText('Không áp dụng cho cửa hàng này')).toBeInTheDocument();
+    expect(screen.getByText('Worker hệ thống không áp dụng cho cửa hàng này')).toBeInTheDocument();
     expect(screen.queryByText('Worker')).not.toBeInTheDocument();
-    // Cho effect (nếu có) cơ hội chạy rồi mới khẳng định không gọi API
-    await new Promise((r) => setTimeout(r, 0));
+    await waitFor(() => expect(getSyncJobMonitor).toHaveBeenCalledWith('ownStore'));
     expect(getWorkers).not.toHaveBeenCalled();
     expect(enqueueSnackbar).not.toHaveBeenCalled();
   });
@@ -94,6 +102,7 @@ describe('SystemJobsView', () => {
         enabled: true,
         supportsEnableToggle: false,
         supportsManualTrigger: false,
+        stopBehavior: 'Huỷ hoặc buộc dừng từng job ở bảng Tiến trình bên dưới',
         lastTickAtUtc: null,
         lastSuccessAtUtc: null,
         lastTickWasManual: false,
@@ -106,7 +115,9 @@ describe('SystemJobsView', () => {
 
     expect(await screen.findByText('Đồng bộ KiotViet')).toBeInTheDocument();
     expect(getWorkers).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText('Không áp dụng cho cửa hàng này')).not.toBeInTheDocument();
+    expect(getSyncJobMonitor).toHaveBeenCalledWith('allStores');
+    expect(screen.getByText('Huỷ hoặc buộc dừng từng job ở bảng Tiến trình bên dưới')).toBeInTheDocument();
+    expect(screen.queryByText('Worker hệ thống không áp dụng cho cửa hàng này')).not.toBeInTheDocument();
     await waitFor(() => expect(enqueueSnackbar).not.toHaveBeenCalled());
   });
 });
