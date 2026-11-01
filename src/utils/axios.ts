@@ -493,6 +493,7 @@ export const endpoints = {
     violationSummary: '/hr-violations/summary',
     violationsMine: '/hr-violations/mine',
     violationsSync: '/hr-violations/sync',
+    violationShift: (id: string) => `/hr-violations/${id}/shift`,
     violationCancel: (id: string) => `/hr-violations/${id}/cancel`,
     violationResolve: (id: string) => `/hr-violations/${id}/resolve`,
     violationComplaint: (id: string) => `/hr-violations/${id}/complaint`,

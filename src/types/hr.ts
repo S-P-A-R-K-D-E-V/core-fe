@@ -748,6 +748,21 @@ export interface IViolationEntry {
   occurrenceWindowMonths?: number | null;
   /** Việc cần làm theo bậc tái phạm (hệ thống không tự làm). */
   escalationAction?: string | null;
+  /** Ca để sửa chấm công; chỉ có ở lần tự ghi từ chấm công. */
+  attendanceAssignmentId?: string | null;
+}
+
+/** Ca của một lần ghi nhận và giờ chấm hiện tại. */
+export interface IViolationShift {
+  shiftAssignmentId: string;
+  staffId: string;
+  staffName: string;
+  shiftName?: string | null;
+  date: string;
+  startTime: string;
+  endTime: string;
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
 }
 
 export interface IViolationSummary {
