@@ -6,7 +6,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 import type { IViolationEntry, IViolationPolicy, IViolationSummary } from 'src/types/hr';
 
-import HrViolationsView, { bonusLabel } from '../view/hr-violations-view';
+import HrViolationsView, { money, ruleMoney, bonusLabel, occurrenceLabel } from '../view/hr-violations-view';
 
 // ----------------------------------------------------------------------
 // Vi phạm & điểm trừ: nhân viên thấy điểm trừ tháng của mình + khiếu nại trong hạn; quản lý thấy bảng điểm cả cửa hàng.
@@ -169,6 +169,67 @@ describe('Công tắc tính vào thưởng', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: /Tính điểm trừ vào thưởng doanh số tuần/ }));
     await waitFor(() =>
       expect(api.saveViolationPolicy).toHaveBeenCalledWith(expect.objectContaining({ appliesToBonus: true, halfBonusFromPoints: 6 }))
+    );
+  });
+
+  it('bật / tắt công tắc giữ nguyên tiền mô phỏng / điểm (PUT thay cả dòng)', async () => {
+    auth.user.permissions = ['hr.violation.manage', 'hr.rule.manage'];
+    api.getViolationSummary.mockResolvedValue({
+      month: '2026-11-01',
+      policy: { ...policy, appliesToBonus: false, simulatedAmountPerPoint: 10000 },
+      rows: [summary({ fullName: 'Mai', userId: 'mai', simulatedAmount: 70000 })],
+    });
+    api.getViolations.mockResolvedValue([]);
+    api.saveViolationPolicy.mockResolvedValue({ ...policy, simulatedAmountPerPoint: 10000 });
+    renderView();
+
+    expect(await screen.findByText('Tiền mô phỏng')).toBeInTheDocument();
+    expect(screen.getByText(money(70000))).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: /Tính điểm trừ vào thưởng doanh số tuần/ }));
+    await waitFor(() =>
+      expect(api.saveViolationPolicy).toHaveBeenCalledWith(expect.objectContaining({ appliesToBonus: true, simulatedAmountPerPoint: 10000 }))
+    );
+  });
+});
+
+describe('Tiền mô phỏng & tái phạm', () => {
+  it('nhân viên thấy tiền mô phỏng của từng lần, tổng tháng và bậc tái phạm', async () => {
+    api.getMyViolations.mockResolvedValue({
+      month: '2026-11-01',
+      policy: { ...policy, simulatedAmountPerPoint: 10000 },
+      summary: summary({ points: 15, simulatedAmount: 150000 }),
+      entries: [
+        entry({
+          ruleName: 'Bỏ ca không báo',
+          points: 15,
+          simulatedAmount: 150000,
+          occurrence: 2,
+          occurrenceWindowMonths: 12,
+          escalationAction: 'Kéo dài thời hạn nâng lương',
+        }),
+      ],
+    });
+    renderView();
+
+    expect(await screen.findByText('Tiền mô phỏng (không trừ lương)')).toBeInTheDocument();
+    expect(screen.getByText(money(150000))).toBeInTheDocument();
+    expect(screen.getByText(`~${money(150000)}`)).toBeInTheDocument();
+    expect(screen.getByText('Lần 2 trong 12 tháng · Kéo dài thời hạn nâng lương')).toBeInTheDocument();
+  });
+
+  it('ruleMoney: số tiền riêng của hành vi ghi đè điểm × đơn giá; 0 = không quy ra tiền; không đơn giá = không hiện', () => {
+    const p = { ...policy, simulatedAmountPerPoint: 10000 };
+    expect(ruleMoney({ points: 3, simulatedAmount: null }, p, 2)).toBe(60000);
+    expect(ruleMoney({ points: 5, simulatedAmount: 0 }, p)).toBe(0);
+    expect(ruleMoney({ points: 5, simulatedAmount: 25000 }, p, 2)).toBe(50000);
+    expect(ruleMoney({ points: 5, simulatedAmount: null }, { ...policy, simulatedAmountPerPoint: null })).toBeNull();
+  });
+
+  it('occurrenceLabel: trong tháng / N tháng, chưa tới bậc thì không có việc', () => {
+    expect(occurrenceLabel({ occurrence: null })).toBeNull();
+    expect(occurrenceLabel({ occurrence: 1, occurrenceWindowMonths: 1, escalationAction: null })).toBe('Lần 1 trong tháng');
+    expect(occurrenceLabel({ occurrence: 2, occurrenceWindowMonths: 3, escalationAction: 'Khiển trách' })).toBe(
+      'Lần 2 trong 3 tháng · Khiển trách'
     );
   });
 });

@@ -50,6 +50,11 @@ export interface IBonusProgram {
   categoryRates: IBonusCategoryRate[];
   /** Đã trả vào lương — không sửa cách tính được nữa. */
   locked: boolean;
+  /**
+   * Ngày 1 của tháng bắt đầu áp điểm trừ: phần mỗi người nhân % theo ngưỡng điểm trừ của tháng, phần bị trừ giữ lại cửa hàng.
+   * Trống = không áp. Chương trình đã trả vào lương chỉ bật / đổi được từ tháng hiện tại.
+   */
+  violationPointsFrom?: string | null;
 }
 
 export type ISaveBonusProgram = Omit<IBonusProgram, 'id' | 'locked'>;
@@ -80,6 +85,11 @@ export interface IBonusPersonTotal {
   amount: number;
   paidOrders: number;
   paidAmount: number;
+  /** Tiền trước khi áp điểm trừ; trống = chương trình không áp điểm trừ tháng này. */
+  baseAmount?: number | null;
+  /** % nhận theo điểm trừ của tháng. */
+  appliedPct?: number | null;
+  deductionPoints?: number | null;
 }
 
 export interface IBonusProgramMonth {
@@ -114,4 +124,7 @@ export interface IMyBonusProgram {
   amount: number;
   paidOrders: number;
   paidAmount: number;
+  baseAmount?: number | null;
+  appliedPct?: number | null;
+  deductionPoints?: number | null;
 }

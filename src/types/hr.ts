@@ -658,8 +658,10 @@ export interface IViolationPolicy {
   noBonusFromPoints?: number | null;
   notCompleteFromPoints?: number | null;
   updatedAt: string;
-  /** Bật: thưởng doanh số tuần nhận theo % của ngưỡng điểm trừ (tính thử + bảng lương). */
+  /** Bật: thưởng doanh số tuần nhận theo % của ngưỡng điểm trừ (tính thử + bảng lương); phần bị trừ giữ lại cửa hàng. */
   appliesToBonus: boolean;
+  /** Tiền mô phỏng mỗi điểm (CiCi 10.000đ) — chỉ hiển thị, không vào lương; trống = không hiện tiền. */
+  simulatedAmountPerPoint?: number | null;
 }
 
 export interface IViolationRule {
@@ -675,6 +677,12 @@ export interface IViolationRule {
   extraAction?: string | null;
   sortOrder: number;
   isActive: boolean;
+  /** Tiền mô phỏng mỗi lần, ghi đè điểm × đơn giá; 0 = không quy ra tiền. */
+  simulatedAmount?: number | null;
+  /** Bậc tái phạm, mỗi dòng "lần: việc cần làm". */
+  escalationSteps?: string | null;
+  /** Đếm tái phạm trong ngần này tháng gần nhất (tính cả tháng xảy ra). */
+  escalationWindowMonths?: number | null;
 }
 
 export interface IViolationCatalog {
@@ -694,6 +702,9 @@ export interface ISaveViolationRule {
   extraAction: string | null;
   sortOrder: number;
   isActive: boolean;
+  simulatedAmount: number | null;
+  escalationSteps: string | null;
+  escalationWindowMonths: number | null;
 }
 
 export interface IViolationEntry {
@@ -719,6 +730,13 @@ export interface IViolationEntry {
   resolvedAt?: string | null;
   createdAt: string;
   complaintDeadline?: string | null;
+  /** Tiền mô phỏng chụp lúc ghi — không trừ lương. */
+  simulatedAmount?: number | null;
+  /** Lần thứ mấy trong khoảng đếm tái phạm; trống = luật không đếm. */
+  occurrence?: number | null;
+  occurrenceWindowMonths?: number | null;
+  /** Việc cần làm theo bậc tái phạm (hệ thống không tự làm). */
+  escalationAction?: string | null;
 }
 
 export interface IViolationSummary {
@@ -734,6 +752,8 @@ export interface IViolationSummary {
   notComplete: boolean;
   losesMonthlyBonus: boolean;
   weeksWithoutBonus: string[];
+  /** Tổng tiền mô phỏng tháng — chỉ hiển thị. */
+  simulatedAmount?: number;
 }
 
 export interface IViolationMonth {
