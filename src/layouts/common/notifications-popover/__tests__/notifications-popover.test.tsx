@@ -85,4 +85,39 @@ describe('NotificationsPopover', () => {
     expect(push).toHaveBeenCalledTimes(1);
     expect(push).toHaveBeenCalledWith(ACTION_URL);
   });
+
+  it.each([
+    ['không có đường dẫn', undefined],
+    ['đường dẫn ra ngoài', 'https://evil.example/dashboard'],
+  ])('%s → mở trang chi tiết thông báo', async (_name, actionUrl) => {
+    push.mockClear();
+    const user = userEvent.setup();
+    const context: any = {
+      notifications: [],
+      totalUnRead: 0,
+      markAllAsRead: vi.fn(),
+      removeNotification: vi.fn(),
+      dbNotifications: [
+        { id: 'n2', title: 'Họp tối nay', message: '21 giờ', category: 'System', actionUrl, isRead: true, createdAt: '2026-11-01T14:30:00Z' },
+      ],
+      dbUnreadCount: 0,
+      markAsRead: vi.fn(),
+      markDbAllAsRead: vi.fn(),
+      deleteDbNotification: vi.fn(),
+      loadNotifications: vi.fn(),
+    };
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <SyncNotificationContext.Provider value={context}>
+          <NotificationsPopover />
+        </SyncNotificationContext.Provider>
+      </ThemeProvider>
+    );
+
+    await user.click(screen.getAllByRole('button')[0]);
+    await user.click(await screen.findByText('Họp tối nay'));
+
+    expect(push).toHaveBeenCalledWith('/dashboard/notifications/n2');
+  });
 });

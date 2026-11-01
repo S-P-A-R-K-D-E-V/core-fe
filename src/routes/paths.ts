@@ -291,6 +291,9 @@ export const paths = {
     checkinFace: {
       root: `${ROOTS.DASHBOARD}/checkin-face`,
     },
+    notifications: {
+      details: (id: string) => `${ROOTS.DASHBOARD}/notifications/${id}`,
+    },
     notificationConfig: {
       root: `${ROOTS.DASHBOARD}/notification-config`,
     },
