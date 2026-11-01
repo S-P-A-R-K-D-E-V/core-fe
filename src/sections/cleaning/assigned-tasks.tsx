@@ -150,13 +150,19 @@ export function SubmitTaskDialog({
 }) {
   const { enqueueSnackbar } = useSnackbar();
   const [note, setNote] = useState('');
+  const [lateReason, setLateReason] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setNote('');
+    setLateReason(task?.lateReason ?? '');
     setFiles([]);
   }, [task]);
+
+  // Nộp lần đầu sau hạn: quy chế trừ 2 điểm nếu không ghi lý do trễ.
+  const overdue = !!task?.dueAt && !task.submittedAt && new Date(task.dueAt).getTime() < Date.now();
+  const askLateReason = overdue || !!task?.late;
 
   const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
@@ -169,7 +175,7 @@ export function SubmitTaskDialog({
     setSaving(true);
     try {
       const keys = await uploadWorkTaskPhotos(task.id, files);
-      await submitWorkTask(task.id, note.trim() || null, keys);
+      await submitWorkTask(task.id, note.trim() || null, keys, lateReason.trim() || null);
       enqueueSnackbar('Đã nộp — chờ quản lý duyệt');
       onDone();
     } catch (err) {
@@ -185,6 +191,19 @@ export function SubmitTaskDialog({
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <TextField label="Ghi chú" value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2} />
+          {askLateReason && (
+            <TextField
+              label="Lý do trễ hạn"
+              value={lateReason}
+              onChange={(e) => setLateReason(e.target.value)}
+              multiline
+              minRows={2}
+              inputProps={{ maxLength: 500 }}
+              color="warning"
+              focused
+              helperText="Việc đã quá hạn. Không ghi lý do trễ sẽ bị trừ 2 điểm theo quy chế."
+            />
+          )}
           <Button variant="outlined" component="label" sx={{ alignSelf: 'flex-start' }}>
             Chọn ảnh nghiệm thu
             <input
