@@ -37,10 +37,12 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { getActiveStaffUsers } from 'src/api/users';
+import { adjustAttendanceTime } from 'src/api/attendance';
 import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
 import {
   getViolations,
   syncViolations,
+  getViolationShift,
   cancelViolation,
   getMyViolations,
   createViolations,
@@ -60,6 +62,7 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import type {
   IViolationRule,
   IViolationEntry,
+  IViolationShift,
   IViolationMonth,
   IViolationPolicy,
   IViolationSummary,
@@ -203,6 +206,7 @@ export default function HrViolationsView({ initialTab }: { initialTab?: string }
   const canManage = hasPermission(user, PERMISSIONS.hr.violationManage);
   const canSeeStore = canManage || hasPermission(user, PERMISSIONS.hr.performanceRead);
   const canEditCatalog = hasPermission(user, PERMISSIONS.hr.ruleManage);
+  const canAdjust = hasPermission(user, PERMISSIONS.attendance.adjust);
 
   const [tab, setTab] = useState<TabKey>(() => {
     if (initialTab === 'mine' || initialTab === 'catalog') return initialTab;
@@ -233,7 +237,7 @@ export default function HrViolationsView({ initialTab }: { initialTab?: string }
       </Stack>
 
       {tab === 'mine' && <MyViolations month={month} />}
-      {tab === 'store' && canSeeStore && <StoreViolations month={month} canManage={canManage} canEditPolicy={canEditCatalog} />}
+      {tab === 'store' && canSeeStore && <StoreViolations month={month} canManage={canManage} canEditPolicy={canEditCatalog} canAdjust={canAdjust} />}
       {tab === 'catalog' && <Catalog canEdit={canEditCatalog} />}
     </Container>
   );
@@ -536,7 +540,144 @@ function MyViolations({ month }: { month: string }) {
 
 // ----------------------------------------------------------------------
 
-function StoreViolations({ month, canManage, canEditPolicy }: { month: string; canManage: boolean; canEditPolicy: boolean }) {
+/** Giờ UTC ↔ giá trị ô datetime-local theo giờ VN. */
+const toVnLocal = (iso?: string | null) =>
+  iso ? new Date(new Date(iso).getTime() + 7 * 3600_000).toISOString().slice(0, 16) : '';
+const vnLocalToIso = (local: string) => new Date(`${local}:00+07:00`).toISOString();
+
+/** Sửa chấm công đúng ca của khiếu nại rồi trả lời luôn. Sửa công không tự đóng khiếu nại: quản lý vẫn chọn chấp nhận hay giữ điểm. */
+function FixShiftDialog({
+  entry,
+  onClose,
+  onAnswer,
+}: {
+  entry: IViolationEntry;
+  onClose: () => void;
+  onAnswer: (keep: boolean) => void;
+}) {
+  const { enqueueSnackbar } = useSnackbar();
+  const [shift, setShift] = useState<IViolationShift | null>(null);
+  const [checkIn, setCheckIn] = useState('');
+  const [checkOut, setCheckOut] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getViolationShift(entry.id)
+      .then((s) => {
+        if (cancelled) return;
+        setShift(s);
+        setCheckIn(toVnLocal(s.checkInTime));
+        setCheckOut(toVnLocal(s.checkOutTime));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        enqueueSnackbar(apiErrorMessage(err, 'Không tải được ca làm'), { variant: 'error' });
+        onClose();
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [entry.id, enqueueSnackbar, onClose]);
+
+  const invalid = !!checkIn && !!checkOut && checkOut <= checkIn;
+
+  const save = async () => {
+    if (!shift) return;
+    setBusy(true);
+    try {
+      await adjustAttendanceTime({
+        shiftAssignmentId: shift.shiftAssignmentId,
+        checkInTime: checkIn ? vnLocalToIso(checkIn) : null,
+        checkOutTime: checkOut ? vnLocalToIso(checkOut) : null,
+        note: 'Sửa từ khiếu nại vi phạm',
+      });
+      setSaved(true);
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không lưu được chấm công'), { variant: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Sửa chấm công của ca</DialogTitle>
+      <DialogContent>
+        {!shift ? (
+          <Stack alignItems="center" sx={{ py: 4 }}>
+            <CircularProgress />
+          </Stack>
+        ) : (
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Box>
+              <Typography variant="subtitle2">{shift.staffName}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {shift.shiftName ?? 'Ca làm'} · {fDate(shift.date, 'dd/MM/yyyy')} · {shift.startTime.slice(0, 5)}–{shift.endTime.slice(0, 5)}
+              </Typography>
+              <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
+                Khiếu nại: {entry.complaintText}
+              </Typography>
+            </Box>
+            {saved ? (
+              <Alert severity="success">Đã lưu chấm công. Khiếu nại vẫn mở cho tới khi bạn trả lời.</Alert>
+            ) : (
+              <>
+                <TextField
+                  type="datetime-local"
+                  label="Giờ vào"
+                  value={checkIn}
+                  onChange={(e) => setCheckIn(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+                <TextField
+                  type="datetime-local"
+                  label="Giờ ra"
+                  value={checkOut}
+                  onChange={(e) => setCheckOut(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  error={invalid}
+                  helperText={invalid ? 'Giờ ra phải sau giờ vào.' : undefined}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Nhập giờ thật. Giờ vào muộn hoặc giờ ra sớm hơn ca có thể bị hệ thống ghi thêm lỗi tương ứng.
+                </Typography>
+              </>
+            )}
+          </Stack>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{saved ? 'Để sau' : 'Đóng'}</Button>
+        {saved ? (
+          <>
+            <Button onClick={() => onAnswer(true)}>Giữ điểm trừ</Button>
+            <Button variant="contained" color="success" onClick={() => onAnswer(false)}>
+              Chấp nhận khiếu nại
+            </Button>
+          </>
+        ) : (
+          <LoadingButton variant="contained" loading={busy} disabled={!shift || invalid || (!checkIn && !checkOut)} onClick={save}>
+            Lưu chấm công
+          </LoadingButton>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function StoreViolations({
+  month,
+  canManage,
+  canEditPolicy,
+  canAdjust,
+}: {
+  month: string;
+  canManage: boolean;
+  canEditPolicy: boolean;
+  canAdjust: boolean;
+}) {
   const { enqueueSnackbar } = useSnackbar();
   const [summary, setSummary] = useState<IViolationMonth | null>(null);
   const [entries, setEntries] = useState<IViolationEntry[]>([]);
@@ -546,6 +687,8 @@ function StoreViolations({ month, canManage, canEditPolicy }: { month: string; c
   const [creating, setCreating] = useState(false);
   const [cancelling, setCancelling] = useState<IViolationEntry | null>(null);
   const [resolving, setResolving] = useState<{ entry: IViolationEntry; keep: boolean } | null>(null);
+  const [fixing, setFixing] = useState<IViolationEntry | null>(null);
+  const closeFixing = useCallback(() => setFixing(null), []);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -726,6 +869,11 @@ function StoreViolations({ month, canManage, canEditPolicy }: { month: string; c
                   if (e.status === 'Disputed')
                     return (
                       <>
+                        {canAdjust && e.attendanceAssignmentId && (
+                          <Button size="small" color="inherit" onClick={() => setFixing(e)}>
+                            Sửa chấm công
+                          </Button>
+                        )}
                         <Button size="small" color="success" onClick={() => setResolving({ entry: e, keep: false })}>
                           Chấp nhận
                         </Button>
@@ -753,6 +901,16 @@ function StoreViolations({ month, canManage, canEditPolicy }: { month: string; c
           onCreated={() => {
             setCreating(false);
             load();
+          }}
+        />
+      )}
+      {fixing && (
+        <FixShiftDialog
+          entry={fixing}
+          onClose={closeFixing}
+          onAnswer={(keep) => {
+            setResolving({ entry: fixing, keep });
+            setFixing(null);
           }}
         />
       )}

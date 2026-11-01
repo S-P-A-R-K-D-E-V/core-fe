@@ -31,6 +31,7 @@ vi.mock('src/api/users', () => ({ getActiveStaffUsers: vi.fn().mockResolvedValue
 const api = vi.hoisted(() => ({
   getViolations: vi.fn(),
   syncViolations: vi.fn(),
+  getViolationShift: vi.fn(),
   cancelViolation: vi.fn(),
   getMyViolations: vi.fn(),
   createViolations: vi.fn(),
@@ -45,6 +46,9 @@ const api = vi.hoisted(() => ({
 vi.mock('src/api/hr', () =>
   Object.fromEntries(Object.keys(api).map((k) => [k, (...a: any[]) => (api as any)[k](...a)]))
 );
+
+const adjustAttendanceTime = vi.hoisted(() => vi.fn());
+vi.mock('src/api/attendance', () => ({ adjustAttendanceTime: (...a: any[]) => adjustAttendanceTime(...a) }));
 
 const theme = createTheme();
 const renderView = () =>
@@ -150,6 +154,67 @@ describe('Vi phạm & điểm trừ', () => {
     expect(bonusLabel({ weeklyBonusPct: null, notComplete: false, losesMonthlyBonus: false })).toBeNull();
     expect(bonusLabel({ weeklyBonusPct: 100, notComplete: false, losesMonthlyBonus: false })).toBe('Nhận đủ thưởng tuần');
     expect(bonusLabel({ weeklyBonusPct: 0, notComplete: false, losesMonthlyBonus: false })).toBe('Không nhận thưởng tuần');
+  });
+});
+
+describe('Sửa chấm công từ khiếu nại', () => {
+  const disputed = () =>
+    entry({ id: 'v1', userId: 'mai', fullName: 'Mai', status: 'Disputed', complaintText: 'Không chấm được', attendanceAssignmentId: 'a1' });
+
+  const setup = (permissions: string[], row = disputed()) => {
+    auth.user.permissions = permissions;
+    api.getViolationSummary.mockResolvedValue({ month: '2026-11-01', policy, rows: [summary({ fullName: 'Mai', userId: 'mai' })] });
+    api.getViolations.mockResolvedValue([row]);
+    api.getViolationShift.mockResolvedValue({
+      shiftAssignmentId: 'a1',
+      staffId: 'mai',
+      staffName: 'Mai',
+      shiftName: 'Ca Tối',
+      date: '2026-11-01',
+      startTime: '18:00:00',
+      endTime: '22:30:00',
+      checkInTime: '2026-11-01T11:00:00Z',
+      checkOutTime: null,
+    });
+    adjustAttendanceTime.mockResolvedValue({});
+    renderView();
+  };
+
+  it('mở đúng ca, giữ giờ vào hiện có theo giờ VN, lưu rồi trả lời khiếu nại', async () => {
+    setup(['hr.violation.manage', 'attendance.adjust']);
+    await userEvent.click(await screen.findByRole('button', { name: 'Sửa chấm công' }));
+
+    expect(api.getViolationShift).toHaveBeenCalledWith('v1');
+    expect(await screen.findByLabelText('Giờ vào')).toHaveValue('2026-11-01T18:00');
+    expect(screen.getByText(/Ca Tối · 01\/11\/2026 · 18:00–22:30/)).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText('Giờ ra'), '2026-11-01T22:30');
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu chấm công' }));
+    await waitFor(() =>
+      expect(adjustAttendanceTime).toHaveBeenCalledWith({
+        shiftAssignmentId: 'a1',
+        checkInTime: '2026-11-01T11:00:00.000Z',
+        checkOutTime: '2026-11-01T15:30:00.000Z',
+        note: 'Sửa từ khiếu nại vi phạm',
+      })
+    );
+
+    // Sửa công chưa đóng khiếu nại: quản lý vẫn chọn trả lời.
+    expect(api.resolveViolation).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByRole('button', { name: 'Chấp nhận khiếu nại' }));
+    expect(await screen.findByLabelText('Trả lời nhân viên')).toBeInTheDocument();
+  });
+
+  it('không có quyền sửa chấm công hoặc lần ghi nhận không gắn ca → không hiện nút', async () => {
+    setup(['hr.violation.manage']);
+    expect(await screen.findByRole('button', { name: 'Chấp nhận' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sửa chấm công' })).not.toBeInTheDocument();
+  });
+
+  it('khiếu nại lần ghi tay (không gắn ca) → không hiện nút dù có quyền', async () => {
+    setup(['hr.violation.manage', 'attendance.adjust'], { ...disputed(), attendanceAssignmentId: null });
+    expect(await screen.findByRole('button', { name: 'Chấp nhận' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sửa chấm công' })).not.toBeInTheDocument();
   });
 });
 
