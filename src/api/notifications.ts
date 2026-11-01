@@ -1,6 +1,6 @@
 import axios, { endpoints } from 'src/utils/axios';
 
-import type { NotificationCategory, INotificationListResponse } from 'src/types/notification';
+import type { INotification, NotificationCategory, INotificationListResponse } from 'src/types/notification';
 
 // ----------------------------------------------------------------------
 
@@ -11,6 +11,11 @@ export async function getNotifications(params: {
   isRead?: boolean;
 }): Promise<INotificationListResponse> {
   const res = await axios.get(endpoints.notifications.list, { params });
+  return res.data;
+}
+
+export async function getNotification(id: string): Promise<INotification> {
+  const res = await axios.get<INotification>(endpoints.notifications.detail(id));
   return res.data;
 }
 

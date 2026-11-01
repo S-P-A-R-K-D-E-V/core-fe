@@ -17,6 +17,8 @@ import ListItemText from '@mui/material/ListItemText';
 import ListItemButton from '@mui/material/ListItemButton';
 import LinearProgress from '@mui/material/LinearProgress';
 
+import { paths } from 'src/routes/paths';
+import { isInternalActionUrl } from 'src/utils/notification-links';
 import { useBoolean } from 'src/hooks/use-boolean';
 import { SyncNotificationContext } from 'src/hooks/use-sync-notification';
 
@@ -93,10 +95,13 @@ export default function NotificationsPopover() {
       if (!notification.isRead) {
         markAsRead(notification.id);
       }
-      if (notification.actionUrl) {
-        router.push(notification.actionUrl);
-        drawer.onFalse();
-      }
+      // Có trang tính năng thì mở thẳng, không thì mở trang chi tiết.
+      router.push(
+        notification.actionUrl && isInternalActionUrl(notification.actionUrl)
+          ? notification.actionUrl
+          : paths.dashboard.notifications.details(notification.id)
+      );
+      drawer.onFalse();
     },
     [markAsRead, router, drawer]
   );
