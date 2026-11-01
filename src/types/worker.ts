@@ -21,6 +21,8 @@ export interface IWorkerStatus {
   lastTickWasManual: boolean;
   supportsEnableToggle: boolean;
   enabled: boolean;
+  /** Muốn dừng lần đang chạy thì được gì (core-be WorkerStopBehaviors). */
+  stopBehavior: string;
 }
 
 export interface IRunWorkerNowResponse {

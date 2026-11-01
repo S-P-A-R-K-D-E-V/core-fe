@@ -40,6 +40,67 @@ export interface ISyncJobStep {
   attempts?: number;
 }
 
+// ----------------------------------------------------------------------
+// Theo dõi / huỷ / buộc dừng / chạy lại job (GET /kiotviet/sync/jobs/monitor, GET /admin/workers/jobs)
+// ----------------------------------------------------------------------
+
+/** Immediate: có tác dụng ngay. NextCheckpoint: dừng ở điểm an toàn kế tiếp. GraceThenDetach: chờ rồi worker bỏ đợi. */
+export type SyncJobStopMode = 'Immediate' | 'NextCheckpoint' | 'GraceThenDetach' | 'None';
+
+export interface ISyncJobControlState {
+  canCancel: boolean;
+  cancelMode: SyncJobStopMode;
+  cancelNote: string;
+  canForce: boolean;
+  forceMode: SyncJobStopMode;
+  forceNote: string;
+  canRetry: boolean;
+  retryNote: string;
+  suspected: boolean;
+  suspectNote: string | null;
+}
+
+export interface ISyncJobControlEvent {
+  action: string;
+  /** Null khi do worker tự ghi. */
+  actorId: string | null;
+  actorName: string | null;
+  at: string;
+  note: string | null;
+}
+
+export interface ISyncJobMonitorItem {
+  jobId: string;
+  tenantId: string;
+  tenantCode: string | null;
+  type: string;
+  status: ISyncJobStatus['status'];
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  lastProgressAt: string;
+  error: string | null;
+  stepsTotal: number;
+  stepsDone: number;
+  stepsFailed: number;
+  currentStep: string | null;
+  runnerAlive: boolean;
+  cancelRequested: boolean;
+  forceRequested: boolean;
+  forceStoppedAt: string | null;
+  forceStopMode: 'Detached' | 'NoRunner' | null;
+  detachedTaskAlive: boolean;
+  retryOfJobId: string | null;
+  control: ISyncJobControlState;
+  controlEvents: ISyncJobControlEvent[];
+}
+
+export interface ISyncJobControlResponse {
+  message: string;
+  stopMode: SyncJobStopMode | null;
+  newJobId: string | null;
+}
+
 export interface ISyncJobResponse {
   jobId: string;
   message: string;

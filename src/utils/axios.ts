@@ -576,6 +576,9 @@ export const endpoints = {
     syncSelected: '/kiotviet/sync/selected',
     syncJobStatus: (jobId: string) => `/kiotviet/sync/jobs/${jobId}`,
     syncJobCancel: (jobId: string) => `/kiotviet/sync/jobs/${jobId}/cancel`,
+    syncJobForceCancel: (jobId: string) => `/kiotviet/sync/jobs/${jobId}/force-cancel`,
+    syncJobRetry: (jobId: string) => `/kiotviet/sync/jobs/${jobId}/retry`,
+    syncJobsMonitor: '/kiotviet/sync/jobs/monitor',
     syncStepRetry: (jobId: string, key: string) => `/kiotviet/sync/jobs/${jobId}/steps/${encodeURIComponent(key)}/retry`,
     syncRunning: '/kiotviet/sync/running',
     transform: '/kiotviet/transform',
@@ -594,6 +597,11 @@ export const endpoints = {
     runNow: (name: string) => `/admin/workers/${name}/run-now`,
     enable: (name: string) => `/admin/workers/${name}/enable`,
     disable: (name: string) => `/admin/workers/${name}/disable`,
+    // Job KiotViet của mọi cửa hàng (chỉ Admin CiCi); thao tác chạy trong scope cửa hàng sở hữu job.
+    jobs: '/admin/workers/jobs',
+    jobCancel: (tenantId: string, jobId: string) => `/admin/workers/jobs/${tenantId}/${jobId}/cancel`,
+    jobForceCancel: (tenantId: string, jobId: string) => `/admin/workers/jobs/${tenantId}/${jobId}/force-cancel`,
+    jobRetry: (tenantId: string, jobId: string) => `/admin/workers/jobs/${tenantId}/${jobId}/retry`,
   },
   // Quy tắc cảnh báo tự động của cửa hàng (chỉ Admin) — mã quy tắc dạng "till.discrepancy"
   automation: {

@@ -36,6 +36,8 @@ import { getWorkers, runWorkerNow, setWorkerEnabled } from 'src/api/system-jobs'
 
 import type { IWorkerStatus, WorkerHealth } from 'src/types/worker';
 
+import SyncJobMonitorCard from '../sync-job-monitor-card';
+
 // Auto-refresh — heartbeat cập nhật liên tục, nhưng không cần realtime tuyệt đối cho màn theo dõi
 const POLL_INTERVAL_MS = 15_000;
 
@@ -54,14 +56,14 @@ const HEALTH_COLOR: Record<WorkerHealth, 'default' | 'success' | 'warning' | 'er
 };
 
 // core-be chỉ mở GET/POST /admin/workers cho Admin của cửa hàng CiCi — cửa hàng khác nhận 404.
-// Cửa hàng khác mở thẳng đường dẫn thì báo "không áp dụng", không gọi API nên không có toast lỗi.
+// Cửa hàng khác không gọi /admin/workers (không có toast lỗi), chỉ thấy và thao tác trên job của chính cửa hàng mình.
 export default function SystemJobsView() {
   const { isCiCi } = useStoreBrand();
 
-  return isCiCi ? <SystemJobsDashboard /> : <SystemJobsUnavailable />;
+  return isCiCi ? <SystemJobsDashboard /> : <SystemJobsStoreOnly />;
 }
 
-function SystemJobsUnavailable() {
+function SystemJobsStoreOnly() {
   const settings = useSettingsContext();
 
   return (
@@ -72,12 +74,16 @@ function SystemJobsUnavailable() {
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
-      <EmptyContent
-        filled
-        title="Không áp dụng cho cửa hàng này"
-        description="Màn System Jobs theo dõi tiến trình chạy nền chung của hệ thống, chỉ dành cho quản trị viên CiCi."
-        sx={{ py: 10 }}
-      />
+      <RoleBasedGuard hasContent roles={['Admin']}>
+        <SyncJobMonitorCard scope="ownStore" />
+
+        <EmptyContent
+          filled
+          title="Worker hệ thống không áp dụng cho cửa hàng này"
+          description="Bảng trạng thái worker chạy chung của hệ thống chỉ dành cho quản trị viên CiCi."
+          sx={{ py: 5 }}
+        />
+      </RoleBasedGuard>
     </Container>
   );
 }
@@ -169,6 +175,8 @@ function SystemJobsDashboard() {
           tại <strong>Đồng bộ KiotViet</strong>.
         </Typography>
 
+        <SyncJobMonitorCard scope="allStores" />
+
         <Card>
           <TableContainer sx={{ overflow: 'unset' }}>
             <Scrollbar>
@@ -225,8 +233,11 @@ function SystemJobsDashboard() {
                           <Typography variant="body2" fontWeight={600}>
                             {worker.displayName}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                             {worker.description}
+                          </Typography>
+                          <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.5 }}>
+                            {worker.stopBehavior}
                           </Typography>
                         </TableCell>
 
