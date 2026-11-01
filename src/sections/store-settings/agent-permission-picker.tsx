@@ -46,7 +46,8 @@ const DOMAIN_LABELS: Record<string, string> = {
   shift: 'Ca làm',
   attendance: 'Chấm công',
   payroll: 'Lương',
-  hr: 'Quy chế thưởng / phạt',
+  hr: 'Quy chế thưởng / phạt, giao việc',
+  inspection: 'Kiểm tra cửa hàng, việc trong ca',
   cash: 'Kiểm tiền ca',
   'cash-fund': 'Quỹ tiền',
   'cash-flow-category': 'Danh mục thu chi',
@@ -101,7 +102,7 @@ const CATEGORIES: { label: string; icon: string; domains: string[] }[] = [
     label: 'Nhân sự, ca & lương',
     icon: 'solar:users-group-rounded-bold',
     // hr: danh mục vi phạm, điểm trừ, luật thưởng tuần (tool hr_*).
-    domains: ['employees', 'shift', 'attendance', 'payroll', 'hr'],
+    domains: ['employees', 'shift', 'attendance', 'payroll', 'hr', 'inspection'],
   },
   {
     label: 'Thu chi & tài chính',

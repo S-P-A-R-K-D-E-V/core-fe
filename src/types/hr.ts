@@ -199,6 +199,11 @@ export interface IWorkTask {
   onTime: boolean;
   createdAt: string;
   photos: { id: string; url: string; uploadedAt: string }[];
+  /** Lý do trễ hạn — có thì không bị ghi vi phạm "trễ, không ghi lý do". */
+  lateReason?: string | null;
+  rejectCount?: number;
+  /** Có hạn và nộp lần đầu sau hạn (hoặc quá hạn chưa nộp). */
+  late?: boolean;
 }
 
 // ── Biên bản ───────────────────────────────────────────────────────────
@@ -626,7 +631,10 @@ export type ViolationAutoSource =
   | 'NoShow'
   | 'LateNoticeLeave'
   | 'InspectionFault'
-  | 'Discrepancy';
+  | 'Discrepancy'
+  | 'WorkTaskLate'
+  | 'WorkTaskRejectedTwice'
+  | 'ShiftWorkMissing';
 export type ViolationEntryStatus = 'Active' | 'Disputed' | 'Cancelled';
 
 export const VIOLATION_COMPONENT_LABEL: Record<ViolationComponent, string> = {
@@ -643,6 +651,9 @@ export const VIOLATION_AUTO_SOURCE_LABEL: Record<ViolationAutoSource, string> = 
   LateNoticeLeave: 'Tự ghi: đơn nghỉ báo muộn được duyệt',
   InspectionFault: 'Tự ghi: mỗi mục bảng kiểm không đạt',
   Discrepancy: 'Tự ghi: biên bản chênh lệch có lỗi cá nhân',
+  WorkTaskLate: 'Tự ghi: việc giao riêng trễ hạn, không ghi lý do',
+  WorkTaskRejectedTwice: 'Tự ghi: việc bị trả lại lần 2',
+  ShiftWorkMissing: 'Tự ghi: hết ca còn việc trong ca chưa làm (trưởng ca)',
 };
 
 export const VIOLATION_STATUS_LABEL: Record<ViolationEntryStatus, string> = {
