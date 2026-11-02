@@ -12,7 +12,7 @@ import type { IPendingAnnouncement } from 'src/types/announcement';
 import AnnouncementBody from '../announcement-body';
 import AnnouncementHost from '../announcement-host';
 import AnnouncementDialog from '../announcement-dialog';
-import { mergeQueue, shouldCheck, isInternalPath, CHECK_INTERVAL_MS } from '../utils';
+import { mergeQueue, shouldCheck, isInternalPath, CHECK_INTERVAL_MS, announcementImageError } from '../utils';
 
 // ----------------------------------------------------------------------
 
@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   getPending: vi.fn(),
   seen: vi.fn(),
   ack: vi.fn(),
+  imageUrl: vi.fn(),
   snackbar: vi.fn(),
 }));
 
@@ -55,6 +56,7 @@ vi.mock('src/api/announcements', () => ({
   getPendingAnnouncements: mocks.getPending,
   markAnnouncementSeen: mocks.seen,
   acknowledgeAnnouncement: mocks.ack,
+  getAnnouncementImageUrl: mocks.imageUrl,
 }));
 
 const theme = createTheme();
@@ -81,6 +83,7 @@ beforeEach(() => {
   mocks.getPending.mockReset().mockResolvedValue([]);
   mocks.seen.mockReset().mockResolvedValue(undefined);
   mocks.ack.mockReset().mockResolvedValue(undefined);
+  mocks.imageUrl.mockReset().mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -194,6 +197,73 @@ describe('hộp thoại', () => {
 
     dialog({ ctaLabel: 'Xem nội quy', ctaUrl: '/dashboard/hr/policies' });
     expect(screen.getByRole('button', { name: 'Xem nội quy' })).toBeTruthy();
+  });
+});
+
+describe('ảnh đính kèm', () => {
+  const SIGNED = 'announcements/x/a.png?exp=1&sig=s';
+  const dialog = (over: Partial<IPendingAnnouncement> = {}, onAcknowledge = vi.fn()) =>
+    render(
+      withTheme(
+        <AnnouncementDialog
+          announcement={item({ imageUrl: SIGNED, ...over })}
+          remaining={0}
+          busy={false}
+          onDismiss={vi.fn()}
+          onAcknowledge={onAcknowledge}
+          onCta={vi.fn()}
+        />
+      )
+    );
+
+  it('không có ảnh thì không có thẻ ảnh', () => {
+    dialog({ imageUrl: null });
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('hiện qua /media, có alt, rộng bằng khung và không cắt', () => {
+    dialog();
+    const img = screen.getByRole('img', { name: 'Ảnh đính kèm: Họp tối nay' }) as HTMLImageElement;
+
+    expect(img.getAttribute('src')).toBe(`/media/${SIGNED}`);
+    const style = getComputedStyle(img);
+    expect(style.width).toBe('100%');
+    expect(style.height).toBe('auto');
+    expect(style.objectFit).not.toBe('cover');
+  });
+
+  it('link hết hạn: xin link mới một lần rồi hiện lại', async () => {
+    mocks.imageUrl.mockResolvedValue('announcements/x/a.png?exp=2&sig=t');
+    dialog();
+
+    fireEvent.error(screen.getByRole('img'));
+
+    await waitFor(() => expect(screen.getByRole('img').getAttribute('src')).toBe('/media/announcements/x/a.png?exp=2&sig=t'));
+    expect(mocks.imageUrl).toHaveBeenCalledWith('a1');
+  });
+
+  it('ảnh lỗi hẳn: vẫn đọc được chữ, vẫn bấm được Đã hiểu, thử lại được', async () => {
+    mocks.imageUrl.mockRejectedValue({ status: 500 });
+    const onAcknowledge = vi.fn();
+    dialog({ requireAck: true }, onAcknowledge);
+
+    fireEvent.error(screen.getByRole('img'));
+
+    expect(await screen.findByText('Không tải được ảnh đính kèm.')).toBeTruthy();
+    expect(screen.getByText('21 giờ tại quầy')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Đã hiểu' }));
+    expect(onAcknowledge).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+    expect(screen.getByRole('img')).toBeTruthy();
+  });
+
+  it('kiểm tệp trước khi tải: chỉ JPEG, PNG, WebP, tối đa 5 MB', () => {
+    expect(announcementImageError({ type: 'image/png', size: 530 * 1024 })).toBeNull();
+    expect(announcementImageError({ type: 'image/webp', size: 5 * 1024 * 1024 })).toBeNull();
+    expect(announcementImageError({ type: 'image/png', size: 5 * 1024 * 1024 + 1 })).toBe('Ảnh vượt quá 5 MB.');
+    expect(announcementImageError({ type: 'image/gif', size: 10 })).toBe('Chỉ nhận ảnh JPEG, PNG hoặc WebP.');
+    expect(announcementImageError({ type: 'image/svg+xml', size: 10 })).toBe('Chỉ nhận ảnh JPEG, PNG hoặc WebP.');
   });
 });
 

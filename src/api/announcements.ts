@@ -26,6 +26,22 @@ export async function acknowledgeAnnouncement(id: string): Promise<void> {
   await axios.post(endpoints.announcements.ack(id));
 }
 
+/** Link ảnh mới cho popup đang mở, khi link cũ đã hết hạn. */
+export async function getAnnouncementImageUrl(id: string): Promise<string | null> {
+  const response = await axios.get<{ imageUrl: string | null }>(endpoints.announcements.imageUrl(id));
+  return response.data.imageUrl;
+}
+
+/** Tải ảnh đính kèm lên kho riêng tư, trả object key để gửi kèm khi lưu. */
+export async function uploadAnnouncementImage(file: File): Promise<string> {
+  const presign = await axios.post<{ objectKey: string; uploadUrl: string }>(endpoints.announcements.imagePresign, {
+    contentType: file.type,
+  });
+  const put = await fetch(presign.data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+  if (!put.ok) throw new Error(`Tải ảnh lên thất bại (${put.status})`);
+  return presign.data.objectKey;
+}
+
 export async function getAnnouncements(): Promise<IAnnouncement[]> {
   const response = await axios.get<IAnnouncement[]>(endpoints.announcements.list);
   return response.data;

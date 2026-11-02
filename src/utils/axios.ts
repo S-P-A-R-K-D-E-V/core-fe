@@ -731,6 +731,8 @@ export const endpoints = {
     seen: (id: string) => `/announcements/${id}/seen`,
     ack: (id: string) => `/announcements/${id}/ack`,
     receipts: (id: string) => `/announcements/${id}/receipts`,
+    imageUrl: (id: string) => `/announcements/${id}/image-url`,
+    imagePresign: '/announcements/images/presign',
   },
   // Chương trình thưởng theo đơn
   quarterBonuses: {

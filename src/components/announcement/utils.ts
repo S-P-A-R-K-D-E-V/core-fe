@@ -34,6 +34,15 @@ export function isInternalPath(url: unknown): url is string {
   return !url.split(/[?#]/)[0].split('/').includes('..');
 }
 
+/** Cùng giới hạn với Core-be AnnouncementsController: chỉ JPEG, PNG, WebP, tối đa 5 MB. */
+export const ANNOUNCEMENT_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp';
+const ANNOUNCEMENT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+export function announcementImageError(file: { type: string; size: number }): string | null {
+  if (!ANNOUNCEMENT_IMAGE_ACCEPT.split(',').includes(file.type)) return 'Chỉ nhận ảnh JPEG, PNG hoặc WebP.';
+  return file.size > ANNOUNCEMENT_IMAGE_MAX_BYTES ? 'Ảnh vượt quá 5 MB.' : null;
+}
+
 export const SEVERITY_META: Record<AnnouncementSeverity, { color: 'info' | 'warning' | 'error'; icon: string }> = {
   Info: { color: 'info', icon: 'solar:info-circle-bold' },
   Warn: { color: 'warning', icon: 'solar:danger-triangle-bold' },
