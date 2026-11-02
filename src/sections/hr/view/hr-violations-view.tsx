@@ -76,9 +76,8 @@ import { MonthField, monthStart } from '../hr-common';
 
 // ----------------------------------------------------------------------
 // Vi phạm & điểm trừ: danh mục riêng của cửa hàng (Admin sửa), các lần ghi nhận (hệ thống tự ghi phần có dữ liệu chấm công /
-// bảng kiểm / biên bản, quản lý ghi tay phần còn lại), điểm trừ tháng từng người, khiếu nại, bậc tái phạm. Tiền chỉ là mô phỏng
-// (đơn giá / điểm hoặc số tiền riêng của hành vi) để thấy mức độ — không phạt tiền, không trừ lương; hậu quả thật là giảm / mất
-// thưởng theo tổng điểm tháng.
+// bảng kiểm / biên bản, quản lý ghi tay phần còn lại), điểm trừ tháng từng người, khiếu nại, bậc tái phạm. Tiền phạt
+// (đơn giá / điểm hoặc số tiền riêng của hành vi) trừ vào lương; tổng điểm tháng còn làm giảm / mất thưởng.
 // ----------------------------------------------------------------------
 
 type TabKey = 'mine' | 'store' | 'catalog';
@@ -91,15 +90,15 @@ const STATUS_COLOR: Record<ViolationEntryStatus, 'default' | 'warning' | 'error'
 
 const MINUTE_SOURCES: ViolationAutoSource[] = ['Late', 'EarlyLeave'];
 
-/** Tiền mô phỏng kiểu "150.000đ". */
+/** Tiền phạt kiểu "150.000đ". */
 export function money(n: number): string {
   return `${Math.round(n).toLocaleString('vi-VN')}đ`;
 }
 
-/** Tiền mô phỏng mỗi lần của một hành vi; null = không hiện (cửa hàng chưa đặt đơn giá, hoặc hành vi không quy ra tiền). */
-export function ruleMoney(r: Pick<IViolationRule, 'points' | 'simulatedAmount'>, p: IViolationPolicy | null, qty = 1): number | null {
-  if (r.simulatedAmount != null) return r.simulatedAmount * qty;
-  if (p?.simulatedAmountPerPoint != null) return r.points * qty * p.simulatedAmountPerPoint;
+/** Tiền phạt mỗi lần của một hành vi; null = không hiện (cửa hàng chưa đặt đơn giá, hoặc hành vi không quy ra tiền). */
+export function ruleMoney(r: Pick<IViolationRule, 'points' | 'fineAmount'>, p: IViolationPolicy | null, qty = 1): number | null {
+  if (r.fineAmount != null) return r.fineAmount * qty;
+  if (p?.fineAmountPerPoint != null) return r.points * qty * p.fineAmountPerPoint;
   return null;
 }
 
@@ -157,7 +156,7 @@ function BonusToggle({
         noBonusFromPoints: policy.noBonusFromPoints ?? null,
         notCompleteFromPoints: policy.notCompleteFromPoints ?? null,
         appliesToBonus: on,
-        simulatedAmountPerPoint: policy.simulatedAmountPerPoint ?? null,
+        fineAmountPerPoint: policy.fineAmountPerPoint ?? null,
         redistributeForfeitBelowPoints: policy.redistributeForfeitBelowPoints ?? null,
       });
       enqueueSnackbar(on ? 'Đã bật: thưởng tuần nhận theo điểm trừ' : 'Đã tắt: điểm trừ chỉ để xem, thưởng tuần chia đủ theo giờ');
@@ -223,8 +222,8 @@ export default function HrViolationsView({ initialTab }: { initialTab?: string }
         sx={{ mb: 2 }}
       />
       <Alert severity="info" sx={{ mb: 2 }}>
-        Mỗi lần vi phạm trừ điểm theo danh mục của cửa hàng. Tiền hiện kèm chỉ là mô phỏng để thấy mức độ — không phạt tiền, không
-        trừ lương; tổng điểm trong tháng quyết định % thưởng được nhận. Hệ thống tự ghi phần có dữ liệu (chấm công, bảng kiểm, đơn
+        Mỗi lần vi phạm trừ điểm theo danh mục của cửa hàng. Tiền phạt hiện kèm trừ vào lương; tổng
+        điểm trong tháng quyết định % thưởng được nhận. Hệ thống tự ghi phần có dữ liệu (chấm công, bảng kiểm, đơn
         nghỉ, biên bản); phần còn lại quản lý ghi kèm căn cứ. Nhân viên xem từng lần và khiếu nại được.
       </Alert>
 
@@ -285,12 +284,12 @@ function SummaryCard({ summary, policy }: { summary: IViolationSummary; policy: 
               <Typography variant="h6">{bonus}</Typography>
             </Box>
           )}
-          {(policy?.simulatedAmountPerPoint != null || (summary.simulatedAmount ?? 0) > 0) && (
+          {(policy?.fineAmountPerPoint != null || (summary.fineAmount ?? 0) > 0) && (
             <Box>
               <Typography variant="caption" color="text.secondary">
-                Tiền mô phỏng (không trừ lương)
+                Tiền phạt (trừ vào lương)
               </Typography>
-              <Typography variant="h5">{money(summary.simulatedAmount ?? 0)}</Typography>
+              <Typography variant="h5">{money(summary.fineAmount ?? 0)}</Typography>
             </Box>
           )}
         </Stack>
@@ -372,9 +371,9 @@ function EntriesTable({
                 <Typography variant="subtitle2" color={e.status === 'Cancelled' ? 'text.disabled' : 'error.main'}>
                   −{e.points}
                 </Typography>
-                {e.simulatedAmount != null && e.simulatedAmount > 0 && (
+                {e.fineAmount != null && e.fineAmount > 0 && (
                   <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                    ~{money(e.simulatedAmount)}
+                    ~{money(e.fineAmount)}
                   </Typography>
                 )}
               </TableCell>
@@ -766,7 +765,7 @@ function StoreViolations({
 
   const thresholds = thresholdsText(summary?.policy ?? null);
   const showMoney =
-    summary?.policy?.simulatedAmountPerPoint != null || (summary?.rows ?? []).some((r) => (r.simulatedAmount ?? 0) > 0);
+    summary?.policy?.fineAmountPerPoint != null || (summary?.rows ?? []).some((r) => (r.fineAmount ?? 0) > 0);
 
   return (
     <>
@@ -809,7 +808,7 @@ function StoreViolations({
                 <TableCell align="right">Kỷ luật</TableCell>
                 <TableCell align="right">Đối soát</TableCell>
                 <TableCell align="right">Số lần</TableCell>
-                {showMoney && <TableCell align="right">Tiền mô phỏng</TableCell>}
+                {showMoney && <TableCell align="right">Tiền phạt</TableCell>}
                 <TableCell>Thưởng doanh số</TableCell>
               </TableRow>
             </TableHead>
@@ -834,7 +833,7 @@ function StoreViolations({
                     {r.count}
                     {r.disputed > 0 && <Chip size="small" color="warning" label={`${r.disputed} khiếu nại`} sx={{ ml: 1 }} />}
                   </TableCell>
-                  {showMoney && <TableCell align="right">{(r.simulatedAmount ?? 0) > 0 ? money(r.simulatedAmount ?? 0) : '—'}</TableCell>}
+                  {showMoney && <TableCell align="right">{(r.fineAmount ?? 0) > 0 ? money(r.fineAmount ?? 0) : '—'}</TableCell>}
                   <TableCell>{bonusWithState(r, summary?.policy ?? null) ?? '—'}</TableCell>
                 </TableRow>
               ))}
@@ -1039,7 +1038,7 @@ function CreateViolationDialog({ onClose, onCreated }: { onClose: () => void; on
           {rule && valid && (
             <Typography variant="body2">
               Trừ {rule.points * qty} điểm cho mỗi người ({people.length} người)
-              {(ruleMoney(rule, policy, qty) ?? 0) > 0 ? ` — mô phỏng ${money(ruleMoney(rule, policy, qty) ?? 0)}, không trừ lương` : ''}.
+              {(ruleMoney(rule, policy, qty) ?? 0) > 0 ? ` — phạt ${money(ruleMoney(rule, policy, qty) ?? 0)}, trừ vào lương` : ''}.
             </Typography>
           )}
         </Stack>
@@ -1068,7 +1067,7 @@ type RuleDraft = {
   losesMonthlyBonus: boolean;
   losesQuarterBonus: boolean;
   extraAction: string;
-  simulatedAmount: string;
+  fineAmount: string;
   escalationSteps: string;
   escalationWindowMonths: string;
   sortOrder: string;
@@ -1088,7 +1087,7 @@ function toDraft(r: IViolationRule | null, nextOrder: number): RuleDraft {
     losesMonthlyBonus: r?.losesMonthlyBonus ?? false,
     losesQuarterBonus: r?.losesQuarterBonus ?? false,
     extraAction: r?.extraAction ?? '',
-    simulatedAmount: r?.simulatedAmount != null ? String(r.simulatedAmount) : '',
+    fineAmount: r?.fineAmount != null ? String(r.fineAmount) : '',
     escalationSteps: r?.escalationSteps ?? '',
     escalationWindowMonths: r?.escalationWindowMonths != null ? String(r.escalationWindowMonths) : '',
     sortOrder: String(r?.sortOrder ?? nextOrder),
@@ -1128,7 +1127,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
   }, [load]);
 
   const groups = useMemo(() => [...new Set(rules.map((r) => r.groupName))], [rules]);
-  const showMoney = policy?.simulatedAmountPerPoint != null || rules.some((r) => r.simulatedAmount != null);
+  const showMoney = policy?.fineAmountPerPoint != null || rules.some((r) => r.fineAmount != null);
   const nextOrder = (rules.reduce((m, r) => Math.max(m, r.sortOrder), 0) || 0) + 10;
 
   const saveRule = async () => {
@@ -1146,7 +1145,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
         losesMonthlyBonus: draft.losesMonthlyBonus,
         losesQuarterBonus: draft.losesQuarterBonus,
         extraAction: draft.extraAction.trim() || null,
-        simulatedAmount: numOrNull(draft.simulatedAmount),
+        fineAmount: numOrNull(draft.fineAmount),
         escalationSteps: draft.escalationSteps.trim() || null,
         escalationWindowMonths: draft.escalationSteps.trim() ? numOrNull(draft.escalationWindowMonths) : null,
         sortOrder: Number(draft.sortOrder || 0),
@@ -1188,7 +1187,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
         noBonusFromPoints: numOrNull(policyDraft.noBonusFromPoints),
         notCompleteFromPoints: numOrNull(policyDraft.notCompleteFromPoints),
         appliesToBonus: policy?.appliesToBonus ?? false,
-        simulatedAmountPerPoint: numOrNull(policyDraft.simulatedAmountPerPoint),
+        fineAmountPerPoint: numOrNull(policyDraft.fineAmountPerPoint),
         redistributeForfeitBelowPoints: numOrNull(policyDraft.redistributeForfeitBelowPoints),
       });
       enqueueSnackbar('Đã lưu');
@@ -1234,9 +1233,9 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                     {thresholdsText(policy) ?? 'Không đặt ngưỡng tổng điểm trừ.'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {policy.simulatedAmountPerPoint != null
-                      ? `Tiền mô phỏng: ${money(policy.simulatedAmountPerPoint)} / điểm — chỉ để thấy mức độ, không trừ lương.`
-                      : 'Không hiện tiền mô phỏng.'}
+                    {policy.fineAmountPerPoint != null
+                      ? `Tiền phạt: ${money(policy.fineAmountPerPoint)} / điểm, trừ vào lương.`
+                      : 'Không quy điểm ra tiền.'}
                   </Typography>
                   <Box sx={{ mt: 1 }}>
                     <BonusToggle policy={policy} canEdit={canEdit} onChanged={load} />
@@ -1258,7 +1257,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                     halfBonusPct: policy.halfBonusPct?.toString() ?? '',
                     noBonusFromPoints: policy.noBonusFromPoints?.toString() ?? '',
                     notCompleteFromPoints: policy.notCompleteFromPoints?.toString() ?? '',
-                    simulatedAmountPerPoint: policy.simulatedAmountPerPoint?.toString() ?? '',
+                    fineAmountPerPoint: policy.fineAmountPerPoint?.toString() ?? '',
                     redistributeForfeitBelowPoints: policy.redistributeForfeitBelowPoints?.toString() ?? '',
                   })
                 }
@@ -1288,7 +1287,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                 <TableCell>Nhóm</TableCell>
                 <TableCell>Hành vi</TableCell>
                 <TableCell align="right">Điểm trừ / lần</TableCell>
-                {showMoney && <TableCell align="right">Tiền mô phỏng / lần</TableCell>}
+                {showMoney && <TableCell align="right">Tiền phạt / lần</TableCell>}
                 <TableCell>Ghi nhận</TableCell>
                 <TableCell>Xử lý thêm</TableCell>
                 {canEdit && <TableCell align="right" />}
@@ -1305,7 +1304,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                   <TableCell align="right">{r.points}</TableCell>
                   {showMoney && (
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                      {r.simulatedAmount === 0 ? 'Không quy ra tiền' : money(ruleMoney(r, policy) ?? 0)}
+                      {r.fineAmount === 0 ? 'Không quy ra tiền' : money(ruleMoney(r, policy) ?? 0)}
                     </TableCell>
                   )}
                   <TableCell>
@@ -1438,14 +1437,14 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
               />
               <TextField
                 type="number"
-                label="Tiền mô phỏng mỗi lần (đ)"
+                label="Tiền phạt mỗi lần (đ)"
                 helperText={
-                  policy?.simulatedAmountPerPoint != null
-                    ? `Để trống = điểm × ${money(policy.simulatedAmountPerPoint)}. Nhập 0 = không quy ra tiền (vd chênh lệch bồi thường thật). Không trừ lương.`
-                    : 'Để trống = theo đơn giá / điểm của cửa hàng (đang tắt). Nhập 0 = không quy ra tiền. Không trừ lương.'
+                  policy?.fineAmountPerPoint != null
+                    ? `Để trống = điểm × ${money(policy.fineAmountPerPoint)}. Nhập 0 = không quy ra tiền. Trừ vào lương.`
+                    : 'Để trống = theo đơn giá / điểm của cửa hàng (đang tắt). Nhập 0 = không quy ra tiền. Trừ vào lương.'
                 }
-                value={draft.simulatedAmount}
-                onChange={(e) => setDraft({ ...draft, simulatedAmount: e.target.value })}
+                value={draft.fineAmount}
+                onChange={(e) => setDraft({ ...draft, fineAmount: e.target.value })}
                 inputProps={{ min: 0, max: 10000000, step: 1000 }}
               />
               <TextField
@@ -1564,10 +1563,10 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
               />
               <TextField
                 type="number"
-                label="Tiền mô phỏng mỗi điểm (đ)"
-                helperText="Chỉ hiển thị để nhân viên thấy mức độ (vd 10.000đ / điểm) — không trừ lương. Để trống = không hiện tiền."
-                value={policyDraft.simulatedAmountPerPoint}
-                onChange={(e) => setPolicyDraft({ ...policyDraft, simulatedAmountPerPoint: e.target.value })}
+                label="Tiền phạt mỗi điểm (đ)"
+                helperText="Số tiền trừ vào lương cho mỗi điểm trừ (vd 10.000đ / điểm). Để trống = không quy ra tiền."
+                value={policyDraft.fineAmountPerPoint}
+                onChange={(e) => setPolicyDraft({ ...policyDraft, fineAmountPerPoint: e.target.value })}
                 inputProps={{ min: 0, max: 10000000, step: 1000 }}
               />
             </Stack>

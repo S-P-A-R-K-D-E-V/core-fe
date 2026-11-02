@@ -648,8 +648,8 @@ export async function saveViolationPolicy(body: {
   noBonusFromPoints: number | null;
   notCompleteFromPoints: number | null;
   appliesToBonus: boolean;
-  /** Gửi lại giá trị đang có khi không sửa — PUT thay cả dòng, bỏ trống là tắt tiền mô phỏng. */
-  simulatedAmountPerPoint: number | null;
+  /** Gửi lại giá trị đang có khi không sửa — PUT thay cả dòng, bỏ trống là không quy ra tiền. */
+  fineAmountPerPoint: number | null;
   redistributeForfeitBelowPoints: number | null;
 }): Promise<IViolationPolicy> {
   const response = await axios.put<IViolationPolicy>(endpoints.hr.violationPolicy, body);

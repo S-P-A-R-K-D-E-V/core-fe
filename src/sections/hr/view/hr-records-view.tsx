@@ -53,8 +53,8 @@ import { fVnd, MonthField, monthStart, parseAmount, previousMonth } from '../hr-
 import { canCompensate, CompensationsPanel, CreateCompensationDialog } from '../compensations-panel';
 
 // ----------------------------------------------------------------------
-// Biên bản: chênh lệch tiền / hàng, vi phạm (biên bản "cảnh báo hoàn thành công việc" cũ vẫn xem được, không lập mới). Nhân viên đọc, ghi ý kiến, ký hoặc từ chối ký (ghi lý do). Biên bản chỉ ghi nhận — không trừ lương,
-// không phạt tiền.
+// Biên bản: chênh lệch tiền / hàng, vi phạm (biên bản "cảnh báo hoàn thành công việc" cũ vẫn xem được, không lập mới). Nhân viên đọc, ghi ý kiến, ký hoặc từ chối ký (ghi lý do). Biên bản chỉ ghi nhận sự việc,
+// bồi thường và tiền phạt tính riêng.
 // ----------------------------------------------------------------------
 
 const STATUS_COLOR: Record<HrRecordStatus, 'warning' | 'success' | 'error' | 'default'> = {
@@ -219,8 +219,8 @@ export default function HrRecordsView({ initialTab }: { initialTab?: string }) {
         sx={{ mb: 2 }}
       />
       <Alert severity="info" sx={{ mb: 2 }}>
-        Biên bản chỉ ghi nhận sự việc — không phạt tiền. Bồi thường thiệt hại (nếu có lỗi cá nhân) là khoản riêng Admin
-        duyệt, trừ dần tối đa 30% lương / tháng. Nhân viên được ghi ý kiến trước khi ký; không đồng ý thì
+        Bồi thường thiệt hại (nếu có lỗi cá nhân) là khoản riêng Admin duyệt, trừ đủ một lần vào lương; lương không đủ thì phần
+        thiếu chuyển sang kỳ sau. Nhân viên được ghi ý kiến trước khi ký; không đồng ý thì
         từ chối ký và ghi rõ lý do.
       </Alert>
 

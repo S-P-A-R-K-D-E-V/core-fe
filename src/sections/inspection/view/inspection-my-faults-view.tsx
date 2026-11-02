@@ -43,7 +43,7 @@ import { LevelChip, PhotoPicker, InspectionPhotoRules } from '../inspection-comm
 
 // ----------------------------------------------------------------------
 // Lỗi kiểm tra cửa hàng mình phụ trách: đang mở (đánh dấu đã sửa kèm ảnh sau khi sửa) và lịch sử trong tháng. Quản lý có
-// thêm tab lỗi đang mở của mọi người. Lỗi chỉ dùng để kèm cặp — không trừ tiền.
+// thêm tab lỗi đang mở của mọi người. Mục không đạt có điểm trừ và tiền phạt trừ vào lương.
 // ----------------------------------------------------------------------
 
 type TabValue = 'open' | 'month' | 'all';
@@ -261,8 +261,8 @@ export default function InspectionMyFaultsView() {
         sx={{ mb: 2 }}
       />
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Lỗi của khu bạn phụ trách trong ca. Mục B sửa trong 15 phút, mục T sửa trong ca hoặc trước giao ca. Kết quả dùng để kèm
-        cặp, không trừ tiền.
+        Lỗi của khu bạn phụ trách trong ca. Mục B sửa trong 15 phút, mục T sửa trong ca hoặc trước giao ca. Mục không đạt có điểm
+        trừ và tiền phạt trừ vào lương.
       </Typography>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
