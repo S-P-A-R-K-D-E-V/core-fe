@@ -12,7 +12,7 @@ const BACKEND_API_PREFIXES = [
   'shifts', 'shift-templates', 'shift-schedules', 'shift-assignments', 'shift-swap', 'shift-registrations', 'shift-cash', 'late-cover', 'shift-pool', 'shift-audit', 'shift-reminder-rules',
   'attendance', 'branches', 'checkin',
   'salary', 'salary-configurations', 'salary-history',
-  'payroll', 'payroll-cycles', 'payroll-complaints', 'bonus-programs',
+  'payroll', 'payroll-cycles', 'payroll-complaints', 'bonus-programs', 'quarter-bonuses',
   'holiday-policies', 'penalty-policies',
   'kiotviet', 'notification', 'notifications', 'user-tours',
   'categories', 'unit-of-measures', 'units', 'variant-attributes', 'products',

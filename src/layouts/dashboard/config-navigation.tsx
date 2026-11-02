@@ -543,6 +543,12 @@ export function useNavData(
                 featureKey: 'payroll.core',
                 allPermissions: [PAYROLL.bonusProgramManage],
               },
+              {
+                title: 'Thưởng quý',
+                path: paths.dashboard.payroll.quarterBonus,
+                featureKey: 'payroll.core',
+                allPermissions: [PAYROLL.quarterBonusManage],
+              },
             ],
           },
           
