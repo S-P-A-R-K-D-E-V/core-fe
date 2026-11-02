@@ -723,6 +723,16 @@ export const endpoints = {
     withdraw: (id: string) => `/payroll-complaints/${id}/withdraw`,
     reply: (id: string) => `/payroll-complaints/${id}/reply`,
   },
+  // Popup thông báo
+  announcements: {
+    list: '/announcements',
+    detail: (id: string) => `/announcements/${id}`,
+    pending: '/announcements/pending',
+    audience: '/announcements/audience',
+    seen: (id: string) => `/announcements/${id}/seen`,
+    ack: (id: string) => `/announcements/${id}/ack`,
+    receipts: (id: string) => `/announcements/${id}/receipts`,
+  },
   // Chương trình thưởng theo đơn
   quarterBonuses: {
     root: '/quarter-bonuses',

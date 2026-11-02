@@ -24,6 +24,7 @@ import { useShiftNotificationAlert } from 'src/hooks/use-shift-notification-aler
 import Iconify from 'src/components/iconify';
 import { useSettingsContext } from 'src/components/settings';
 import { ChatbotWidget } from 'src/components/chatbot';
+import { AnnouncementHost } from 'src/components/announcement';
 import MessengerProvider from 'src/components/messenger/messenger-provider';
 import ProfileCompletionDialog from 'src/components/profile-completion';
 import ShiftPreferencePromptDialog from 'src/components/shift-preference-prompt/ShiftPreferencePromptDialog';
@@ -162,6 +163,7 @@ export default function DashboardLayout({ children }: Props) {
           {showChatbotWidget && <ChatbotWidget />}
           {renderMobilePrompt}
           {!counterSession && <ProfileCompletionDialog />}
+          {!counterSession && <AnnouncementHost />}
           <ShiftPreferencePromptDialog
             open={showShiftPreferencePrompt}
             onCompleted={() => updateUser?.({ hasShiftPreference: true })}
@@ -192,6 +194,7 @@ export default function DashboardLayout({ children }: Props) {
           {showChatbotWidget && <ChatbotWidget />}
           {renderMobilePrompt}
           {!counterSession && <ProfileCompletionDialog />}
+          {!counterSession && <AnnouncementHost />}
           <ShiftPreferencePromptDialog
             open={showShiftPreferencePrompt}
             onCompleted={() => updateUser?.({ hasShiftPreference: true })}
@@ -221,6 +224,7 @@ export default function DashboardLayout({ children }: Props) {
         {showChatbotWidget && <ChatbotWidget />}
         {renderMobilePrompt}
         {!counterSession && <ProfileCompletionDialog />}
+        {!counterSession && <AnnouncementHost />}
         <ShiftPreferencePromptDialog
           open={showShiftPreferencePrompt}
           onCompleted={() => updateUser?.({ hasShiftPreference: true })}

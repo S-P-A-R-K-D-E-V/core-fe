@@ -248,6 +248,7 @@ export const paths = {
       performance: `${ROOTS.DASHBOARD}/hr/performance`,
       contracts: `${ROOTS.DASHBOARD}/hr/contracts`,
       rules: `${ROOTS.DASHBOARD}/hr/rules`,
+      announcements: `${ROOTS.DASHBOARD}/hr/announcements`,
     },
     inspection: {
       root: `${ROOTS.DASHBOARD}/inspection`,
