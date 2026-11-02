@@ -11,11 +11,15 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 
+import { getStorageUrl } from 'src/utils/storage';
+
+import { getAnnouncementImageUrl } from 'src/api/announcements';
 import { ANNOUNCEMENT_SEVERITY_LABEL, type IPendingAnnouncement } from 'src/types/announcement';
 
 import Iconify from 'src/components/iconify';
 
 import AnnouncementBody from './announcement-body';
+import AnnouncementImage from './announcement-image';
 import { severityMeta, isInternalPath } from './utils';
 
 // ----------------------------------------------------------------------
@@ -31,7 +35,7 @@ type Props = {
 };
 
 export default function AnnouncementDialog({ announcement, remaining, busy, onDismiss, onAcknowledge, onCta }: Props) {
-  const { requireAck, title, bodyMarkdown, severity, ctaLabel, ctaUrl } = announcement;
+  const { id, requireAck, title, bodyMarkdown, severity, ctaLabel, ctaUrl, imageUrl } = announcement;
   const meta = severityMeta(severity);
   const showCta = !!ctaLabel && isInternalPath(ctaUrl);
 
@@ -88,6 +92,16 @@ export default function AnnouncementDialog({ announcement, remaining, busy, onDi
 
       <DialogContent dividers>
         <AnnouncementBody body={bodyMarkdown} />
+        {imageUrl && (
+          <AnnouncementImage
+            src={getStorageUrl(imageUrl)}
+            alt={`Ảnh đính kèm: ${title}`}
+            onRefresh={async () => {
+              const fresh = await getAnnouncementImageUrl(id);
+              return fresh ? getStorageUrl(fresh) : null;
+            }}
+          />
+        )}
       </DialogContent>
 
       <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>

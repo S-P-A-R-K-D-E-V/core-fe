@@ -16,6 +16,8 @@ export type IPendingAnnouncement = {
   startAt: string;
   ctaLabel: string | null;
   ctaUrl: string | null;
+  /** Đường dẫn /media đã ký, có hạn; ghép bằng getStorageUrl. */
+  imageUrl?: string | null;
 };
 
 export type IAnnouncement = {
@@ -37,6 +39,9 @@ export type IAnnouncement = {
   recipients: number;
   seenCount: number;
   ackCount: number;
+  imageKey?: string | null;
+  /** Đường dẫn /media đã ký, có hạn; ghép bằng getStorageUrl. */
+  imageUrl?: string | null;
 };
 
 export type ISaveAnnouncement = {
@@ -52,6 +57,8 @@ export type ISaveAnnouncement = {
   endAt: string | null;
   ctaLabel: string | null;
   ctaUrl: string | null;
+  /** Key đã tải lên. null = không có ảnh (khi sửa: giữ nguyên), '' = gỡ ảnh. */
+  imageKey: string | null;
 };
 
 /** Kết quả lưu. devices là số thiết bị đã đăng ký, không chứng minh máy đã hiện thông báo. */

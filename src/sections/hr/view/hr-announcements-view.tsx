@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 
+import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
@@ -33,6 +34,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { paths } from 'src/routes/paths';
 
+import { getStorageUrl } from 'src/utils/storage';
 import { fDate, fDateTime } from 'src/utils/format-time';
 import { apiErrorMessage } from 'src/utils/api-error';
 
@@ -43,6 +45,7 @@ import {
   saveAnnouncement,
   deleteAnnouncement,
   getAnnouncementStaff,
+  uploadAnnouncementImage,
   getAnnouncementReceipts,
 } from 'src/api/announcements';
 import {
@@ -61,7 +64,14 @@ import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
-import { severityMeta, isInternalPath, AnnouncementBody } from 'src/components/announcement';
+import {
+  severityMeta,
+  isInternalPath,
+  AnnouncementBody,
+  AnnouncementImage,
+  announcementImageError,
+  ANNOUNCEMENT_IMAGE_ACCEPT,
+} from 'src/components/announcement';
 
 // ----------------------------------------------------------------------
 // Popup thông báo (hr.announcement.manage — mặc định Admin): tạo, sửa, xoá mềm, xem ai đã đọc / đã xác nhận.
@@ -85,6 +95,7 @@ const emptyForm = (): ISaveAnnouncement => ({
   endAt: null,
   ctaLabel: null,
   ctaUrl: null,
+  imageKey: null,
 });
 
 /** ISO → giá trị ô datetime-local theo giờ của máy. */
@@ -127,10 +138,17 @@ function AnnouncementFormDialog({
   const [form, setForm] = useState<ISaveAnnouncement>(emptyForm());
   const [tab, setTab] = useState<'edit' | 'preview'>('edit');
   const [saving, setSaving] = useState(false);
+  // Ảnh đang chọn: link đã ký của ảnh hiện có, hoặc blob của ảnh vừa chọn.
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const uploadTurn = useRef(0);
 
   useEffect(() => {
     if (!open) return;
     setTab('edit');
+    uploadTurn.current += 1;
+    setUploading(false);
+    setImageSrc(announcement?.imageUrl ? getStorageUrl(announcement.imageUrl) : null);
     if (announcement) {
       setForm({
         title: announcement.title,
@@ -145,13 +163,59 @@ function AnnouncementFormDialog({
         endAt: announcement.endAt,
         ctaLabel: announcement.ctaLabel,
         ctaUrl: announcement.ctaUrl,
+        // Chưa đổi ảnh thì gửi null: máy chủ giữ nguyên.
+        imageKey: null,
       });
     } else {
       setForm(emptyForm());
     }
   }, [open, announcement, staff]);
 
+  // Blob của ảnh vừa chọn: giải phóng khi đổi ảnh hoặc đóng hộp thoại.
+  useEffect(
+    () => () => {
+      if (imageSrc?.startsWith('blob:')) URL.revokeObjectURL(imageSrc);
+    },
+    [imageSrc]
+  );
+
   const set = <K extends keyof ISaveAnnouncement>(key: K, value: ISaveAnnouncement[K]) => setForm((f) => ({ ...f, [key]: value }));
+
+  const pickImage = async (file: File) => {
+    const problem = announcementImageError(file);
+    if (problem) {
+      enqueueSnackbar(problem, { variant: 'error' });
+      return;
+    }
+    uploadTurn.current += 1;
+    const turn = uploadTurn.current;
+    const previous = imageSrc;
+    setImageSrc(URL.createObjectURL(file));
+    setUploading(true);
+    try {
+      const key = await uploadAnnouncementImage(file);
+      if (turn === uploadTurn.current) set('imageKey', key);
+    } catch (err) {
+      if (turn !== uploadTurn.current) return;
+      enqueueSnackbar(apiErrorMessage(err, 'Không tải được ảnh lên'), { variant: 'error' });
+      // Quay lại ảnh trước đó. Nếu đó là ảnh vừa chọn (blob đã giải phóng) thì quay về ảnh đang lưu trên máy chủ.
+      if (previous?.startsWith('blob:')) {
+        setImageSrc(announcement?.imageUrl ? getStorageUrl(announcement.imageUrl) : null);
+        set('imageKey', null);
+      } else {
+        setImageSrc(previous);
+      }
+    } finally {
+      if (turn === uploadTurn.current) setUploading(false);
+    }
+  };
+
+  const removeImage = () => {
+    uploadTurn.current += 1;
+    setUploading(false);
+    setImageSrc(null);
+    set('imageKey', announcement?.imageKey ? '' : null);
+  };
 
   const ctaUrl = form.ctaUrl?.trim() ?? '';
   const ctaLabel = form.ctaLabel?.trim() ?? '';
@@ -161,7 +225,7 @@ function AnnouncementFormDialog({
   const audienceValid =
     form.audience === 'All' || (form.audience === 'Role' ? form.roles.length > 0 : form.userIds.length > 0);
   const valid =
-    !!form.title.trim() && !!form.bodyMarkdown.trim() && audienceValid && !ctaUrlError && !ctaIncomplete && !periodError;
+    !!form.title.trim() && !!form.bodyMarkdown.trim() && audienceValid && !ctaUrlError && !ctaIncomplete && !periodError && !uploading;
 
   const selectedStaff = useMemo(() => staff.filter((s) => form.userIds.includes(s.userId)), [staff, form.userIds]);
 
@@ -216,7 +280,7 @@ function AnnouncementFormDialog({
                 value={form.bodyMarkdown}
                 inputProps={{ maxLength: MAX_BODY, 'aria-label': 'Nội dung' }}
                 onChange={(e) => set('bodyMarkdown', e.target.value)}
-                helperText="Dùng Markdown: **đậm**, *nghiêng*, - danh sách. HTML không hiển thị. Chỉ link nội bộ (bắt đầu bằng /) bấm được; link ngoài hiện như chữ thường, ảnh không hiện."
+                helperText="Dùng Markdown: **đậm**, *nghiêng*, - danh sách. HTML không hiển thị. Chỉ link nội bộ (bắt đầu bằng /) bấm được; link ngoài hiện như chữ thường. Ảnh trong Markdown không hiện, dùng ô Ảnh đính kèm bên dưới."
               />
             ) : (
               <Card variant="outlined" sx={{ p: 2, minHeight: 140 }}>
@@ -227,7 +291,48 @@ function AnnouncementFormDialog({
                     Chưa có nội dung.
                   </Typography>
                 )}
+                {imageSrc && <AnnouncementImage src={imageSrc} alt={`Ảnh đính kèm: ${form.title.trim()}`} />}
               </Card>
+            )}
+          </Stack>
+
+          <Stack spacing={1}>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Button component="label" variant="outlined" color="inherit" disabled={saving} startIcon={<Iconify icon="solar:gallery-add-bold" />}>
+                {imageSrc ? 'Đổi ảnh' : 'Ảnh đính kèm'}
+                <input
+                  hidden
+                  type="file"
+                  aria-label="Ảnh đính kèm"
+                  accept={ANNOUNCEMENT_IMAGE_ACCEPT}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (file) pickImage(file);
+                  }}
+                />
+              </Button>
+              {imageSrc && (
+                <Button color="error" disabled={saving} onClick={removeImage}>
+                  Gỡ ảnh
+                </Button>
+              )}
+              {uploading && (
+                <Typography variant="caption" color="text.secondary">
+                  Đang tải ảnh lên...
+                </Typography>
+              )}
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+              Không bắt buộc. JPEG, PNG hoặc WebP, tối đa 5 MB. Ảnh dài vẫn đọc được vì popup cuộn cùng nội dung. Nội dung chữ vẫn phải có: push và app bản cũ chỉ đọc được phần chữ.
+            </Typography>
+            {imageSrc && (
+              <Box
+                component="img"
+                src={imageSrc}
+                alt="Ảnh đã chọn"
+                sx={{ maxHeight: 220, maxWidth: 1, width: 'fit-content', objectFit: 'contain', borderRadius: 1, border: (theme) => `1px solid ${theme.palette.divider}` }}
+              />
             )}
           </Stack>
 
@@ -527,6 +632,7 @@ export default function HrAnnouncementsView() {
                       <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
                         <Chip size="small" variant="soft" color={severityMeta(a.severity).color} label={ANNOUNCEMENT_SEVERITY_LABEL[a.severity]} />
                         {a.requireAck && <Chip size="small" variant="outlined" label="Bắt buộc xác nhận" />}
+                        {a.imageKey && <Chip size="small" variant="outlined" label="Có ảnh" />}
                       </Stack>
                       {a.createdByName && (
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
