@@ -11,6 +11,7 @@ import { PERMISSIONS, hasAnyPermission } from 'src/auth/permissions';
 import { useSettingsContext } from 'src/components/settings';
 import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
+import { StaffDashboardCards } from '../staff-dashboard-cards';
 import { StaffRankingCard, MyProvisionalScoreCard } from '../hr-score-cards';
 
 // ----------------------------------------------------------------------
@@ -32,6 +33,7 @@ export default function HrOverviewView() {
         </Alert>
       )}
       <Stack spacing={2}>
+        <StaffDashboardCards />
         <MyProvisionalScoreCard hideWhenEmpty={canRead} />
         {canRead && <StaffRankingCard />}
       </Stack>

@@ -27,6 +27,8 @@ vi.mock('src/components/custom-breadcrumbs', () => ({
   ),
 }));
 
+vi.mock('src/sections/hr/weekly-bonus-rates-card', () => ({ WeeklyBonusRatesCard: () => null }));
+
 const OFF: IHrRules = {
   weeklyBonusEnabled: false,
   weeklyBonusTier1FromPct: null,

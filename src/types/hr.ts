@@ -662,6 +662,39 @@ export const VIOLATION_STATUS_LABEL: Record<ViolationEntryStatus, string> = {
   Cancelled: 'Đã huỷ',
 };
 
+/** Thưởng doanh số tuần của chính mình (GET /sales-targets/weekly-bonus/mine). */
+export interface IMyWeeklyBonus {
+  weekStart: string;
+  achievementPct: number;
+  fund: number;
+  myHours: number;
+  totalHours: number;
+  myAmount: number;
+  paidInPayroll: boolean;
+  baseAmount?: number | null;
+  appliedPct?: number | null;
+  deductionPoints?: number | null;
+}
+
+/** Lương tạm tính của chính mình (GET /payroll/my-current-estimate). */
+export interface ICurrentPayrollEstimate {
+  configured: boolean;
+  cycleName?: string | null;
+  fromDate: string;
+  toDate: string;
+  asOf: string;
+  estimatedSalary: number;
+  baseSalary: number;
+  overtimeSalary: number;
+  bonus: number;
+  penaltyAmount: number;
+  deduction: number;
+  workedShifts: number;
+  assignedShifts: number;
+  hoursWorked: number;
+  lateMinutes: number;
+}
+
 export interface IViolationPolicy {
   /** Phần thưởng tuần bị cắt chia lại cho người dưới mức điểm này; trống = giữ lại cho cửa hàng. */
   redistributeForfeitBelowPoints?: number | null;

@@ -60,6 +60,7 @@ export const PERMISSIONS = {
     complaintReview: 'payroll.complaint.review',
     bonusProgramManage: 'payroll.bonus-program.manage',
     quarterBonusManage: 'payroll.quarter-bonus.manage',
+    costForecastRead: 'payroll.cost-forecast.read',
   },
   /** Chấm công — tự chấm công, việc của chính mình không cần quyền. */
   attendance: {
