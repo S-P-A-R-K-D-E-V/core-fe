@@ -158,6 +158,7 @@ function BonusToggle({
         notCompleteFromPoints: policy.notCompleteFromPoints ?? null,
         appliesToBonus: on,
         simulatedAmountPerPoint: policy.simulatedAmountPerPoint ?? null,
+        redistributeForfeitBelowPoints: policy.redistributeForfeitBelowPoints ?? null,
       });
       enqueueSnackbar(on ? 'Đã bật: thưởng tuần nhận theo điểm trừ' : 'Đã tắt: điểm trừ chỉ để xem, thưởng tuần chia đủ theo giờ');
       onChanged();
@@ -1065,6 +1066,7 @@ type RuleDraft = {
   thresholdMinutes: string;
   losesWeeklyBonus: boolean;
   losesMonthlyBonus: boolean;
+  losesQuarterBonus: boolean;
   extraAction: string;
   simulatedAmount: string;
   escalationSteps: string;
@@ -1084,6 +1086,7 @@ function toDraft(r: IViolationRule | null, nextOrder: number): RuleDraft {
     thresholdMinutes: r?.thresholdMinutes != null ? String(r.thresholdMinutes) : '0',
     losesWeeklyBonus: r?.losesWeeklyBonus ?? false,
     losesMonthlyBonus: r?.losesMonthlyBonus ?? false,
+    losesQuarterBonus: r?.losesQuarterBonus ?? false,
     extraAction: r?.extraAction ?? '',
     simulatedAmount: r?.simulatedAmount != null ? String(r.simulatedAmount) : '',
     escalationSteps: r?.escalationSteps ?? '',
@@ -1141,6 +1144,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
         thresholdMinutes: MINUTE_SOURCES.includes(draft.autoSource) ? Number(draft.thresholdMinutes || 0) : null,
         losesWeeklyBonus: draft.losesWeeklyBonus,
         losesMonthlyBonus: draft.losesMonthlyBonus,
+        losesQuarterBonus: draft.losesQuarterBonus,
         extraAction: draft.extraAction.trim() || null,
         simulatedAmount: numOrNull(draft.simulatedAmount),
         escalationSteps: draft.escalationSteps.trim() || null,
@@ -1185,6 +1189,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
         notCompleteFromPoints: numOrNull(policyDraft.notCompleteFromPoints),
         appliesToBonus: policy?.appliesToBonus ?? false,
         simulatedAmountPerPoint: numOrNull(policyDraft.simulatedAmountPerPoint),
+        redistributeForfeitBelowPoints: numOrNull(policyDraft.redistributeForfeitBelowPoints),
       });
       enqueueSnackbar('Đã lưu');
       setPolicyDraft(null);
@@ -1254,6 +1259,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                     noBonusFromPoints: policy.noBonusFromPoints?.toString() ?? '',
                     notCompleteFromPoints: policy.notCompleteFromPoints?.toString() ?? '',
                     simulatedAmountPerPoint: policy.simulatedAmountPerPoint?.toString() ?? '',
+                    redistributeForfeitBelowPoints: policy.redistributeForfeitBelowPoints?.toString() ?? '',
                   })
                 }
               >
@@ -1314,6 +1320,7 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                     {[
                       r.losesWeeklyBonus ? 'Mất thưởng tuần' : null,
                       r.losesMonthlyBonus ? 'Mất thưởng tháng' : null,
+                      r.losesQuarterBonus ? 'Mất thưởng quý' : null,
                       r.extraAction,
                     ]
                       .filter(Boolean)
@@ -1416,6 +1423,12 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                     <Switch checked={draft.losesMonthlyBonus} onChange={(e) => setDraft({ ...draft, losesMonthlyBonus: e.target.checked })} />
                   }
                   label="Mất thưởng doanh số cả tháng"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch checked={draft.losesQuarterBonus} onChange={(e) => setDraft({ ...draft, losesQuarterBonus: e.target.checked })} />
+                  }
+                  label="Mất thưởng hoàn thành quý"
                 />
               </Stack>
               <TextField
@@ -1541,6 +1554,13 @@ function Catalog({ canEdit }: { canEdit: boolean }) {
                 label="Từ … điểm: xếp loại Không hoàn thành"
                 value={policyDraft.notCompleteFromPoints}
                 onChange={(e) => setPolicyDraft({ ...policyDraft, notCompleteFromPoints: e.target.value })}
+              />
+              <TextField
+                type="number"
+                label="Chia lại thưởng bị cắt cho người dưới (điểm)"
+                helperText="Phần thưởng tuần bị cắt chia theo giờ làm cho người có điểm trừ tháng dưới mức này. Để trống = giữ lại cho cửa hàng."
+                value={policyDraft.redistributeForfeitBelowPoints ?? ''}
+                onChange={(e) => setPolicyDraft({ ...policyDraft, redistributeForfeitBelowPoints: e.target.value })}
               />
               <TextField
                 type="number"

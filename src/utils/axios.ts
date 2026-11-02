@@ -460,6 +460,7 @@ export const endpoints = {
     targetsUnpublish: '/sales-targets/unpublish',
     ruleSettings: '/hr-rule-settings',
     ruleSettingsActive: '/hr-rule-settings/active',
+    weeklyBonusRates: '/hr-rule-settings/weekly-bonus-rates',
     target: (weekStart: string) => `/sales-targets/${weekStart}`,
     weeklyBonus: '/sales-targets/weekly-bonus',
     tasks: '/work-tasks',
@@ -719,6 +720,18 @@ export const endpoints = {
     reply: (id: string) => `/payroll-complaints/${id}/reply`,
   },
   // Chương trình thưởng theo đơn
+  quarterBonuses: {
+    root: '/quarter-bonuses',
+    mine: '/quarter-bonuses/mine',
+    refresh: '/quarter-bonuses/refresh',
+    close: '/quarter-bonuses/close',
+    reopen: '/quarter-bonuses/reopen',
+    override: (id: string) => `/quarter-bonuses/results/${id}/override`,
+    policies: '/quarter-bonuses/policies',
+    policy: (id: string) => `/quarter-bonuses/policies/${id}`,
+    employees: '/quarter-bonuses/employees',
+    employee: (userId: string) => `/quarter-bonuses/employees/${userId}`,
+  },
   bonusPrograms: {
     list: '/bonus-programs',
     detail: (id: string) => `/bonus-programs/${id}`,

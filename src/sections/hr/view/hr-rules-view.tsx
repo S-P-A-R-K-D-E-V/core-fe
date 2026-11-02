@@ -27,6 +27,8 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
 import type { IHrRules } from 'src/types/hr-rules';
 
+import { WeeklyBonusRatesCard } from '../weekly-bonus-rates-card';
+
 // ----------------------------------------------------------------------
 // Luật nhân sự riêng của cửa hàng (chỉ Admin — hr.rule.manage). Mỗi luật có công tắc: tắt = phần mềm không áp luật đó. Số
 // liệu do cửa hàng tự đặt theo quy định của mình; phần mềm không giải thích quy chế.
@@ -207,6 +209,8 @@ export default function HrRulesView() {
             </Rule>
           </CardContent>
         </Card>
+
+        <WeeklyBonusRatesCard />
 
         <Card>
           <CardHeader title="Lương và biên bản" />

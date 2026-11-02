@@ -401,8 +401,30 @@ function ProgramDialog({
 }
 
 function ProgramsTab({ programs, onChanged }: { programs: IBonusProgram[]; onChanged: () => void }) {
+  const { enqueueSnackbar } = useSnackbar();
+  const [askConfirm, confirmDialog] = useConfirmDialog();
   const [editing, setEditing] = useState<IBonusProgram | null>(null);
   const [open, setOpen] = useState(false);
+
+  const remove = async (program: IBonusProgram) => {
+    const ok = await askConfirm({
+      title: `Xoá chương trình "${program.name}"?`,
+      content: program.locked
+        ? 'Chương trình đã trả vào lương. Phiếu lương đã chốt giữ nguyên; kỳ chưa chốt tính lại sẽ không còn khoản thưởng này.'
+        : 'Kết quả tính thử của chương trình sẽ không còn.',
+      confirmText: 'Xoá',
+      cancelText: 'Huỷ',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await deleteBonusProgram(program.id);
+      enqueueSnackbar('Đã xoá chương trình thưởng', { variant: 'success' });
+      onChanged();
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không xoá được chương trình'), { variant: 'error' });
+    }
+  };
 
   return (
     <>
@@ -431,6 +453,7 @@ function ProgramsTab({ programs, onChanged }: { programs: IBonusProgram[]; onCha
                 <TableCell>Cách tính</TableCell>
                 <TableCell>Thời gian</TableCell>
                 <TableCell>Vào lương</TableCell>
+                <TableCell />
               </TableRow>
             </TableHead>
             <TableBody>
@@ -475,6 +498,18 @@ function ProgramsTab({ programs, onChanged }: { programs: IBonusProgram[]; onCha
                       </Typography>
                     )}
                   </TableCell>
+                  <TableCell align="right">
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        remove(p);
+                      }}
+                    >
+                      Xoá
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -482,6 +517,7 @@ function ProgramsTab({ programs, onChanged }: { programs: IBonusProgram[]; onCha
         </TableContainer>
       )}
       <ProgramDialog program={editing} open={open} onClose={() => setOpen(false)} onSaved={onChanged} />
+      {confirmDialog}
     </>
   );
 }

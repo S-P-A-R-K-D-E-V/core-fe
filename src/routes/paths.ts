@@ -173,6 +173,7 @@ export const paths = {
       batch: `${ROOTS.DASHBOARD}/payroll/batch`,
       complaints: `${ROOTS.DASHBOARD}/payroll/complaints`,
       bonusPrograms: `${ROOTS.DASHBOARD}/payroll/bonus-programs`,
+      quarterBonus: `${ROOTS.DASHBOARD}/payroll/quarter-bonus`,
     },
     holidayPolicy: {
       root: `${ROOTS.DASHBOARD}/holiday-policy`,

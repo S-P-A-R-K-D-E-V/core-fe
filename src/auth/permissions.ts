@@ -59,6 +59,7 @@ export const PERMISSIONS = {
     salaryConfigManage: 'payroll.salary-config.manage',
     complaintReview: 'payroll.complaint.review',
     bonusProgramManage: 'payroll.bonus-program.manage',
+    quarterBonusManage: 'payroll.quarter-bonus.manage',
   },
   /** Chấm công — tự chấm công, việc của chính mình không cần quyền. */
   attendance: {

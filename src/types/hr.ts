@@ -663,6 +663,8 @@ export const VIOLATION_STATUS_LABEL: Record<ViolationEntryStatus, string> = {
 };
 
 export interface IViolationPolicy {
+  /** Phần thưởng tuần bị cắt chia lại cho người dưới mức điểm này; trống = giữ lại cho cửa hàng. */
+  redistributeForfeitBelowPoints?: number | null;
   effectiveFrom: string;
   halfBonusFromPoints?: number | null;
   halfBonusPct?: number | null;
@@ -676,6 +678,7 @@ export interface IViolationPolicy {
 }
 
 export interface IViolationRule {
+  losesQuarterBonus?: boolean;
   id: string;
   groupName: string;
   name: string;
@@ -702,6 +705,7 @@ export interface IViolationCatalog {
 }
 
 export interface ISaveViolationRule {
+  losesQuarterBonus: boolean;
   groupName: string;
   name: string;
   points: number;
