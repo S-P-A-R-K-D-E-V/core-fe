@@ -121,6 +121,8 @@ export const PERMISSIONS = {
     ruleManage: 'hr.rule.manage',
     /** Ghi nhận / huỷ vi phạm theo danh mục điểm trừ, trả lời khiếu nại, xem điểm trừ của mọi người. */
     violationManage: 'hr.violation.manage',
+    /** Tạo, sửa, xoá popup thông báo; xem ai đã đọc, đã xác nhận — mặc định Admin. */
+    announcementManage: 'hr.announcement.manage',
   },
   /** Hàng hoá — xem hàng, nhóm hàng, thương hiệu, đơn vị không cần quyền (màn bán hàng). Thêm / sửa cần kèm xem giá vốn. */
   products: {
