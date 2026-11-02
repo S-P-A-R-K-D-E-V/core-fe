@@ -345,11 +345,11 @@ function QuarterBonusCard() {
 
 const loadEstimate = async () => {
   const [estimate, violations] = await Promise.all([getMyCurrentEstimate(), getMyViolations(monthStart()).catch(() => null)]);
-  return { estimate, simulated: violations?.summary.simulatedAmount ?? 0 };
+  return { estimate, fines: violations?.summary.fineAmount ?? 0 };
 };
 
 function PayslipEstimateCard() {
-  const { data, error } = useCardData<{ estimate: ICurrentPayrollEstimate; simulated: number }>(loadEstimate);
+  const { data, error } = useCardData<{ estimate: ICurrentPayrollEstimate; fines: number }>(loadEstimate);
   const estimate = data?.estimate;
 
   return (
@@ -376,8 +376,8 @@ function PayslipEstimateCard() {
           <Row label="Thưởng" value={fVnd(estimate.bonus)} />
           {estimate.deduction > 0 && <Row label="Khấu trừ" value={`−${fVnd(estimate.deduction)}`} />}
           <Row label="Tạm tính" value={fVnd(estimate.estimatedSalary)} strong />
-          {data.simulated > 0 && (
-            <Row label="Quy đổi điểm trừ (mô phỏng – không trừ)" value={fVnd(data.simulated)} note="Chỉ để thấy mức độ, không trừ vào lương." />
+          {data.fines > 0 && (
+            <Row label="Tiền phạt (điểm trừ)" value={fVnd(data.fines)} note="Trừ vào lương." />
           )}
         </Stack>
       )}

@@ -33,8 +33,8 @@ import { useSnackbar } from 'src/components/snackbar';
 import { fVnd, parseAmount } from './hr-common';
 
 // ----------------------------------------------------------------------
-// Bồi thường thiệt hại (Quy chế Điều 25; B7) — KHÔNG phải phạt tiền. Chỉ lập từ biên bản chênh lệch tiền / hàng có lỗi cá
-// nhân đã ký (hoặc ghi rõ từ chối ký); Admin duyệt; trừ dần vào kỳ lương cuối tháng, mỗi tháng tối đa 30% lương thực trả.
+// Bồi thường thiệt hại (B7), tách với tiền phạt. Chỉ lập từ biên bản chênh lệch tiền / hàng có lỗi cá
+// nhân đã ký (hoặc ghi rõ từ chối ký); Admin duyệt; trừ đủ một lần ở kỳ lương đang tính, thiếu thì chuyển kỳ sau.
 // ----------------------------------------------------------------------
 
 /** Biên bản lập được bồi thường (backend kiểm lại). */
@@ -91,8 +91,8 @@ export function CreateCompensationDialog({
           <Stack spacing={2} sx={{ pt: 1 }}>
             <Alert severity="info">
               {record.staffName} · {HR_RECORD_TYPE_LABEL[record.type]} ngày {fDate(record.occurredOn)}
-              {record.amount != null ? ` · thiệt hại ${fVnd(record.amount)}` : ''}. Không phải phạt: trừ dần vào lương kỳ cuối
-              tháng, mỗi tháng tối đa 30% lương thực trả.
+              {record.amount != null ? ` · thiệt hại ${fVnd(record.amount)}` : ''}. Trừ đủ một lần vào lương ở kỳ đang tính; lương không
+              đủ thì phần thiếu chuyển sang kỳ sau.
             </Alert>
             <TextField
               label="Số tiền bồi thường"
@@ -159,7 +159,7 @@ export function CompensationsPanel({ mine = false, refreshKey = 0 }: { mine?: bo
     <Card sx={{ mt: 2 }}>
       <CardHeader
         title={mine ? 'Khoản bồi thường của tôi' : 'Khoản bồi thường'}
-        subheader="Trừ dần vào lương kỳ cuối tháng, mỗi tháng tối đa 30% lương thực trả — không phải phạt tiền."
+        subheader="Trừ đủ một lần vào lương ở kỳ đang tính; lương không đủ thì phần thiếu chuyển sang kỳ sau."
       />
       {list.length === 0 ? (
         <Typography color="text.secondary" sx={{ p: 3, pt: 1 }}>

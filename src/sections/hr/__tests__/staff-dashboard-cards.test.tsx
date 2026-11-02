@@ -26,7 +26,7 @@ vi.mock('src/api/quarter-bonus', () => quarter);
 const violations = {
   month: '2026-11-01',
   policy: { effectiveFrom: '2026-11-01', updatedAt: '', appliesToBonus: true, halfBonusFromPoints: 6, noBonusFromPoints: 10, notCompleteFromPoints: 15 },
-  summary: { points: 7, simulatedAmount: 70000 },
+  summary: { points: 7, fineAmount: 70000 },
   entries: [{ id: 'e1', ruleName: 'Đi muộn trên 15 phút', occurredOn: '2026-11-02', points: 4, status: 'Active', complainedAt: null, complaintDeadline: '2099-01-01' }],
 };
 
@@ -48,10 +48,10 @@ beforeEach(() => {
 });
 
 describe('StaffDashboardCards', () => {
-  it('shows the simulated money only as display, not as a deduction', async () => {
+  it('shows the fine money deducted from pay', async () => {
     render(<StaffDashboardCards />);
 
-    expect(await screen.findByText('Quy đổi điểm trừ (mô phỏng – không trừ)')).toBeTruthy();
+    expect(await screen.findByText('Tiền phạt (điểm trừ)')).toBeTruthy();
     expect(screen.queryByText('Khấu trừ')).toBeNull();
   });
 

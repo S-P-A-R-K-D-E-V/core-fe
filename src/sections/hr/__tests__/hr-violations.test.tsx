@@ -237,37 +237,37 @@ describe('Công tắc tính vào thưởng', () => {
     );
   });
 
-  it('bật / tắt công tắc giữ nguyên tiền mô phỏng / điểm (PUT thay cả dòng)', async () => {
+  it('bật / tắt công tắc giữ nguyên tiền phạt / điểm (PUT thay cả dòng)', async () => {
     auth.user.permissions = ['hr.violation.manage', 'hr.rule.manage'];
     api.getViolationSummary.mockResolvedValue({
       month: '2026-11-01',
-      policy: { ...policy, appliesToBonus: false, simulatedAmountPerPoint: 10000 },
-      rows: [summary({ fullName: 'Mai', userId: 'mai', simulatedAmount: 70000 })],
+      policy: { ...policy, appliesToBonus: false, fineAmountPerPoint: 10000 },
+      rows: [summary({ fullName: 'Mai', userId: 'mai', fineAmount: 70000 })],
     });
     api.getViolations.mockResolvedValue([]);
-    api.saveViolationPolicy.mockResolvedValue({ ...policy, simulatedAmountPerPoint: 10000 });
+    api.saveViolationPolicy.mockResolvedValue({ ...policy, fineAmountPerPoint: 10000 });
     renderView();
 
-    expect(await screen.findByText('Tiền mô phỏng')).toBeInTheDocument();
+    expect(await screen.findByText('Tiền phạt')).toBeInTheDocument();
     expect(screen.getByText(money(70000))).toBeInTheDocument();
     await userEvent.click(screen.getByRole('checkbox', { name: /Tính điểm trừ vào thưởng doanh số tuần/ }));
     await waitFor(() =>
-      expect(api.saveViolationPolicy).toHaveBeenCalledWith(expect.objectContaining({ appliesToBonus: true, simulatedAmountPerPoint: 10000 }))
+      expect(api.saveViolationPolicy).toHaveBeenCalledWith(expect.objectContaining({ appliesToBonus: true, fineAmountPerPoint: 10000 }))
     );
   });
 });
 
-describe('Tiền mô phỏng & tái phạm', () => {
-  it('nhân viên thấy tiền mô phỏng của từng lần, tổng tháng và bậc tái phạm', async () => {
+describe('Tiền phạt & tái phạm', () => {
+  it('nhân viên thấy tiền phạt của từng lần, tổng tháng và bậc tái phạm', async () => {
     api.getMyViolations.mockResolvedValue({
       month: '2026-11-01',
-      policy: { ...policy, simulatedAmountPerPoint: 10000 },
-      summary: summary({ points: 15, simulatedAmount: 150000 }),
+      policy: { ...policy, fineAmountPerPoint: 10000 },
+      summary: summary({ points: 15, fineAmount: 150000 }),
       entries: [
         entry({
           ruleName: 'Bỏ ca không báo',
           points: 15,
-          simulatedAmount: 150000,
+          fineAmount: 150000,
           occurrence: 2,
           occurrenceWindowMonths: 12,
           escalationAction: 'Kéo dài thời hạn nâng lương',
@@ -276,18 +276,18 @@ describe('Tiền mô phỏng & tái phạm', () => {
     });
     renderView();
 
-    expect(await screen.findByText('Tiền mô phỏng (không trừ lương)')).toBeInTheDocument();
+    expect(await screen.findByText('Tiền phạt (trừ vào lương)')).toBeInTheDocument();
     expect(screen.getByText(money(150000))).toBeInTheDocument();
     expect(screen.getByText(`~${money(150000)}`)).toBeInTheDocument();
     expect(screen.getByText('Lần 2 trong 12 tháng · Kéo dài thời hạn nâng lương')).toBeInTheDocument();
   });
 
   it('ruleMoney: số tiền riêng của hành vi ghi đè điểm × đơn giá; 0 = không quy ra tiền; không đơn giá = không hiện', () => {
-    const p = { ...policy, simulatedAmountPerPoint: 10000 };
-    expect(ruleMoney({ points: 3, simulatedAmount: null }, p, 2)).toBe(60000);
-    expect(ruleMoney({ points: 5, simulatedAmount: 0 }, p)).toBe(0);
-    expect(ruleMoney({ points: 5, simulatedAmount: 25000 }, p, 2)).toBe(50000);
-    expect(ruleMoney({ points: 5, simulatedAmount: null }, { ...policy, simulatedAmountPerPoint: null })).toBeNull();
+    const p = { ...policy, fineAmountPerPoint: 10000 };
+    expect(ruleMoney({ points: 3, fineAmount: null }, p, 2)).toBe(60000);
+    expect(ruleMoney({ points: 5, fineAmount: 0 }, p)).toBe(0);
+    expect(ruleMoney({ points: 5, fineAmount: 25000 }, p, 2)).toBe(50000);
+    expect(ruleMoney({ points: 5, fineAmount: null }, { ...policy, fineAmountPerPoint: null })).toBeNull();
   });
 
   it('occurrenceLabel: trong tháng / N tháng, chưa tới bậc thì không có việc', () => {

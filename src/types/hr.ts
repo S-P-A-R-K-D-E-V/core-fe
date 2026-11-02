@@ -600,7 +600,7 @@ export interface IProposedAssignmentWarnings {
 
 export type HrCompensationStatus = 'Active' | 'Cancelled';
 
-/** Không phải phạt: trừ dần vào kỳ lương cuối tháng, mỗi tháng tối đa 30% lương thực trả. */
+/** Trừ đủ một lần vào lương; lương không đủ thì phần thiếu chuyển sang kỳ sau. */
 export interface ICompensation {
   id: string;
   staffId: string;
@@ -706,8 +706,8 @@ export interface IViolationPolicy {
   updatedAt: string;
   /** Bật: thưởng doanh số tuần nhận theo % của ngưỡng điểm trừ (tính thử + bảng lương); phần bị trừ giữ lại cửa hàng. */
   appliesToBonus: boolean;
-  /** Tiền mô phỏng mỗi điểm (CiCi 10.000đ) — chỉ hiển thị, không vào lương; trống = không hiện tiền. */
-  simulatedAmountPerPoint?: number | null;
+  /** Tiền phạt mỗi điểm, trừ vào lương; trống = không quy ra tiền. */
+  fineAmountPerPoint?: number | null;
 }
 
 export interface IViolationRule {
@@ -724,8 +724,8 @@ export interface IViolationRule {
   extraAction?: string | null;
   sortOrder: number;
   isActive: boolean;
-  /** Tiền mô phỏng mỗi lần, ghi đè điểm × đơn giá; 0 = không quy ra tiền. */
-  simulatedAmount?: number | null;
+  /** Tiền phạt mỗi lần, ghi đè điểm × đơn giá; 0 = không quy ra tiền. */
+  fineAmount?: number | null;
   /** Bậc tái phạm, mỗi dòng "lần: việc cần làm". */
   escalationSteps?: string | null;
   /** Đếm tái phạm trong ngần này tháng gần nhất (tính cả tháng xảy ra). */
@@ -750,7 +750,7 @@ export interface ISaveViolationRule {
   extraAction: string | null;
   sortOrder: number;
   isActive: boolean;
-  simulatedAmount: number | null;
+  fineAmount: number | null;
   escalationSteps: string | null;
   escalationWindowMonths: number | null;
 }
@@ -778,8 +778,8 @@ export interface IViolationEntry {
   resolvedAt?: string | null;
   createdAt: string;
   complaintDeadline?: string | null;
-  /** Tiền mô phỏng chụp lúc ghi — không trừ lương. */
-  simulatedAmount?: number | null;
+  /** Tiền phạt chụp lúc ghi, trừ vào lương. */
+  fineAmount?: number | null;
   /** Lần thứ mấy trong khoảng đếm tái phạm; trống = luật không đếm. */
   occurrence?: number | null;
   occurrenceWindowMonths?: number | null;
@@ -815,8 +815,8 @@ export interface IViolationSummary {
   notComplete: boolean;
   losesMonthlyBonus: boolean;
   weeksWithoutBonus: string[];
-  /** Tổng tiền mô phỏng tháng — chỉ hiển thị. */
-  simulatedAmount?: number;
+  /** Tổng tiền phạt tháng, trừ vào lương. */
+  fineAmount?: number;
 }
 
 export interface IViolationMonth {
