@@ -549,6 +549,12 @@ export function useNavData(
                 featureKey: 'payroll.core',
                 allPermissions: [PAYROLL.quarterBonusManage],
               },
+              {
+                title: 'Chi phí dự kiến',
+                path: paths.dashboard.payroll.costForecast,
+                featureKey: 'payroll.core',
+                allPermissions: [PAYROLL.costForecastRead],
+              },
             ],
           },
           

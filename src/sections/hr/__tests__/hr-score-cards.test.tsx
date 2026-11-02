@@ -42,6 +42,7 @@ const api = vi.hoisted(() => ({
   getMyProvisionalPerformance: vi.fn(),
 }));
 vi.mock('src/api/hr', () => api);
+vi.mock('src/sections/hr/staff-dashboard-cards', () => ({ StaffDashboardCards: () => null }));
 
 const score = (over: Partial<IPerformanceScore>): IPerformanceScore =>
   ({

@@ -81,6 +81,7 @@ export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   { prefix: paths.dashboard.payroll.complaints, roles: null, permissions: [PAYROLL.complaintReview] },
   { prefix: paths.dashboard.payroll.bonusPrograms, roles: null, permissions: [PAYROLL.bonusProgramManage] },
   { prefix: paths.dashboard.payroll.quarterBonus, roles: null, permissions: [PAYROLL.quarterBonusManage] },
+  { prefix: paths.dashboard.payroll.costForecast, roles: null, permissions: [PAYROLL.costForecastRead] },
   { prefix: paths.dashboard.hr.rules, roles: null, permissions: [PERMISSIONS.hr.ruleManage] },
 
   { prefix: paths.dashboard.pos.product.new, roles: null, permissions: [PRODUCTS.create] },

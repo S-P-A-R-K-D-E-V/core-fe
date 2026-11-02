@@ -35,6 +35,8 @@ import type {
   ICompensation,
   IViolationRule,
   IMyViolations,
+  IMyWeeklyBonus,
+  ICurrentPayrollEstimate,
   IViolationEntry,
   IViolationShift,
   IViolationMonth,
@@ -192,6 +194,16 @@ export async function getWeeklyBonus(from: string, to: string): Promise<IWeeklyB
 
 export async function getWorkTasks(params: { month?: string; assigneeId?: string; status?: WorkTaskStatus }): Promise<IWorkTask[]> {
   const response = await axios.get<IWorkTask[]>(endpoints.hr.tasks, { params });
+  return response.data;
+}
+
+export async function getMyWeeklyBonus(from: string, to: string): Promise<IMyWeeklyBonus[]> {
+  const response = await axios.get<IMyWeeklyBonus[]>(endpoints.hr.weeklyBonusMine, { params: { from, to } });
+  return response.data;
+}
+
+export async function getMyCurrentEstimate(): Promise<ICurrentPayrollEstimate> {
+  const response = await axios.get<ICurrentPayrollEstimate>(endpoints.payroll.myCurrentEstimate);
   return response.data;
 }
 
