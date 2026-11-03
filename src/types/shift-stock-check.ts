@@ -53,6 +53,8 @@ export interface IShiftStockCheck {
   varianceLines?: number | null;
   varianceValue?: number | null;
   lines?: IShiftStockCheckLine[] | null;
+  /** Ghi chú của người làm ca (mã hàng tag hỏng / thiếu / sai giá…) — ai xem phiếu cũng thấy. */
+  crewNote?: string | null;
 }
 
 export interface IStockCheckArea {

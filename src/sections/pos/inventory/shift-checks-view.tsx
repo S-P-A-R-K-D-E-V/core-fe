@@ -77,6 +77,9 @@ function StatusChip({ check }: { check: IShiftStockCheck }) {
   return <Chip size="small" color={STATUS_COLOR[check.status]} label={SHIFT_STOCK_CHECK_STATUS_LABEL[check.status]} />;
 }
 
+/** Ghi chú của người làm ca — khớp ShiftStockCheckRules.MaxCrewNoteLength (core-be). */
+const CREW_NOTE_MAX = 1000;
+
 const qty = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: 3 }));
 
 function parseQty(text: string): number | null | undefined {
@@ -91,23 +94,27 @@ function parseQty(text: string): number | null | undefined {
 export function ShiftCountCard({ check, onChanged }: { check: IShiftStockCheck; onChanged: (c: IShiftStockCheck) => void }) {
   const { enqueueSnackbar } = useSnackbar();
   const [texts, setTexts] = useState<Record<string, string>>({});
+  const [note, setNote] = useState('');
   const [busy, setBusy] = useState<'save' | 'submit' | null>(null);
   const editable = check.status === 'Draft';
 
   useEffect(() => {
     setTexts(Object.fromEntries((check.lines ?? []).map((l) => [l.lineId, l.countedQuantity == null ? '' : String(l.countedQuantity)])));
+    setNote(check.crewNote ?? '');
   }, [check]);
 
   const changed = (check.lines ?? []).filter((l) => (texts[l.lineId] ?? '') !== (l.countedQuantity == null ? '' : String(l.countedQuantity)));
-  const invalid = changed.some((l) => parseQty(texts[l.lineId] ?? '') === undefined);
+  const invalid = changed.some((l) => parseQty(texts[l.lineId] ?? '') === undefined) || note.length > CREW_NOTE_MAX;
+  const noteChanged = note.trim() !== (check.crewNote ?? '');
 
   const save = async (): Promise<IShiftStockCheck | null> => {
-    if (changed.length === 0) return check;
+    if (changed.length === 0 && !noteChanged) return check;
     setBusy('save');
     try {
       const saved = await saveShiftStockCounts(
         check.id,
-        changed.map((l) => ({ lineId: l.lineId, quantity: parseQty(texts[l.lineId] ?? '') ?? null }))
+        changed.map((l) => ({ lineId: l.lineId, quantity: parseQty(texts[l.lineId] ?? '') ?? null })),
+        noteChanged ? note.trim() : undefined
       );
       onChanged(saved);
       return saved;
@@ -197,9 +204,30 @@ export function ShiftCountCard({ check, onChanged }: { check: IShiftStockCheck; 
           </TableBody>
         </Table>
       </TableContainer>
+      {editable ? (
+        <Stack sx={{ px: 2, pt: 2 }}>
+          <TextField
+            fullWidth
+            label="Ghi chú cho quản lý (không bắt buộc)"
+            placeholder="Mã hàng tag hỏng, mất tag, sai giá… vd: NH01 tag hỏng"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            error={note.length > CREW_NOTE_MAX}
+            helperText={note.length > CREW_NOTE_MAX ? `Tối đa ${CREW_NOTE_MAX} ký tự` : 'Quản lý in tag mới và thay trong ngày.'}
+            multiline
+            minRows={2}
+          />
+        </Stack>
+      ) : (
+        check.crewNote && (
+          <Alert severity="warning" sx={{ mx: 2, mt: 2, whiteSpace: 'pre-wrap' }}>
+            <strong>Ghi chú của ca:</strong> {check.crewNote}
+          </Alert>
+        )
+      )}
       {editable && (
         <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ p: 2 }}>
-          <LoadingButton loading={busy === 'save'} disabled={changed.length === 0 || invalid || !!busy} onClick={save}>
+          <LoadingButton loading={busy === 'save'} disabled={(changed.length === 0 && !noteChanged) || invalid || !!busy} onClick={save}>
             Lưu số đếm
           </LoadingButton>
           <LoadingButton variant="contained" loading={busy === 'submit'} disabled={invalid || !!busy} onClick={submit}>
@@ -283,7 +311,7 @@ function CheckDetailDialog({ id, onClose, onReviewed }: { id: string | null; onC
             )}
             <ShiftCountCard check={check} onChanged={setCheck} />
             {(check.status === 'Pending' || check.status === 'Draft') && (
-              <TextField label="Ghi chú (không bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} />
+              <TextField label="Ghi chú khi xác nhận / huỷ (không bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} />
             )}
             <Alert severity="info">
               Phiếu kiểm ca chỉ để báo chênh lệch — không chỉnh tồn kho. Thiếu hàng thật thì lập biên bản chênh lệch ở mục Nhân sự.
@@ -366,7 +394,14 @@ function ChecksTab() {
               {list.map((c) => (
                 <TableRow key={c.id} hover sx={{ cursor: 'pointer' }} onClick={() => setOpenId(c.id)}>
                   <TableCell>{c.shiftDate ? fDate(c.shiftDate, 'dd/MM/yyyy') : ''}</TableCell>
-                  <TableCell>{c.title ?? c.areaName}</TableCell>
+                  <TableCell>
+                    {c.title ?? c.areaName}
+                    {c.crewNote && (
+                      <Typography variant="caption" color="warning.dark" display="block" noWrap sx={{ maxWidth: 360 }} title={c.crewNote}>
+                        Ghi chú: {c.crewNote}
+                      </Typography>
+                    )}
+                  </TableCell>
                   <TableCell align="right">
                     {c.countedLines}/{c.totalLines}
                   </TableCell>

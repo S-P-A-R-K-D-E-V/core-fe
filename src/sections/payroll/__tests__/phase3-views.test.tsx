@@ -163,11 +163,56 @@ describe('Kiểm hàng ca', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Nộp phiếu' }));
 
     await waitFor(() => expect(checks.submitShiftStockCheck).toHaveBeenCalledWith('k1'));
-    expect(checks.saveShiftStockCounts).toHaveBeenCalledWith('k1', [
-      { lineId: 'l1', quantity: 4 },
-      { lineId: 'l2', quantity: 3 },
-    ]);
+    expect(checks.saveShiftStockCounts).toHaveBeenCalledWith(
+      'k1',
+      [
+        { lineId: 'l1', quantity: 4 },
+        { lineId: 'l2', quantity: 3 },
+      ],
+      undefined
+    );
     expect(onChanged).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'Pending' }));
+  });
+
+  it('nhân viên ghi mã hàng tag hỏng vào ghi chú — lưu cùng số đếm rồi nộp', async () => {
+    const { ShiftCountCard } = await import('src/sections/pos/inventory/shift-checks-view');
+    const saved = check({ countedLines: 2, crewNote: 'NH01 tag hỏng' });
+    checks.saveShiftStockCounts.mockResolvedValue(saved);
+    checks.submitShiftStockCheck.mockResolvedValue({ ...saved, status: 'Pending' });
+    wrap(<ShiftCountCard check={check()} onChanged={vi.fn()} />);
+
+    const [ring, chain] = screen.getAllByRole('textbox');
+    await userEvent.type(ring, '4');
+    await userEvent.type(chain, '3');
+    await userEvent.type(screen.getByLabelText('Ghi chú cho quản lý (không bắt buộc)'), '  NH01 tag hỏng ');
+    await userEvent.click(screen.getByRole('button', { name: 'Nộp phiếu' }));
+
+    await waitFor(() => expect(checks.submitShiftStockCheck).toHaveBeenCalledWith('k1'));
+    expect(checks.saveShiftStockCounts).toHaveBeenCalledWith(
+      'k1',
+      [
+        { lineId: 'l1', quantity: 4 },
+        { lineId: 'l2', quantity: 3 },
+      ],
+      'NH01 tag hỏng'
+    );
+  });
+
+  it('quản lý thấy ghi chú của ca trên phiếu đã nộp và trong danh sách', async () => {
+    const { ShiftCountCard, ShiftStockChecksView } = await import('src/sections/pos/inventory/shift-checks-view');
+    const { unmount } = wrap(
+      <ShiftCountCard onChanged={vi.fn()} check={check({ blind: false, status: 'Pending', crewNote: 'DC01 sai giá' })} />
+    );
+    expect(screen.getByText('DC01 sai giá')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Ghi chú cho quản lý (không bắt buộc)')).not.toBeInTheDocument();
+    unmount();
+
+    auth.user.permissions = ['stocktake.read'];
+    checks.getMyShiftStockChecks.mockResolvedValue([]);
+    checks.getShiftStockChecks.mockResolvedValue([check({ status: 'Pending', crewNote: 'DC01 sai giá', lines: null })]);
+    wrap(<ShiftStockChecksView />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Các phiếu kiểm ca' }));
+    expect(await screen.findByText('Ghi chú: DC01 sai giá')).toBeInTheDocument();
   });
 
   it('quản lý thấy tồn máy và chênh lệch của phiếu đã nộp', async () => {
