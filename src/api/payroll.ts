@@ -182,11 +182,12 @@ export async function markPayrollPaid(
 // ── Salary config preview + bulk finalize ────────────────────────────────
 
 export async function getSalaryConfigPreview(
-  fromDate: string
+  fromDate: string,
+  toDate?: string
 ): Promise<ISalaryConfigPreviewItem[]> {
   const response = await axios.get<ISalaryConfigPreviewItem[]>(
     endpoints.payroll.salaryConfigPreview,
-    { params: { fromDate } }
+    { params: toDate ? { fromDate, toDate } : { fromDate } }
   );
   return response.data;
 }

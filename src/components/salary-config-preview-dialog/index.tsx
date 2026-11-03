@@ -36,6 +36,8 @@ import type { ISalaryConfigPreviewItem, IVersionedUpsertSalaryConfigRequest } fr
 import { getSalaryConfigPreview } from 'src/api/payroll';
 import { versionedUpsertSalaryConfig } from 'src/api/salary';
 
+import { periodLines, shortDate } from './period-lines';
+
 // ──────────────────────────────────────────────────────────────────────────
 
 const SALARY_TYPE_LABELS: Record<string, string> = {
@@ -64,6 +66,8 @@ const DEFAULT_EDIT: Omit<EditState, 'userId'> = {
 type Props = {
   open: boolean;
   fromDate: string; // yyyy-MM-dd
+  /** Ngày cuối kỳ — có thì hiện mọi mức lương áp trong kỳ, không chỉ mức của ngày đầu. */
+  toDate?: string;
   onClose: VoidFunction;
   /**
    * Gọi khi bấm "Tiếp tục tính lương". `userIds` = danh sách nhân viên được
@@ -72,7 +76,7 @@ type Props = {
   onProceed: (userIds: string[] | null) => void;
 };
 
-export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onProceed }: Props) {
+export default function SalaryConfigPreviewDialog({ open, fromDate, toDate, onClose, onProceed }: Props) {
   const { enqueueSnackbar } = useSnackbar();
 
   const [items, setItems] = useState<ISalaryConfigPreviewItem[]>([]);
@@ -90,7 +94,7 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onP
     if (!fromDate) return;
     setLoading(true);
     try {
-      const data = await getSalaryConfigPreview(fromDate);
+      const data = await getSalaryConfigPreview(fromDate, toDate && toDate >= fromDate ? toDate : undefined);
       // Defensive client-side filter using INCLUSIVE logic: show the item if
       // isStaff is true OR undefined (older BE that doesn't send the field).
       // isStaff === false only when a future BE explicitly marks a non-staff
@@ -105,7 +109,7 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onP
     } finally {
       setLoading(false);
     }
-  }, [fromDate, enqueueSnackbar]);
+  }, [fromDate, toDate, enqueueSnackbar]);
 
   useEffect(() => {
     if (open) fetchPreview();
@@ -298,11 +302,24 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, onClose, onP
                           </Typography>
                         </TableCell>
                         <TableCell align="right">
-                          <Typography variant="body2" fontWeight={item.activeConfig ? 600 : 400}>
-                            {item.activeConfig
-                              ? new Intl.NumberFormat('vi-VN').format(item.activeConfig.amount)
-                              : '—'}
-                          </Typography>
+                          {periodLines(item) ? (
+                            <Stack spacing={0.25} alignItems="flex-end">
+                              {periodLines(item)!.map((p) => (
+                                <Typography key={p.id} variant="body2" fontWeight={600}>
+                                  {new Intl.NumberFormat('vi-VN').format(p.amount)}
+                                  <Typography component="span" variant="caption" color="text.secondary">
+                                    {` · ${shortDate(p.from)}–${shortDate(p.to)}`}
+                                  </Typography>
+                                </Typography>
+                              ))}
+                            </Stack>
+                          ) : (
+                            <Typography variant="body2" fontWeight={item.activeConfig ? 600 : 400}>
+                              {item.activeConfig
+                                ? new Intl.NumberFormat('vi-VN').format(item.activeConfig.amount)
+                                : '—'}
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" color="text.secondary">
