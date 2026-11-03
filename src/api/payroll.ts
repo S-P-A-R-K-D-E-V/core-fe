@@ -82,7 +82,7 @@ export async function getPayrollShiftDetails(
   return response.data;
 }
 
-/** Thưởng lễ, bù đủ 300% ngày lễ, làm thêm giờ, ca đêm, làm hộ — tổng khớp bonus + overtimeSalary. */
+/** Thưởng lễ, bù đủ 300% ngày lễ, làm thêm giờ, làm hộ (và làm đêm ở cửa hàng có) — tổng khớp bonus + overtimeSalary. */
 export async function getPayrollAllowanceDetails(
   payrollRecordId: string
 ): Promise<IPayrollAllowanceDetailItem[]> {

@@ -5,8 +5,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 // ----------------------------------------------------------------------
-// "Trả lương theo Bộ luật Lao động": chưa áp dụng thì cảnh báo Điều 98; lưu ngày + giờ làm bình thường sau khi xác nhận;
-// giờ ngoài 4–10 không lưu được; bỏ ngày áp dụng gửi null.
+// "Phụ cấp giờ làm": lưu ngày + giờ làm bình thường sau khi xác nhận; giờ ngoài 4–10 không lưu được; bỏ ngày áp dụng
+// gửi null; dòng làm đêm 22:00–06:00 chỉ hiện ở cửa hàng có phụ cấp làm đêm (CiCi không có).
 // ----------------------------------------------------------------------
 
 const enqueueSnackbar = vi.fn();
@@ -53,7 +53,25 @@ describe('StatutoryPayCard', () => {
     await confirmInDialog('Áp dụng');
 
     await waitFor(() => expect(updateStatutoryPaySettings).toHaveBeenCalledWith('2026-11-01', 8));
-    expect(await screen.findByText(/theo luật từ 01\/11\/2026, giờ làm bình thường 8 giờ\/ngày/)).toBeTruthy();
+    expect(await screen.findByText(/Áp dụng từ 01\/11\/2026, giờ làm bình thường 8 giờ\/ngày/)).toBeTruthy();
+  });
+
+  it('cửa hàng không có phụ cấp làm đêm (CiCi): không hiện dòng 22:00–06:00', async () => {
+    getStatutoryPaySettings.mockResolvedValue({ statutoryPayFrom: '2026-11-01', normalHoursPerDay: 8, updatedAt: 'x', nightPremiumEnabled: false });
+    renderCard();
+
+    expect(await screen.findByText(/không có phụ cấp làm đêm/)).toBeTruthy();
+    expect(screen.queryByText(/22:00–06:00/)).toBeNull();
+    expect(screen.queryByText(/ban đêm/)).toBeNull();
+    expect(screen.getByText('Làm quá số giờ bình thường trong ngày: 150%.')).toBeTruthy();
+  });
+
+  it('cửa hàng có phụ cấp làm đêm: hiện dòng +30% và +20%', async () => {
+    getStatutoryPaySettings.mockResolvedValue({ statutoryPayFrom: '2026-11-01', normalHoursPerDay: 8, updatedAt: 'x', nightPremiumEnabled: true });
+    renderCard();
+
+    expect(await screen.findByText('Làm việc 22:00–06:00: thêm 30% lương giờ.')).toBeTruthy();
+    expect(screen.getByText('Làm thêm giờ ban đêm: thêm 20% lương giờ ban ngày.')).toBeTruthy();
   });
 
   it('giờ làm bình thường ngoài 4–10 thì khoá nút Lưu', async () => {

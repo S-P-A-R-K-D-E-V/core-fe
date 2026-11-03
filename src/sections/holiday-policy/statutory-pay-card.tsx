@@ -22,9 +22,9 @@ import { getStatutoryPaySettings, updateStatutoryPaySettings } from 'src/api/hol
 import { useSnackbar } from 'src/components/snackbar';
 
 // ----------------------------------------------------------------------
-// Trả lương theo luật (PUT /holiday-policies/statutory-pay): kỳ lương bắt đầu từ ngày đã chọn cộng
-// phụ cấp ca đêm 22:00–06:00 (+30%), làm thêm giờ ngày thường (150%), làm thêm giờ ban đêm (+20%) và bù cho đủ 300% giờ
-// làm ngày lễ, Tết theo luật. Kỳ trước ngày đó giữ nguyên; bỏ ngày là tính như cũ.
+// Phụ cấp giờ làm (PUT /holiday-policies/statutory-pay): kỳ lương bắt đầu từ ngày đã chọn cộng làm thêm giờ ngày thường
+// (150%) và bù cho đủ 300% giờ làm ngày lễ, Tết. Phụ cấp làm đêm 22:00–06:00 chỉ hiện và chỉ tính khi cửa hàng có
+// (nightPremiumEnabled; CiCi không có). Kỳ trước ngày đó giữ nguyên; bỏ ngày là tính như cũ.
 
 /** Ngày đầu tháng sau theo giờ máy, dạng yyyy-MM-dd — gợi ý mặc định (chu kỳ lương theo tháng). */
 function firstDayOfNextMonth(now = new Date()): string {
@@ -33,18 +33,30 @@ function firstDayOfNextMonth(now = new Date()): string {
   return `${d.getFullYear()}-${mm}-01`;
 }
 
-const RULES = [
-  'Làm việc 22:00–06:00: thêm 30% lương giờ.',
-  'Làm quá số giờ bình thường trong ngày: 150%.',
-  'Làm thêm giờ ban đêm: thêm 20% lương giờ ban ngày.',
-  'Ngày lễ, Tết theo luật: tối thiểu 300% (tự bù phần thưởng lễ còn thiếu).',
-];
+/** Các dòng giải thích; dòng làm đêm chỉ có khi cửa hàng có phụ cấp làm đêm. */
+export function statutoryRules(nightPremium: boolean): string[] {
+  return [
+    'Làm quá số giờ bình thường trong ngày: 150%.',
+    ...(nightPremium
+      ? ['Làm việc 22:00–06:00: thêm 30% lương giờ.', 'Làm thêm giờ ban đêm: thêm 20% lương giờ ban ngày.']
+      : []),
+    'Ngày lễ, Tết: tối thiểu 300% (tự bù phần thưởng lễ còn thiếu).',
+  ];
+}
+
+/** Câu mô tả các khoản được cộng, dùng trong hộp xác nhận. */
+function addedItems(nightPremium: boolean, hours: number): string {
+  return nightPremium
+    ? `phụ cấp làm đêm, làm thêm giờ (quá ${hours} giờ/ngày) và bù đủ 300% ngày lễ`
+    : `làm thêm giờ (quá ${hours} giờ/ngày) và bù đủ 300% ngày lễ`;
+}
 
 export function StatutoryPayCard() {
   const { enqueueSnackbar } = useSnackbar();
   const [confirm, confirmDialog] = useConfirmDialog();
   const [from, setFrom] = useState<string | null>(null);
   const [hours, setHours] = useState(8);
+  const [nightPremium, setNightPremium] = useState(false);
   const [draftFrom, setDraftFrom] = useState(firstDayOfNextMonth());
   const [draftHours, setDraftHours] = useState('8');
   const [loaded, setLoaded] = useState(false);
@@ -55,10 +67,11 @@ export function StatutoryPayCard() {
       const settings = await getStatutoryPaySettings();
       setFrom(settings.statutoryPayFrom);
       setHours(settings.normalHoursPerDay);
+      setNightPremium(settings.nightPremiumEnabled === true);
       setDraftHours(String(settings.normalHoursPerDay));
       if (settings.statutoryPayFrom) setDraftFrom(settings.statutoryPayFrom);
     } catch (err) {
-      enqueueSnackbar(apiErrorMessage(err, 'Không tải được thiết lập trả lương theo luật'), { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(err, 'Không tải được thiết lập phụ cấp giờ làm'), { variant: 'error' });
     } finally {
       setLoaded(true);
     }
@@ -76,16 +89,16 @@ export function StatutoryPayCard() {
     const ok = await confirm(
       value
         ? {
-            title: `Trả lương theo luật từ ${fDate(value)}?`,
+            title: `Áp dụng phụ cấp giờ làm từ ${fDate(value)}?`,
             content:
-              `Kỳ lương bắt đầu từ ngày này cộng phụ cấp ca đêm, làm thêm giờ (quá ${parsedHours} giờ/ngày) và bù đủ 300% ngày lễ.\n` +
+              `Kỳ lương bắt đầu từ ngày này cộng ${addedItems(nightPremium, parsedHours)}.\n` +
               'Kỳ trước ngày này giữ nguyên. Tính lại chu kỳ lương để bảng lương áp dụng.',
             confirmText: 'Áp dụng',
             cancelText: 'Huỷ',
           }
         : {
-            title: 'Bỏ trả lương theo luật?',
-            content: 'Bảng lương tính lại sẽ không còn phụ cấp ca đêm, làm thêm giờ và phần bù 300% ngày lễ.',
+            title: 'Bỏ phụ cấp giờ làm?',
+            content: `Bảng lương tính lại sẽ không còn ${nightPremium ? 'phụ cấp làm đêm, làm thêm giờ' : 'phần làm thêm giờ'} và phần bù 300% ngày lễ.`,
             confirmText: 'Bỏ ngày áp dụng',
             cancelText: 'Huỷ',
             destructive: true,
@@ -98,6 +111,7 @@ export function StatutoryPayCard() {
       const settings = await updateStatutoryPaySettings(value, value ? parsedHours : null);
       setFrom(settings.statutoryPayFrom);
       setHours(settings.normalHoursPerDay);
+      setNightPremium(settings.nightPremiumEnabled === true);
       setDraftHours(String(settings.normalHoursPerDay));
       enqueueSnackbar('Đã lưu. Tính lại chu kỳ lương để áp dụng.', { variant: 'success' });
     } catch (err) {
@@ -111,19 +125,20 @@ export function StatutoryPayCard() {
 
   return (
     <Card sx={{ mb: 3 }}>
-      <CardHeader title="Trả lương theo luật" />
+      <CardHeader title="Phụ cấp giờ làm" />
       <CardContent>
         <Stack spacing={2}>
           {from ? (
             <Alert severity="success">
-              Cửa hàng trả lương theo luật từ {fDate(from)}, giờ làm bình thường {hours} giờ/ngày.
+              Áp dụng từ {fDate(from)}, giờ làm bình thường {hours} giờ/ngày
+              {nightPremium ? ', có phụ cấp làm đêm' : ', không có phụ cấp làm đêm'}.
             </Alert>
           ) : (
             <Alert severity="info">Chưa áp dụng. Chọn ngày bắt đầu áp dụng.</Alert>
           )}
 
           <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 2.5 }}>
-            {RULES.map((rule) => (
+            {statutoryRules(nightPremium).map((rule) => (
               <Typography key={rule} component="li" variant="body2" color="text.secondary">
                 {rule}
               </Typography>
