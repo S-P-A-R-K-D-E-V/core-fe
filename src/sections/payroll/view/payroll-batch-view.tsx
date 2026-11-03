@@ -2467,6 +2467,7 @@ export default function PayrollBatchView() {
       <SalaryConfigPreviewDialog
         open={salaryConfigOpen}
         fromDate={fromDate || (pendingAction === 'recalculate' && cycleDetail ? cycleDetail.fromDate : '')}
+        toDate={toDate || (pendingAction === 'recalculate' && cycleDetail ? cycleDetail.toDate : '')}
         onClose={() => {
           setSalaryConfigOpen(false);
           setPendingAction(null);

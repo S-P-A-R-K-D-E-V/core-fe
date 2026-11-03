@@ -840,6 +840,17 @@ export interface ISalaryConfigPreviewItem {
   activeConfig?: ISalaryConfigSummary;
   /** Always true — endpoint only returns Staff users. Used for defensive client-side guard. */
   isStaff?: boolean;
+  /** Chỉ có khi gửi toDate: mọi mức lương áp trong kỳ, kèm khoảng ngày (mức cũ và mức mới khi đổi giữa kỳ). */
+  periodConfigs?: ISalaryConfigPeriodSummary[];
+}
+
+export interface ISalaryConfigPeriodSummary {
+  id: string;
+  salaryType: string;
+  amount: number;
+  probationRate?: number;
+  from: string; // yyyy-MM-dd
+  to: string;
 }
 
 // POST /salary-configurations/versioned-upsert
