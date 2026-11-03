@@ -177,7 +177,8 @@ export function CostForecastView() {
   const lines = items
     ? [
         { label: 'Lương giờ', value: items.hourlyPay },
-        { label: 'Phụ cấp đêm', value: items.nightPremium },
+        // Chỉ cửa hàng có phụ cấp làm đêm mới có khoản này (CiCi không có).
+        ...(items.nightPremium ? [{ label: 'Phụ cấp làm đêm', value: items.nightPremium }] : []),
         { label: 'Làm thêm giờ', value: items.overtimePremium },
         { label: 'Phụ trội ngày lễ', value: items.holidayPremium },
         { label: 'Làm hộ', value: items.coverPay },

@@ -21,7 +21,7 @@ import type { IPayrollAllowanceDetailItem, IPayrollRecord } from 'src/types/core
 
 // ──────────────────────────────────────────────────────────────────────────
 // Popup "Chi tiết thưởng & phụ cấp" — bấm vào thưởng lễ hoặc phụ cấp trên bảng lương để xem từng khoản: thưởng lễ, bù đủ
-// 300% ngày lễ, làm thêm giờ, ca đêm, làm hộ. Cùng pattern PenaltyDetailDialog (tự fetch khi mở).
+// 300% ngày lễ, làm thêm giờ, làm hộ (và làm đêm ở cửa hàng có phụ cấp này). Cùng pattern PenaltyDetailDialog (tự fetch khi mở).
 // ──────────────────────────────────────────────────────────────────────────
 
 function formatCurrency(n: number) {

@@ -2444,7 +2444,7 @@ export default function PayrollBatchView() {
         onClose={() => setPenaltyDetailRecord(null)}
       />
 
-      {/* ── Allowance Detail Dialog (thưởng lễ, làm thêm giờ, ca đêm, làm hộ) ── */}
+      {/* ── Allowance Detail Dialog (thưởng lễ, làm thêm giờ, làm hộ, làm đêm nếu có) ── */}
       <AllowanceDetailDialog
         open={!!allowanceDetailRecord}
         record={allowanceDetailRecord}
