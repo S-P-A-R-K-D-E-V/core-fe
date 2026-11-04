@@ -3406,12 +3406,31 @@ export interface IPosAccountCapability {
   bankAccountId: string;
   /** auto: tiền về tự xác nhận · auto_paid: tự xác nhận nhưng ApiPay đã hết hạn mức (tính phí) · manual: thu ngân tự kiểm tra */
   confirmation: 'auto' | 'auto_paid' | 'manual';
-  /** bank_direct (Open Banking) | bank_feed (ApiPay, SePay, Casso) — null khi manual */
-  kind: 'bank_direct' | 'bank_feed' | null;
+  /** bank_direct (Open Banking) | bank_feed (ApiPay, SePay, Casso) | gateway_va (payOS gắn tài khoản) — null khi manual */
+  kind: 'bank_direct' | 'bank_feed' | 'gateway_va' | null;
   provider: string | null;
-  quota: { used: number; pending: number; limit: number; remaining: number; state: string } | null;
-  /** no_connection | apipay_quota_exceeded */
+  quota: IPosAccountQuota | null;
+  /** no_connection | apipay_quota_exceeded | quota_exceeded (payOS hết lượt) */
   reason: string | null;
+  /** Mọi nguồn báo tiền về của tài khoản (nguồn dùng kế tiếp đứng đầu, next = true) — payOS / ApiPay còn hạn mức luân phiên. */
+  sources?: IPosAccountSource[] | null;
+}
+
+export interface IPosAccountQuota {
+  used: number;
+  pending: number;
+  limit: number;
+  remaining: number;
+  state: string;
+}
+
+export interface IPosAccountSource {
+  connectionId: string;
+  kind: 'bank_direct' | 'bank_feed' | 'gateway_va';
+  provider: string;
+  displayName: string | null;
+  quota: IPosAccountQuota | null;
+  next: boolean;
 }
 
 export interface IPosAccountCapabilitiesResponse {

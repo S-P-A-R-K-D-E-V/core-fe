@@ -39,8 +39,14 @@ import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 
+import {
+  sourceLabel,
+  useAccountCapabilities,
+  type AccountCapabilities,
+} from 'src/components/account-capability';
+
 import { ApiPayBankLinkCard } from './apipay-bank-link';
-import { ConnectionList, ConfirmActionDialog } from './payment-connection';
+import { ConnectionList, ConfirmActionDialog, ConnectionFormDialog } from './payment-connection';
 import BankAccountFormDialog from './bank-account/bank-account-form-dialog';
 import BankAccountVietQrDialog from './bank-account/bank-account-vietqr-dialog';
 import { bankLinkCodeOf, BankLinkRegisterDialog, type BankLinkPreset } from './bank-link';
@@ -86,8 +92,13 @@ export default function BankAccountsTab() {
   );
   const [deactivating, setDeactivating] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
+  // "Thêm nguồn payOS": kết nối payOS gắn đúng tài khoản này (S Payment luân phiên payOS ⇄ ApiPay theo hạn mức).
+  const [payosTarget, setPayosTarget] = useState<IBankAccountWithConnections | null>(null);
+  const [loadCount, setLoadCount] = useState(0);
+  const capabilities = useAccountCapabilities(enabled ? loadCount : -1);
 
   const load = useCallback(async () => {
+    setLoadCount((n) => n + 1);
     setLoadError(null);
     setConnectionsError(null);
     try {
@@ -289,6 +300,9 @@ export default function BankAccountsTab() {
           account={a}
           bank={bankOf(a)}
           enabled={enabled}
+          capabilities={capabilities}
+          canAddPayOs={providers.some((p) => p.key === 'payos')}
+          onAddPayOs={() => setPayosTarget(a)}
           providers={providers}
           providersLoading={providersLoading}
           providersError={providersError}
@@ -363,6 +377,30 @@ export default function BankAccountsTab() {
         onClose={() => setQrTarget(null)}
       />
 
+      <ConnectionFormDialog
+        open={!!payosTarget}
+        mode="create"
+        presetProvider="payos"
+        providers={providers}
+        providersLoading={providersLoading}
+        providersError={providersError}
+        presetBankAccount={
+          payosTarget
+            ? {
+                id: payosTarget.id,
+                label: bankAccountOptionLabel(payosTarget),
+                bin: payosTarget.bin,
+                accountNumber: payosTarget.accountNumber,
+              }
+            : null
+        }
+        onClose={() => setPayosTarget(null)}
+        onSaved={() => {
+          setPayosTarget(null);
+          load();
+        }}
+      />
+
       <BankLinkRegisterDialog
         open={!!registerPreset}
         preset={registerPreset}
@@ -396,6 +434,9 @@ type CardProps = {
   account: IBankAccountWithConnections;
   bank?: IVietQRBank;
   enabled: boolean;
+  capabilities: AccountCapabilities;
+  canAddPayOs: boolean;
+  onAddPayOs: VoidFunction;
   providers: IPaymentProviderInfo[];
   providersLoading: boolean;
   providersError: string | null;
@@ -413,6 +454,9 @@ function BankAccountCard({
   account: a,
   bank,
   enabled,
+  capabilities,
+  canAddPayOs,
+  onAddPayOs,
   providers,
   providersLoading,
   providersError,
@@ -429,6 +473,11 @@ function BankAccountCard({
   const editable = !a.isManagedByKiotViet;
   // Đăng ký báo có qua S Payment: VietinBank / MB, tài khoản chưa có kết nối nào.
   const canRegister = !!bankLinkCodeOf(a.bin) && a.connections.length === 0;
+  // Nguồn tự xác nhận S Payment thấy cho tài khoản (kể cả ApiPay VA gắn số TK gốc) — nguồn đầu dùng cho thanh toán kế tiếp.
+  const sources = capabilities[a.id]?.sources ?? [];
+  const hasPayOs = sources.some((s) => s.provider === 'payos');
+  const rotating =
+    sources.filter((s) => s.kind !== 'bank_direct' && (!s.quota || s.quota.remaining > 0)).length > 1;
 
   return (
     <Card sx={{ p: 3, ...(a.isActive ? {} : { bgcolor: 'background.neutral' }) }}>
@@ -515,6 +564,17 @@ function BankAccountCard({
                 Đăng ký báo có
               </Button>
             )}
+            {enabled && a.isActive && canAddPayOs && !hasPayOs && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Iconify icon="mingcute:add-line" />}
+                onClick={onAddPayOs}
+                disabled={!a.accountNumber}
+              >
+                Thêm nguồn payOS
+              </Button>
+            )}
             {editable && (
               <Button
                 size="small"
@@ -556,17 +616,51 @@ function BankAccountCard({
               <Typography variant="overline" sx={{ color: 'text.secondary' }}>
                 Kết nối đối soát
               </Typography>
+              {sources.length > 0 && (
+                <Stack spacing={0.75}>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      Nguồn tự xác nhận:
+                    </Typography>
+                    {sources.map((s) => (
+                      <Label
+                        key={s.connectionId}
+                        variant="soft"
+                        color={
+                          s.quota && s.quota.remaining === 0 ? 'default' : s.next ? 'success' : 'info'
+                        }
+                      >
+                        {sourceLabel(s)}
+                        {s.next ? ' · dùng tiếp' : ''}
+                      </Label>
+                    ))}
+                  </Stack>
+                  {rotating && (
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      S Payment luân phiên các nguồn còn lượt miễn phí cho mỗi lần tạo QR; nguồn hết lượt tự
+                      rời vòng.
+                    </Typography>
+                  )}
+                </Stack>
+              )}
               {a.connections.length === 0 ? (
-                <Box>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    Chưa kết nối — tiền vào tài khoản này chưa được tự xác nhận
-                    {!a.isActive
-                      ? '.'
-                      : canRegister
-                        ? '. Bấm "Đăng ký báo có" để ngân hàng báo tiền về (cần CCCD / MST, SĐT chủ tài khoản và OTP).'
-                        : '. Đăng ký báo có hiện hỗ trợ tài khoản VietinBank và MB.'}
-                  </Typography>
-                </Box>
+                sources.length === 0 && (
+                  <Box>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      Chưa kết nối — tiền vào tài khoản này chưa được tự xác nhận
+                      {!a.isActive
+                        ? '.'
+                        : canRegister
+                          ? '. Bấm "Đăng ký báo có" để ngân hàng báo tiền về (cần CCCD / MST, SĐT chủ tài khoản và OTP)'
+                          : '. Đăng ký báo có hiện hỗ trợ tài khoản VietinBank và MB'}
+                      {a.isActive && canAddPayOs
+                        ? ', hoặc "Thêm nguồn payOS" (tạo kênh trên my.payos.vn cho tài khoản này rồi dán 3 khoá).'
+                        : a.isActive
+                          ? '.'
+                          : ''}
+                    </Typography>
+                  </Box>
+                )
               ) : (
                 <ConnectionList
                   connections={a.connections}

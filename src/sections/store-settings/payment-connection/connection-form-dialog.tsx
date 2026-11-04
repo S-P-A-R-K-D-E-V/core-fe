@@ -85,6 +85,8 @@ type Props = {
   presetBankAccount?: BankAccountOption | null;
   /** Cập nhật: cho gắn tài khoản nhận (kết nối chưa gắn tài khoản nào) */
   allowBankAccountChange?: boolean;
+  /** Tạo: chọn sẵn nhà cung cấp này, ẩn ô chọn (vd "Thêm nguồn payOS" trên thẻ tài khoản) */
+  presetProvider?: string | null;
   onClose: VoidFunction;
   onSaved: (connection: IPaymentConnection, mode: ConnectionFormMode) => void;
 };
@@ -99,6 +101,7 @@ export default function ConnectionFormDialog({
   bankAccounts = [],
   presetBankAccount,
   allowBankAccountChange,
+  presetProvider,
   onClose,
   onSaved,
 }: Props) {
@@ -125,10 +128,10 @@ export default function ConnectionFormDialog({
       setProviderKey(connection.provider);
       setDisplayName(connection.displayName ?? '');
     } else {
-      setProviderKey('');
+      setProviderKey(presetProvider ?? '');
       setDisplayName('');
     }
-  }, [open, mode, connection]);
+  }, [open, mode, connection, presetProvider]);
 
   // Danh mục về / đổi nhà cung cấp → dựng lại giá trị ban đầu của các ô
   useEffect(() => {
@@ -212,7 +215,7 @@ export default function ConnectionFormDialog({
         <Stack spacing={3}>
           {providersError && <Alert severity="error">{providersError}</Alert>}
 
-          {mode === 'create' && (
+          {mode === 'create' && !presetProvider && (
             <ProviderPicker
               loading={!!providersLoading}
               providers={selectable}
