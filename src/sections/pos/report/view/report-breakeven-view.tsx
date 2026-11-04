@@ -221,11 +221,20 @@ export default function ReportBreakEvenView() {
                     </Stack>
                   </Stack>
 
+                  {(data.operatingCost?.payrollExpensesExcluded ?? 0) > 0 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
+                      Khoản chi lương đã nhập ({fCurrency(data.operatingCost!.payrollExpensesExcluded!)}) không cộng thêm vì
+                      tháng này đã có bảng lương.
+                    </Typography>
+                  )}
+
                   {data.operatingCost?.hasEstimates && (
                     <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-                      Khoản &quot;ước tính&quot; gồm: chi phí định kỳ chưa được sinh, lương kỳ chưa chốt (suy từ
-                      kỳ lương gần nhất), và chi phí biến đổi chưa nhập (trung bình mùa vụ). Con số thực tế
-                      thay thế ước tính khi dữ liệu được nhập/chốt.
+                      Lương tính cùng cách với bảng lương: phiếu đã chốt, phiếu đã tính, chấm công thật, ca đã xếp; ngày
+                      chưa xếp ca theo giờ công trung bình 8 tuần gần nhất × đơn giá hiện hành; thưởng tuần, chuyên cần,
+                      thưởng quý (chia theo tháng xét thưởng). Lương tính trước khi trừ tiền phạt. Khoản &quot;ước
+                      tính&quot; khác: chi phí định kỳ chưa sinh, khoản hằng tháng chưa nhập (trung bình 3 tháng gần nhất),
+                      chi phí biến đổi chưa nhập. Số thực tế thay thế ước tính khi dữ liệu được nhập / chốt.
                     </Typography>
                   )}
                 </CardContent>

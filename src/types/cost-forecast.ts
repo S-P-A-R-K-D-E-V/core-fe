@@ -14,6 +14,12 @@ export interface ICostForecastItems {
   quarterAtRisk: number;
   quarterLost: number;
   employerInsurance: number;
+  /** Thưởng chuyên cần dự kiến (chưa có phiếu cuối tháng). */
+  attendanceBonus?: number;
+  /** Thưởng nhập tay trên phiếu. */
+  otherBonus?: number;
+  /** Tiền phạt trừ lương trong kỳ — chỉ để xem, không làm giảm chi phí. */
+  fines?: number;
 }
 
 export interface ICostForecastEmployee {
@@ -27,6 +33,7 @@ export interface ICostForecastEmployee {
   quarterStatus?: string | null;
   employerInsurance: number;
   total: number;
+  attendanceBonus?: number;
 }
 
 export interface ICostForecast {

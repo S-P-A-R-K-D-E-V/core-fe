@@ -19,9 +19,10 @@ import Chart, { useChart } from 'src/components/chart';
 import { useAuthContext } from 'src/auth/hooks';
 import { hasAllPermissions } from 'src/auth/permissions';
 import { reportPermissionsFor } from '../report-access';
+import { dashboardMoney } from '../dashboard-money';
 
-import { IRevenueReport, IExpenseReport, IBreakEvenAnalysis } from 'src/types/corecms-api';
-import { getRevenueReport, getExpenseReport, getBreakEvenAnalysis } from 'src/api/reports';
+import { IRevenueReport, IExpenseReport, IBreakEvenAnalysis, IOperatingCostBreakdown } from 'src/types/corecms-api';
+import { getRevenueReport, getExpenseReport, getBreakEvenAnalysis, getOperatingCost } from 'src/api/reports';
 
 // ----------------------------------------------------------------------
 
@@ -45,6 +46,8 @@ export default function ReportDashboardView() {
   const [breakEven, setBreakEven] = useState<IBreakEvenAnalysis | null>(null);
   const [prevRevenue, setPrevRevenue] = useState<IRevenueReport | null>(null);
   const [prevExpense, setPrevExpense] = useState<IExpenseReport | null>(null);
+  const [operatingCost, setOperatingCost] = useState<IOperatingCostBreakdown | null>(null);
+  const [prevOperatingCost, setPrevOperatingCost] = useState<IOperatingCostBreakdown | null>(null);
 
   const { user } = useAuthContext();
   // Trang cần đủ quyền doanh thu + chi phí + hoà vốn (ReportPageGuard ở page) — thiếu quyền thì không gọi API (403).
@@ -62,19 +65,31 @@ export default function ReportDashboardView() {
       const prevFrom = new Date(prevTo.getTime() - lenDays * msPerDay);
       const iso = (d: Date) => d.toISOString().slice(0, 10);
 
-      const [revenueResult, expenseResult, breakEvenResult, prevRevenueResult, prevExpenseResult] =
-        await Promise.all([
-          getRevenueReport({ fromDate, toDate, groupBy: 'day' }),
-          getExpenseReport({ fromDate, toDate, groupBy: 'day' }),
-          getBreakEvenAnalysis({ period: 'month', targetDate: toDate }),
-          getRevenueReport({ fromDate: iso(prevFrom), toDate: iso(prevTo), groupBy: 'day' }),
-          getExpenseReport({ fromDate: iso(prevFrom), toDate: iso(prevTo), groupBy: 'day' }),
-        ]);
+      const [
+        revenueResult,
+        expenseResult,
+        breakEvenResult,
+        prevRevenueResult,
+        prevExpenseResult,
+        operatingCostResult,
+        prevOperatingCostResult,
+      ] = await Promise.all([
+        getRevenueReport({ fromDate, toDate, groupBy: 'day' }),
+        getExpenseReport({ fromDate, toDate, groupBy: 'day' }),
+        getBreakEvenAnalysis({ period: 'month', targetDate: toDate }),
+        getRevenueReport({ fromDate: iso(prevFrom), toDate: iso(prevTo), groupBy: 'day' }),
+        getExpenseReport({ fromDate: iso(prevFrom), toDate: iso(prevTo), groupBy: 'day' }),
+        // Chi phí vận hành gồm lương (cùng bộ ước tính với hoà vốn) — lợi nhuận ròng trừ cả lương.
+        getOperatingCost({ fromDate, toDate }),
+        getOperatingCost({ fromDate: iso(prevFrom), toDate: iso(prevTo) }),
+      ]);
       setRevenue(revenueResult);
       setExpense(expenseResult);
       setBreakEven(breakEvenResult);
       setPrevRevenue(prevRevenueResult);
       setPrevExpense(prevExpenseResult);
+      setOperatingCost(operatingCostResult);
+      setPrevOperatingCost(prevOperatingCostResult);
     } catch (error) {
       console.error(error);
       enqueueSnackbar('Không thể tải dashboard tài chính', { variant: 'error' });
@@ -85,7 +100,8 @@ export default function ReportDashboardView() {
     fetchData();
   }, [fetchData]);
 
-  const netProfit = revenue && expense ? revenue.grossProfit - expense.totalExpense : 0;
+  const money = dashboardMoney(revenue?.grossProfit, operatingCost);
+  const netProfit = revenue && operatingCost ? money.netProfit : 0;
 
   const achievedPercent = breakEven && breakEven.breakEvenRevenue > 0
     ? Math.min(999, (breakEven.actualRevenue / breakEven.breakEvenRevenue) * 100)
@@ -113,11 +129,13 @@ export default function ReportDashboardView() {
 
     // MoM: so kỳ hiện tại (khoảng chọn) vs kỳ trước cùng độ dài
     const curRevenue = revenue.totalRevenue;
-    const curExpense = expense?.totalExpense ?? 0;
-    const curNet = revenue.grossProfit - curExpense;
+    const cur = dashboardMoney(revenue.grossProfit, operatingCost);
+    const curExpense = cur.operatingCost;
+    const curNet = cur.netProfit;
     const pRevenue = prevRevenue?.totalRevenue ?? 0;
-    const pExpense = prevExpense?.totalExpense ?? 0;
-    const pNet = (prevRevenue?.grossProfit ?? 0) - pExpense;
+    const prev = dashboardMoney(prevRevenue?.grossProfit, prevOperatingCost);
+    const pExpense = prev.operatingCost;
+    const pNet = prev.netProfit;
     const pct = (cur: number, prev: number) =>
       prev !== 0 ? ((cur - prev) / Math.abs(prev)) * 100 : null;
 
@@ -158,7 +176,7 @@ export default function ReportDashboardView() {
       aov,
       currentOrders: revenue.totalOrders,
     };
-  }, [breakEven, revenue, expense, prevRevenue, prevExpense, toDate]);
+  }, [breakEven, revenue, prevRevenue, operatingCost, prevOperatingCost, toDate]);
 
   const chartData = useMemo(() => {
     if (!revenue || !expense) return { categories: [] as string[], revenueSeries: [] as number[], costSeries: [] as number[], expenseSeries: [] as number[] };
@@ -241,7 +259,7 @@ export default function ReportDashboardView() {
           </CardContent>
         </Card>
 
-        {revenue && expense && (
+        {revenue && expense && operatingCost && (
           <Grid container spacing={3} sx={{ mb: 3 }}>
             <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
               <Card>
@@ -271,7 +289,10 @@ export default function ReportDashboardView() {
               <Card>
                 <CardContent>
                   <Typography variant="subtitle2" color="text.secondary">Chi phí vận hành</Typography>
-                  <Typography variant="h5" color="error.main">{fCurrency(expense.totalExpense)}</Typography>
+                  <Typography variant="h5" color="error.main">{fCurrency(money.operatingCost)}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Gồm lương {fCurrency(money.laborCost)}
+                  </Typography>
                 </CardContent>
               </Card>
             </Grid>
@@ -298,7 +319,7 @@ export default function ReportDashboardView() {
                   series={[
                     { name: 'Doanh thu', data: chartData.revenueSeries },
                     { name: 'Giá vốn', data: chartData.costSeries },
-                    { name: 'Chi phí vận hành', data: chartData.expenseSeries },
+                    { name: 'Chi phí đã nhập (chưa gồm lương)', data: chartData.expenseSeries },
                   ]}
                   options={trendChartOptions}
                   height={360}

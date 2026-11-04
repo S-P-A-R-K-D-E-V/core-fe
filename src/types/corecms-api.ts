@@ -1220,6 +1220,16 @@ export interface IWeeklyBonusPaySettings {
   updatedAt: string | null;
 }
 
+/** Chế độ trả lương của cửa hàng: kỳ 1 / kỳ 2, mức sàn lương thử việc, thưởng chuyên cần (GET /holiday-policies/pay-regime). */
+export interface IPayRegimeSettings {
+  halfMonthCyclesFrom: string | null;
+  probationHourlyFloor: number | null;
+  probationHourlyFloorFrom: string | null;
+  attendanceBonusAmount: number | null;
+  attendanceBonusFrom: string | null;
+  updatedAt: string | null;
+}
+
 export interface IUpdateHolidayPolicyRequest {
   name: string;
   fromDate: string;
@@ -2870,6 +2880,8 @@ export interface IExpenseCategory {
   name: string;
   type: ExpenseType;
   isActive: boolean;
+  /** Khoản chi lương nhân viên: Điểm hoà vốn không cộng ở tháng đã có bảng lương. */
+  isPayroll?: boolean;
 }
 
 export interface IExpense {
@@ -2926,12 +2938,14 @@ export interface IUpdateExpenseRequest {
 export interface ICreateExpenseCategoryRequest {
   name: string;
   type: ExpenseType;
+  isPayroll?: boolean;
 }
 
 export interface IUpdateExpenseCategoryRequest {
   name: string;
   type: ExpenseType;
   isActive: boolean;
+  isPayroll?: boolean;
 }
 
 export interface ICreateRecurringExpenseTemplateRequest {
@@ -3664,11 +3678,27 @@ export interface IDebtSummary {
 }
 
 // --- Break-even Analysis (điểm hòa vốn) ---
+/** Nguồn của một dòng chi phí hoạt động (core-be OperatingCostEstimator + LaborCostEstimator). */
+export type OperatingCostSource =
+  | 'recorded'
+  | 'recurring'
+  | 'labor'
+  | 'labor-calculated'
+  | 'labor-attendance'
+  | 'labor-scheduled'
+  | 'labor-projected'
+  | 'labor-monthly-config'
+  | 'labor-weekly-bonus'
+  | 'labor-attendance-bonus'
+  | 'labor-quarter-bonus'
+  | 'variable-estimated'
+  | 'regular-estimated';
+
 export interface IOperatingCostLine {
   label: string;
   amount: number;
   isEstimated: boolean;
-  source: 'recorded' | 'recurring' | 'labor' | 'labor-estimated' | 'variable-estimated';
+  source: OperatingCostSource;
 }
 
 export interface IOperatingCostBreakdown {
@@ -3684,6 +3714,10 @@ export interface IOperatingCostBreakdown {
   laborCost: number;
   otherCost: number;
   lines: IOperatingCostLine[];
+  /** Khoản hằng tháng chưa nhập (điện nước...), ước tính theo TB 3 tháng gần nhất có nhập — đã nằm trong total. */
+  regularEstimated?: number;
+  /** Khoản chi danh mục lương không cộng vì tháng đó đã có bảng lương (chỉ để xem). */
+  payrollExpensesExcluded?: number;
 }
 
 export interface IBreakEvenAnalysis {
