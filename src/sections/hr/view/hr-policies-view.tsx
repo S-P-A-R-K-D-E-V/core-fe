@@ -33,6 +33,7 @@ import { useAuthContext } from 'src/auth/hooks';
 import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
 import {
+  attachPolicyText,
   getPolicyDocuments,
   uploadPolicyFile,
   publishPolicyDocument,
@@ -130,6 +131,29 @@ export default function HrPoliciesView() {
       enqueueSnackbar(apiErrorMessage(err, 'Không đăng được văn bản'), { variant: 'error' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Bản Word gốc cho trợ lý (tách chữ theo Điều): gắn vào đúng phiên bản này — không tạo bản mới, không ai phải xác nhận lại.
+  const [attachingId, setAttachingId] = useState<string | null>(null);
+  const attachText = async (doc: IPolicyDocument, file: File | undefined) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.docx')) {
+      enqueueSnackbar('Chọn tệp Word (.docx) gốc của văn bản', { variant: 'error' });
+      return;
+    }
+    setAttachingId(doc.id);
+    try {
+      const r = await attachPolicyText(doc.id, file);
+      enqueueSnackbar(
+        `Trợ lý đã đọc được "${doc.title}": ${r.sections} đoạn` +
+          (r.embedded > 0 ? `, ${r.embedded} đoạn tìm được theo nghĩa` : ' (tìm theo từ khoá)')
+      );
+      load();
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không đọc được tệp Word'), { variant: 'error' });
+    } finally {
+      setAttachingId(null);
     }
   };
 
@@ -234,7 +258,26 @@ export default function HrPoliciesView() {
                         <Button size="small" onClick={() => newVersionOf(doc)}>
                           Sửa (bản mới)
                         </Button>
+                        <LoadingButton size="small" component="label" loading={attachingId === doc.id}>
+                          {doc.textFileName ? 'Đổi bản Word cho trợ lý' : 'Gắn bản Word cho trợ lý'}
+                          <input
+                            hidden
+                            type="file"
+                            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            onChange={(e) => {
+                              attachText(doc, e.target.files?.[0]);
+                              e.target.value = '';
+                            }}
+                          />
+                        </LoadingButton>
                       </Stack>
+                    )}
+                    {canManage && (
+                      <Typography variant="caption" color={doc.textFileName ? 'text.secondary' : 'warning.main'}>
+                        {doc.textFileName
+                          ? `Trợ lý đọc theo Điều từ ${doc.textFileName}`
+                          : 'Trợ lý chưa đọc được văn bản này — gắn bản Word gốc'}
+                      </Typography>
                     )}
                   </Stack>
                 </Stack>

@@ -44,6 +44,7 @@ import type {
   IViolationCatalog,
   ISaveViolationRule,
   ViolationEntryStatus,
+  IPolicyTextResult,
 } from 'src/types/hr';
 
 // ----------------------------------------------------------------------
@@ -139,6 +140,26 @@ export async function uploadPolicyFile(file: File): Promise<string> {
   const put = await fetch(presign.data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
   if (!put.ok) throw new Error(`Tải tệp lên thất bại (${put.status})`);
   return presign.data.objectKey;
+}
+
+// DOCX_TYPE khai báo ở phần hợp đồng bên dưới.
+
+/**
+ * Gắn bản Word (.docx) gốc cho ĐÚNG phiên bản đang có để trợ lý đọc và trích dẫn theo Điều — không tạo phiên bản mới,
+ * không ai phải xác nhận lại.
+ */
+export async function attachPolicyText(id: string, file: File): Promise<IPolicyTextResult> {
+  const presign = await axios.post<{ objectKey: string; uploadUrl: string }>(endpoints.hr.policyFilePresign, {
+    contentType: DOCX_TYPE,
+    fileName: file.name,
+  });
+  const put = await fetch(presign.data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': DOCX_TYPE }, body: file });
+  if (!put.ok) throw new Error(`Tải tệp lên thất bại (${put.status})`);
+  const response = await axios.put<IPolicyTextResult>(endpoints.hr.policyText(id), {
+    textFileKey: presign.data.objectKey,
+    textFileName: file.name,
+  });
+  return response.data;
 }
 
 export async function deactivatePolicyDocument(id: string): Promise<IPolicyDocument> {

@@ -453,6 +453,7 @@ export const endpoints = {
     policiesActive: '/policy-documents/active',
     policiesPending: '/policy-documents/pending',
     policyDeactivate: (id: string) => `/policy-documents/${id}/deactivate`,
+    policyText: (id: string) => `/policy-documents/${id}/text`,
     policyAcknowledge: (id: string) => `/policy-documents/${id}/acknowledge`,
     policyAcknowledgements: (id: string) => `/policy-documents/${id}/acknowledgements`,
     policyFilePresign: '/policy-documents/files/presign',
