@@ -67,6 +67,12 @@ export const CHATBOT_WEB_ROUTES: Readonly<Record<string, WebRouteDef>> = {
   'shift-pool': { roles: ALL, featureKey: SCHEDULING, path: () => dashboard.shiftPool.root },
   checkin: { roles: ALL, featureKey: ATTENDANCE, path: () => dashboard.attendance.checkin },
   chat: { roles: ALL, path: () => dashboard.messenger },
+  // Nhân sự (khớp AssistantRouteCatalog phía server).
+  'hr-policies': { roles: ALL, featureKey: SCHEDULING, path: () => dashboard.hr.policies },
+  'hr-violations': { roles: ALL, featureKey: SCHEDULING, path: () => dashboard.hr.violations },
+  'hr-tasks': { roles: ALL, featureKey: SCHEDULING, path: () => dashboard.hr.tasks },
+  'hr-performance': { roles: ALL, featureKey: SCHEDULING, path: () => dashboard.hr.performance },
+  'hr-leave': { roles: ALL, featureKey: SCHEDULING, path: () => dashboard.hr.leave },
   products: { roles: ADMIN, featureKey: INVENTORY, path: () => dashboard.pos.product.list },
   'product-detail': {
     params: ['id'],

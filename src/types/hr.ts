@@ -88,6 +88,14 @@ export interface IPolicyDocument {
   isActive: boolean;
   publishedAt: string;
   acknowledgedAt?: string | null;
+  /** Bản .docx gốc đã tách chữ theo Điều cho trợ lý; trống = trợ lý chưa đọc được văn bản này. */
+  textFileName?: string | null;
+}
+
+export interface IPolicyTextResult {
+  document: IPolicyDocument;
+  sections: number;
+  embedded: number;
 }
 
 export interface IPolicyAcknowledgementStatus {

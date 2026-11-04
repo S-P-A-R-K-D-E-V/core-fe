@@ -21,7 +21,10 @@ import type {
   ChatbotUiAction,
   ChatbotUiToolAction,
   ChatbotUiPurchaseImport,
+  ChatbotUiCitation,
 } from './chatbot-blocks';
+
+import { paths } from 'src/routes/paths';
 
 // ----------------------------------------------------------------------
 // Phần có cấu trúc dưới câu trả lời đã xong (đã qua normalizeChatbotBlocks): thẻ hoá đơn nhập, ảnh, thẻ link, nút.
@@ -138,6 +141,57 @@ function LinkCard({ link }: { link: ChatbotUiLink }) {
   );
 }
 
+/** Thẻ nguồn trích dẫn quy chế (chữ do server điền). Bấm → trang Nội quy, quy chế. */
+function CitationCard({ citation, onNavigate }: { citation: ChatbotUiCitation; onNavigate: (href: string) => void }) {
+  const meta = [citation.version ? `Bản ${citation.version}` : null, citation.publishedOn].filter(Boolean).join(' · ');
+  return (
+    <Stack
+      component="button"
+      type="button"
+      onClick={() => onNavigate(paths.dashboard.hr.policies)}
+      direction="row"
+      alignItems="center"
+      spacing={1}
+      aria-label={`${citation.docTitle}, ${citation.label}`}
+      sx={{
+        px: 1,
+        py: 0.75,
+        minWidth: 0,
+        width: '100%',
+        textAlign: 'left',
+        font: 'inherit',
+        cursor: 'pointer',
+        borderRadius: 1,
+        border: '1px solid',
+        borderColor: 'divider',
+        bgcolor: 'transparent',
+        color: 'text.primary',
+        transition: (theme) => theme.transitions.create('background-color'),
+        '&:hover': { bgcolor: 'action.hover' },
+        '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main' },
+      }}
+    >
+      <Iconify icon="solar:document-text-bold" width={18} sx={{ color: 'primary.main', flexShrink: 0 }} />
+      <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+        <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+          {citation.docTitle} · {citation.label}
+        </Typography>
+        {citation.title && (
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            {citation.title}
+          </Typography>
+        )}
+        {meta && (
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+            {meta}
+          </Typography>
+        )}
+      </Box>
+      <Iconify icon="eva:arrow-ios-forward-fill" width={16} sx={{ color: 'text.disabled', flexShrink: 0 }} />
+    </Stack>
+  );
+}
+
 type Props = {
   blocks: ChatbotUiBlock[];
   /** Đang có câu trả lời chạy → tạm khoá nút, tránh chồng lệnh. */
@@ -152,12 +206,17 @@ function ChatbotMessageBlocks({ blocks, busy, onNavigate, onRequestTool }: Props
   const links = blocks.filter((b): b is ChatbotUiLink => b.type === 'link');
   const actions = blocks.filter((b): b is ChatbotUiAction => b.type === 'action');
   const invoices = blocks.filter((b): b is ChatbotUiPurchaseImport => b.type === 'purchase-import');
-  if (!images.length && !links.length && !actions.length && !invoices.length) return null;
+  const citations = blocks.filter((b): b is ChatbotUiCitation => b.type === 'citation');
+  if (!images.length && !links.length && !actions.length && !invoices.length && !citations.length) return null;
 
   return (
     <Stack spacing={1} sx={{ mt: 1, minWidth: 0 }}>
       {invoices.map((invoice) => (
         <PurchaseImportChatCard key={invoice.importId} importId={invoice.importId} onNavigate={onNavigate} />
+      ))}
+
+      {citations.map((citation) => (
+        <CitationCard key={`${citation.doc}/${citation.number}`} citation={citation} onNavigate={onNavigate} />
       ))}
 
       {images.length > 0 && <ImageGrid images={images} />}

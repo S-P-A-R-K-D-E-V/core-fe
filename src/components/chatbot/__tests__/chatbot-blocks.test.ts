@@ -460,6 +460,8 @@ describe('đối tượng + câu hỏi nhanh', () => {
     expect(CHATBOT_QUICK_ACTIONS.admin.map((a) => a.label)).toEqual([
       'Doanh thu hôm nay',
       'Ai đang trong ca',
+      'Việc còn dở hôm nay',
+      'Điểm trừ tháng này',
       'Kiểm quầy',
       'Bán chạy tuần này',
       'Đi trễ tháng này',
@@ -468,6 +470,9 @@ describe('đối tượng + câu hỏi nhanh', () => {
     ]);
     expect(CHATBOT_QUICK_ACTIONS.staff.map((a) => a.label)).toEqual([
       'Lịch làm của tôi',
+      'Việc hôm nay',
+      'Điểm trừ của tôi',
+      'Hỏi quy chế',
       'Lương của tôi',
       'Ca còn trống',
       'Đăng ký ca',
@@ -484,9 +489,11 @@ describe('đối tượng + câu hỏi nhanh', () => {
   });
 
   it('quản lý cửa hàng SaaS không thấy câu hỏi cần công cụ tiền', () => {
-    expect(quickActionsFor('admin', 'cici_admin')).toHaveLength(7);
+    expect(quickActionsFor('admin', 'cici_admin')).toHaveLength(9);
     expect(quickActionsFor('admin', 'store_manager').map((a) => a.label)).toEqual([
       'Ai đang trong ca',
+      'Việc còn dở hôm nay',
+      'Điểm trừ tháng này',
       'Bán chạy tuần này',
       'Đi trễ tháng này',
       'Đăng ký ca tuần tới',
@@ -509,5 +516,47 @@ describe('normalizeChatbotBlocks — thẻ hoá đơn nhập', () => {
     );
 
     expect(blocks).toEqual([{ type: 'purchase-import', importId: id }]);
+  });
+});
+
+describe('khối citation (thẻ nguồn quy chế)', () => {
+  const real = {
+    type: 'citation',
+    doc: 'quy-che-luonh',
+    number: '14b',
+    docTitle: 'Quy chế lương thưởng',
+    label: 'Điều 14b',
+    title: 'Ngưỡng điểm trừ trong tháng và điều kiện nhận thưởng',
+    version: 1,
+    publishedOn: '03/11/2026',
+  };
+
+  it('giữ thẻ đủ chữ server điền, bỏ trùng, tối đa 3', () => {
+    const more = ['1', '2', '3'].map((n) => ({ ...real, number: n, label: `Điều ${n}` }));
+    const out = normalizeChatbotBlocks([real, { ...real }, ...more], staff);
+    const cites = out.filter((b) => b.type === 'citation');
+    expect(cites).toHaveLength(3);
+    expect(cites[0]).toEqual(real);
+  });
+
+  it('bỏ thẻ thiếu tên văn bản / nhãn hoặc mã lạ; trường phụ sai thì bỏ trường đó', () => {
+    const out = normalizeChatbotBlocks(
+      [
+        { ...real, docTitle: '' },
+        { ...real, label: '' },
+        { ...real, doc: '../x' },
+        { ...real, number: '2', version: 0, publishedOn: '2026-11-03' },
+      ],
+      staff
+    );
+    expect(out).toEqual([{ ...real, number: '2', version: undefined, publishedOn: undefined }]);
+  });
+
+  it('nút mở các trang Nhân sự', () => {
+    expect(resolveChatbotRoute('hr-policies', null, staff)).toBe(paths.dashboard.hr.policies);
+    expect(resolveChatbotRoute('hr-violations', null, staff)).toBe(paths.dashboard.hr.violations);
+    expect(resolveChatbotRoute('hr-tasks', null, staff)).toBe(paths.dashboard.hr.tasks);
+    expect(resolveChatbotRoute('hr-performance', null, staff)).toBe(paths.dashboard.hr.performance);
+    expect(resolveChatbotRoute('hr-leave', null, staff)).toBe(paths.dashboard.hr.leave);
   });
 });

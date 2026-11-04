@@ -253,11 +253,11 @@ describe('ChatbotWidget', () => {
     await waitFor(() =>
       expect(api.sendChatbotMessage).toHaveBeenCalledWith({
         sessionId: 's-admin',
-        content: 'Hôm nay những ai làm ca nào?',
+        content: 'Bây giờ ai đang trong ca, ai chưa chấm công vào?',
         phone: '0900000001',
       })
     );
-    expect(await within(panel).findByText('Hôm nay những ai làm ca nào?')).toBeInTheDocument();
+    expect(await within(panel).findByText('Bây giờ ai đang trong ca, ai chưa chấm công vào?')).toBeInTheDocument();
     // Một chỉ báo "đang trả lời" duy nhất, nằm trong bong bóng đang chờ.
     await waitFor(() => expect(within(panel).getAllByRole('status')).toHaveLength(2)); // header + bong bóng
     expect(within(panel).getAllByRole('status')[0]).toHaveTextContent('Đang trả lời…');
@@ -311,7 +311,7 @@ describe('ChatbotWidget', () => {
 
     await user.type(composer(), '/');
     const list = await within(panel).findByRole('listbox', { name: 'Danh sách lệnh' });
-    expect(within(list).getAllByRole('option')).toHaveLength(14);
+    expect(within(list).getAllByRole('option')).toHaveLength(18);
     expect(composer()).toHaveAttribute('aria-activedescendant');
 
     await user.type(composer(), 'moi');
@@ -346,7 +346,7 @@ describe('ChatbotWidget', () => {
     expect(within(list).getAllByRole('option')[1]).toHaveAttribute('aria-selected', 'true');
     await user.keyboard('{ArrowUp}{ArrowUp}');
     // Vòng lên mục cuối cùng (/trogiup).
-    expect(within(list).getAllByRole('option')[13]).toHaveAttribute('aria-selected', 'true');
+    expect(within(list).getAllByRole('option')[17]).toHaveAttribute('aria-selected', 'true');
 
     await user.keyboard('{Escape}');
     expect(within(panel).queryByRole('listbox')).toBeNull();
@@ -366,7 +366,7 @@ describe('ChatbotWidget', () => {
     await user.clear(composer());
     await user.click(within(panel).getByRole('button', { name: 'Mở danh sách lệnh' }));
     expect(within(await within(panel).findByRole('listbox')).getAllByRole('option')).toHaveLength(
-      14
+      18
     );
   });
 
