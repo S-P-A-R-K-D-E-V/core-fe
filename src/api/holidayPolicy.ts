@@ -5,8 +5,15 @@ import type {
   IHolidayPolicy,
   IStatutoryPaySettings,
   IWeeklyBonusPaySettings,
+  IPayRegimeSettings,
   IUpdateHolidayPolicyRequest,
 } from 'src/types/corecms-api';
+
+/** Chế độ trả lương (kỳ 1 / kỳ 2, mức sàn lương thử việc, chuyên cần). Cần quyền payroll.policy.manage. */
+export async function getPayRegimeSettings(): Promise<IPayRegimeSettings> {
+  const response = await axios.get<IPayRegimeSettings>(endpoints.holidayPolicy.payRegime);
+  return response.data;
+}
 
 // ----------------------------------------------------------------------
 

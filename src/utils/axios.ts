@@ -386,6 +386,7 @@ export const endpoints = {
     delete: (id: string) => `/holiday-policies/${id}`,
     statutoryPay: '/holiday-policies/statutory-pay',
     weeklyBonusPay: '/holiday-policies/weekly-bonus-pay',
+    payRegime: '/holiday-policies/pay-regime',
   },
   penaltyPolicy: {
     list: '/penalty-policies',
@@ -962,6 +963,7 @@ export const endpoints = {
     expenses: '/reports/expenses',
     debtSummary: '/reports/debt-summary',
     breakEven: '/reports/break-even',
+    operatingCost: '/reports/operating-cost',
   },
   chatbot: {
     startSession: '/chatbot/sessions',

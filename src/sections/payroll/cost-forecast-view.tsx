@@ -183,6 +183,8 @@ export function CostForecastView() {
         { label: 'Phụ trội ngày lễ', value: items.holidayPremium },
         { label: 'Làm hộ', value: items.coverPay },
         { label: 'Thưởng tuần dự kiến', value: items.weeklyBonus },
+        { label: 'Thưởng chuyên cần dự kiến', value: items.attendanceBonus ?? 0 },
+        ...(items.otherBonus ? [{ label: 'Thưởng nhập tay', value: items.otherBonus }] : []),
         { label: 'Hoa hồng', value: items.commission },
         { label: 'Thưởng quý: đủ điều kiện', value: items.quarterEligible },
         { label: 'Thưởng quý: rủi ro', value: items.quarterAtRisk },
@@ -271,6 +273,14 @@ export function CostForecastView() {
                       <TableCell align="right">{fVnd(l.value)}</TableCell>
                     </TableRow>
                   ))}
+                  {(items?.fines ?? 0) > 0 && (
+                    <TableRow>
+                      <TableCell sx={{ color: 'text.secondary' }}>Tiền phạt trừ lương (không làm giảm chi phí)</TableCell>
+                      <TableCell align="right" sx={{ color: 'text.secondary' }}>
+                        {fVnd(items?.fines)}
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {(items?.quarterLost ?? 0) > 0 && (
                     <TableRow>
                       <TableCell sx={{ color: 'text.secondary' }}>Thưởng quý đã mất (không tính)</TableCell>
@@ -289,9 +299,10 @@ export function CostForecastView() {
                   <TableHead>
                     <TableRow>
                       <TableCell>Nhân viên</TableCell>
-                      <TableCell align="right">Giờ thực / lịch</TableCell>
+                      <TableCell align="right">Giờ thực / dự kiến</TableCell>
                       <TableCell align="right">Lương, phụ cấp</TableCell>
                       <TableCell align="right">Thưởng tuần</TableCell>
+                      <TableCell align="right">Chuyên cần</TableCell>
                       <TableCell align="right">Thưởng quý</TableCell>
                       <TableCell align="right">BHXH</TableCell>
                       <TableCell align="right">Tổng</TableCell>
@@ -306,6 +317,7 @@ export function CostForecastView() {
                         </TableCell>
                         <TableCell align="right">{fVnd(e.pay)}</TableCell>
                         <TableCell align="right">{fVnd(e.weeklyBonus)}</TableCell>
+                        <TableCell align="right">{fVnd(e.attendanceBonus ?? 0)}</TableCell>
                         <TableCell align="right">
                           {fVnd(e.quarterBonus)}
                           {e.quarterStatus && (

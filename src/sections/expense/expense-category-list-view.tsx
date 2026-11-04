@@ -74,6 +74,7 @@ const Schema = Yup.object().shape({
   name: Yup.string().required('Tên danh mục là bắt buộc'),
   type: Yup.string().oneOf(['Fixed', 'Variable', 'Income', 'Expense']).required(),
   isActive: Yup.boolean().default(true),
+  isPayroll: Yup.boolean().default(false),
 });
 
 type FormValuesProps = Yup.InferType<typeof Schema>;
@@ -107,6 +108,7 @@ export default function ExpenseCategoryListView() {
       name: editing?.name || '',
       type: editing?.type || 'Fixed',
       isActive: editing?.isActive ?? true,
+      isPayroll: editing?.isPayroll ?? false,
     }),
     [editing]
   );
@@ -139,10 +141,11 @@ export default function ExpenseCategoryListView() {
           name: data.name,
           type: data.type as ExpenseType,
           isActive: data.isActive,
+          isPayroll: data.isPayroll,
         });
         enqueueSnackbar('Cập nhật thành công!');
       } else {
-        await createExpenseCategory({ name: data.name, type: data.type as ExpenseType });
+        await createExpenseCategory({ name: data.name, type: data.type as ExpenseType, isPayroll: data.isPayroll });
         enqueueSnackbar('Tạo thành công!');
       }
       dialog.onFalse();
@@ -194,7 +197,13 @@ export default function ExpenseCategoryListView() {
                 <TableBody>
                   {categories.map((row) => (
                     <TableRow key={row.id} hover>
-                      <TableCell>{row.name}</TableCell>
+                      <TableCell>{row.name}
+                        {row.isPayroll && (
+                          <Label variant="soft" color="info" sx={{ ml: 1 }}>
+                            Lương
+                          </Label>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Label variant="soft" color={TYPE_COLOR[row.type] ?? 'info'}>
                           {TYPE_LABEL[row.type] ?? row.type}
@@ -249,6 +258,11 @@ export default function ExpenseCategoryListView() {
                 <MenuItem value="Income">Khoản thu</MenuItem>
                 <MenuItem value="Expense">Chi phí</MenuItem>
               </RHFSelect>
+              <RHFSwitch
+                name="isPayroll"
+                label="Khoản chi lương nhân viên"
+                helperText="Tháng đã có bảng lương thì Điểm hoà vốn không cộng các khoản chi này, để lương không bị tính hai lần."
+              />
               {editing && <RHFSwitch name="isActive" label="Đang hoạt động" />}
             </Stack>
           </DialogContent>

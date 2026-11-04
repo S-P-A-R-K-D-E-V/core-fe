@@ -32,11 +32,13 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 
-import type { ISalaryConfigPreviewItem, IVersionedUpsertSalaryConfigRequest } from 'src/types/corecms-api';
+import type { ISalaryConfigPreviewItem, IVersionedUpsertSalaryConfigRequest, IPayRegimeSettings } from 'src/types/corecms-api';
 import { getSalaryConfigPreview } from 'src/api/payroll';
+import { getPayRegimeSettings } from 'src/api/holidayPolicy';
 import { versionedUpsertSalaryConfig } from 'src/api/salary';
 
 import { periodLines, shortDate } from './period-lines';
+import { probationLabel } from './probation-label';
 
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -89,6 +91,8 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, toDate, onCl
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
+  // Mức sàn lương thử việc của cửa hàng: kỳ từ ngày có mức sàn thì cột hệ số thử việc hiện mức sàn (bảng lương bỏ hệ số).
+  const [regime, setRegime] = useState<IPayRegimeSettings | null>(null);
 
   const fetchPreview = useCallback(async () => {
     if (!fromDate) return;
@@ -114,6 +118,12 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, toDate, onCl
   useEffect(() => {
     if (open) fetchPreview();
   }, [open, fetchPreview]);
+
+  useEffect(() => {
+    if (!open) return;
+    // Cần quyền chính sách lương; thiếu quyền thì giữ cách hiện cũ (hệ số).
+    getPayRegimeSettings().then(setRegime).catch(() => setRegime(null));
+  }, [open]);
 
   const missingCount = items.filter((i) => !i.hasActiveConfig).length;
 
@@ -323,9 +333,7 @@ export default function SalaryConfigPreviewDialog({ open, fromDate, toDate, onCl
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" color="text.secondary">
-                            {item.activeConfig?.probationRate != null
-                              ? `${(item.activeConfig.probationRate * 100).toFixed(0)}%`
-                              : '100%'}
+                            {probationLabel(item.activeConfig?.probationRate, regime, fromDate)}
                           </Typography>
                         </TableCell>
                         <TableCell>
