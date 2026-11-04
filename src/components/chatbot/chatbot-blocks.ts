@@ -37,12 +37,28 @@ export type ChatbotUiSuggestions = { type: 'suggestions'; items: ChatbotSuggesti
 /** Thẻ hoá đơn nhập (server tạo khi người dùng gửi ảnh hoá đơn NCC) — tự tải lần nhập theo id. */
 export type ChatbotUiPurchaseImport = { type: 'purchase-import'; importId: string };
 
+/**
+ * Thẻ nguồn trích dẫn nội quy / quy chế — server tra văn bản đang hiệu lực và tự điền mọi chữ hiển thị (model chỉ ghi mã
+ * văn bản + số Điều). Client vẫn kiểm kiểu / độ dài.
+ */
+export type ChatbotUiCitation = {
+  type: 'citation';
+  doc: string;
+  number: string;
+  docTitle: string;
+  label: string;
+  title?: string;
+  version?: number;
+  publishedOn?: string;
+};
+
 export type ChatbotUiBlock =
   | ChatbotUiImage
   | ChatbotUiLink
   | ChatbotUiAction
   | ChatbotUiSuggestions
-  | ChatbotUiPurchaseImport;
+  | ChatbotUiPurchaseImport
+  | ChatbotUiCitation;
 
 export const CHATBOT_BLOCK_LIMITS = {
   total: 12,
@@ -52,7 +68,32 @@ export const CHATBOT_BLOCK_LIMITS = {
   suggestions: 1,
   suggestionItems: 4,
   purchaseImport: 2,
+  citation: 3,
 } as const;
+
+const CITATION_CODE = /^[a-z0-9-]{1,100}$/i;
+const PUBLISHED_ON = /^\d{2}\/\d{2}\/\d{4}$/;
+
+function citationBlock(b: Record<string, unknown>): ChatbotUiCitation | null {
+  const doc = str(b.doc).trim();
+  const number = str(b.number).trim();
+  const docTitle = str(b.docTitle).trim().slice(0, 200);
+  const label = str(b.label).trim().slice(0, 120);
+  if (!CITATION_CODE.test(doc) || !number || number.length > 20 || !docTitle || !label) return null;
+  const publishedOn = str(b.publishedOn).trim();
+  const version =
+    typeof b.version === 'number' && Number.isInteger(b.version) && b.version > 0 ? b.version : undefined;
+  return {
+    type: 'citation',
+    doc,
+    number,
+    docTitle,
+    label,
+    title: str(b.title).trim().slice(0, 200) || undefined,
+    version,
+    publishedOn: PUBLISHED_ON.test(publishedOn) ? publishedOn : undefined,
+  };
+}
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -182,7 +223,7 @@ function suggestionsBlock(b: Record<string, unknown>): ChatbotUiSuggestions | nu
 export function normalizeChatbotBlocks(raw: unknown, user: ChatbotRouteUser): ChatbotUiBlock[] {
   if (!Array.isArray(raw)) return [];
   const out: ChatbotUiBlock[] = [];
-  const count = { image: 0, link: 0, action: 0, suggestions: 0, purchaseImport: 0 };
+  const count = { image: 0, link: 0, action: 0, suggestions: 0, purchaseImport: 0, citation: 0 };
   // Model hay lặp cùng một link / ảnh → chỉ giữ một (url cũng là key khi vẽ).
   const seen = new Set<string>();
 
@@ -225,6 +266,14 @@ export function normalizeChatbotBlocks(raw: unknown, user: ChatbotRouteUser): Ch
           seen.add(`purchase-import:${importId}`);
           out.push({ type: 'purchase-import', importId });
           count.purchaseImport += 1;
+        }
+      } else if (b.type === 'citation' && count.citation < CHATBOT_BLOCK_LIMITS.citation) {
+        const block = citationBlock(b);
+        const key = block ? `citation:${block.doc.toLowerCase()}/${block.number.toLowerCase()}` : '';
+        if (block && !seen.has(key)) {
+          seen.add(key);
+          out.push(block);
+          count.citation += 1;
         }
       }
       // loại lạ → bỏ

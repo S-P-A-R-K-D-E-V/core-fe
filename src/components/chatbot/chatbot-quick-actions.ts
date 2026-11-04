@@ -106,8 +106,20 @@ export const CHATBOT_QUICK_ACTIONS: Record<ChatbotAudience, ChatbotQuickAction[]
     {
       id: 'on-shift',
       label: 'Ai đang trong ca',
-      prompt: 'Hôm nay những ai làm ca nào?',
+      prompt: 'Bây giờ ai đang trong ca, ai chưa chấm công vào?',
       icon: 'solar:users-group-rounded-bold-duotone',
+    },
+    {
+      id: 'work-today',
+      label: 'Việc còn dở hôm nay',
+      prompt: 'Hôm nay còn việc nào chưa xong (việc trong ca, vệ sinh, việc giao)? Của ai?',
+      icon: 'solar:checklist-minimalistic-bold-duotone',
+    },
+    {
+      id: 'violations-month',
+      label: 'Điểm trừ tháng này',
+      prompt: 'Tháng này ai bị trừ điểm nhiều nhất, có khiếu nại nào đang chờ trả lời?',
+      icon: 'solar:danger-triangle-bold-duotone',
     },
     {
       id: 'cash-counter',
@@ -148,6 +160,24 @@ export const CHATBOT_QUICK_ACTIONS: Record<ChatbotAudience, ChatbotQuickAction[]
       label: 'Lịch làm của tôi',
       prompt: 'Lịch làm của tôi tuần này?',
       icon: 'solar:calendar-bold-duotone',
+    },
+    {
+      id: 'my-work-today',
+      label: 'Việc hôm nay',
+      prompt: 'Hôm nay tôi có việc gì (việc trong ca, vệ sinh, việc được giao)?',
+      icon: 'solar:checklist-minimalistic-bold-duotone',
+    },
+    {
+      id: 'my-points',
+      label: 'Điểm trừ của tôi',
+      prompt: 'Tháng này tôi bị trừ mấy điểm, vì sao?',
+      icon: 'solar:danger-triangle-bold-duotone',
+    },
+    {
+      id: 'policy',
+      label: 'Hỏi quy chế',
+      prompt: 'Quy chế nói gì về đổi ca và xin nghỉ?',
+      icon: 'solar:document-text-bold-duotone',
     },
     {
       id: 'my-payroll',
