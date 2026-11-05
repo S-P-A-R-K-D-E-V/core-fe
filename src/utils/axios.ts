@@ -870,6 +870,8 @@ export const endpoints = {
     connections: '/payment/qr/connections',
     /** Tài khoản nào tự xác nhận được (Open Banking / ApiPay còn hạn mức) — S Payment */
     accountCapabilities: '/payment/qr/account-capabilities',
+    /** Tài khoản quầy chọn khi tạo QR — theo S Payment (mỗi số TK thật một dòng, kèm nhãn tự xác nhận) */
+    posAccounts: '/payment/qr/pos-accounts',
   },
   // "Kết nối S Payment" (OAuth với portal S Payment — Admin): trạng thái, bắt đầu kết nối, ngắt.
   spayConnect: {

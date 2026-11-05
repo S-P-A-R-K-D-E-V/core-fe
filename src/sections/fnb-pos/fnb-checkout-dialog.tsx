@@ -29,10 +29,10 @@ import { fCurrency } from 'src/utils/format-number';
 import { qrTarget } from 'src/utils/payment-connection';
 import { qrOutcome, isEventForQr } from 'src/utils/payment-status';
 
-import { getBankAccounts } from 'src/api/bank-accounts';
 import AccountCapabilityHint, {
   AccountCapabilityTag,
-  useAccountCapabilities,
+  loadPosBankAccounts,
+  type AccountCapabilities,
 } from 'src/components/account-capability';
 import { cancelQrPayment, createQrPayment, getQrPaymentStatus } from 'src/api/payment-qr';
 
@@ -90,8 +90,8 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
   const fnbMethods = allowedPosMethods(FNB_METHODS, methods);
   const firstMethod = fnbMethods[0].value;
   // Lựa chọn gắn tài khoản của cửa hàng (vd VietinBank VietQR Pay — tài khoản VietinBank) → ô tài khoản theo luôn.
-  // Tài khoản nào tiền về được tự xác nhận (S Payment) — nhãn + gợi ý đổi tài khoản.
-  const capabilities = useAccountCapabilities();
+  // Tài khoản nào tiền về được tự xác nhận (S Payment, đi kèm danh sách tài khoản) — nhãn + gợi ý đổi tài khoản.
+  const [capabilities, setCapabilities] = useState<AccountCapabilities>({});
 
   const selectSource = (key: string) => {
     setSelectionKey(key);
@@ -117,10 +117,12 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
     setMethod(firstMethod);
     setCash('');
     setTransferRef(order ? `${order.tableName ?? 'Mang ve'} #${order.displayNo}` : '');
-    getBankAccounts()
-      .then((list) => {
+    // Theo S Payment: mỗi số tài khoản thật một dòng; tài khoản đang chọn không còn trong danh sách thì về dòng đầu.
+    loadPosBankAccounts()
+      .then(({ accounts: list, capabilities: caps }) => {
         setAccounts(list);
-        setAccountId((current) => current || list[0]?.id || '');
+        setCapabilities(caps);
+        setAccountId((current) => (list.some((a) => a.id === current) ? current : list[0]?.id || ''));
       })
       .catch(() => setAccounts([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps

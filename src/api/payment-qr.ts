@@ -5,6 +5,7 @@ import {
   IQrPaymentStatusResponse,
   IPosPaymentConnectionsResponse,
   IPosAccountCapabilitiesResponse,
+  IPosBankAccountsResponse,
 } from 'src/types/corecms-api';
 
 export async function createQrPayment(data: ICreateQrPaymentRequest): Promise<IQrPaymentResponse> {
@@ -26,6 +27,12 @@ export async function getPosAccountCapabilities(): Promise<IPosAccountCapabiliti
   const response = await axios.get<IPosAccountCapabilitiesResponse>(
     endpoints.paymentQr.accountCapabilities
   );
+  return response.data;
+}
+
+/** Tài khoản thu ngân chọn khi tạo QR — theo S Payment (S Payment tắt / lỗi → tài khoản của cửa hàng, source = core). */
+export async function getPosBankAccounts(): Promise<IPosBankAccountsResponse> {
+  const response = await axios.get<IPosBankAccountsResponse>(endpoints.paymentQr.posAccounts);
   return response.data;
 }
 

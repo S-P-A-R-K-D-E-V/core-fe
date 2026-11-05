@@ -3442,6 +3442,18 @@ export interface IPosAccountCapabilitiesResponse {
   accounts: IPosAccountCapability[];
 }
 
+/** Tài khoản ở quầy (GET /payment/qr/pos-accounts): cùng trường với GET /bank-accounts + nhãn tự xác nhận. */
+export interface IPosBankAccount extends IKiotVietBankAccount {
+  /** null khi source = core (S Payment tắt / không trả lời) */
+  capability?: IPosAccountCapability | null;
+}
+
+export interface IPosBankAccountsResponse {
+  /** spay: danh sách theo S Payment · core: tài khoản của cửa hàng (S Payment tắt hoặc lỗi) */
+  source: 'spay' | 'core';
+  accounts: IPosBankAccount[];
+}
+
 export interface IPosPaymentConnectionsResponse {
   /** Dịch vụ thanh toán (spark-payment) đang bật */
   enabled: boolean;

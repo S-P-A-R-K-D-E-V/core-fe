@@ -19,7 +19,8 @@ import Iconify from 'src/components/iconify';
 import PaymentQrInfo, { useQrImageSrc, useExpirySeconds } from 'src/components/payment-qr-info';
 import AccountCapabilityHint, {
   AccountCapabilityTag,
-  useAccountCapabilities,
+  loadPosBankAccounts,
+  type AccountCapabilities,
 } from 'src/components/account-capability';
 import PaymentConnectionSelect, {
   usePosPaymentConnections,
@@ -29,7 +30,7 @@ import { apiErrorMessage } from 'src/utils/api-error';
 import { qrTarget } from 'src/utils/payment-connection';
 import { qrOutcome, isEventForQr } from 'src/utils/payment-status';
 import { usePaymentStatusEvents } from 'src/hooks/use-payment-status-events';
-import { getBankAccounts, getVietQRBanks } from 'src/api/bank-accounts';
+import { getVietQRBanks } from 'src/api/bank-accounts';
 import { createQrPayment, getQrPaymentStatus, cancelQrPayment } from 'src/api/payment-qr';
 import {
   IKiotVietBankAccount,
@@ -81,8 +82,8 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     loaded: connectionsLoaded,
     allowBankAccount,
   } = usePosPaymentConnections();
-  // Tài khoản nào tiền về được tự xác nhận (S Payment) — nhãn + gợi ý đổi tài khoản.
-  const capabilities = useAccountCapabilities();
+  // Tài khoản nào tiền về được tự xác nhận (S Payment, đi kèm danh sách tài khoản) — nhãn + gợi ý đổi tài khoản.
+  const [capabilities, setCapabilities] = useState<AccountCapabilities>({});
 
   const [debouncedAmount, setDebouncedAmount] = useState(amount);
   const [qrState, setQrState] = useState<QrState>('idle');
@@ -100,12 +101,13 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
   // Poll và SignalR có thể cùng báo COMPLETED — chỉ gọi onPaymentCompleted một lần cho mỗi mã.
   const completedQrIdRef = useRef<string | null>(null);
 
-  // Tải danh sách tài khoản ngân hàng + logo VietQR
+  // Tải danh sách tài khoản (theo S Payment: mỗi số tài khoản thật một dòng) + logo VietQR
   useEffect(() => {
-    Promise.all([getBankAccounts(), getVietQRBanks()])
-      .then(([accounts, banks]) => {
+    Promise.all([loadPosBankAccounts(), getVietQRBanks()])
+      .then(([{ accounts, capabilities: caps }, banks]) => {
         if (!mountedRef.current) return;
         setBankAccounts(accounts);
+        setCapabilities(caps);
         setVietQRBanks(banks);
         if (accounts.length > 0) setSelectedAccountId(accounts[0].id);
       })

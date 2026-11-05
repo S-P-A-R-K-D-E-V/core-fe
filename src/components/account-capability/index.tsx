@@ -15,10 +15,11 @@ import Button from '@mui/material/Button';
 
 import { paymentProviderLabel } from 'src/utils/payment-status';
 
-import { getPosAccountCapabilities } from 'src/api/payment-qr';
+import { getBankAccounts } from 'src/api/bank-accounts';
+import { getPosBankAccounts, getPosAccountCapabilities } from 'src/api/payment-qr';
 
 // ----------------------------------------------------------------------
-// Quầy chọn tài khoản nhận: S Payment cho biết tài khoản nào tiền về được tự xác nhận (Open Banking ưu tiên, rồi payOS /
+// Quầy chọn tài khoản nhận theo danh sách của S Payment (loadPosBankAccounts). S Payment cho biết tài khoản nào tiền về được tự xác nhận (Open Banking ưu tiên, rồi payOS /
 // ApiPay còn hạn mức — luân phiên) và tài khoản nào thu ngân phải tự kiểm tra. Tài khoản đang chọn không tự xác nhận được mà tài khoản khác
 // được → gợi ý đổi (thu ngân bấm, không tự đổi). S Payment tắt / lỗi → không hiện gì, quầy như cũ.
 // ----------------------------------------------------------------------
@@ -41,6 +42,26 @@ export function useAccountCapabilities(refreshKey?: unknown): AccountCapabilitie
     };
   }, [refreshKey]);
   return capabilities;
+}
+
+/**
+ * Tài khoản ở quầy (Bán hàng, F&B): theo S Payment — mỗi số tài khoản thật một dòng, nhãn tự xác nhận đi kèm. Không gọi được
+ * (BE cũ, mạng) → tài khoản của cửa hàng như trước, không nhãn.
+ */
+export async function loadPosBankAccounts(): Promise<{
+  accounts: IKiotVietBankAccount[];
+  capabilities: AccountCapabilities;
+}> {
+  try {
+    const res = await getPosBankAccounts();
+    const capabilities: AccountCapabilities = {};
+    res.accounts.forEach((a) => {
+      if (a.capability) capabilities[a.id] = a.capability;
+    });
+    return { accounts: res.accounts, capabilities };
+  } catch {
+    return { accounts: await getBankAccounts(), capabilities: {} };
+  }
 }
 
 /** Nhãn một nguồn: "payOS 97/100 lượt", "ApiPay hết lượt (0/60)", "Open Banking (MB)". */
