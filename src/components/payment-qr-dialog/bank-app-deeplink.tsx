@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import {
   getBankApps,
   detectMobileOs,
+  deeplinkContent,
   buildBankDeeplink,
   type VietQrBankApp,
 } from 'src/utils/vietqr';
@@ -80,6 +81,9 @@ export default function BankAppDeeplink({
   }, [os]);
 
   const app = apps.find((a) => a.appId === appId);
+  // Link mở app chỉ mang nội dung rút gọn (≤ 25 ký tự); báo cho người dùng khi bị rút.
+  const shortContent = useMemo(() => deeplinkContent(content), [content]);
+  const shortened = shortContent !== deeplinkContent(content, Number.MAX_SAFE_INTEGER);
 
   const href = useMemo(
     () =>
@@ -91,7 +95,7 @@ export default function BankAppDeeplink({
             amount,
             content,
             accountName,
-            returnUrl: window.location.href,
+            returnUrl: window.location.origin + window.location.pathname,
           })
         : null,
     [app, bankCode, account, amount, content, accountName]
@@ -156,6 +160,9 @@ export default function BankAppDeeplink({
           {app.autofill
             ? `${app.appName} sẽ điền sẵn số tài khoản, số tiền và nội dung — kiểm tra lại rồi xác nhận trong app.`
             : `${app.appName} chưa hỗ trợ điền sẵn: app chỉ được mở lên, hãy dán số tài khoản / nội dung đã sao chép hoặc quét QR từ ảnh đã tải.`}
+          {app.autofill && shortened
+            ? ` Nội dung điền sẵn được rút gọn thành «${shortContent}» (nội dung dài thì app không tự điền); mã QR vẫn giữ nội dung đầy đủ.`
+            : ''}
         </Typography>
       ) : null}
     </Stack>
