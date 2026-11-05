@@ -38,7 +38,7 @@ export type SPayBankAccount = {
   autoConfirm: boolean;
 };
 
-/** Kết nối bằng khoá ứng dụng tạo ở S Payment → Nhà phát triển. core-be kiểm khoá trên S Payment rồi lưu mã hoá. */
+/** Kết nối bằng khoá ứng dụng tạo ở S Payment → Ứng dụng & khoá API. core-be kiểm khoá trên S Payment rồi lưu mã hoá. */
 export async function connectSPayApiKey(accessKey: string, secret: string): Promise<SPayConnectStatus> {
   const res = await axios.post<SPayConnectStatus>(endpoints.spayConnect.apiKey, { accessKey, secret });
   return res.data;

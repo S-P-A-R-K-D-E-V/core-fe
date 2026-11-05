@@ -33,7 +33,7 @@ import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 
 // ----------------------------------------------------------------------
-// Kết nối S Payment bằng khoá ứng dụng: chủ cửa hàng tạo khoá ở S Payment → Nhà phát triển (Access key sp_live_… + Secret)
+// Kết nối S Payment bằng khoá ứng dụng: chủ cửa hàng tạo khoá ở S Payment → Ứng dụng & khoá API (Access key sp_live_… + Secret)
 // rồi dán vào đây. Liên kết / gỡ tài khoản ngân hàng, xem giao dịch, đối soát đều làm trên S Payment — tab Tài khoản ngân
 // hàng của S Store chỉ là dữ liệu (số TK hiện ở quầy).
 // ----------------------------------------------------------------------
@@ -94,7 +94,7 @@ export default function SPayKeyCard() {
     const ok = await confirm({
       title: 'Ngắt kết nối S Payment?',
       content:
-        'S Store xoá khoá đã lưu. Muốn khoá hết hiệu lực hẳn, thu hồi khoá trên S Payment → Nhà phát triển.\n' +
+        'S Store xoá khoá đã lưu. Muốn khoá hết hiệu lực hẳn, thu hồi khoá trên S Payment → Ứng dụng & khoá API.\n' +
         'Tài khoản ngân hàng và giao dịch trên S Payment giữ nguyên.',
       confirmText: 'Ngắt kết nối',
       cancelText: 'Huỷ',
@@ -180,7 +180,7 @@ export default function SPayKeyCard() {
             <>
               {connected && <Divider />}
               <Typography variant="body2" color="text.secondary">
-                1. Mở S Payment → <b>Nhà phát triển</b> → Tạo khoá (chọn Live). 2. Chép <b>Access key</b> và <b>Secret</b> (Secret
+                1. Mở S Payment → <b>Ứng dụng &amp; khoá API</b> → Tạo khoá live. 2. Chép <b>Access key</b> và <b>Secret</b> (dán cả chuỗi Bearer vào ô Secret cũng được; Secret
                 chỉ hiện một lần) rồi dán vào đây.
               </Typography>
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
