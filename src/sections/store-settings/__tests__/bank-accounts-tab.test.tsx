@@ -133,7 +133,7 @@ describe('BankAccountsTab — dịch vụ thanh toán tắt', () => {
     expect(within(own).getByRole('button', { name: 'Bật lại' })).toBeInTheDocument();
 
     expect(screen.getByText(/Dịch vụ thanh toán chưa bật/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Đăng ký báo có' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Liên kết trên S Payment' })).not.toBeInTheDocument();
     expect(screen.queryByText('VietQR')).not.toBeInTheDocument();
   });
 });
@@ -252,21 +252,22 @@ describe('BankAccountsTab — dịch vụ thanh toán bật', () => {
 
     const vcb = await cardOf('0011223344');
     expect(within(vcb).getByText('VietQR')).toBeInTheDocument();
-    expect(within(vcb).getByText(/hỗ trợ tài khoản VietinBank, MB, ACB, BIDV/)).toBeInTheDocument();
-    expect(within(vcb).queryByRole('button', { name: 'Đăng ký báo có' })).not.toBeInTheDocument();
-    // Tài khoản ACB đã có QR động vẫn đăng ký báo có được (S Payment đi qua Pay2S, thêm nguồn); không còn form khoá payOS.
-    expect(within(acb).getByRole('button', { name: 'Đăng ký báo có' })).toBeInTheDocument();
+    // Liên kết báo có làm ở một chỗ (trang Ngân hàng của S Payment) cho mọi ngân hàng — kể cả Vietcombank.
+    expect(within(vcb).getByText(/thêm tài khoản ở trang Ngân hàng của S Payment/)).toBeInTheDocument();
+    expect(within(vcb).getByRole('button', { name: 'Liên kết trên S Payment' })).toBeInTheDocument();
+    // Tài khoản ACB đã có QR động vẫn thêm nguồn được (SPL luân phiên); không còn form khoá payOS.
+    expect(within(acb).getByRole('button', { name: 'Liên kết trên S Payment' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Thêm nguồn payOS' })).not.toBeInTheDocument();
 
     const vtb = await cardOf('103885549137');
-    expect(within(vtb).getByRole('button', { name: 'Đăng ký báo có' })).toBeInTheDocument();
+    expect(within(vtb).getByRole('button', { name: 'Liên kết trên S Payment' })).toBeInTheDocument();
 
     const linked = await cardOf('116002680669');
     expect(within(linked).getByText('Đăng ký báo có')).toBeInTheDocument();
     // Chỉ còn nút Tắt của chính tài khoản — kết nối báo có không tắt ở đây.
     expect(within(linked).getAllByRole('button', { name: 'Tắt' })).toHaveLength(1);
     expect(within(linked).queryByRole('button', { name: 'Kiểm tra kết nối' })).not.toBeInTheDocument();
-    expect(within(linked).queryByRole('button', { name: 'Đăng ký báo có' })).not.toBeInTheDocument();
+    expect(within(linked).queryByRole('button', { name: 'Liên kết trên S Payment' })).not.toBeInTheDocument();
 
     const unassigned = (await screen.findByText('Kết nối chưa gắn tài khoản')).closest(
       '.MuiCard-root'

@@ -37,3 +37,6 @@ export async function startSPayConnect(returnPath: string): Promise<string> {
 export async function disconnectSPay(): Promise<void> {
   await axios.post(endpoints.spayConnect.disconnect);
 }
+
+/** Trang Ngân hàng của S Payment — nơi DUY NHẤT thêm / gỡ tài khoản nhận tiền (SPL tự chọn đường kết nối). */
+export const SPAY_BANKS_URL = 'https://spay.devbyspark.com/banks';

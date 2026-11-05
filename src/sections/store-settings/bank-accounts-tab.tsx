@@ -48,7 +48,7 @@ import {
 import { ConnectionList, ConfirmActionDialog } from './payment-connection';
 import BankAccountFormDialog from './bank-account/bank-account-form-dialog';
 import BankAccountVietQrDialog from './bank-account/bank-account-vietqr-dialog';
-import { bankLinkCodeOf, BankLinkRegisterDialog, type BankLinkPreset } from './bank-link';
+import { SPAY_BANKS_URL } from 'src/api/spay-connect';
 import {
   findVietQRBank,
   normalizeBankAccount,
@@ -85,7 +85,6 @@ export default function BankAccountsTab() {
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<IBankAccountWithConnections | null>(null);
   const [qrTarget, setQrTarget] = useState<IBankAccountWithConnections | null>(null);
-  const [registerPreset, setRegisterPreset] = useState<BankLinkPreset | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<IBankAccountWithConnections | null>(
     null
   );
@@ -304,13 +303,7 @@ export default function BankAccountsTab() {
           paymentCodePrefix={paymentCodePrefix}
           reactivating={reactivatingId === a.id}
           onQr={() => setQrTarget(a)}
-          onRegister={() =>
-            setRegisterPreset({
-              bank: bankLinkCodeOf(a.bin),
-              accountNumber: a.accountNumber,
-              accountName: a.accountHolder,
-            })
-          }
+          onRegister={() => window.open(SPAY_BANKS_URL, '_blank', 'noopener')}
           onEdit={() => {
             setEditTarget(a);
             setFormOpen(true);
@@ -364,13 +357,6 @@ export default function BankAccountsTab() {
         onClose={() => setQrTarget(null)}
       />
 
-
-      <BankLinkRegisterDialog
-        open={!!registerPreset}
-        preset={registerPreset}
-        onClose={() => setRegisterPreset(null)}
-        onChanged={load}
-      />
 
       <ConfirmActionDialog
         open={!!deactivateTarget}
@@ -431,11 +417,9 @@ function BankAccountCard({
 }: CardProps) {
   const label = bankAccountBankLabel(a, bank);
   const editable = !a.isManagedByKiotViet;
-  // Đăng ký báo có qua S Payment (VietinBank, MB, ACB, BIDV — S Payment tự chọn ngân hàng trực tiếp hoặc Pay2S): tài khoản
-  // chưa có bản đăng ký báo có đang chạy. Nguồn khác (ApiPay, payOS…) không chặn — thêm nguồn thì S Payment luân phiên.
-  const canRegister =
-    !!bankLinkCodeOf(a.bin) &&
-    !a.connections.some((c) => c.status === 'active' && !!c.publicSettings?.bankLinkId);
+  // Liên kết báo có làm ở MỘT chỗ: trang Ngân hàng của S Payment (SPL tự chọn đường Pay2S / ngân hàng trực tiếp / ApiPay
+  // cho mọi ngân hàng). Ẩn nút khi tài khoản đã có bản đăng ký báo có đang chạy.
+  const canRegister = !a.connections.some((c) => c.status === 'active' && !!c.publicSettings?.bankLinkId);
   // Nguồn tự xác nhận S Payment thấy cho tài khoản (kể cả ApiPay VA gắn số TK gốc) — nguồn đầu dùng cho thanh toán kế tiếp.
   const sources = capabilities[a.id]?.sources ?? [];
   const rotating =
@@ -523,7 +507,7 @@ function BankAccountCard({
                 onClick={onRegister}
                 disabled={!a.accountNumber}
               >
-                Đăng ký báo có
+                Liên kết trên S Payment
               </Button>
             )}
             {editable && (
@@ -601,9 +585,7 @@ function BankAccountCard({
                       Chưa kết nối — tiền vào tài khoản này chưa được tự xác nhận
                       {!a.isActive
                         ? '.'
-                        : canRegister
-                          ? '. Bấm "Đăng ký báo có": nhập thông tin chủ tài khoản (CCCD / MST, SĐT) và OTP — S Payment tự kết nối, không cần khoá nào.'
-                          : '. Đăng ký báo có hiện hỗ trợ tài khoản VietinBank, MB, ACB, BIDV — ngân hàng khác chỉ hiện VietQR, thu ngân tự kiểm tra tiền về.'}
+                        : '. Bấm "Liên kết trên S Payment": thêm tài khoản ở trang Ngân hàng của S Payment (nhập thông tin chủ tài khoản và OTP), POS dùng được ngay.'}
                     </Typography>
                   </Box>
                 )
