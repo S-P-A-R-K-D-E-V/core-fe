@@ -165,7 +165,7 @@ describe('PosQrPayment — nguồn xác nhận chuyển khoản', () => {
     });
     expect(await screen.findByText('MB - 9704229999')).toBeInTheDocument();
     expect(
-      screen.getByText(/Tiền về qua ApiPay là đơn tự xác nhận \(thử nghiệm\)/)
+      screen.getByText(/Tiền về là đơn tự xác nhận \(thử nghiệm\)/)
     ).toBeInTheDocument();
     expect(screen.getByText('Nội dung CK: SPZZ99XX1')).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Tài khoản ngân hàng' })).not.toBeInTheDocument();

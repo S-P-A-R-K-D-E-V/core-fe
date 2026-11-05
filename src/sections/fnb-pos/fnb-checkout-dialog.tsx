@@ -27,7 +27,7 @@ import { usePaymentStatusEvents } from 'src/hooks/use-payment-status-events';
 import { apiErrorMessage } from 'src/utils/api-error';
 import { fCurrency } from 'src/utils/format-number';
 import { qrTarget } from 'src/utils/payment-connection';
-import { qrOutcome, isEventForQr, paymentProviderLabel } from 'src/utils/payment-status';
+import { qrOutcome, isEventForQr } from 'src/utils/payment-status';
 
 import { getBankAccounts } from 'src/api/bank-accounts';
 import AccountCapabilityHint, {
@@ -189,13 +189,9 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
   });
 
   const qrImageSrc = useQrImageSrc(qr?.qrDataUrl, qr?.qrPayload);
-  // Mã tạo theo kết nối → "đang chờ tiền về qua ApiPay".
+  // Mã tạo theo kết nối → "đang chờ tiền về; tiền về là tự thanh toán" — không nêu nhà cung cấp phía sau (SPL).
   const qrVia =
-    connection && qr?.connectionId === connection.id
-      ? ` qua ${paymentProviderLabel(connection.provider)}${
-          connection.environment === 'test' ? ' (thử nghiệm)' : ''
-        }`
-      : '';
+    connection && qr?.connectionId === connection.id && connection.environment === 'test' ? ' (thử nghiệm)' : '';
   const secondsLeft = useExpirySeconds(qr?.expiresAt);
 
   // Màn hình khách: mã QR to cho khách quét trên màn phụ; đóng hộp / bỏ mã thì ẩn.

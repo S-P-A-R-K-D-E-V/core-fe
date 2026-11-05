@@ -27,7 +27,7 @@ import PaymentConnectionSelect, {
 import { fCurrency } from 'src/utils/format-number';
 import { apiErrorMessage } from 'src/utils/api-error';
 import { qrTarget } from 'src/utils/payment-connection';
-import { qrOutcome, isEventForQr, paymentProviderLabel } from 'src/utils/payment-status';
+import { qrOutcome, isEventForQr } from 'src/utils/payment-status';
 import { usePaymentStatusEvents } from 'src/hooks/use-payment-status-events';
 import { getBankAccounts, getVietQRBanks } from 'src/api/bank-accounts';
 import { createQrPayment, getQrPaymentStatus, cancelQrPayment } from 'src/api/payment-qr';
@@ -586,7 +586,8 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
 
         {qrConnection && (
           <Typography variant="caption" color="text.secondary">
-            Tiền về qua {paymentProviderLabel(qrConnection.provider)} là đơn tự xác nhận
+            {/* Không nêu nhà cung cấp phía sau (SPL: khách không cần biết đi qua ApiPay / Pay2S / payOS). */}
+            Tiền về là đơn tự xác nhận
             {qrConnection.environment === 'test' ? ' (thử nghiệm)' : ''}
           </Typography>
         )}

@@ -123,7 +123,7 @@ describe('FnbCheckoutDialog — nguồn xác nhận chuyển khoản', () => {
       description: 'Bàn 3 #12',
     });
     expect(
-      await screen.findByText(/đang chờ tiền về qua ApiPay; tiền về là tự thanh toán/)
+      await screen.findByText(/đang chờ tiền về(?: \(thử nghiệm\))?; tiền về là tự thanh toán/)
     ).toBeInTheDocument();
     expect(screen.getByText('Nội dung CK: SPAB12CD3')).toBeInTheDocument();
   });

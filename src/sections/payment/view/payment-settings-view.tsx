@@ -11,6 +11,7 @@ import Iconify from 'src/components/iconify';
 import BankAccountsTab from 'src/sections/store-settings/bank-accounts-tab';
 import PaymentConnectionsTab from 'src/sections/store-settings/payment-connections-tab';
 
+import SPayConnectCard from '../settings/spay-connect-card';
 import PaymentChannelsCard from '../settings/payment-channels-card';
 import OnlineShopSettingsCard from '../settings/online-shop-settings-card';
 import { paymentSettingsHref, paymentSettingsTabOf, PAYMENT_SETTINGS_TABS } from '../payment-pages';
@@ -51,7 +52,12 @@ export default function PaymentSettingsView() {
       )}
       {tab === 'online' && <OnlineShopSettingsCard />}
       {tab === 'accounts' && <BankAccountsTab />}
-      {tab === 'connections' && <PaymentConnectionsTab />}
+      {tab === 'connections' && (
+        <>
+          <SPayConnectCard />
+          <PaymentConnectionsTab />
+        </>
+      )}
     </Stack>
   );
 }
