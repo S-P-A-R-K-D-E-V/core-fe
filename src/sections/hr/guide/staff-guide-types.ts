@@ -1,0 +1,32 @@
+// Kiểu dữ liệu của tài liệu "Hướng dẫn sử dụng app cho nhân viên" — dùng chung cho trang web và bản PDF
+// (scripts/build-staff-guide-pdf.mts đọc thẳng nội dung để dựng HTML in PDF, nên tệp này không import gì).
+
+export type GuideBlock =
+  | { kind: 'p'; text: string }
+  | { kind: 'steps'; title?: string; items: string[] }
+  | { kind: 'bullets'; title?: string; items: string[] }
+  | { kind: 'table'; title?: string; head: string[]; rows: string[][] }
+  | { kind: 'note'; tone: 'info' | 'warning'; text: string };
+
+export type GuideSection = {
+  /** Mã neo dùng cho mục lục (#id). */
+  id: string;
+  title: string;
+  /** Một câu tóm tắt dưới tiêu đề. */
+  lead?: string;
+  blocks: GuideBlock[];
+};
+
+export type GuidePart = {
+  id: string;
+  title: string;
+  sections: GuideSection[];
+};
+
+export type StaffGuide = {
+  title: string;
+  subtitle: string;
+  /** Ngày cập nhật nội dung, dd/MM/yyyy. */
+  updatedAt: string;
+  parts: GuidePart[];
+};

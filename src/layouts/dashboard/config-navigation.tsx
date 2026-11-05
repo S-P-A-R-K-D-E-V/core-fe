@@ -445,6 +445,7 @@ export function useNavData(
             children: [
               { title: t('hrLeave'), path: paths.dashboard.hr.leave },
               { title: t('hrPolicies'), path: paths.dashboard.hr.policies },
+              { title: t('hrGuide'), path: paths.dashboard.hr.guide },
               { title: t('hrAnnouncements'), path: paths.dashboard.hr.announcements, permissions: [PERMISSIONS.hr.announcementManage] },
               { title: t('hrTargets'), path: paths.dashboard.hr.targets },
               { title: t('hrRecords'), path: paths.dashboard.hr.records },
