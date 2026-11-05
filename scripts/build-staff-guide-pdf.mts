@@ -14,6 +14,8 @@ import { STAFF_GUIDE } from '../src/sections/hr/guide/staff-guide-content.ts';
 import type { GuideBlock } from '../src/sections/hr/guide/staff-guide-types.ts';
 
 const outDir = resolve(process.argv[2] ?? 'staff-guide-out');
+// Ảnh chụp app nằm cùng chỗ trang web dùng (public/assets/staff-guide).
+const shotsDir = resolve(import.meta.dirname ?? '.', '..', 'public', 'assets', 'staff-guide');
 mkdirSync(outDir, { recursive: true });
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -36,6 +38,13 @@ function block(b: GuideBlock): string {
     }
     case 'note':
       return `<div class="note ${b.tone}">${esc(b.text)}</div>`;
+    case 'shots':
+      return `<div class="shots">${b.items
+        .map(
+          (s) =>
+            `<figure><img src="${pathToFileURL(join(shotsDir, s.file)).href}" alt="${esc(s.caption)}"><figcaption>${esc(s.caption)}</figcaption></figure>`
+        )
+        .join('')}</div>`;
     default:
       return '';
   }
@@ -85,6 +94,10 @@ th { background: #eef4f7; }
 .meta { color: #555; }
 .toc { columns: 2; column-gap: 18pt; font-size: 9.5pt; margin: 8pt 0 0; padding-left: 14pt; }
 .toc ul { padding-left: 12pt; margin: 0 0 4pt; }
+.shots { display: flex; flex-wrap: wrap; gap: 8pt; margin: 4pt 0 10pt; page-break-inside: avoid; }
+.shots figure { margin: 0; width: 30%; }
+.shots img { width: 100%; border: 1px solid #c4cdd5; border-radius: 4pt; display: block; }
+.shots figcaption { font-size: 8.5pt; color: #555; margin-top: 2pt; }
 .part { page-break-before: always; }
 .sec { page-break-inside: auto; }
 h3 { page-break-after: avoid; }

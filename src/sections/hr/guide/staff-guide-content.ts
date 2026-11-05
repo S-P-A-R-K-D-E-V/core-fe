@@ -10,7 +10,7 @@ import type { StaffGuide } from './staff-guide-types';
 export const STAFF_GUIDE: StaffGuide = {
   title: 'Hướng dẫn sử dụng app cho nhân viên CiCi',
   subtitle:
-    'Cách dùng app Spark Store trong từng ca và tóm tắt những quy định cần nhớ trong Nội quy lao động và Quy chế lương thưởng (chạy thử 01/11–31/12/2026). Khi có chỗ khác nhau, văn bản Nội quy và Quy chế là bản gốc.',
+    'Cách dùng app Spark Store trong từng ca và tóm tắt những quy định cần nhớ trong Nội quy lao động và Quy chế lương thưởng (chạy thử 01/11–31/12/2026). Khi có chỗ khác nhau, văn bản Nội quy và Quy chế là bản gốc. Ảnh chụp từ app Spark Store 1.0.4 (Android) bằng tài khoản nhân viên; tên và ảnh đại diện đã được làm mờ.',
   updatedAt: '06/11/2026',
   parts: [
     // ------------------------------------------------------------------
@@ -27,10 +27,19 @@ export const STAFF_GUIDE: StaffGuide = {
               kind: 'steps',
               items: [
                 'Cài app "Spark Store" từ App Store (iPhone) hoặc Google Play (Android).',
-                'Mở app, chọn "Tiếp tục với Google" nếu tài khoản của bạn là Gmail; hoặc nhập Email và Mật khẩu rồi bấm "Đăng nhập".',
-                'Ô "Mã hoặc tên miền cửa hàng": nhập cici21chualang.vn, hoặc bỏ trống để app tự tìm cửa hàng của tài khoản.',
+                'Mở app. Nếu app hỏi cửa hàng, ô "Mã hoặc tên miền cửa hàng" nhập cici21chualang.vn (hoặc bỏ trống để app tự tìm cửa hàng của tài khoản).',
+                'Ở màn "CiCi 21 Chùa Láng": tài khoản tạo bằng Gmail thì bấm "Tiếp tục với Google"; tài khoản có mật khẩu thì bấm "Đăng nhập bằng tài khoản email", nhập Email và Mật khẩu rồi bấm "Đăng nhập".',
                 'Lần đầu vào app, cho phép app dùng Vị trí, Máy ảnh và Thông báo. Thiếu quyền Vị trí thì không chấm công được.',
               ],
+            },
+            {
+              kind: 'shots',
+              items: [{ file: 'dang-nhap.webp', caption: 'Màn đăng nhập của cửa hàng CiCi 21 Chùa Láng' }],
+            },
+            {
+              kind: 'note',
+              tone: 'info',
+              text: 'Tài khoản tạo bằng Google chưa có mật khẩu: đăng nhập bằng nút "Tiếp tục với Google", không dùng ô email và mật khẩu.',
             },
             {
               kind: 'note',
@@ -62,12 +71,24 @@ export const STAFF_GUIDE: StaffGuide = {
                 'Khi khuôn mặt đã được duyệt, bạn có thể bấm "Kiểm tra so khớp" để thử. Đổi kiểu tóc, kính… mà máy khó nhận thì bấm "Đăng ký lại".',
               ],
             },
+            {
+              kind: 'shots',
+              items: [{ file: 'tai-khoan.webp', caption: 'Tài khoản: Chỉnh sửa hồ sơ, Đăng ký khuôn mặt, Quét mã đăng nhập web' }],
+            },
           ],
         },
         {
           id: 'trang-chu',
           title: 'Trang chủ và thanh tab',
           blocks: [
+            {
+              kind: 'shots',
+              items: [
+                { file: 'trang-chu.webp', caption: 'Trang chủ: lương tạm tính, Dùng nhanh, ca hôm nay' },
+                { file: 'trang-chu-2.webp', caption: 'Kéo xuống: target tuần, điểm trừ tháng, thưởng quý' },
+                { file: 'tien-ich.webp', caption: 'Tab Tiện ích: mọi tính năng theo nhóm' },
+              ],
+            },
             {
               kind: 'table',
               head: ['Tab', 'Dùng để'],
@@ -106,6 +127,13 @@ export const STAFF_GUIDE: StaffGuide = {
               ],
             },
             {
+              kind: 'shots',
+              items: [
+                { file: 'nhan-su.webp', caption: 'Tiện ích → Nhân sự: các việc của tôi' },
+                { file: 'noi-quy.webp', caption: 'Nội quy & văn bản: Mở tệp văn bản, Tôi đã đọc và hiểu' },
+              ],
+            },
+            {
               kind: 'note',
               tone: 'info',
               text: 'Khi văn bản được sửa thành bản mới, bạn phải xác nhận lại. Chưa xác nhận thì có thể không chấm công được: app sẽ tự mở trang văn bản để bạn đọc và xác nhận.',
@@ -132,6 +160,15 @@ export const STAFF_GUIDE: StaffGuide = {
                 'Bấm nút giữa "Điểm danh". Khi ca mở check-in, trạng thái hiện "SẴN SÀNG LÀM VIỆC".',
                 'Cửa hàng dùng khuôn mặt: giữ mặt trước camera, nhìn thẳng; app tự nhận ra rồi ghi giờ vào. Cửa hàng dùng ảnh: bấm "Chụp ảnh & Check-in" → "Chụp ảnh" → "Xác nhận Check-in".',
                 'Xong, màn hình chuyển sang "ĐANG LÀM VIỆC" và hiện giờ vào, "Đúng giờ" hoặc "Trễ … phút".',
+              ],
+            },
+            {
+              kind: 'shots',
+              items: [
+                {
+                  file: 'diem-danh.webp',
+                  caption: 'Tab Điểm danh. Ví dụ đang ở xa cửa hàng nên báo "Ngoài khu vực cửa hàng" và khoảng cách',
+                },
               ],
             },
             {
@@ -176,6 +213,13 @@ export const STAFF_GUIDE: StaffGuide = {
                 'Có phiếu "Kiểm hàng ca": vào Nhân sự → "Kiểm hàng ca", đếm số thật trên kệ (không cần nhìn số trên máy), nhập "Số đếm", bấm "Lưu số đếm" rồi "Nộp phiếu" trước hạn ghi trên phiếu. Mã hàng hỏng tag, sai giá… ghi vào "Ghi chú cho quản lý".',
               ],
             },
+            {
+              kind: 'shots',
+              items: [
+                { file: 'kiem-hang-ca.webp', caption: 'Nhân sự → Kiểm hàng ca: phiếu tự tạo khi ca bắt đầu' },
+                { file: 'kiem-tra-ca.webp', caption: 'Tiện ích → Kiểm tra ca: Lỗi của tôi và kiểm nhanh của trưởng ca' },
+              ],
+            },
           ],
         },
         {
@@ -183,6 +227,10 @@ export const STAFF_GUIDE: StaffGuide = {
           title: 'Làm việc được giao và việc trong ca',
           lead: 'Làm xong việc nào thì đánh dấu ngay việc đó; việc cần ảnh thì chụp ảnh nghiệm thu.',
           blocks: [
+            {
+              kind: 'shots',
+              items: [{ file: 'viec-cua-toi.webp', caption: 'Việc của tôi: Việc trong ca theo ngày và Việc giao riêng cho tôi' }],
+            },
             {
               kind: 'table',
               head: ['Mục trong "Việc của tôi"', 'Cách làm'],
@@ -241,6 +289,10 @@ export const STAFF_GUIDE: StaffGuide = {
                 '"Chốt tiền" khi giao ca và cuối ngày: nhập số tờ từng mệnh giá (1.000đ đến 500.000đ), có thể "Lưu tạm"; đếm xong bấm "Chốt ca". App hiện tiền đếm được, tồn cuối dự kiến và chênh lệch.',
                 'Ca Tối chụp ảnh quỹ tiền mặt gửi quản lý trước khi khoá két.',
               ],
+            },
+            {
+              kind: 'shots',
+              items: [{ file: 'kiem-quay.webp', caption: 'Kiểm tiền quầy khi hôm nay bạn không có ca: app chặn, có nút "Thử lại"' }],
             },
             {
               kind: 'note',
@@ -322,6 +374,10 @@ export const STAFF_GUIDE: StaffGuide = {
               ],
             },
             {
+              kind: 'shots',
+              items: [{ file: 'dang-ky-ca.webp', caption: 'Đăng ký lịch tuần: tuần đã chốt thì các ô bị khoá' }],
+            },
+            {
               kind: 'note',
               tone: 'info',
               text: 'Sau hạn, tuần bị chốt đăng ký và mọi ô bị khoá. Muốn thay đổi thì dùng Chợ ca (làm hộ, đổi ca) hoặc xin nghỉ ca. Điểm hiệu suất hiện ở trang đăng ký ca để người xếp lịch tham khảo, nhưng không quyết định thứ tự đăng ký và không giới hạn số ca.',
@@ -343,6 +399,14 @@ export const STAFF_GUIDE: StaffGuide = {
               ],
             },
             {
+              kind: 'shots',
+              items: [
+                { file: 'lich-lam.webp', caption: 'Lịch làm: bấm vào ca của mình' },
+                { file: 'dang-ca-len-cho.webp', caption: 'Đăng ca lên chợ: chọn Làm hộ cả ca, Làm hộ một phần hoặc Đổi ca' },
+                { file: 'lam-ho-ca.webp', caption: 'Tiện ích → Nhận ca: Chợ ca, Hỗ trợ, Tôi đăng, Tôi nhận' },
+              ],
+            },
+            {
               kind: 'steps',
               title: 'Người nhận',
               items: [
@@ -354,7 +418,7 @@ export const STAFF_GUIDE: StaffGuide = {
             {
               kind: 'bullets',
               items: [
-                'Tiện ích → "Đổi ca" để theo dõi: "Chờ đồng nghiệp xác nhận", "Chờ quản lý duyệt", "Đã duyệt", "Bị từ chối". Khi được nhờ, bấm "Đồng ý đổi" hoặc "Từ chối".',
+                'Tiện ích → "Đổi ca" (tab "Của tôi" / "Chờ xác nhận") để theo dõi: "Chờ đồng nghiệp xác nhận", "Chờ quản lý duyệt", "Đã duyệt", "Bị từ chối". Khi được nhờ, bấm "Đồng ý đổi" hoặc "Từ chối".',
                 'Người làm hộ hưởng lương giờ của chính mình; giờ làm hộ tính vào giới hạn giờ làm trong ngày.',
               ],
             },
@@ -371,6 +435,10 @@ export const STAFF_GUIDE: StaffGuide = {
                 'Chọn ca, ghi lý do, gửi. Đơn được duyệt thì ca được gỡ khỏi lịch và không tính vắng.',
                 'Đơn còn chờ duyệt có thể "Huỷ đơn".',
               ],
+            },
+            {
+              kind: 'shots',
+              items: [{ file: 'xin-nghi-ca.webp', caption: 'Xin nghỉ một ca: chọn ca, ghi lý do, bật "Khẩn cấp" nếu báo dưới 24 giờ' }],
             },
             {
               kind: 'table',
@@ -439,6 +507,13 @@ export const STAFF_GUIDE: StaffGuide = {
                 'Trang chủ có "Lương tạm tính" của kỳ đang chạy; Nhân sự → "Điểm, lương & thưởng" có lương tạm tính, thưởng doanh số tuần và điểm các tháng.',
               ],
             },
+            {
+              kind: 'shots',
+              items: [
+                { file: 'luong.webp', caption: 'Tab Lương: phiếu lương hiện khi kỳ lương được tạo' },
+                { file: 'diem-luong-thuong.webp', caption: 'Nhân sự → Điểm, lương & thưởng: điểm trừ, lương tạm tính, thưởng tuần' },
+              ],
+            },
           ],
         },
         {
@@ -474,6 +549,10 @@ export const STAFF_GUIDE: StaffGuide = {
                 'Thấy sai: bấm "Khiếu nại (hạn dd/MM)", ghi "Lý do khiếu nại" → "Gửi khiếu nại". Hạn là 3 ngày làm việc.',
                 'Lần vi phạm được xoá sau khiếu nại thì tiền phạt được hoàn ở kỳ lương kế tiếp.',
               ],
+            },
+            {
+              kind: 'shots',
+              items: [{ file: 'vi-pham.webp', caption: 'Vi phạm & điểm trừ: điểm trừ tháng, mức thưởng tuần, tiền phạt' }],
             },
             {
               kind: 'table',

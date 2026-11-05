@@ -6,7 +6,18 @@ export type GuideBlock =
   | { kind: 'steps'; title?: string; items: string[] }
   | { kind: 'bullets'; title?: string; items: string[] }
   | { kind: 'table'; title?: string; head: string[]; rows: string[][] }
-  | { kind: 'note'; tone: 'info' | 'warning'; text: string };
+  | { kind: 'note'; tone: 'info' | 'warning'; text: string }
+  /** Ảnh chụp màn hình app (public/assets/staff-guide/<file>), xếp thành hàng. */
+  | { kind: 'shots'; items: GuideShot[] };
+
+export type GuideShot = {
+  /** Tên tệp trong public/assets/staff-guide, vd "trang-chu.webp". */
+  file: string;
+  caption: string;
+};
+
+/** Thư mục ảnh chụp (trang web dùng đường dẫn này; bản PDF đọc thẳng từ public/). */
+export const STAFF_GUIDE_SHOTS_PATH = '/assets/staff-guide';
 
 export type GuideSection = {
   /** Mã neo dùng cho mục lục (#id). */

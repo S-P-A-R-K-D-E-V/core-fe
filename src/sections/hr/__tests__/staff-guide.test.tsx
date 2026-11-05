@@ -63,3 +63,17 @@ describe('StaffGuideView', () => {
     expect(text).toContain('25.500đ');
   });
 });
+
+describe('ảnh chụp trong hướng dẫn', () => {
+  it('mỗi ảnh được nhắc tới đều có tệp trong public/assets/staff-guide, và không có tệp thừa', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const dir = path.resolve(__dirname, '../../../../public/assets/staff-guide');
+    const used = STAFF_GUIDE.parts.flatMap((p) =>
+      p.sections.flatMap((s) => s.blocks.flatMap((b) => (b.kind === 'shots' ? b.items.map((i) => i.file) : [])))
+    );
+    expect(used.length).toBeGreaterThan(10);
+    used.forEach((file) => expect(fs.existsSync(path.join(dir, file))).toBe(true));
+    expect(fs.readdirSync(dir).sort()).toEqual([...new Set(used)].sort());
+  });
+});

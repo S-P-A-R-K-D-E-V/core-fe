@@ -26,7 +26,7 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
 import { STAFF_GUIDE } from './staff-guide-content';
 
-import type { GuideBlock, GuideSection } from './staff-guide-types';
+import { STAFF_GUIDE_SHOTS_PATH, type GuideBlock, type GuideSection } from './staff-guide-types';
 
 // ----------------------------------------------------------------------
 // Hướng dẫn sử dụng app S Store cho nhân viên CiCi, kèm tóm tắt nội quy và quy chế lương thưởng T11–T12/2026.
@@ -100,6 +100,32 @@ function Block({ block }: { block: GuideBlock }) {
         <Alert severity={block.tone} variant="outlined" sx={{ typography: 'body2' }}>
           {block.text}
         </Alert>
+      );
+    case 'shots':
+      return (
+        <Box
+          sx={{
+            display: 'grid',
+            gap: 2,
+            gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' },
+            maxWidth: 720,
+          }}
+        >
+          {block.items.map((shot) => (
+            <Box key={shot.file} component="figure" sx={{ m: 0, breakInside: 'avoid' }}>
+              <Box
+                component="img"
+                src={`${STAFF_GUIDE_SHOTS_PATH}/${shot.file}`}
+                alt={shot.caption}
+                loading="lazy"
+                sx={{ width: 1, display: 'block', borderRadius: 1.5, border: 1, borderColor: 'divider' }}
+              />
+              <Typography component="figcaption" variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
+                {shot.caption}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
       );
     default:
       return null;
