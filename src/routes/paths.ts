@@ -241,6 +241,7 @@ export const paths = {
       overview: `${ROOTS.DASHBOARD}/hr/overview`,
       leave: `${ROOTS.DASHBOARD}/hr/leave`,
       policies: `${ROOTS.DASHBOARD}/hr/policies`,
+      guide: `${ROOTS.DASHBOARD}/hr/guide`,
       targets: `${ROOTS.DASHBOARD}/hr/targets`,
       tasks: `${ROOTS.DASHBOARD}/hr/tasks`,
       records: `${ROOTS.DASHBOARD}/hr/records`,
