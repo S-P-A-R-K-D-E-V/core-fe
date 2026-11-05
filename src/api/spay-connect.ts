@@ -21,7 +21,34 @@ export type SPayConnectStatus = {
   disconnectedAt: string | null;
   /** disconnected_by_store | revoked_in_spay */
   disconnectReason: string | null;
+  /** api_key: dán khoá ứng dụng tạo trên S Payment · oauth: nút Kết nối S Payment. */
+  mode: string;
+  /** Access key công khai (sp_live_…) khi kết nối bằng khoá. */
+  accessKey: string | null;
+  livemode: boolean;
+  /** Khoá thuộc đúng workspace của cửa hàng này. */
+  workspaceMatchesStore: boolean;
 };
+
+export type SPayBankAccount = {
+  id: string;
+  bankName: string;
+  accountNumber: string;
+  accountName: string | null;
+  autoConfirm: boolean;
+};
+
+/** Kết nối bằng khoá ứng dụng tạo ở S Payment → Nhà phát triển. core-be kiểm khoá trên S Payment rồi lưu mã hoá. */
+export async function connectSPayApiKey(accessKey: string, secret: string): Promise<SPayConnectStatus> {
+  const res = await axios.post<SPayConnectStatus>(endpoints.spayConnect.apiKey, { accessKey, secret });
+  return res.data;
+}
+
+/** Tài khoản nhận tiền hiện có trên S Payment (đọc qua khoá đã lưu). */
+export async function getSPayAccounts(): Promise<SPayBankAccount[]> {
+  const res = await axios.get<SPayBankAccount[]>(endpoints.spayConnect.accounts);
+  return res.data;
+}
 
 export async function getSPayConnectStatus(): Promise<SPayConnectStatus> {
   const res = await axios.get<SPayConnectStatus>(endpoints.spayConnect.status);

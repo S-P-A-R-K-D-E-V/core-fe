@@ -48,7 +48,7 @@ export const PAYMENT_SETTINGS_TABS: readonly { value: PaymentSettingsTab; label:
   { value: 'channels', label: 'Phương thức theo kênh', icon: 'solar:checklist-bold' },
   { value: 'online', label: 'Bán online & giao hàng', icon: 'solar:delivery-bold' },
   { value: 'accounts', label: 'Tài khoản ngân hàng', icon: 'solar:wallet-money-bold' },
-  { value: 'connections', label: 'Báo có & kết nối', icon: 'solar:card-transfer-bold' },
+  { value: 'connections', label: 'Kết nối S Payment', icon: 'solar:link-round-bold' },
 ];
 
 export function paymentSettingsTabOf(value: string | null | undefined): PaymentSettingsTab {

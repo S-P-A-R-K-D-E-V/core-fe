@@ -876,6 +876,8 @@ export const endpoints = {
     status: '/payment/spay/status',
     connect: '/payment/spay/connect',
     disconnect: '/payment/spay/disconnect',
+    apiKey: '/payment/spay/api-key',
+    accounts: '/payment/spay/accounts',
   },
   // Dịch vụ thanh toán (spark-payment) qua core-be: kết nối SePay/Casso/payOS/VNPay/ngân hàng trực tiếp (Admin), đối
   // soát (Admin, Manager).

@@ -51,6 +51,10 @@ const BASE: SPayConnectStatus = {
   banksUrl: 'https://spay.devbyspark.com/banks',
   disconnectedAt: null,
   disconnectReason: null,
+  mode: 'oauth',
+  accessKey: null,
+  livemode: true,
+  workspaceMatchesStore: true,
 };
 
 const wrap = (ui: React.ReactElement) => render(<ThemeProvider theme={createTheme()}>{ui}</ThemeProvider>);

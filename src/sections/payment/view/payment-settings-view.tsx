@@ -9,9 +9,8 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 import Iconify from 'src/components/iconify';
 
 import BankAccountsTab from 'src/sections/store-settings/bank-accounts-tab';
-import PaymentConnectionsTab from 'src/sections/store-settings/payment-connections-tab';
 
-import SPayConnectCard from '../settings/spay-connect-card';
+import SPayKeyCard from '../settings/spay-key-card';
 import PaymentChannelsCard from '../settings/payment-channels-card';
 import OnlineShopSettingsCard from '../settings/online-shop-settings-card';
 import { paymentSettingsHref, paymentSettingsTabOf, PAYMENT_SETTINGS_TABS } from '../payment-pages';
@@ -52,12 +51,8 @@ export default function PaymentSettingsView() {
       )}
       {tab === 'online' && <OnlineShopSettingsCard />}
       {tab === 'accounts' && <BankAccountsTab />}
-      {tab === 'connections' && (
-        <>
-          <SPayConnectCard />
-          <PaymentConnectionsTab />
-        </>
-      )}
+      {/* Kết nối S Payment bằng khoá ứng dụng — liên kết ngân hàng, báo có, đối soát quản lý trên S Payment. */}
+      {tab === 'connections' && <SPayKeyCard />}
     </Stack>
   );
 }
