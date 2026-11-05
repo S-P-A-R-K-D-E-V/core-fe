@@ -91,7 +91,7 @@ export default function BankAppDeeplink({
             amount,
             content,
             accountName,
-            returnUrl: window.location.href,
+            returnUrl: window.location.origin + window.location.pathname,
           })
         : null,
     [app, bankCode, account, amount, content, accountName]
