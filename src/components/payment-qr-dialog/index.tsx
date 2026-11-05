@@ -31,48 +31,20 @@ import type {
   IPreparePayrollPaymentResponse,
 } from 'src/types/corecms-api';
 import { markPayrollPaid, preparePayrollPayment } from 'src/api/payroll';
+import { vietQrImageUrl, buildVietQrPayload, sanitizeTransferContent } from 'src/utils/vietqr';
+
+import { useQrImageSrc } from 'src/components/payment-qr-info';
+
+import BankAppDeeplink from './bank-app-deeplink';
 
 // ──────────────────────────────────────────────────────────────────────────
-// VietQR spec: https://www.vietqr.io/danh-sach-api/link-tao-ma-nhanh/
-//   BANK_ID-ACCOUNT_NO-TEMPLATE.png?amount=N&addInfo=DESC&accountName=NAME
-//   • addInfo: ASCII only, no diacritics, no special chars, max 50 chars
-//   • amount: positive integer, max 13 digits
-//   • template: compact2 (540×640) recommended for popups
-
-/** Strip Vietnamese diacritics and reduce to [a-zA-Z0-9 -], max 50 chars. */
-function sanitizeAddInfo(text: string): string {
-  const noAccents = text
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // strip combining marks
-    .replace(/đ/gi, 'd'); // đ / Đ → d
-  const ascii = noAccents
-    .replace(/[^a-zA-Z0-9 \-]/g, ' ') // keep alphanumeric, space, hyphen
-    .replace(/ {2,}/g, ' ') // collapse spaces
-    .trim();
-  return ascii.length > 50 ? ascii.slice(0, 50).trimEnd() : ascii;
-}
+// QR trả lương: vẽ tại chỗ từ chuỗi VietQR EMVCo (BIN do core-be trả trong prepare) — không phụ thuộc ảnh
+// img.vietqr.io (VietQR bỏ PNG/JPEG Quick Link trong 2027). Không có BIN → ảnh Quick Link SVG như trước.
+// Nội dung: ASCII, không dấu, [A-Za-z0-9 -], tối đa 50 ký tự (src/utils/vietqr.ts).
 
 /** Round up to whole VND — mirrors backend SalaryMath.CeilVnd. */
 function ceilVnd(amount: number): number {
   return Math.ceil(amount);
-}
-
-function buildVietQRUrl(
-  bankCode: string,
-  bankAccount: string,
-  amount: number,
-  content: string,
-  accountName: string
-): string {
-  const safeAmount = ceilVnd(Math.abs(amount));
-  const amountStr = String(safeAmount).slice(0, 13);
-  const safeContent = sanitizeAddInfo(content);
-  const params = new URLSearchParams({
-    amount: amountStr,
-    addInfo: safeContent,
-    accountName,
-  });
-  return `https://img.vietqr.io/image/${bankCode}-${bankAccount}-compact2.jpg?${params.toString()}`;
 }
 
 function formatCurrency(n: number) {
@@ -100,7 +72,13 @@ type Props = {
   canMarkPaid?: boolean;
 };
 
-export default function PaymentQRDialog({ open, record, onClose, onPaid, canMarkPaid = true }: Props) {
+export default function PaymentQRDialog({
+  open,
+  record,
+  onClose,
+  onPaid,
+  canMarkPaid = true,
+}: Props) {
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
 
@@ -162,7 +140,7 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid, canMark
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setQrAmount(parsedAmount > 0 ? parsedAmount : prepare.computedAmount);
-      setQrContent(content || prepare.suggestedContent);
+      setQrContent(content.trim() || prepare.suggestedContent);
       setQrLoading(true);
       setQrError(false);
     }, 300);
@@ -193,7 +171,8 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid, canMark
   };
 
   const handleContentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const sanitized = sanitizeAddInfo(e.target.value);
+    // Không cắt khoảng trắng cuối khi đang gõ — trước đây gõ dấu cách ở cuối ô bị xoá ngay.
+    const sanitized = sanitizeTransferContent(e.target.value, false);
     setContent(sanitized);
   };
 
@@ -209,7 +188,7 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid, canMark
   const noteRequired = amountChanged;
   const noteValid = !noteRequired || (note.trim().length >= 5 && note.trim().length <= 500);
   const amountValid = parsedAmount > 0 && String(parsedAmount).length <= 13;
-  const contentValid = content.length > 0 && content.length <= 50;
+  const contentValid = content.trim().length > 0 && content.length <= 50;
   const canSubmit = amountValid && contentValid && noteValid;
 
   const handleMarkPaid = async () => {
@@ -219,7 +198,7 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid, canMark
       const detail = await markPayrollPaid(record.id, {
         amount: parsedAmount || computedAmount,
         computedAmount,
-        content: content || prepare.suggestedContent,
+        content: content.trim() || prepare.suggestedContent,
         transactionRef: transactionRef.trim() || undefined,
         note: note.trim() || undefined,
       });
@@ -240,16 +219,42 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid, canMark
 
   const isPaid = record?.payment?.status === 'Paid';
 
-  const qrUrl =
+  const qrPayload =
     prepare?.canPay && qrAmount > 0
-      ? buildVietQRUrl(prepare.bankCode!, prepare.bankAccount!, qrAmount, qrContent, prepare.accountName!)
+      ? buildVietQrPayload(prepare.bankBin, prepare.bankAccount, qrAmount, qrContent)
       : null;
+  const generatedQr = useQrImageSrc(undefined, qrPayload);
+  let qrUrl: string | null = null;
+  if (prepare?.canPay && qrAmount > 0) {
+    qrUrl = qrPayload
+      ? (generatedQr ?? null)
+      : vietQrImageUrl(
+          prepare.bankCode!,
+          prepare.bankAccount!,
+          qrAmount,
+          qrContent,
+          prepare.accountName
+        );
+  }
+
+  /** Lưu ảnh QR (vẽ tại chỗ) để mở app ngân hàng → quét từ ảnh trong thư viện. */
+  const downloadQr = () => {
+    if (!qrPayload || !qrUrl) return;
+    const link = document.createElement('a');
+    link.href = qrUrl;
+    link.download = `qr-luong-${sanitizeTransferContent(record?.userName ?? 'nhan vien').replace(/ /g, '-')}.png`;
+    link.click();
+  };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
         <Stack direction="row" spacing={1.5} alignItems="center">
-          <Iconify icon="solar:wallet-money-bold-duotone" width={28} sx={{ color: 'primary.main' }} />
+          <Iconify
+            icon="solar:wallet-money-bold-duotone"
+            width={28}
+            sx={{ color: 'primary.main' }}
+          />
           <Box>
             <Typography variant="h6" lineHeight={1.3}>
               {isPaid ? 'Chi tiết thanh toán lương' : 'Trả lương'}
@@ -287,9 +292,11 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid, canMark
           <Stack spacing={2.5}>
             {/* Already paid info */}
             {isPaid && record?.payment && (
-              <Alert severity="success" icon={<Iconify icon="solar:check-circle-bold" width={20} />}>
-                Đã thanh toán{' '}
-                <strong>{formatCurrency(record.payment.amount)}</strong> vào{' '}
+              <Alert
+                severity="success"
+                icon={<Iconify icon="solar:check-circle-bold" width={20} />}
+              >
+                Đã thanh toán <strong>{formatCurrency(record.payment.amount)}</strong> vào{' '}
                 {new Date(record.payment.paidAt).toLocaleString('vi-VN')}
                 {record.payment.transactionRef && (
                   <span>
@@ -311,7 +318,9 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid, canMark
                   onChange={handleAmountChange}
                   onKeyDown={handleAmountKeyDown}
                   error={amountInput !== '' && !amountValid}
-                  helperText={amountInput !== '' && !amountValid ? 'Số tiền không hợp lệ' : undefined}
+                  helperText={
+                    amountInput !== '' && !amountValid ? 'Số tiền không hợp lệ' : undefined
+                  }
                   InputProps={{
                     endAdornment: <InputAdornment position="end">₫</InputAdornment>,
                   }}
@@ -361,8 +370,8 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid, canMark
               {qrError ? (
                 <Box
                   sx={{
-                    width: 240,
-                    height: 240,
+                    width: 260,
+                    height: 260,
                     mx: 'auto',
                     display: 'flex',
                     alignItems: 'center',
@@ -395,12 +404,12 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid, canMark
                   </Stack>
                 </Box>
               ) : (
-                <Box sx={{ position: 'relative', width: 240, height: 240, mx: 'auto' }}>
+                <Box sx={{ position: 'relative', width: 260, height: 260, mx: 'auto' }}>
                   {qrLoading && (
                     <Skeleton
                       variant="rectangular"
-                      width={240}
-                      height={240}
+                      width={260}
+                      height={260}
                       sx={{ borderRadius: 2, position: 'absolute', top: 0, left: 0 }}
                     />
                   )}
@@ -415,10 +424,11 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid, canMark
                         setQrError(true);
                       }}
                       sx={{
-                        width: 240,
-                        height: 240,
+                        width: 260,
+                        height: 260,
                         borderRadius: 2,
-                        objectFit: 'cover',
+                        objectFit: 'contain',
+                        bgcolor: 'common.white',
                         display: qrLoading ? 'none' : 'block',
                       }}
                     />
@@ -426,9 +436,30 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid, canMark
                 </Box>
               )}
               <Typography variant="caption" color="text.disabled" display="block" mt={0.75}>
-                Quét mã QR để chuyển khoản (compact2 · 540×640)
+                Quét bằng app ngân hàng bất kỳ (VietQR · NAPAS 247)
               </Typography>
+              {qrPayload && qrUrl ? (
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={downloadQr}
+                  startIcon={<Iconify icon="solar:download-minimalistic-bold" width={16} />}
+                  sx={{ mt: 0.5 }}
+                >
+                  Tải ảnh QR
+                </Button>
+              ) : null}
             </Box>
+
+            {!isPaid && prepare.bankCode && prepare.bankAccount && qrAmount > 0 ? (
+              <BankAppDeeplink
+                bankCode={prepare.bankCode}
+                account={prepare.bankAccount}
+                amount={qrAmount}
+                content={qrContent}
+                accountName={prepare.accountName}
+              />
+            ) : null}
 
             <Divider />
 
@@ -544,7 +575,11 @@ export default function PaymentQRDialog({ open, record, onClose, onPaid, canMark
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <Iconify icon="solar:hashtag-bold" width={16} sx={{ color: 'text.disabled' }} />
+                          <Iconify
+                            icon="solar:hashtag-bold"
+                            width={16}
+                            sx={{ color: 'text.disabled' }}
+                          />
                         </InputAdornment>
                       ),
                     }}
