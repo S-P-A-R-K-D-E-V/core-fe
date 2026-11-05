@@ -45,8 +45,7 @@ import {
   type AccountCapabilities,
 } from 'src/components/account-capability';
 
-import { ApiPayBankLinkCard } from './apipay-bank-link';
-import { ConnectionList, ConfirmActionDialog, ConnectionFormDialog } from './payment-connection';
+import { ConnectionList, ConfirmActionDialog } from './payment-connection';
 import BankAccountFormDialog from './bank-account/bank-account-form-dialog';
 import BankAccountVietQrDialog from './bank-account/bank-account-vietqr-dialog';
 import { bankLinkCodeOf, BankLinkRegisterDialog, type BankLinkPreset } from './bank-link';
@@ -92,8 +91,6 @@ export default function BankAccountsTab() {
   );
   const [deactivating, setDeactivating] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
-  // "Thêm nguồn payOS": kết nối payOS gắn đúng tài khoản này (S Payment luân phiên payOS ⇄ ApiPay theo hạn mức).
-  const [payosTarget, setPayosTarget] = useState<IBankAccountWithConnections | null>(null);
   const [loadCount, setLoadCount] = useState(0);
   const capabilities = useAccountCapabilities(enabled ? loadCount : -1);
 
@@ -301,8 +298,6 @@ export default function BankAccountsTab() {
           bank={bankOf(a)}
           enabled={enabled}
           capabilities={capabilities}
-          canAddPayOs={providers.some((p) => p.key === 'payos')}
-          onAddPayOs={() => setPayosTarget(a)}
           providers={providers}
           providersLoading={providersLoading}
           providersError={providersError}
@@ -325,14 +320,6 @@ export default function BankAccountsTab() {
           onChanged={load}
         />
       ))}
-
-      {enabled && (
-        <ApiPayBankLinkCard
-          connections={[...accounts.flatMap((a) => a.connections ?? []), ...unassigned]}
-          hideWhenEmpty
-          onChanged={load}
-        />
-      )}
 
       {enabled && unassigned.length > 0 && (
         <Card sx={{ p: 3 }}>
@@ -377,29 +364,6 @@ export default function BankAccountsTab() {
         onClose={() => setQrTarget(null)}
       />
 
-      <ConnectionFormDialog
-        open={!!payosTarget}
-        mode="create"
-        presetProvider="payos"
-        providers={providers}
-        providersLoading={providersLoading}
-        providersError={providersError}
-        presetBankAccount={
-          payosTarget
-            ? {
-                id: payosTarget.id,
-                label: bankAccountOptionLabel(payosTarget),
-                bin: payosTarget.bin,
-                accountNumber: payosTarget.accountNumber,
-              }
-            : null
-        }
-        onClose={() => setPayosTarget(null)}
-        onSaved={() => {
-          setPayosTarget(null);
-          load();
-        }}
-      />
 
       <BankLinkRegisterDialog
         open={!!registerPreset}
@@ -435,8 +399,6 @@ type CardProps = {
   bank?: IVietQRBank;
   enabled: boolean;
   capabilities: AccountCapabilities;
-  canAddPayOs: boolean;
-  onAddPayOs: VoidFunction;
   providers: IPaymentProviderInfo[];
   providersLoading: boolean;
   providersError: string | null;
@@ -455,8 +417,6 @@ function BankAccountCard({
   bank,
   enabled,
   capabilities,
-  canAddPayOs,
-  onAddPayOs,
   providers,
   providersLoading,
   providersError,
@@ -471,11 +431,13 @@ function BankAccountCard({
 }: CardProps) {
   const label = bankAccountBankLabel(a, bank);
   const editable = !a.isManagedByKiotViet;
-  // Đăng ký báo có qua S Payment: VietinBank / MB, tài khoản chưa có kết nối nào.
-  const canRegister = !!bankLinkCodeOf(a.bin) && a.connections.length === 0;
+  // Đăng ký báo có qua S Payment (VietinBank, MB, ACB, BIDV — S Payment tự chọn ngân hàng trực tiếp hoặc Pay2S): tài khoản
+  // chưa có bản đăng ký báo có đang chạy. Nguồn khác (ApiPay, payOS…) không chặn — thêm nguồn thì S Payment luân phiên.
+  const canRegister =
+    !!bankLinkCodeOf(a.bin) &&
+    !a.connections.some((c) => c.status === 'active' && !!c.publicSettings?.bankLinkId);
   // Nguồn tự xác nhận S Payment thấy cho tài khoản (kể cả ApiPay VA gắn số TK gốc) — nguồn đầu dùng cho thanh toán kế tiếp.
   const sources = capabilities[a.id]?.sources ?? [];
-  const hasPayOs = sources.some((s) => s.provider === 'payos');
   const rotating =
     sources.filter((s) => s.kind !== 'bank_direct' && (!s.quota || s.quota.remaining > 0)).length > 1;
 
@@ -564,17 +526,6 @@ function BankAccountCard({
                 Đăng ký báo có
               </Button>
             )}
-            {enabled && a.isActive && canAddPayOs && !hasPayOs && (
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<Iconify icon="mingcute:add-line" />}
-                onClick={onAddPayOs}
-                disabled={!a.accountNumber}
-              >
-                Thêm nguồn payOS
-              </Button>
-            )}
             {editable && (
               <Button
                 size="small"
@@ -651,13 +602,8 @@ function BankAccountCard({
                       {!a.isActive
                         ? '.'
                         : canRegister
-                          ? '. Bấm "Đăng ký báo có" để ngân hàng báo tiền về (cần CCCD / MST, SĐT chủ tài khoản và OTP)'
-                          : '. Đăng ký báo có hiện hỗ trợ tài khoản VietinBank và MB'}
-                      {a.isActive && canAddPayOs
-                        ? ', hoặc "Thêm nguồn payOS" (tạo kênh trên my.payos.vn cho tài khoản này rồi dán 3 khoá).'
-                        : a.isActive
-                          ? '.'
-                          : ''}
+                          ? '. Bấm "Đăng ký báo có": nhập thông tin chủ tài khoản (CCCD / MST, SĐT) và OTP — S Payment tự kết nối, không cần khoá nào.'
+                          : '. Đăng ký báo có hiện hỗ trợ tài khoản VietinBank, MB, ACB, BIDV — ngân hàng khác chỉ hiện VietQR, thu ngân tự kiểm tra tiền về.'}
                     </Typography>
                   </Box>
                 )

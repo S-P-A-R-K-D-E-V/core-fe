@@ -252,8 +252,11 @@ describe('BankAccountsTab — dịch vụ thanh toán bật', () => {
 
     const vcb = await cardOf('0011223344');
     expect(within(vcb).getByText('VietQR')).toBeInTheDocument();
-    expect(within(vcb).getByText(/hỗ trợ tài khoản VietinBank và MB/)).toBeInTheDocument();
+    expect(within(vcb).getByText(/hỗ trợ tài khoản VietinBank, MB, ACB, BIDV/)).toBeInTheDocument();
     expect(within(vcb).queryByRole('button', { name: 'Đăng ký báo có' })).not.toBeInTheDocument();
+    // Tài khoản ACB đã có QR động vẫn đăng ký báo có được (S Payment đi qua Pay2S, thêm nguồn); không còn form khoá payOS.
+    expect(within(acb).getByRole('button', { name: 'Đăng ký báo có' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Thêm nguồn payOS' })).not.toBeInTheDocument();
 
     const vtb = await cardOf('103885549137');
     expect(within(vtb).getByRole('button', { name: 'Đăng ký báo có' })).toBeInTheDocument();

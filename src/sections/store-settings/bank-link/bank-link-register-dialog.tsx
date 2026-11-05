@@ -30,6 +30,7 @@ import {
   identityLabel,
   cleanIdentity,
   normalizeMobile,
+  bankLinkFields,
   toBankAccountName,
   cleanAccountNumber,
   registerFormErrors,
@@ -111,16 +112,20 @@ export default function BankLinkRegisterDialog({
 
   const bank = banks.find((b) => b.code === values.bank);
   const types = bank?.accountTypes ?? (Object.keys(ACCOUNT_TYPE_LABELS) as BankLinkAccountType[]);
-  const errors = registerFormErrors(values);
+  // S Payment báo ngân hàng cần gì (vd ACB chỉ tên + SĐT, BIDV thêm email) — cửa hàng không chọn đường đăng ký.
+  const fields = bankLinkFields(bank);
+  const needsIdentity = fields.includes('identity');
+  const needsEmail = fields.includes('email');
+  const errors = registerFormErrors(values, fields);
   const fieldError = (key: keyof RegisterFormValues) => (showErrors ? errors[key] : undefined);
-  const canResend = !!values.identity && !!values.mobile;
+  const canResend = (!needsIdentity || !!values.identity) && !!values.mobile;
 
   const set = (key: keyof RegisterFormValues) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setValues((v) => ({ ...v, [key]: e.target.value }));
 
   const finish = (res: IBankLink) => {
-    // Xong: bỏ CCCD / SĐT khỏi bộ nhớ.
-    setValues((v) => ({ ...v, identity: '', mobile: '' }));
+    // Xong: bỏ CCCD / SĐT / email khỏi bộ nhớ.
+    setValues((v) => ({ ...v, identity: '', mobile: '', email: '' }));
     setLink(res);
     setStep('done');
     onChanged();
@@ -137,9 +142,10 @@ export default function BankLinkRegisterDialog({
         accountNumber: cleanAccountNumber(values.accountNumber),
         accountName: toBankAccountName(values.accountName),
         accountType: values.accountType,
-        identity: cleanIdentity(values.identity),
+        identity: needsIdentity ? cleanIdentity(values.identity) : '',
         mobile: normalizeMobile(values.mobile),
         policyAgree: consent,
+        ...(needsEmail ? { email: values.email.trim() } : {}),
       });
       setShowErrors(false);
       setOtp('');
@@ -254,14 +260,16 @@ export default function BankLinkRegisterDialog({
               ))}
             </TextField>
 
-            <TextField
-              label={identityLabel(values.accountType)}
-              value={values.identity}
-              onChange={set('identity')}
-              error={!!fieldError('identity')}
-              helperText={fieldError('identity')}
-              inputProps={{ autoComplete: 'off' }}
-            />
+            {needsIdentity && (
+              <TextField
+                label={identityLabel(values.accountType)}
+                value={values.identity}
+                onChange={set('identity')}
+                error={!!fieldError('identity')}
+                helperText={fieldError('identity')}
+                inputProps={{ autoComplete: 'off' }}
+              />
+            )}
 
             <TextField
               label="Số điện thoại"
@@ -272,6 +280,17 @@ export default function BankLinkRegisterDialog({
               inputProps={{ inputMode: 'tel', autoComplete: 'off' }}
             />
 
+            {needsEmail && (
+              <TextField
+                label="Email chủ tài khoản"
+                value={values.email}
+                onChange={set('email')}
+                error={!!fieldError('email')}
+                helperText={fieldError('email') ?? 'Email đăng ký với ngân hàng'}
+                inputProps={{ inputMode: 'email', autoComplete: 'off' }}
+              />
+            )}
+
             <FormControlLabel
               control={
                 <Checkbox checked={consent} onChange={(e) => setConsent(e.target.checked)} />
@@ -280,7 +299,7 @@ export default function BankLinkRegisterDialog({
                 <Typography variant="body2">
                   {bank?.consent ??
                     'Tôi đồng ý để ngân hàng cung cấp thông tin giao dịch của tài khoản cho SPARK để thông báo tiền về khi thanh toán QR.'}{' '}
-                  Hệ thống không lưu CCCD / mã số thuế và SĐT.
+                  Hệ thống không lưu CCCD / mã số thuế, SĐT và email.
                 </Typography>
               }
             />

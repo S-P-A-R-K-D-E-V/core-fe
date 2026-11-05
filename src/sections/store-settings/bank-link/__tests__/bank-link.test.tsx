@@ -122,6 +122,72 @@ describe('utils', () => {
   });
 });
 
+describe('BankLinkRegisterDialog — ngân hàng qua Pay2S', { timeout: 20000 }, () => {
+  const PAY2S: IBankLinkBank[] = [
+    {
+      code: 'acb',
+      bin: '970416',
+      name: 'ACB',
+      available: true,
+      accountTypes: ['individual'],
+      consent: 'Tôi đồng ý để ACB cung cấp thông tin giao dịch của tài khoản cho Pay2S (đối tác kết nối) và SPARK.',
+      via: 'pay2s',
+      fields: ['mobile'],
+    },
+    {
+      code: 'bidv',
+      bin: '970418',
+      name: 'BIDV',
+      available: true,
+      accountTypes: ['individual', 'household'],
+      consent: 'Tôi đồng ý để BIDV cung cấp thông tin giao dịch.',
+      via: 'pay2s',
+      fields: ['identity', 'mobile', 'email'],
+    },
+  ];
+
+  it('ACB chỉ hỏi tên + SĐT; BIDV hỏi thêm email và gửi kèm', async () => {
+    const user = userEvent.setup();
+    getBankLinkBanks.mockResolvedValue(PAY2S);
+    registerBankLink.mockResolvedValue(link({ bank: 'bidv', bin: '970418', bankName: 'BIDV', via: 'pay2s' }));
+
+    wrap(<BankLinkRegisterDialog open onClose={vi.fn()} onChanged={vi.fn()} />);
+
+    await waitFor(() => expect(getBankLinkBanks).toHaveBeenCalled());
+    await pick(user, 'Ngân hàng', /ACB/);
+    await pick(user, 'Loại tài khoản', /Cá nhân/);
+    expect(screen.queryByLabelText('Số CCCD / CMND / Hộ chiếu')).toBeNull();
+    expect(screen.queryByLabelText('Email chủ tài khoản')).toBeNull();
+    expect(screen.getByText(/cho Pay2S \(đối tác kết nối\)/)).toBeInTheDocument();
+
+    await pick(user, 'Ngân hàng', /BIDV/);
+    await user.type(screen.getByLabelText('Số tài khoản'), '1234567890');
+    await user.type(screen.getByLabelText('Chủ tài khoản'), 'Vũ Xuân Bình');
+    await user.type(screen.getByLabelText('Số CCCD / CMND / Hộ chiếu'), '001203004567');
+    await user.type(screen.getByLabelText('Số điện thoại'), '0372812115');
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Đăng ký' }));
+    expect(await screen.findByText('Nhập email của chủ tài khoản')).toBeInTheDocument();
+    expect(registerBankLink).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText('Email chủ tài khoản'), 'chu@cici.vn');
+    await user.click(screen.getByRole('button', { name: 'Đăng ký' }));
+
+    await waitFor(() =>
+      expect(registerBankLink).toHaveBeenCalledWith({
+        bank: 'bidv',
+        accountNumber: '1234567890',
+        accountName: 'VU XUAN BINH',
+        accountType: 'individual',
+        identity: '001203004567',
+        mobile: '0372812115',
+        policyAgree: true,
+        email: 'chu@cici.vn',
+      })
+    );
+  });
+});
+
 describe('BankLinkRegisterDialog', { timeout: 20000 }, () => {
   it('đăng ký đã chuẩn hoá → OTP → thành công, không có ô khoá ngân hàng', async () => {
     const user = userEvent.setup();

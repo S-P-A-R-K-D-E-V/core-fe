@@ -338,7 +338,13 @@ export type IBankLinkBank = {
   accountTypes: BankLinkAccountType[];
   /** Câu đồng ý chủ tài khoản phải tick */
   consent: string;
+  /** Đường S Payment dùng: direct (ngân hàng trực tiếp) | pay2s — chỉ để hiển thị, cửa hàng không chọn */
+  via?: 'direct' | 'pay2s' | null;
+  /** Thông tin chủ TK cần nhập; thiếu = identity + mobile (như trước) */
+  fields?: BankLinkField[] | null;
 };
+
+export type BankLinkField = 'identity' | 'mobile' | 'email';
 
 export type IBankLink = {
   id: string;
@@ -357,6 +363,7 @@ export type IBankLink = {
   lastError?: string | null;
   connectionId?: string | null;
   createdAt: string;
+  via?: 'direct' | 'pay2s' | null;
   /** Chỉ khi vừa active: tài khoản ngân hàng của cửa hàng core-be đã thêm / bật lại */
   coreBankAccount?: IApiPayCoreBankAccount | null;
 };
@@ -370,6 +377,8 @@ export type IRegisterBankLinkRequest = {
   identity: string;
   mobile: string;
   policyAgree: boolean;
+  /** Chỉ BIDV (qua Pay2S) đòi */
+  email?: string;
 };
 
 // ---------------------------------------------------------------------- Đối soát (Admin, Manager)

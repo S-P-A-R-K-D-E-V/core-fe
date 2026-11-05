@@ -64,9 +64,11 @@ export default function BankLinkRevokeDialog({ link, onClose, onChanged }: Props
     setError(null);
   }, [link]);
 
-  const idError = identityError(current?.accountType ?? '', identity);
-  const phoneError = mobileError(mobile);
-  const canResend = !!identity && !!mobile;
+  // Đăng ký qua Pay2S: Pay2S gửi OTP huỷ về SĐT đã đăng ký — không cần nhập lại CCCD / SĐT.
+  const needsInfo = current?.via !== 'pay2s';
+  const idError = needsInfo ? identityError(current?.accountType ?? '', identity) : undefined;
+  const phoneError = needsInfo ? mobileError(mobile) : undefined;
+  const canResend = !needsInfo || (!!identity && !!mobile);
 
   const request = async () => {
     if (!current) return;
@@ -76,8 +78,8 @@ export default function BankLinkRevokeDialog({ link, onClose, onChanged }: Props
     setError(null);
     try {
       const res = await revokeBankLink(current.id, {
-        identity: cleanIdentity(identity),
-        mobile: normalizeMobile(mobile),
+        identity: needsInfo ? cleanIdentity(identity) : '',
+        mobile: needsInfo ? normalizeMobile(mobile) : '',
       });
       setCurrent(res);
       setOtp('');
@@ -133,27 +135,33 @@ export default function BankLinkRevokeDialog({ link, onClose, onChanged }: Props
           <Stack spacing={2.5}>
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               Tài khoản <b>{current.accountNumber}</b> ({current.bankName}) sẽ thôi báo tiền về —
-              chuyển khoản qua QR phải xác nhận tay. {current.bankName} cần thông tin chủ tài khoản
-              để gửi OTP huỷ.
+              chuyển khoản qua QR phải xác nhận tay.{' '}
+              {needsInfo
+                ? `${current.bankName} cần thông tin chủ tài khoản để gửi OTP huỷ.`
+                : 'OTP huỷ được gửi về SĐT chủ tài khoản đã đăng ký.'}
             </Typography>
-            <TextField
-              label={identityLabel(current.accountType)}
-              value={identity}
-              onChange={(e) => setIdentity(e.target.value)}
-              error={showErrors && !!idError}
-              helperText={showErrors ? idError : undefined}
-              inputProps={{ autoComplete: 'off' }}
-            />
-            <TextField
-              label="Số điện thoại"
-              value={mobile}
-              onChange={(e) => setMobile(e.target.value)}
-              error={showErrors && !!phoneError}
-              helperText={
-                (showErrors && phoneError) || 'SĐT chủ tài khoản đã đăng ký tại ngân hàng'
-              }
-              inputProps={{ inputMode: 'tel', autoComplete: 'off' }}
-            />
+            {needsInfo && (
+              <>
+                <TextField
+                  label={identityLabel(current.accountType)}
+                  value={identity}
+                  onChange={(e) => setIdentity(e.target.value)}
+                  error={showErrors && !!idError}
+                  helperText={showErrors ? idError : undefined}
+                  inputProps={{ autoComplete: 'off' }}
+                />
+                <TextField
+                  label="Số điện thoại"
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value)}
+                  error={showErrors && !!phoneError}
+                  helperText={
+                    (showErrors && phoneError) || 'SĐT chủ tài khoản đã đăng ký tại ngân hàng'
+                  }
+                  inputProps={{ inputMode: 'tel', autoComplete: 'off' }}
+                />
+              </>
+            )}
             {error && <Alert severity="error">{error}</Alert>}
           </Stack>
         )}

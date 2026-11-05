@@ -26,7 +26,6 @@ import { useSnackbar } from 'src/components/snackbar';
 
 import { BankLinkCard } from './bank-link';
 import { ConnectionList } from './payment-connection';
-import { ApiPayBankLinkCard } from './apipay-bank-link';
 
 // ----------------------------------------------------------------------
 // Thanh toán qua S Payment (chỉ Admin), kiểu KiotViet: chủ cửa hàng chỉ đăng ký báo có cho tài khoản (ngân hàng → số TK,
@@ -123,8 +122,6 @@ export default function PaymentConnectionsTab() {
           />
         </Stack>
       </Card>
-
-      <ApiPayBankLinkCard connections={connections} hideWhenEmpty onChanged={load} />
     </Stack>
   );
 }

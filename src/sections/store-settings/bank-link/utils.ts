@@ -1,4 +1,9 @@
-import type { IBankLink, BankLinkAccountType } from 'src/types/payment-service';
+import type {
+  IBankLink,
+  BankLinkField,
+  IBankLinkBank,
+  BankLinkAccountType,
+} from 'src/types/payment-service';
 
 import { normalizeMobile, toBankAccountName } from '../apipay-bank-link/utils';
 
@@ -9,14 +14,24 @@ import { normalizeMobile, toBankAccountName } from '../apipay-bank-link/utils';
 
 export { normalizeMobile, toBankAccountName };
 
-/** Ngân hàng đăng ký báo có được, theo BIN tài khoản của cửa hàng. */
+/**
+ * Ngân hàng đăng ký báo có được, theo BIN tài khoản của cửa hàng. S Payment tự chọn đường (ngân hàng trực tiếp hoặc Pay2S) —
+ * cửa hàng chỉ nhập thông tin chủ tài khoản.
+ */
 export const BANK_LINK_BINS: Record<string, string> = {
   '970415': 'vietinbank',
   '970422': 'mbbank',
+  '970416': 'acb',
+  '970418': 'bidv',
 };
 
 export function bankLinkCodeOf(bin: string | null | undefined): string | null {
   return (bin && BANK_LINK_BINS[bin.trim()]) || null;
+}
+
+/** Thông tin chủ TK ngân hàng này cần (máy chủ cũ không trả = CCCD/MST + SĐT). */
+export function bankLinkFields(bank: IBankLinkBank | null | undefined): BankLinkField[] {
+  return bank?.fields?.length ? bank.fields : ['identity', 'mobile'];
 }
 
 export const ACCOUNT_TYPE_LABELS: Record<BankLinkAccountType, string> = {
@@ -40,6 +55,7 @@ export type RegisterFormValues = {
   accountType: BankLinkAccountType | '';
   identity: string;
   mobile: string;
+  email: string;
 };
 
 export const EMPTY_REGISTER_FORM: RegisterFormValues = {
@@ -49,6 +65,7 @@ export const EMPTY_REGISTER_FORM: RegisterFormValues = {
   accountType: '',
   identity: '',
   mobile: '',
+  email: '',
 };
 
 export function cleanAccountNumber(value: string): string {
@@ -78,8 +95,14 @@ export function mobileError(value: string): string | undefined {
     : 'SĐT di động 10 số, đúng số đã đăng ký tại ngân hàng';
 }
 
+export function emailError(value: string): string | undefined {
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value.trim()) ? undefined : 'Nhập email của chủ tài khoản';
+}
+
+/** @param fields thông tin ngân hàng đòi (mặc định CCCD/MST + SĐT). */
 export function registerFormErrors(
-  v: RegisterFormValues
+  v: RegisterFormValues,
+  fields: BankLinkField[] = ['identity', 'mobile']
 ): Partial<Record<keyof RegisterFormValues, string>> {
   const errors: Partial<Record<keyof RegisterFormValues, string>> = {};
   if (!v.bank) errors.bank = 'Chọn ngân hàng';
@@ -90,10 +113,12 @@ export function registerFormErrors(
   if (!name) errors.accountName = 'Nhập tên chủ tài khoản';
   else if (name.length > 100) errors.accountName = 'Tối đa 100 ký tự';
   if (!v.accountType) errors.accountType = 'Chọn loại tài khoản';
-  const id = identityError(v.accountType, v.identity);
+  const id = fields.includes('identity') ? identityError(v.accountType, v.identity) : undefined;
   if (id) errors.identity = id;
   const mobile = mobileError(v.mobile);
   if (mobile) errors.mobile = mobile;
+  const email = fields.includes('email') ? emailError(v.email) : undefined;
+  if (email) errors.email = email;
   return errors;
 }
 
