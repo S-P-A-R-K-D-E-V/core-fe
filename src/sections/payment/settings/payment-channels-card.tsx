@@ -30,7 +30,12 @@ import { getPaymentChannels, updatePaymentChannels } from 'src/api/online-shop';
 
 import { useSnackbar } from 'src/components/snackbar';
 
-import { channelDraft, togglePaymentOption, posDefaultChoices, type ChannelDraft } from './payment-channels-utils';
+import {
+  channelDraft,
+  togglePaymentOption,
+  posDefaultChoices,
+  type ChannelDraft,
+} from './payment-channels-utils';
 
 // ----------------------------------------------------------------------
 // Phương thức theo kênh: một bảng, mỗi dòng một lựa chọn thanh toán (tiền mặt, thẻ, VietQR theo tài khoản, chuyển khoản
@@ -62,7 +67,9 @@ export default function PaymentChannelsCard({ onOpenConnections }: Props) {
       setData(res);
       setDraft(channelDraft(res));
     } catch (err) {
-      enqueueSnackbar(apiErrorMessage(err, 'Không tải được phương thức thanh toán'), { variant: 'error' });
+      enqueueSnackbar(apiErrorMessage(err, 'Không tải được phương thức thanh toán'), {
+        variant: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -92,7 +99,8 @@ export default function PaymentChannelsCard({ onOpenConnections }: Props) {
     );
   }
 
-  const toggle = (channel: PaymentChannel, key: string) => setDraft((d) => (d ? togglePaymentOption(d, channel, key) : d));
+  const toggle = (channel: PaymentChannel, key: string) =>
+    setDraft((d) => (d ? togglePaymentOption(d, channel, key) : d));
 
   const save = async () => {
     setSaving(true);
@@ -117,35 +125,47 @@ export default function PaymentChannelsCard({ onOpenConnections }: Props) {
     <Card>
       <CardHeader
         title="Phương thức thanh toán theo kênh"
-        subheader="Tích ô để bật phương thức cho từng kênh bán. Quầy chỉ hiện phương thức / nguồn chuyển khoản được bật; trang bán online chỉ cho khách chọn các ô ở cột Bán online."
+        subheader='Tích ô để bật phương thức cho từng kênh bán. Chuyển khoản ở quầy: bật dòng "VietQR theo tài khoản ngân hàng" — S Payment tự chọn kênh báo tiền về. Trang bán online chỉ cho khách chọn các ô ở cột Bán online.'
       />
 
       <Stack spacing={2} sx={{ p: 3, pt: 2 }}>
         {!data.paymentServiceEnabled && (
           <Alert severity="info">
-            S Payment chưa bật cho cửa hàng — chỉ có tiền mặt, thẻ và VietQR theo tài khoản (không tự xác nhận). Bán online
-            cần một kết nối xác nhận tiền về.
+            S Payment chưa bật cho cửa hàng — chỉ có tiền mặt, thẻ và VietQR theo tài khoản (không
+            tự xác nhận). Bán online cần một kết nối xác nhận tiền về.
           </Alert>
         )}
         {data.paymentServiceEnabled && !hasConnection && (
           <Alert
             severity="warning"
-            action={onOpenConnections && <Button color="inherit" onClick={onOpenConnections}>Thêm kết nối</Button>}
+            action={
+              onOpenConnections && (
+                <Button color="inherit" onClick={onOpenConnections}>
+                  Thêm kết nối
+                </Button>
+              )
+            }
           >
-            Chưa có kết nối xác nhận tiền về (ApiPay, ngân hàng trực tiếp…). Trang bán online cần ít nhất một kết nối để đơn tự
-            xác nhận khi khách chuyển khoản.
+            Chưa có tài khoản tự xác nhận tiền về — liên kết tài khoản ngân hàng trên S Payment.
+            Trang bán online cần ít nhất một tài khoản tự xác nhận để đơn tự xác nhận khi khách
+            chuyển khoản.
           </Alert>
         )}
         {!data.pos.configured && (
           <Alert severity="info">
-            Chưa lưu cấu hình quầy: quầy đang dùng mọi phương thức như trước. Bấm Lưu để áp dụng lựa chọn bên dưới.
+            Chưa lưu cấu hình quầy: quầy đang dùng mọi phương thức như trước. Bấm Lưu để áp dụng lựa
+            chọn bên dưới.
           </Alert>
         )}
         {draft.online.length === 0 && (
-          <Alert severity="warning">Trang bán online chưa nhận thanh toán — tích ít nhất một ô ở cột Bán online.</Alert>
+          <Alert severity="warning">
+            Trang bán online chưa nhận thanh toán — tích ít nhất một ô ở cột Bán online.
+          </Alert>
         )}
 
-        <TableContainer sx={{ border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 1 }}>
+        <TableContainer
+          sx={{ border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 1 }}
+        >
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -166,27 +186,34 @@ export default function PaymentChannelsCard({ onOpenConnections }: Props) {
           </Table>
         </TableContainer>
 
-        <TextField
-          select
-          label="Nguồn chuyển khoản mặc định ở quầy"
-          value={draft.posDefault}
-          onChange={(e) => setDraft({ ...draft, posDefault: e.target.value })}
-          helperText="Quầy tự chọn sẵn nguồn này khi tạo mã QR; để trống thì mỗi máy quầy nhớ lựa chọn lần trước."
-          sx={{ maxWidth: 560 }}
-        >
-          <MenuItem value="">Để máy quầy tự nhớ</MenuItem>
-          {defaultChoices.map((o) => (
-            <MenuItem key={o.key} value={o.key}>
-              {o.label}
-            </MenuItem>
-          ))}
-        </TextField>
+        {(defaultChoices.length > 1 || !!draft.posDefault) && (
+          <TextField
+            select
+            label="Nguồn chuyển khoản mặc định ở quầy"
+            value={draft.posDefault}
+            onChange={(e) => setDraft({ ...draft, posDefault: e.target.value })}
+            helperText="Quầy tự chọn sẵn nguồn này khi tạo mã QR; để trống thì mỗi máy quầy nhớ lựa chọn lần trước."
+            sx={{ maxWidth: 560 }}
+          >
+            <MenuItem value="">Để máy quầy tự nhớ</MenuItem>
+            {defaultChoices.map((o) => (
+              <MenuItem key={o.key} value={o.key}>
+                {o.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
 
         <Stack direction="row" justifyContent="flex-end" spacing={1}>
           <Button color="inherit" onClick={() => setDraft(channelDraft(data))} disabled={saving}>
             Hoàn tác
           </Button>
-          <LoadingButton variant="contained" loading={saving} onClick={save} disabled={draft.pos.length === 0}>
+          <LoadingButton
+            variant="contained"
+            loading={saving}
+            onClick={save}
+            disabled={draft.pos.length === 0}
+          >
             Lưu
           </LoadingButton>
         </Stack>
@@ -210,8 +237,12 @@ function OptionRow({ option, draft, onToggle }: RowProps) {
         <Stack spacing={0.5}>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
             <Typography variant="subtitle2">{option.label}</Typography>
-            {option.autoConfirm && <Chip size="small" color="success" variant="soft" label="Tự xác nhận" />}
-            {option.environment === 'test' && <Chip size="small" color="warning" variant="outlined" label="Thử nghiệm" />}
+            {option.autoConfirm && (
+              <Chip size="small" color="success" variant="soft" label="Tự xác nhận" />
+            )}
+            {option.environment === 'test' && (
+              <Chip size="small" color="warning" variant="outlined" label="Thử nghiệm" />
+            )}
           </Stack>
           {option.detail && (
             <Typography variant="caption" color="text.secondary">
@@ -237,7 +268,13 @@ function OptionRow({ option, draft, onToggle }: RowProps) {
                 inputProps={{ 'aria-label': `${option.label} — ${c.label}` }}
               />
             ) : (
-              <Tooltip title={c.value === 'online' ? 'Không dùng cho bán online (cần tự xác nhận tiền về)' : 'Chỉ dùng cho bán online'}>
+              <Tooltip
+                title={
+                  c.value === 'online'
+                    ? 'Không dùng cho bán online (cần tự xác nhận tiền về)'
+                    : 'Chỉ dùng cho bán online'
+                }
+              >
                 <Typography variant="body2" color="text.disabled">
                   —
                 </Typography>
