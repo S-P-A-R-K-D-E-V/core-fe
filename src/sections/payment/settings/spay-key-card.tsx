@@ -6,6 +6,7 @@ import Card from '@mui/material/Card';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Switch from '@mui/material/Switch';
 import Divider from '@mui/material/Divider';
 import Skeleton from '@mui/material/Skeleton';
 import TextField from '@mui/material/TextField';
@@ -21,6 +22,7 @@ import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
 import {
   disconnectSPay,
+  setSPayPaymentsViaV2,
   getSPayAccounts,
   connectSPayApiKey,
   getSPayConnectStatus,
@@ -90,6 +92,32 @@ export default function SPayKeyCard() {
     }
   };
 
+  const handleViaV2 = async (enabled: boolean) => {
+    const ok = await confirm({
+      title: enabled ? 'Chuyển thanh toán sang S Payment?' : 'Quay về kết nối cũ?',
+      content: enabled
+        ? 'QR ở quầy và đơn online sẽ tạo bằng khoá của cửa hàng; S Payment chọn tài khoản / kênh báo tiền về theo chính sách ' +
+          'Chia tải & chi phí. Tài khoản chưa liên kết trên S Payment vẫn tạo được QR nhưng thu ngân tự kiểm tra tiền về.'
+        : 'Thanh toán mới quay về kết nối chung như trước. Thanh toán đang chờ vẫn được cập nhật bình thường.',
+      confirmText: enabled ? 'Chuyển' : 'Quay về',
+      cancelText: 'Huỷ',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      setStatus(await setSPayPaymentsViaV2(enabled));
+      enqueueSnackbar(enabled ? 'Thanh toán đã chuyển sang S Payment' : 'Đã quay về kết nối cũ', {
+        variant: 'success',
+      });
+    } catch (error) {
+      enqueueSnackbar(apiErrorMessage(error, 'Chưa đổi được cách thanh toán'), {
+        variant: 'error',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleDisconnect = async () => {
     const ok = await confirm({
       title: 'Ngắt kết nối S Payment?',
@@ -128,7 +156,9 @@ export default function SPayKeyCard() {
         action={
           <Stack direction="row" spacing={1}>
             {connected && !status.livemode && <Label color="warning">Khoá thử nghiệm</Label>}
-            <Label color={connected ? 'success' : 'default'}>{connected ? 'Đã kết nối' : 'Chưa kết nối'}</Label>
+            <Label color={connected ? 'success' : 'default'}>
+              {connected ? 'Đã kết nối' : 'Chưa kết nối'}
+            </Label>
           </Stack>
         }
       />
@@ -148,9 +178,31 @@ export default function SPayKeyCard() {
               </Typography>
               {!status.workspaceMatchesStore && (
                 <Alert severity="warning">
-                  Khoá này thuộc một workspace S Payment khác cửa hàng hiện tại. Kiểm tra lại workspace khi tạo khoá trên S Payment.
+                  Khoá này thuộc một workspace S Payment khác cửa hàng hiện tại. Kiểm tra lại
+                  workspace khi tạo khoá trên S Payment.
                 </Alert>
               )}
+            </Stack>
+          )}
+
+          {connected && status.mode === 'api_key' && (
+            <Stack spacing={1}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                <div>
+                  <Typography variant="subtitle2">Thanh toán qua S Payment</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {status.paymentsViaV2
+                      ? 'Đang bật — QR quầy và đơn online tạo bằng khoá của cửa hàng, S Payment tự chọn tài khoản và kênh báo tiền về.'
+                      : 'Đang tắt — thanh toán vẫn đi qua kết nối chung như trước. Bật để S Payment quản lý theo chính sách của cửa hàng.'}
+                  </Typography>
+                </div>
+                <Switch
+                  checked={!!status.paymentsViaV2}
+                  disabled={busy}
+                  onChange={(e) => handleViaV2(e.target.checked)}
+                  inputProps={{ 'aria-label': 'Thanh toán qua S Payment' }}
+                />
+              </Stack>
             </Stack>
           )}
 
@@ -165,12 +217,21 @@ export default function SPayKeyCard() {
                 </Typography>
               )}
               {accounts?.map((a) => (
-                <Stack key={a.id} direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                <Stack
+                  key={a.id}
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  spacing={1}
+                >
                   <Typography variant="body2">
-                    <b>{a.bankName}</b> · <span style={{ fontFamily: 'monospace' }}>{a.accountNumber}</span>
+                    <b>{a.bankName}</b> ·{' '}
+                    <span style={{ fontFamily: 'monospace' }}>{a.accountNumber}</span>
                     {a.accountName ? ` · ${a.accountName}` : ''}
                   </Typography>
-                  <Label color={a.autoConfirm ? 'success' : 'default'}>{a.autoConfirm ? 'Tự xác nhận' : 'Xác nhận tay'}</Label>
+                  <Label color={a.autoConfirm ? 'success' : 'default'}>
+                    {a.autoConfirm ? 'Tự xác nhận' : 'Xác nhận tay'}
+                  </Label>
                 </Stack>
               ))}
             </Stack>
@@ -180,8 +241,9 @@ export default function SPayKeyCard() {
             <>
               {connected && <Divider />}
               <Typography variant="body2" color="text.secondary">
-                1. Mở S Payment → <b>Ứng dụng &amp; khoá API</b> → Tạo khoá live. 2. Chép <b>Access key</b> và <b>Secret</b> (dán cả chuỗi Bearer vào ô Secret cũng được; Secret
-                chỉ hiện một lần) rồi dán vào đây.
+                1. Mở S Payment → <b>Ứng dụng &amp; khoá API</b> → Tạo khoá live. 2. Chép{' '}
+                <b>Access key</b> và <b>Secret</b> (dán cả chuỗi Bearer vào ô Secret cũng được;
+                Secret chỉ hiện một lần) rồi dán vào đây.
               </Typography>
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
                 <TextField
@@ -217,7 +279,12 @@ export default function SPayKeyCard() {
                 >
                   {connected ? 'Lưu khoá mới' : 'Kết nối'}
                 </LoadingButton>
-                <Button variant="outlined" href={`${status.portalUrl}/developer`} target="_blank" rel="noopener">
+                <Button
+                  variant="outlined"
+                  href={`${status.portalUrl}/developer`}
+                  target="_blank"
+                  rel="noopener"
+                >
                   Tạo khoá trên S Payment
                 </Button>
                 {connected && (
@@ -240,7 +307,12 @@ export default function SPayKeyCard() {
                 <Button variant="outlined" onClick={() => setEditing(true)}>
                   Đổi khoá
                 </Button>
-                <LoadingButton color="error" variant="outlined" loading={busy} onClick={handleDisconnect}>
+                <LoadingButton
+                  color="error"
+                  variant="outlined"
+                  loading={busy}
+                  onClick={handleDisconnect}
+                >
                   Ngắt kết nối
                 </LoadingButton>
               </>

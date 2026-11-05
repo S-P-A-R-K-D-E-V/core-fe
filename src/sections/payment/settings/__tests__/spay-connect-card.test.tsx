@@ -55,6 +55,7 @@ const BASE: SPayConnectStatus = {
   accessKey: null,
   livemode: true,
   workspaceMatchesStore: true,
+  paymentsViaV2: false,
 };
 
 const wrap = (ui: React.ReactElement) => render(<ThemeProvider theme={createTheme()}>{ui}</ThemeProvider>);

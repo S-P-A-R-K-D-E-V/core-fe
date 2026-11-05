@@ -15,11 +15,13 @@ const getSPayConnectStatus = vi.fn();
 const connectSPayApiKey = vi.fn();
 const getSPayAccounts = vi.fn();
 const disconnectSPay = vi.fn();
+const setSPayPaymentsViaV2 = vi.fn();
 vi.mock('src/api/spay-connect', () => ({
   getSPayConnectStatus: (...a: any[]) => getSPayConnectStatus(...a),
   connectSPayApiKey: (...a: any[]) => connectSPayApiKey(...a),
   getSPayAccounts: (...a: any[]) => getSPayAccounts(...a),
   disconnectSPay: (...a: any[]) => disconnectSPay(...a),
+  setSPayPaymentsViaV2: (...a: any[]) => setSPayPaymentsViaV2(...a),
 }));
 
 const snackbar = { enqueueSnackbar: vi.fn() };
@@ -45,6 +47,7 @@ const BASE: SPayConnectStatus = {
   accessKey: null,
   livemode: true,
   workspaceMatchesStore: true,
+  paymentsViaV2: false,
 };
 const CONNECTED: SPayConnectStatus = {
   ...BASE,
@@ -97,5 +100,17 @@ describe('SPayKeyCard', () => {
     const buttons = await screen.findAllByRole('button', { name: 'Ngắt kết nối' });
     await userEvent.click(buttons[buttons.length - 1]);
     await waitFor(() => expect(disconnectSPay).toHaveBeenCalledTimes(1));
+  });
+  it('switches payments to S Payment only after confirming', async () => {
+    getSPayConnectStatus.mockResolvedValue(CONNECTED);
+    getSPayAccounts.mockResolvedValue([]);
+    setSPayPaymentsViaV2.mockResolvedValue({ ...CONNECTED, paymentsViaV2: true });
+    wrap();
+
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Thanh toán qua S Payment' }));
+    expect(setSPayPaymentsViaV2).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByRole('button', { name: 'Chuyển' }));
+    await waitFor(() => expect(setSPayPaymentsViaV2).toHaveBeenCalledWith(true));
+    expect(await screen.findByText(/Đang bật/)).toBeInTheDocument();
   });
 });

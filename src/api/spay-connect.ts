@@ -28,7 +28,15 @@ export type SPayConnectStatus = {
   livemode: boolean;
   /** Khoá thuộc đúng workspace của cửa hàng này. */
   workspaceMatchesStore: boolean;
+  /** QR quầy và đơn online đi qua S Payment bằng khoá của cửa hàng (API mới) thay vì kết nối chung. */
+  paymentsViaV2: boolean;
 };
+
+/** Bật / tắt thanh toán qua S Payment bằng khoá của cửa hàng (tắt = quay về kết nối chung như trước). */
+export async function setSPayPaymentsViaV2(enabled: boolean): Promise<SPayConnectStatus> {
+  const res = await axios.post<SPayConnectStatus>(endpoints.spayConnect.paymentsViaV2, { enabled });
+  return res.data;
+}
 
 export type SPayBankAccount = {
   id: string;
@@ -39,8 +47,14 @@ export type SPayBankAccount = {
 };
 
 /** Kết nối bằng khoá ứng dụng tạo ở S Payment → Ứng dụng & khoá API. core-be kiểm khoá trên S Payment rồi lưu mã hoá. */
-export async function connectSPayApiKey(accessKey: string, secret: string): Promise<SPayConnectStatus> {
-  const res = await axios.post<SPayConnectStatus>(endpoints.spayConnect.apiKey, { accessKey, secret });
+export async function connectSPayApiKey(
+  accessKey: string,
+  secret: string
+): Promise<SPayConnectStatus> {
+  const res = await axios.post<SPayConnectStatus>(endpoints.spayConnect.apiKey, {
+    accessKey,
+    secret,
+  });
   return res.data;
 }
 
@@ -57,7 +71,9 @@ export async function getSPayConnectStatus(): Promise<SPayConnectStatus> {
 
 /** Bắt đầu kết nối → URL màn đồng ý của S Payment; returnPath = trang quay về sau khi đồng ý (cùng tên miền cửa hàng). */
 export async function startSPayConnect(returnPath: string): Promise<string> {
-  const res = await axios.post<{ authorizeUrl: string }>(endpoints.spayConnect.connect, { returnPath });
+  const res = await axios.post<{ authorizeUrl: string }>(endpoints.spayConnect.connect, {
+    returnPath,
+  });
   return res.data.authorizeUrl;
 }
 
