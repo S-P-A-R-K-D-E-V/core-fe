@@ -44,6 +44,8 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 import { useAuthContext } from 'src/auth/hooks';
 import { permissionsKnown } from 'src/auth/permissions';
 
+import { useCounterSession } from 'src/sections/counter/counter-scope';
+
 import type { IBranchLocation } from 'src/types/corecms-api';
 
 // ----------------------------------------------------------------------
@@ -53,6 +55,8 @@ import type { IBranchLocation } from 'src/types/corecms-api';
 //                     2) tải toạ độ chi nhánh — lỗi thì CHẶN, không mở cổng khi không kiểm được
 //                     3) GPS trình duyệt (độ chính xác cao) trong bán kính một chi nhánh, sai số ≤ 200 m.
 //    Chưa chi nhánh nào có toạ độ → bỏ qua bước GPS (giống chấm công).
+//  - Phiên máy quầy (token mang claim counter_device — máy chủ / quản lý đã đặt ở cửa hàng): vẫn cần ca hôm nay,
+//    nhưng KHÔNG hỏi GPS — máy quầy đã ghép nối ở cửa hàng là bằng chứng vị trí (BE cũng bỏ geofence cho phiên này).
 // Qua cổng: vị trí đặt vào src/api/shiftCash (header X-Geo-*), và tiếp tục cập nhật khi người dùng di chuyển.
 // Quay lại tab → kiểm lại vị trí ngầm (như app khi về foreground): ra ngoài cửa hàng / thu hồi quyền → chặn lại.
 // Trang con gặp 403 ShiftCash.* từ BE → gọi deny(message) để quay lại màn chặn với đúng thông điệp BE.
@@ -164,6 +168,8 @@ export default function ShiftCashAccessGate({ children }: Props) {
   const bypass = canOverseeShiftCash(user);
   const waitingPermissions = !bypass && !permissionsKnown(user);
   const allowedRole = canUseShiftCash(user);
+  // Máy quầy đứng ở cửa hàng — không hỏi vị trí (chủ chốt 2026-11-06).
+  const counterSession = useCounterSession();
 
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<GateState>(
@@ -233,6 +239,12 @@ export default function ShiftCashAccessGate({ children }: Props) {
         return;
       }
 
+      // Máy quầy: đã ghép nối tại cửa hàng → không kiểm vị trí, không gửi X-Geo-*.
+      if (counterSession) {
+        setState({ step: 'passed', trackLocation: false });
+        return;
+      }
+
       // 2) Toạ độ chi nhánh — lỗi thì chặn (không mở cổng khi không kiểm được vị trí)
       setState({ step: 'checking-location' });
       let branches;
@@ -292,7 +304,7 @@ export default function ShiftCashAccessGate({ children }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [bypass, waitingPermissions, allowedRole, attempt]);
+  }, [bypass, waitingPermissions, allowedRole, counterSession, attempt]);
 
   // ── Đã qua cổng: cập nhật vị trí gửi kèm (người dùng mở trang cả ca) ──
   // Chỉ nhận điểm đủ chính xác; không tự khoá trang khi GPS chập chờn — BE quyết định khi bật geofence.

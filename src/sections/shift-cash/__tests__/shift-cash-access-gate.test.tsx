@@ -9,7 +9,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 // ----------------------------------------------------------------------
 
 // permissions: [] — quyền đã nạp từ /users/me (token không mang quyền), người thường không có quyền giám sát.
-let mockUser: { role: string; roles: string[]; permissions?: string[] } = {
+let mockUser: { role: string; roles: string[]; permissions?: string[]; accessToken?: string } = {
   role: 'Staff',
   roles: ['Staff'],
   permissions: [],
@@ -107,6 +107,15 @@ function mockGeolocation(
   return geolocation;
 }
 
+// Token phiên máy quầy (claim counter_device) — chỉ phần payload được đọc ở client.
+function counterToken(): string {
+  const payload = btoa(JSON.stringify({ counter_device: 'dev-1', exp: Math.floor(Date.now() / 1000) + 3600 }))
+    .replace(/=+$/, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+  return `h.${payload}.s`;
+}
+
 function renderGate(children: React.ReactNode = <div>NỘI DUNG KIỂM QUẦY</div>) {
   return render(
     <ThemeProvider theme={createTheme()}>
@@ -199,6 +208,40 @@ describe('ShiftCashAccessGate', () => {
     expect(getMySchedule).not.toHaveBeenCalled();
     expect(screen.queryByText('NỘI DUNG KIỂM QUẦY')).not.toBeInTheDocument();
     expect(screen.queryByText('Hôm nay bạn không có ca')).not.toBeInTheDocument();
+  });
+
+  it('máy quầy: có ca → vào thẳng, không tải chi nhánh, không hỏi GPS, không gửi X-Geo-*', async () => {
+    mockUser = { role: 'Staff', roles: ['Staff', 'Counter'], permissions: [], accessToken: counterToken() };
+    getMySchedule.mockResolvedValue([{ id: 'a1', date: vnToday() }]);
+    getBranchLocations.mockResolvedValue([STORE]);
+    // Ở rất xa cửa hàng — phiên thường sẽ bị chặn
+    const geo = mockGeolocation({ latitude: 10.77, longitude: 106.7, accuracy: 5000 });
+
+    renderGate();
+
+    expect(await screen.findByText('NỘI DUNG KIỂM QUẦY')).toBeInTheDocument();
+    expect(getMySchedule).toHaveBeenCalledTimes(1);
+    expect(getBranchLocations).not.toHaveBeenCalled();
+    expect(geo.watchPosition).not.toHaveBeenCalled();
+    expect(setShiftCashGeo).not.toHaveBeenCalledWith(expect.objectContaining({ latitude: expect.any(Number) }));
+
+    // Quay lại tab cũng không kiểm lại vị trí
+    switchTabAwayAndBack();
+    await new Promise((r) => {
+      setTimeout(r, 20);
+    });
+    expect(geo.watchPosition).not.toHaveBeenCalled();
+    expect(screen.getByText('NỘI DUNG KIỂM QUẦY')).toBeInTheDocument();
+  });
+
+  it('máy quầy vẫn cần ca hôm nay', async () => {
+    mockUser = { role: 'Staff', roles: ['Staff', 'Counter'], permissions: [], accessToken: counterToken() };
+    getMySchedule.mockResolvedValue([]);
+
+    renderGate();
+
+    expect(await screen.findByText('Hôm nay bạn không có ca')).toBeInTheDocument();
+    expect(getBranchLocations).not.toHaveBeenCalled();
   });
 
   it('Manager không có ca hôm nay → chặn, không hỏi GPS', async () => {
