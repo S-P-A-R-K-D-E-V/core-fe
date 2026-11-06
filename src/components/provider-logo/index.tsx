@@ -4,7 +4,7 @@ import Tooltip from '@mui/material/Tooltip';
 
 // ----------------------------------------------------------------------
 // Nhãn nhà cung cấp kênh báo tiền về (payOS, ApiPay, GPMPay…) — cùng bộ màu / chữ viết tắt với trang S Payment.
-// Logo chính thức: thả file vào public/assets/icons/payment-providers/<mã>.svg rồi thêm mã vào LOGO_FILES — chưa có file thì
+// Logo chính thức: thả file vào public/assets/icons/payment-providers/<mã>.png rồi thêm mã vào LOGO_FILES — chưa có file thì
 // hiện chữ viết tắt trên nền màu nhận diện.
 // ----------------------------------------------------------------------
 
@@ -25,11 +25,11 @@ const BRANDS: Record<string, Brand> = {
   },
   sepay: { name: 'SePay', mark: 'SP', color: '#1d4ed8', title: 'SePay — báo biến động số dư' },
   casso: { name: 'Casso', mark: 'CA', color: '#0f766e', title: 'Casso — báo biến động số dư' },
-  pay2s: { name: 'Pay2S', mark: 'P2', color: '#7c3aed', title: 'Pay2S — báo biến động số dư' },
+  pay2s: { name: 'Pay2S', mark: 'P2', color: '#2e7d4f', title: 'Pay2S — báo biến động số dư' },
   gpmpay: {
     name: 'GPMPay',
     mark: 'GP',
-    color: '#ea580c',
+    color: '#0f2a6b',
     title: 'GPMPay — báo biến động số dư MB',
   },
   acb: {
@@ -72,7 +72,7 @@ const BRANDS: Record<string, Brand> = {
 };
 
 /** Mã nhà cung cấp đã có file logo trong public/assets/icons/payment-providers. */
-const LOGO_FILES = new Set<string>([]);
+const LOGO_FILES = new Set<string>(['payos', 'apipay', 'gpmpay', 'pay2s', 'sepay']);
 
 export function providerBrand(provider: string): Brand {
   return (
@@ -116,9 +116,15 @@ export function ProviderLogo({ provider, compact }: Props) {
         {LOGO_FILES.has(provider) ? (
           <Box
             component="img"
-            src={`/assets/icons/payment-providers/${provider}.svg`}
+            src={`/assets/icons/payment-providers/${provider}.png`}
             alt={brand.name}
-            sx={{ width: 18, height: 18, borderRadius: 99, objectFit: 'contain', bgcolor: '#fff' }}
+            sx={{
+              width: 18,
+              height: 18,
+              borderRadius: '5px',
+              objectFit: 'contain',
+              bgcolor: '#fff',
+            }}
           />
         ) : (
           <Box

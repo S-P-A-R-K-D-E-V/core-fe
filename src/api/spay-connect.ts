@@ -46,6 +46,8 @@ export type SPayBankAccount = {
   autoConfirm: boolean;
   /** Nhà cung cấp báo có của tài khoản (payos, apipay, gpmpay, vietqr…) — S Payment cũ không trả. */
   providers?: string[] | null;
+  /** BIN VietQR — lấy logo ngân hàng. */
+  bin?: string | null;
 };
 
 /** Kết nối bằng khoá ứng dụng tạo ở S Payment → Ứng dụng & khoá API. core-be kiểm khoá trên S Payment rồi lưu mã hoá. */

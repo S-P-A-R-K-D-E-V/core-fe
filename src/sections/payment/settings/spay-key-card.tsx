@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
@@ -19,6 +20,8 @@ import { fDateTime } from 'src/utils/format-time';
 import { apiErrorMessage } from 'src/utils/api-error';
 
 import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
+
+import { getVietQRBanks } from 'src/api/bank-accounts';
 
 import {
   disconnectSPay,
@@ -47,6 +50,13 @@ export default function SPayKeyCard() {
   const [status, setStatus] = useState<SPayConnectStatus | null>(null);
   const [accounts, setAccounts] = useState<SPayBankAccount[] | null>(null);
   const [accountsError, setAccountsError] = useState<string | null>(null);
+  // Logo ngân hàng theo BIN từ danh sách VietQR (như quầy).
+  const [bankLogos, setBankLogos] = useState<Record<string, string>>({});
+  useEffect(() => {
+    getVietQRBanks()
+      .then((banks) => setBankLogos(Object.fromEntries(banks.map((b) => [b.bin, b.logo]))))
+      .catch(() => {});
+  }, []);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [accessKey, setAccessKey] = useState('');
@@ -225,9 +235,21 @@ export default function SPayKeyCard() {
                   justifyContent="space-between"
                   spacing={1}
                 >
-                  <Typography variant="body2">
-                    <b>{a.bankName}</b> ·{' '}
-                    <span style={{ fontFamily: 'monospace' }}>{a.accountNumber}</span>
+                  <Typography
+                    variant="body2"
+                    sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}
+                  >
+                    {a.bin && bankLogos[a.bin] ? (
+                      <Box
+                        component="img"
+                        src={bankLogos[a.bin]}
+                        alt={a.bankName}
+                        sx={{ height: 18, maxWidth: 72, objectFit: 'contain' }}
+                      />
+                    ) : (
+                      <b>{a.bankName}</b>
+                    )}{' '}
+                    · <span style={{ fontFamily: 'monospace' }}>{a.accountNumber}</span>
                     {a.accountName ? ` · ${a.accountName}` : ''}
                   </Typography>
                   <Stack direction="row" spacing={0.75} alignItems="center">
