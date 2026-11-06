@@ -19,10 +19,16 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
-import { disconnectSPay, startSPayConnect, getSPayConnectStatus, type SPayConnectStatus } from 'src/api/spay-connect';
+import {
+  disconnectSPay,
+  startSPayConnect,
+  getSPayConnectStatus,
+  type SPayConnectStatus,
+} from 'src/api/spay-connect';
 
 import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
+import { SPayLogo } from 'src/components/spay-logo';
 import { useSnackbar } from 'src/components/snackbar';
 
 // ----------------------------------------------------------------------
@@ -35,7 +41,10 @@ import { useSnackbar } from 'src/components/snackbar';
 const OUTCOME: Record<string, { variant: 'success' | 'warning' | 'error'; message: string }> = {
   connected: { variant: 'success', message: 'Đã kết nối S Payment' },
   denied: { variant: 'warning', message: 'Bạn đã không đồng ý kết nối S Payment' },
-  expired: { variant: 'warning', message: 'Yêu cầu kết nối đã hết hạn, bấm Kết nối S Payment lần nữa' },
+  expired: {
+    variant: 'warning',
+    message: 'Yêu cầu kết nối đã hết hạn, bấm Kết nối S Payment lần nữa',
+  },
   failed: { variant: 'error', message: 'Chưa kết nối được S Payment, thử lại sau ít phút' },
 };
 
@@ -117,25 +126,33 @@ export default function SPayConnectCard() {
   return (
     <Card>
       <CardHeader
+        avatar={<SPayLogo size={28} />}
         title="Kết nối S Payment"
         subheader="Quản lý tài khoản ngân hàng nhận tiền, giao dịch và đối soát của cửa hàng trên S Payment."
-        action={<Label color={connected ? 'success' : 'default'}>{connected ? 'Đã kết nối' : 'Chưa kết nối'}</Label>}
+        action={
+          <Label color={connected ? 'success' : 'default'}>
+            {connected ? 'Đã kết nối' : 'Chưa kết nối'}
+          </Label>
+        }
       />
       <CardContent>
         <Stack spacing={2}>
           {connected ? (
             <Typography variant="body2" color="text.secondary">
               Kết nối lúc {status.connectedAt ? fDateTime(status.connectedAt) : '—'}
-              {status.accountCount != null ? ` · ${status.accountCount} tài khoản nhận tiền` : ''}. Thêm hoặc gỡ ngân hàng ở
-              trang Ngân hàng của S Payment; POS dùng được ngay.
+              {status.accountCount != null ? ` · ${status.accountCount} tài khoản nhận tiền` : ''}.
+              Thêm hoặc gỡ ngân hàng ở trang Ngân hàng của S Payment; POS dùng được ngay.
             </Typography>
           ) : (
             <>
               {status.disconnectReason === 'revoked_in_spay' && (
-                <Alert severity="info">Kết nối đã bị thu hồi trên S Payment. Bấm Kết nối S Payment để nối lại.</Alert>
+                <Alert severity="info">
+                  Kết nối đã bị thu hồi trên S Payment. Bấm Kết nối S Payment để nối lại.
+                </Alert>
               )}
               <Typography variant="body2" color="text.secondary">
-                Bấm Kết nối, đăng nhập hoặc tạo tài khoản S Payment rồi đồng ý. Không cần nhập khoá hay mã nào.
+                Bấm Kết nối, đăng nhập hoặc tạo tài khoản S Payment rồi đồng ý. Không cần nhập khoá
+                hay mã nào.
               </Typography>
             </>
           )}
@@ -152,7 +169,12 @@ export default function SPayConnectCard() {
                 >
                   Quản lý tài khoản ngân hàng
                 </Button>
-                <LoadingButton color="error" variant="outlined" loading={busy} onClick={handleDisconnect}>
+                <LoadingButton
+                  color="error"
+                  variant="outlined"
+                  loading={busy}
+                  onClick={handleDisconnect}
+                >
                   Ngắt kết nối
                 </LoadingButton>
               </>

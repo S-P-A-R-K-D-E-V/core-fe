@@ -35,6 +35,7 @@ import {
 
 import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
+import { SPayLogo } from 'src/components/spay-logo';
 import { ProviderLogos } from 'src/components/provider-logo';
 import { useSnackbar } from 'src/components/snackbar';
 
@@ -162,6 +163,7 @@ export default function SPayKeyCard() {
   return (
     <Card>
       <CardHeader
+        avatar={<SPayLogo size={28} />}
         title="Kết nối S Payment"
         subheader="S Payment quản lý tài khoản ngân hàng nhận tiền, báo tiền về và đối soát cho cửa hàng."
         action={

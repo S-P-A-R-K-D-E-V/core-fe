@@ -7,6 +7,7 @@ import Stack from '@mui/material/Stack';
 import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import Iconify from 'src/components/iconify';
+import { SPayLogo } from 'src/components/spay-logo';
 
 import BankAccountsTab from 'src/sections/store-settings/bank-accounts-tab';
 
@@ -41,13 +42,21 @@ export default function PaymentSettingsView() {
             value={t.value}
             label={t.label}
             iconPosition="start"
-            icon={<Iconify icon={t.icon} width={20} />}
+            icon={
+              t.value === 'connections' ? (
+                <SPayLogo size={20} />
+              ) : (
+                <Iconify icon={t.icon} width={20} />
+              )
+            }
           />
         ))}
       </Tabs>
 
       {tab === 'channels' && (
-        <PaymentChannelsCard onOpenConnections={() => router.replace(paymentSettingsHref('connections'))} />
+        <PaymentChannelsCard
+          onOpenConnections={() => router.replace(paymentSettingsHref('connections'))}
+        />
       )}
       {tab === 'online' && <OnlineShopSettingsCard />}
       {tab === 'accounts' && <BankAccountsTab />}
