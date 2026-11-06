@@ -32,6 +32,7 @@ import {
 
 import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
+import { ProviderLogos } from 'src/components/provider-logo';
 import { useSnackbar } from 'src/components/snackbar';
 
 // ----------------------------------------------------------------------
@@ -229,9 +230,12 @@ export default function SPayKeyCard() {
                     <span style={{ fontFamily: 'monospace' }}>{a.accountNumber}</span>
                     {a.accountName ? ` · ${a.accountName}` : ''}
                   </Typography>
-                  <Label color={a.autoConfirm ? 'success' : 'default'}>
-                    {a.autoConfirm ? 'Tự xác nhận' : 'Xác nhận tay'}
-                  </Label>
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <ProviderLogos providers={a.providers ?? []} />
+                    <Label color={a.autoConfirm ? 'success' : 'default'}>
+                      {a.autoConfirm ? 'Tự xác nhận' : 'Xác nhận tay'}
+                    </Label>
+                  </Stack>
                 </Stack>
               ))}
             </Stack>

@@ -10,10 +10,13 @@ import type {
 import { useState, useEffect } from 'react';
 
 import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 
 import { paymentProviderLabel } from 'src/utils/payment-status';
+
+import { ProviderLogos } from 'src/components/provider-logo';
 
 import { getBankAccounts } from 'src/api/bank-accounts';
 import { getPosBankAccounts, getPosAccountCapabilities } from 'src/api/payment-qr';
@@ -88,7 +91,10 @@ export function capabilityLabel(c: IPosAccountCapability): string {
     );
     if (rotating.length > 1)
       return `Tự xác nhận · ${rotating
-        .map((s) => `${paymentProviderLabel(s.provider as PaymentProvider)}${s.quota ? ` ${s.quota.remaining}/${s.quota.limit}` : ''}`)
+        .map(
+          (s) =>
+            `${paymentProviderLabel(s.provider as PaymentProvider)}${s.quota ? ` ${s.quota.remaining}/${s.quota.limit}` : ''}`
+        )
         .join(' ⇄ ')}`;
     return `Tự xác nhận · ${paymentProviderLabel(c.provider as PaymentProvider)}${quota}`;
   }
@@ -99,17 +105,24 @@ export function capabilityLabel(c: IPosAccountCapability): string {
   return 'Tự kiểm tra tiền về';
 }
 
-/** Chấm nhỏ trong danh sách tài khoản — chỉ cho tài khoản tự xác nhận được. */
+/** Nhà cung cấp báo tiền về của tài khoản (nguồn dùng kế tiếp đứng đầu); không có nguồn nào → QR thường. */
+export function capabilityProviders(c?: IPosAccountCapability): string[] {
+  if (!c) return [];
+  const providers = (c.sources ?? []).map((s) => s.provider).filter(Boolean);
+  if (providers.length === 0 && c.provider) providers.push(c.provider);
+  return providers.length > 0 ? Array.from(new Set(providers)) : ['vietqr'];
+}
+
+/** Đuôi dòng trong danh sách tài khoản: logo nhà cung cấp + chấm "Tự xác nhận" (chỉ tài khoản tự xác nhận được). */
 export function AccountCapabilityTag({ capability }: { capability?: IPosAccountCapability }) {
-  if (!isAuto(capability)) return null;
+  if (!capability) return null;
   return (
-    <Chip
-      size="small"
-      color="success"
-      variant="soft"
-      label="Tự xác nhận"
-      sx={{ ml: 'auto', height: 20 }}
-    />
+    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ ml: 'auto', pl: 1 }}>
+      <ProviderLogos providers={capabilityProviders(capability)} />
+      {isAuto(capability) && (
+        <Chip size="small" color="success" variant="soft" label="Tự xác nhận" sx={{ height: 20 }} />
+      )}
+    </Stack>
   );
 }
 
