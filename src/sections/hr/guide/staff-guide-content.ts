@@ -4,7 +4,7 @@ import type { StaffGuide } from './staff-guide-types';
 // Nội dung "Hướng dẫn sử dụng app cho nhân viên CiCi" — một nguồn cho trang /dashboard/hr/guide và bản PDF
 // (scripts/build-staff-guide-pdf.mts). Thứ tự theo chủ cửa hàng (06/11/2026): chào mừng → về app → đăng nhập →
 // thông tin cá nhân → nội quy → ca làm → đăng ký ca → khuôn mặt + chấm công vào → chấm công ra → công việc trong ca →
-// kiểm quầy → đổi ca, làm hộ → lương, điểm trừ, khiếu nại. Mỗi bước ghi cách làm trên app Spark Store và trên web.
+// kiểm quầy → đổi ca, làm hộ → lương, điểm trừ, khiếu nại. Mỗi bước ghi cách làm trên app S Store và trên web.
 // Quy định lấy theo Nội quy lao động và Quy chế lương thưởng CiCi bản T11–T12/2026. Nhãn nút giữ đúng chữ trên app/web.
 // Xin nghỉ ca chưa áp dụng nên không hướng dẫn. Không import gì ngoài kiểu (để Node chạy thẳng được khi dựng PDF).
 // ----------------------------------------------------------------------
@@ -12,7 +12,7 @@ import type { StaffGuide } from './staff-guide-types';
 export const STAFF_GUIDE: StaffGuide = {
   title: 'Hướng dẫn sử dụng app cho nhân viên CiCi',
   subtitle:
-    'Từng bước dùng app Spark Store và trang web cici21chualang.vn trong công việc hằng ngày, kèm những quy định cần nhớ trong Nội quy lao động và Quy chế lương thưởng (chạy thử 01/11–31/12/2026). Khi có chỗ khác nhau, văn bản Nội quy và Quy chế là bản gốc. Ảnh chụp từ app Spark Store 1.0.4 (Android) và trang web; tên, ảnh đại diện, email, giấy tờ và số tiền đã được làm mờ.',
+    'Từng bước dùng app S Store và trang web cici21chualang.vn trong công việc hằng ngày, kèm những quy định cần nhớ trong Nội quy lao động và Quy chế lương thưởng (chạy thử 01/11–31/12/2026). Khi có chỗ khác nhau, văn bản Nội quy và Quy chế là bản gốc. Ảnh chụp từ app S Store 1.0.4 (Android) và trang web; tên, ảnh đại diện, email, giấy tờ và số tiền đã được làm mờ.',
   updatedAt: '06/11/2026',
   parts: [
     // ------------------------------------------------------------------
@@ -23,7 +23,7 @@ export const STAFF_GUIDE: StaffGuide = {
         {
           id: 'chao-mung-ban',
           title: 'Chào mừng bạn đến với CiCi',
-          lead: 'Mọi việc trong ca của bạn — lịch làm, chấm công, việc được giao, kiểm quầy, lương và điểm — đều nằm trên app Spark Store.',
+          lead: 'Mọi việc trong ca của bạn — lịch làm, chấm công, việc được giao, kiểm quầy, lương và điểm — đều nằm trên app S Store.',
           blocks: [
             {
               kind: 'p',
@@ -33,7 +33,7 @@ export const STAFF_GUIDE: StaffGuide = {
               kind: 'bullets',
               title: 'Ngày đầu tiên, bạn cần làm xong',
               items: [
-                'Cài app Spark Store và đăng nhập (mục 3).',
+                'Cài app S Store và đăng nhập (mục 3).',
                 'Điền hồ sơ: số điện thoại, tài khoản ngân hàng nhận lương, CCCD (mục 4).',
                 'Đọc và bấm xác nhận Nội quy lao động và Quy chế lương thưởng (mục 5).',
                 'Đăng ký khuôn mặt để chấm công (mục 8).',
@@ -57,13 +57,13 @@ export const STAFF_GUIDE: StaffGuide = {
       sections: [
         {
           id: 'app-va-web',
-          title: 'App Spark Store và trang web',
+          title: 'App S Store và trang web',
           blocks: [
             {
               kind: 'table',
-              head: ['', 'App Spark Store (điện thoại)', 'Trang web cici21chualang.vn (máy tính, máy quầy)'],
+              head: ['', 'App S Store (điện thoại)', 'Trang web cici21chualang.vn (máy tính, máy quầy)'],
               rows: [
-                ['Cài đặt', 'App Store (iPhone) hoặc Google Play (Android), tìm "Spark Store"', 'Mở trình duyệt, vào cici21chualang.vn'],
+                ['Cài đặt', 'App Store (iPhone) hoặc Google Play (Android), tìm "S Store"', 'Mở trình duyệt, vào cici21chualang.vn'],
                 ['Dùng để', 'Mọi việc hằng ngày: chấm công, lịch, việc trong ca, kiểm quầy, lương, điểm', 'Như app; tiện khi làm ở máy quầy hoặc xem bảng lớn'],
                 ['Chấm công', 'Bằng khuôn mặt và vị trí điện thoại', 'Bằng camera máy và vị trí trình duyệt (phải cho phép vị trí)'],
                 ['Thông báo', 'Có thông báo đẩy về điện thoại', 'Xem ở biểu tượng chuông'],
@@ -134,7 +134,7 @@ export const STAFF_GUIDE: StaffGuide = {
                 'Mở link mời quản lý gửi (qua Zalo, tin nhắn) hoặc quét mã QR mời.',
                 'Trang lời mời hiện tên cửa hàng. Bấm "Tiếp tục với Google" (chưa có tài khoản thì hệ thống tự tạo từ Google).',
                 'Thấy "Bạn đã là nhân viên của CiCi 21 Chùa Láng" là xong.',
-                'Mở app Spark Store trên điện thoại, đăng nhập bằng đúng tài khoản Google vừa dùng — cửa hàng hiện ngay trong danh sách.',
+                'Mở app S Store trên điện thoại, đăng nhập bằng đúng tài khoản Google vừa dùng — cửa hàng hiện ngay trong danh sách.',
               ],
             },
             {
@@ -151,7 +151,7 @@ export const STAFF_GUIDE: StaffGuide = {
             {
               kind: 'steps',
               items: [
-                'Mở app Spark Store. Nếu app hỏi cửa hàng, nhập cici21chualang.vn (hoặc bỏ trống để app tự tìm cửa hàng của tài khoản).',
+                'Mở app S Store. Nếu app hỏi cửa hàng, nhập cici21chualang.vn (hoặc bỏ trống để app tự tìm cửa hàng của tài khoản).',
                 'Ở màn "CiCi 21 Chùa Láng": tài khoản Gmail thì bấm "Tiếp tục với Google"; tài khoản có mật khẩu thì bấm "Đăng nhập bằng tài khoản email", nhập Email và Mật khẩu rồi bấm "Đăng nhập".',
                 'Lần đầu vào app, cho phép app dùng Vị trí, Máy ảnh và Thông báo. Thiếu quyền Vị trí thì không chấm công được.',
               ],
