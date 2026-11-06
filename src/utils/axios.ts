@@ -110,6 +110,13 @@ export const endpoints = {
     appHubQrExchange: '/api/app-hub/qr/exchange',
     deleteAccount: '/auth/account',
   },
+  // Link mời nhân viên: tạo / xem / thu hồi (quyền user.create), xem trước (ẩn danh), nhận khi đang đăng nhập.
+  staffInvites: {
+    root: '/staff-invites',
+    revoke: (id: string) => `/staff-invites/${id}`,
+    preview: '/staff-invites/preview',
+    accept: '/staff-invites/accept',
+  },
   users: {
     list: '/users',
     activeStaff: '/users/active-staff',

@@ -58,7 +58,12 @@ export type JWTContextType = CanRemove & {
   verifyOtp: (email: string, otpCode: string) => Promise<void>;
   resendOtp: (email: string) => Promise<void>;
   restoreSession: (sessionToken: string) => Promise<void>;
-  loginWithOAuth: (provider: 'google' | 'facebook' | 'apple', token: string, avatarUrl?: string) => Promise<void>;
+  loginWithOAuth: (
+    provider: 'google' | 'facebook' | 'apple',
+    token: string,
+    avatarUrl?: string,
+    inviteToken?: string
+  ) => Promise<void>;
   loginWithSso?: (code: string, state: string) => Promise<void>;
   loginWithQr?: (code: string, codeVerifier: string) => Promise<void>;
   /** Máy quầy: nhận phiên BE trả về sau khi đổi mã 6 số / mật khẩu / QR (src/sections/counter). */

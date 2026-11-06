@@ -9,6 +9,8 @@ const isStaticExport = 'false';
 // forwarded server-side to the backend — no CORS, no backend URL exposed to browser.
 const BACKEND_API_PREFIXES = [
   'auth', 'users', 'roles', 'custom-roles', 'permissions', 'platform-features', 'media',
+  // Link mời nhân viên (tạo / xem trước / nhận) — trang /invite/[token] là của Next, API là /staff-invites.
+  'staff-invites',
   'shifts', 'shift-templates', 'shift-schedules', 'shift-assignments', 'shift-swap', 'shift-registrations', 'shift-cash', 'late-cover', 'shift-pool', 'shift-audit', 'shift-reminder-rules',
   'attendance', 'branches', 'checkin',
   'salary', 'salary-configurations', 'salary-history',

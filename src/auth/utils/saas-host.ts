@@ -97,7 +97,9 @@ const SSO_MOBILE_REDIRECT_KEY = 'ssoMobileRedirect';
 export function beginCentralLogin(
   provider: 'google' | 'apple' | null,
   returnTo: string | null,
-  mobileRedirectUri?: string | null
+  mobileRedirectUri?: string | null,
+  // Mã link mời nhân viên: trang auth gửi kèm khi handoff để BE nhận lời mời trước khi kiểm thành viên.
+  inviteToken?: string | null
 ) {
   const code = tenantCodeFromHost(window.location.host);
   if (!code) return;
@@ -117,6 +119,7 @@ export function beginCentralLogin(
   url.searchParams.set('state', state);
   if (provider) url.searchParams.set('provider', provider);
   if (returnTo) url.searchParams.set('returnTo', returnTo);
+  if (inviteToken) url.searchParams.set('invite', inviteToken);
   window.location.assign(url.toString());
 }
 

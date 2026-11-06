@@ -164,6 +164,8 @@ export interface IOAuthLoginRequest {
   firstName?: string;
   lastName?: string;
   authorizationCode?: string;
+  // Mã link mời nhân viên (trang /invite/[token]): nhận lời mời ngay trong lần đăng nhập.
+  inviteToken?: string;
 }
 
 // RBAC Types

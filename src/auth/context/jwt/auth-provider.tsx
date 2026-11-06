@@ -446,8 +446,14 @@ export function AuthProvider({ children }: Props) {
     fetchAndPatchAvatar(user);
   }, [fetchAndPatchAvatar]);
 
-  const loginWithOAuth = useCallback(async (provider: 'google' | 'facebook' | 'apple', token: string, avatarUrl?: string) => {
-    const data: IOAuthLoginRequest = { provider, token };
+  // inviteToken: đăng nhập từ trang link mời (/invite/[token]) — BE nhận lời mời trong cùng lần đăng nhập.
+  const loginWithOAuth = useCallback(async (
+    provider: 'google' | 'facebook' | 'apple',
+    token: string,
+    avatarUrl?: string,
+    inviteToken?: string
+  ) => {
+    const data: IOAuthLoginRequest = inviteToken ? { provider, token, inviteToken } : { provider, token };
     const res = await axios.post<IAuthResponse>(endpoints.auth.oauthLogin, data);
     const { token: accessToken, refreshToken, sessionToken } = res.data;
 

@@ -3,6 +3,7 @@
 import isEqual from 'lodash/isEqual';
 import { useState, useEffect, useCallback } from 'react';
 
+import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Card from '@mui/material/Card';
@@ -43,6 +44,7 @@ import { IUserTableFilters, IUserTableFilterValue } from 'src/types/user';
 import { getAllUsers, deleteUser, changeUserStatus } from 'src/api/users';
 
 import UserTableRow from '../user-table-row';
+import UserInviteDialog from '../user-invite-dialog';
 import UserAddStaffDialog from '../user-add-staff-dialog';
 import UserTableToolbar from '../user-table-toolbar';
 import UserTableFiltersResult from '../user-table-filters-result';
@@ -87,6 +89,7 @@ export default function UserListView() {
 
   const confirm = useBoolean();
   const addStaffDialog = useBoolean();
+  const inviteDialog = useBoolean();
   const access = useUserAccess();
 
   const [tableData, setTableData] = useState<IUser[]>([]);
@@ -200,13 +203,22 @@ export default function UserListView() {
           ]}
           action={
             access.canCreate && (
-              <Button
-                variant="contained"
-                startIcon={<Iconify icon="mingcute:add-line" />}
-                onClick={addStaffDialog.onTrue}
-              >
-                Thêm nhân viên
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="contained"
+                  startIcon={<Iconify icon="solar:link-bold" />}
+                  onClick={inviteDialog.onTrue}
+                >
+                  Mời bằng link
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<Iconify icon="mingcute:add-line" />}
+                  onClick={addStaffDialog.onTrue}
+                >
+                  Thêm nhân viên
+                </Button>
+              </Box>
             )
           }
           sx={{
@@ -215,6 +227,13 @@ export default function UserListView() {
         />
 
         <UserAddStaffDialog open={addStaffDialog.value} onClose={addStaffDialog.onFalse} onAdded={fetchUsers} />
+        <UserInviteDialog
+          open={inviteDialog.value}
+          onClose={() => {
+            inviteDialog.onFalse();
+            fetchUsers();
+          }}
+        />
 
         <Card>
           <Tabs

@@ -89,6 +89,9 @@ function SsoSignInView() {
   const appLang = searchParams.get('lang') === 'en' ? 'en' : 'vi';
   const text = APP_TEXT[appLang];
   const returnTo = searchParams.get('returnTo');
+  // Đến từ trang link mời của cửa hàng: gửi kèm mã để BE nhận lời mời (tạo tài khoản nếu chưa có) rồi mới kiểm thành viên.
+  const inviteParam = searchParams.get('invite');
+  const inviteToken = inviteParam && /^[A-Za-z0-9_-]{43}$/.test(inviteParam) ? inviteParam : undefined;
   // Tên miền cửa hàng người dùng đang dùng; chỉ tin khi đúng là tên miền của mã cửa hàng này.
   const hostParam = searchParams.get('host');
   const storeHost = hostParam && tenantCodeFromHost(hostParam) === tenant ? hostParam.split(':')[0] : `${tenant}.${SAAS_ZONE}`;
@@ -141,10 +144,11 @@ function SsoSignInView() {
         state,
         host: storeHost,
         returnTo,
+        ...(inviteToken ? { inviteToken } : {}),
       });
       window.location.assign(res.data.redirectUrl);
     },
-    [tenant, state, returnTo, storeHost, appMode, challenge, appRedirect]
+    [tenant, state, returnTo, storeHost, appMode, challenge, appRedirect, inviteToken]
   );
 
   const showError = (err: any, fallback: string) => {
