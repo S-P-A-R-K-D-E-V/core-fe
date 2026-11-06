@@ -5,7 +5,7 @@ vi.mock('src/auth/hooks', () => ({ useAuthContext: () => ({ user: null }) }));
 import { paths } from 'src/routes/paths';
 
 import { groupRoster } from '../counter-lock-view';
-import { counterHome, isCounterPathAllowed } from '../counter-scope';
+import { counterHome, counterSaleHome, isCounterPathAllowed } from '../counter-scope';
 
 // Máy quầy chỉ phục vụ bán hàng: trang ngoài phạm vi bị đưa về bán hàng (server cũng chặn API).
 
@@ -31,11 +31,27 @@ describe('isCounterPathAllowed', () => {
   ])('chặn %s', (path) => expect(isCounterPathAllowed(path)).toBe(false));
 });
 
-describe('counterHome', () => {
+describe('counterSaleHome', () => {
   it('bán lẻ nếu cửa hàng bật, không thì F&B', () => {
-    expect(counterHome(['commerce.retail.pos', 'commerce.fnb.pos'])).toBe(paths.dashboard.pos.sale.root);
-    expect(counterHome(['commerce.fnb.pos'])).toBe(paths.dashboard.fnb.pos);
-    expect(counterHome(null)).toBe(paths.dashboard.pos.sale.root);
+    expect(counterSaleHome(['commerce.retail.pos', 'commerce.fnb.pos'])).toBe(paths.dashboard.pos.sale.root);
+    expect(counterSaleHome(['commerce.fnb.pos'])).toBe(paths.dashboard.fnb.pos);
+    expect(counterSaleHome(null)).toBe(paths.dashboard.pos.sale.root);
+  });
+});
+
+describe('counterHome', () => {
+  it('mặc định vào Kiểm tiền quầy — cả khi chưa nạp người dùng (vừa đăng nhập ở màn khoá)', () => {
+    expect(counterHome(null)).toBe(paths.dashboard.shiftCash.root);
+    expect(counterHome({ enabledFeatures: ['commerce.fnb.pos'], blockedFeatures: [] })).toBe(paths.dashboard.shiftCash.root);
+  });
+
+  it('Kiểm quầy bị tắt trên nền tảng này → về trang bán hàng', () => {
+    expect(counterHome({ enabledFeatures: ['commerce.retail.pos'], blockedFeatures: ['shift-cash.counter'] })).toBe(
+      paths.dashboard.pos.sale.root
+    );
+    expect(counterHome({ enabledFeatures: ['commerce.fnb.pos'], blockedFeatures: ['shift-cash.counter'] })).toBe(
+      paths.dashboard.fnb.pos
+    );
   });
 });
 

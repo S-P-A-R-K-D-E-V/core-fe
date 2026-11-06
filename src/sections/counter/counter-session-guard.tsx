@@ -14,7 +14,7 @@ import { counterHome, COUNTER_LOCK_PATH, isCounterPathAllowed, useCounterSession
 
 // ----------------------------------------------------------------------
 // Trong dashboard, khi phiên là phiên máy quầy:
-//   - trang ngoài phạm vi bán hàng (gõ URL, link cũ) → về trang bán hàng;
+//   - trang ngoài phạm vi bán hàng (gõ URL, link cũ) → về trang đầu của máy quầy (Kiểm tiền quầy, counterHome);
 //   - tới giờ phiên hết (hết ca + 30 phút) → đăng xuất về màn chọn tên, kể cả khi trang đang mở yên.
 // ----------------------------------------------------------------------
 
@@ -28,8 +28,8 @@ export default function CounterSessionGuard() {
   useEffect(() => {
     if (!counterSession || isCounterPathAllowed(pathname)) return;
     enqueueSnackbar('Máy quầy chỉ dùng cho bán hàng — mở tính năng này trên điện thoại hoặc máy tính cá nhân.', { variant: 'info' });
-    router.replace(counterHome(user?.enabledFeatures));
-  }, [counterSession, pathname, router, user?.enabledFeatures, enqueueSnackbar]);
+    router.replace(counterHome(user));
+  }, [counterSession, pathname, router, user, enqueueSnackbar]);
 
   const expiresAt = counterSession ? tokenExpiresAt(user?.accessToken) : null;
   useEffect(() => {

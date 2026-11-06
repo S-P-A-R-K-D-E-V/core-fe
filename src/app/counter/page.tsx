@@ -15,7 +15,7 @@ import { counterHome, useCounterSession } from 'src/sections/counter/counter-sco
 
 // ----------------------------------------------------------------------
 // Máy quầy trên web: màn chọn nhân viên có ca. Trình duyệt chưa đặt làm máy quầy → hiện mã ghép nối; đã có người đăng nhập ở
-// máy quầy → vào thẳng trang bán hàng.
+// máy quầy → vào thẳng Kiểm tiền quầy (counterHome).
 // ----------------------------------------------------------------------
 
 export default function CounterPage() {
@@ -24,11 +24,11 @@ export default function CounterPage() {
   const { loading, authenticated, user, logout } = useAuthContext();
   const counterSession = useCounterSession();
 
-  const home = counterHome(user?.enabledFeatures);
+  const home = counterHome(user);
 
   useEffect(() => {
     if (loading || !device || !authenticated) return;
-    // Đã đăng nhập ở máy quầy → bán hàng. Phiên thường còn sót trong tab (quản lý vừa đặt máy) → đăng xuất.
+    // Đã đăng nhập ở máy quầy → Kiểm tiền quầy. Phiên thường còn sót trong tab (quản lý vừa đặt máy) → đăng xuất.
     if (counterSession) router.replace(home);
     else logout?.();
   }, [loading, device, authenticated, counterSession, home, router, logout]);

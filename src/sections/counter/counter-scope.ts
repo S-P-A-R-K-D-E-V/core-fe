@@ -3,6 +3,7 @@
 import { paths } from 'src/routes/paths';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { PLATFORM_FEATURES } from 'src/auth/platform-features';
 
 import { counterDeviceOfToken } from './counter-device';
 
@@ -41,12 +42,23 @@ export function isCounterPathAllowed(pathname: string | null | undefined): boole
   });
 }
 
-/** Trang đầu sau khi đăng nhập ở máy quầy: bán lẻ nếu cửa hàng bật, không thì bán hàng F&B. */
-export function counterHome(enabledFeatures?: readonly string[] | null): string {
+/** Trang bán hàng của máy quầy: bán lẻ nếu cửa hàng bật, không thì bán hàng F&B. */
+export function counterSaleHome(enabledFeatures?: readonly string[] | null): string {
   if (enabledFeatures && !enabledFeatures.includes('commerce.retail.pos') && enabledFeatures.includes('commerce.fnb.pos')) {
     return paths.dashboard.fnb.pos;
   }
   return paths.dashboard.pos.sale.root;
+}
+
+type CounterUser = { enabledFeatures?: readonly string[] | null; blockedFeatures?: readonly string[] | null } | null | undefined;
+
+/**
+ * Trang đầu ở máy quầy (sau khi đăng nhập, hoặc khi mở trang ngoài phạm vi): Kiểm tiền quầy (chủ chốt 2026-11-06) —
+ * máy quầy không phải kiểm vị trí nên vào thẳng được. Kiểm quầy bị tắt trên nền tảng này thì về trang bán hàng.
+ */
+export function counterHome(user: CounterUser): string {
+  if (user?.blockedFeatures?.includes(PLATFORM_FEATURES.shiftCash)) return counterSaleHome(user.enabledFeatures);
+  return paths.dashboard.shiftCash.root;
 }
 
 /** Phiên đang đăng nhập được mở ở máy quầy (token mang claim counter_device). */
