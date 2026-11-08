@@ -84,6 +84,13 @@ export type SocialPostInput = {
 
 export type SocialCaptionResult = { text: string; imageUrls: string[]; productUrl: string | null };
 
+/** Studio ảnh (core-be SocialImageController): "product" = đổi nền / bối cảnh, "hair" = cài lên tóc. */
+export type SocialImageStyle = { id: string; label: string; group: 'product' | 'hair'; hint: string };
+export type SocialImageBackground = { id: string; label: string; color: string };
+export type SocialImageCatalog = { items: SocialImageStyle[]; backgrounds: SocialImageBackground[]; maxNoteLength: number };
+/** style "frame" = giữ nguyên ảnh gốc đặt lên nền màu (không qua AI). */
+export type SocialImageResult = { url: string; sourceUrl: string; style: string; label: string };
+
 /** Giới hạn của Threads (core-be kiểm lại). */
 export const SOCIAL_TEXT_MAX = 500;
 export const SOCIAL_MAX_IMAGES = 10;
