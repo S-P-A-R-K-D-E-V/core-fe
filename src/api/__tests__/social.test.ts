@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { it, expect, describe } from 'vitest';
 
-import { countLinks, isEditable, type SocialPost } from 'src/lib/social';
+import { countLinks, isEditable, type SocialPost, isValidThreadsAppId } from 'src/lib/social';
 import { requiredPermissionsFor } from 'src/auth/route-roles';
 import { paths } from 'src/routes/paths';
 
@@ -45,5 +45,12 @@ describe('social api / helpers', () => {
   it('trang Kênh kết nối cần social.channels, trang bài đăng cần social.posts', () => {
     expect(requiredPermissionsFor(paths.dashboard.social.channels)).toEqual(['social.channels']);
     expect(requiredPermissionsFor(paths.dashboard.social.new)).toEqual(['social.posts']);
+    expect(requiredPermissionsFor(paths.dashboard.social.settings)).toEqual(['social.channels']);
+  });
+
+  it('Threads app ID phải là dãy số', () => {
+    expect(isValidThreadsAppId(' 2418901455589871 ')).toBe(true);
+    expect(isValidThreadsAppId('1234')).toBe(false);
+    expect(isValidThreadsAppId('abc123456')).toBe(false);
   });
 });

@@ -50,6 +50,7 @@ export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   // Bán hàng online: bài đăng theo social.posts; trang Kênh kết nối theo social.channels (SocialController).
   { prefix: paths.dashboard.social.root, roles: null, permissions: [PERMISSIONS.social.posts] },
   { prefix: paths.dashboard.social.channels, roles: null, permissions: [PERMISSIONS.social.channels] },
+  { prefix: paths.dashboard.social.settings, roles: null, permissions: [PERMISSIONS.social.channels] },
   // Thiết bị cửa hàng: quản lý xem / ghép / thu hồi máy quầy, kiosk của chi nhánh mình (server lọc theo chi nhánh).
   { prefix: paths.dashboard.storeSettings.devices, roles: MANAGER_ROLES },
   // Mẫu in hoá đơn / tem mã: theo quyền sales.print-template.manage (PrintTemplatesController; mặc định Admin, Manager).

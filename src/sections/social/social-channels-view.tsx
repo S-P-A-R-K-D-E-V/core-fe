@@ -15,6 +15,7 @@ import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 
 import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
 import { usePathname, useSearchParams } from 'src/routes/hooks';
 
 import { fDateTime } from 'src/utils/format-time';
@@ -33,13 +34,17 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
 // ----------------------------------------------------------------------
 // Kênh kết nối: các tài khoản Threads của cửa hàng. Bấm Kết nối → màn đồng ý của Threads → quay lại trang này với
-// ?threads=connected|denied|failed|expired (&account=…). Kết nối lại cùng tài khoản = gia hạn token.
+// ?threads=connected|denied|failed|expired (&account=…). Kết nối lại cùng tài khoản = gia hạn token. Một cửa hàng kết
+// nối được nhiều tài khoản: Threads đăng nhập bằng tài khoản đang mở trên threads.com của trình duyệt này.
 
 const OUTCOME: Record<string, { variant: 'success' | 'warning' | 'error'; message: string }> = {
   connected: { variant: 'success', message: 'Đã kết nối kênh Threads' },
   denied: { variant: 'warning', message: 'Bạn đã không đồng ý kết nối Threads' },
   expired: { variant: 'warning', message: 'Yêu cầu kết nối đã hết hạn, bấm Kết nối Threads lần nữa' },
-  failed: { variant: 'error', message: 'Chưa kết nối được Threads, thử lại sau ít phút' },
+  failed: {
+    variant: 'error',
+    message: 'Chưa kết nối được Threads — kiểm tra App secret và Redirect callback URL ở trang Cấu hình',
+  },
 };
 
 const STATUS: Record<string, { label: string; color: 'success' | 'warning' | 'default' }> = {
@@ -103,7 +108,7 @@ export function SocialChannelsView() {
       startIcon={<Iconify icon="ri:threads-fill" />}
       onClick={handleConnect}
     >
-      Kết nối Threads
+      {channels.length > 0 ? 'Thêm tài khoản Threads' : 'Kết nối Threads'}
     </LoadingButton>
   );
 
@@ -121,15 +126,31 @@ export function SocialChannelsView() {
       />
 
       {!loading && !threadsConfigured && (
-        <Alert severity="info" sx={{ mb: 3 }}>
-          SPARK chưa bật kết nối Threads cho hệ thống. Liên hệ SPARK để bật.
+        <Alert
+          severity="warning"
+          sx={{ mb: 3 }}
+          action={
+            <Button color="inherit" size="small" component={RouterLink} href={paths.dashboard.social.settings}>
+              Mở Cấu hình
+            </Button>
+          }
+        >
+          Cửa hàng chưa nhập Meta app (Threads app ID và app secret). Nhập ở trang Cấu hình rồi quay lại kết nối.
         </Alert>
       )}
 
       <Alert severity="info" variant="outlined" sx={{ mb: 3 }}>
-        Mỗi tài khoản Threads phải được SPARK thêm làm người thử (Threads Tester) và bấm chấp nhận trong Threads → Cài
-        đặt → Tài khoản → Quyền của trang web. Để trang cá nhân ở chế độ công khai thì kết nối tự gia hạn, không phải
-        kết nối lại sau 90 ngày.
+        <Stack component="ul" spacing={0.5} sx={{ pl: 2, m: 0 }}>
+          <li>
+            Kết nối nhiều trang: Threads dùng tài khoản đang đăng nhập trên threads.com của trình duyệt này. Muốn thêm
+            trang khác, mở threads.com, chuyển sang (hoặc đăng nhập) tài khoản đó, rồi bấm Thêm tài khoản Threads.
+          </li>
+          <li>
+            Mỗi tài khoản phải được thêm làm Threads Tester trong Meta app của cửa hàng và bấm chấp nhận trong Threads →
+            Cài đặt → Tài khoản → Quyền của trang web.
+          </li>
+          <li>Để trang ở chế độ công khai thì kết nối tự gia hạn, không phải kết nối lại sau 90 ngày.</li>
+        </Stack>
       </Alert>
 
       {error && <Alert severity="error">{apiErrorMessage(error, 'Không tải được danh sách kênh')}</Alert>}

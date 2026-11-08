@@ -498,12 +498,14 @@ describe('useNavData — Bán hàng online', () => {
     const admin = navPaths('Admin', ['social.selling']);
     expect(admin).toContain(paths.dashboard.social.root);
     expect(admin).toContain(paths.dashboard.social.channels);
+    expect(admin).toContain(paths.dashboard.social.settings);
   });
 
   it('quản lý có social.posts thấy Bài đăng nhưng không thấy Kênh kết nối; nhân viên không có quyền thì không thấy', () => {
     const manager = navPaths('Manager', ['social.selling'], ['social.posts']);
     expect(manager).toContain(paths.dashboard.social.root);
     expect(manager).not.toContain(paths.dashboard.social.channels);
+    expect(manager).not.toContain(paths.dashboard.social.settings);
     expect(navPaths('Staff', ['social.selling'], [])).not.toContain(paths.dashboard.social.root);
   });
 });
