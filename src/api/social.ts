@@ -3,7 +3,9 @@ import type {
   SocialPostPage,
   SocialPostInput,
   SocialChannelList,
+  SocialImageResult,
   SocialCaptionResult,
+  SocialImageCatalog,
 } from 'src/lib/social';
 
 import useSWR from 'swr';
@@ -109,4 +111,31 @@ export function useSocialAi() {
 
 export async function writeSocialCaption(input: { productId: string | null; brief: string; includeLink?: boolean }) {
   return (await axios.post<SocialCaptionResult>(`${ROOT}/posts/ai/caption`, input, { timeout: 120000 })).data;
+}
+
+// ---------- Studio ảnh: tạo ảnh mới từ ảnh sản phẩm có sẵn ----------
+
+export function useSocialImageCatalog() {
+  const { data } = useSWR<SocialImageCatalog>(`${ROOT}/posts/ai/images/styles`, fetcher, { revalidateOnFocus: false });
+  return data;
+}
+
+/** AI vẽ lại từ ảnh gốc (ảnh gốc gửi kèm cho model) — 10–40 giây. */
+export async function generateSocialImage(input: {
+  sourceUrl: string;
+  style: string;
+  productId: string | null;
+  note?: string;
+}) {
+  return (await axios.post<SocialImageResult>(`${ROOT}/posts/ai/images`, input, { timeout: 180000 })).data;
+}
+
+/** Giữ nguyên ảnh gốc, đặt lên nền màu (không qua AI). */
+export async function frameSocialImage(input: {
+  sourceUrl: string;
+  productId: string | null;
+  background: string;
+  aspect: 'square' | 'portrait';
+}) {
+  return (await axios.post<SocialImageResult>(`${ROOT}/posts/ai/images/frame`, input, { timeout: 60000 })).data;
 }

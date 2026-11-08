@@ -20,6 +20,8 @@ const api = vi.hoisted(() => ({
   updateSocialPost: vi.fn(),
   uploadSocialImage: vi.fn(),
   writeSocialCaption: vi.fn(),
+  frameSocialImage: vi.fn(),
+  generateSocialImage: vi.fn(),
 }));
 
 vi.mock('src/api/social', () => ({
@@ -27,6 +29,19 @@ vi.mock('src/api/social', () => ({
   updateSocialPost: (...a: any[]) => api.updateSocialPost(...a),
   uploadSocialImage: (...a: any[]) => api.uploadSocialImage(...a),
   writeSocialCaption: (...a: any[]) => api.writeSocialCaption(...a),
+  frameSocialImage: (...a: any[]) => api.frameSocialImage(...a),
+  generateSocialImage: (...a: any[]) => api.generateSocialImage(...a),
+  useSocialImageCatalog: () => ({
+    items: [
+      { id: 'studio', label: 'Nền studio pastel', group: 'product', hint: '' },
+      { id: 'hair-bun', label: 'Búi thấp', group: 'hair', hint: '' },
+    ],
+    backgrounds: [
+      { id: 'pink', label: 'Hồng pastel', color: '#FBE4EA' },
+      { id: 'mint', label: 'Xanh bạc hà', color: '#E2F3EC' },
+    ],
+    maxNoteLength: 200,
+  }),
   useSocialAi: () => ({ enabled: true, reason: null }),
   useSocialChannels: () => ({
     loading: false,
@@ -108,5 +123,73 @@ describe('SocialPostForm', () => {
     const srcs = Array.from(document.querySelectorAll('img')).map((i) => i.getAttribute('src'));
     expect(srcs).toContain('https://cdn.test/kep.jpg');
     expect(srcs).not.toContain('http://khong-https.test/a.jpg');
+  });
+
+  const withImage = async () => {
+    api.writeSocialCaption.mockResolvedValue({ text: 'Bài', imageUrls: ['https://cdn.test/kep.jpg'], productUrl: null });
+    renderForm();
+    await userEvent.type(screen.getByLabelText('Ý muốn nói thêm'), 'x');
+    await userEvent.click(screen.getByRole('button', { name: 'Viết bài' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Studio ảnh: tạo ảnh mới từ ảnh này' }));
+  };
+
+  it('Studio ảnh mặc định giữ nguyên sản phẩm: ghép nền rồi thêm ảnh mới vào bài', async () => {
+    api.frameSocialImage.mockResolvedValue({
+      url: 'https://cdn.test/frame-1.jpg',
+      sourceUrl: 'https://cdn.test/kep.jpg',
+      style: 'frame',
+      label: 'Giữ nguyên ảnh — nền xanh bạc hà',
+    });
+    await withImage();
+    await userEvent.click(screen.getByRole('button', { name: 'Nền Xanh bạc hà' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Dọc 4:5' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Tạo ảnh' }));
+    await waitFor(() =>
+      expect(api.frameSocialImage).toHaveBeenCalledWith({
+        sourceUrl: 'https://cdn.test/kep.jpg',
+        productId: null,
+        background: 'mint',
+        aspect: 'portrait',
+      })
+    );
+    expect(api.generateSocialImage).not.toHaveBeenCalled();
+    // Ảnh gốc và ảnh mới cạnh nhau; ghép nền không qua AI nên không có cảnh báo lệch chi tiết.
+    expect(screen.getByAltText('Ảnh gốc')).toHaveAttribute('src', 'https://cdn.test/kep.jpg');
+    expect(await screen.findByAltText('Ảnh mới — Giữ nguyên ảnh — nền xanh bạc hà')).toBeInTheDocument();
+    expect(screen.queryByText(/có thể lệch chi tiết/)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Thêm vào bài' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Đóng' }));
+    const srcs = Array.from(document.querySelectorAll('img')).map((i) => i.getAttribute('src'));
+    expect(srcs).toEqual(expect.arrayContaining(['https://cdn.test/kep.jpg', 'https://cdn.test/frame-1.jpg']));
+  });
+
+  it('Studio ảnh — AI vẽ lại: gửi kiểu + ghi chú, cảnh báo so sánh, thay ảnh gốc', async () => {
+    api.generateSocialImage.mockResolvedValue({
+      url: 'https://cdn.test/ai-1.jpg',
+      sourceUrl: 'https://cdn.test/kep.jpg',
+      style: 'hair-bun',
+      label: 'Búi thấp',
+    });
+    await withImage();
+    await userEvent.click(screen.getByRole('button', { name: 'AI vẽ lại' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Búi thấp' }));
+    await userEvent.type(screen.getByLabelText('Ghi chú cho AI (không bắt buộc)'), 'kẹp hồng');
+    await userEvent.click(screen.getByRole('button', { name: 'Tạo ảnh' }));
+    await waitFor(() =>
+      expect(api.generateSocialImage).toHaveBeenCalledWith({
+        sourceUrl: 'https://cdn.test/kep.jpg',
+        productId: null,
+        style: 'hair-bun',
+        note: 'kẹp hồng',
+      })
+    );
+    expect(await screen.findByText(/có thể lệch chi tiết/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Thay ảnh gốc' }));
+    await waitFor(() => expect(screen.queryByText('Studio ảnh')).not.toBeInTheDocument());
+    const srcs = Array.from(document.querySelectorAll('img')).map((i) => i.getAttribute('src'));
+    expect(srcs).toContain('https://cdn.test/ai-1.jpg');
+    expect(srcs).not.toContain('https://cdn.test/kep.jpg');
   });
 });
