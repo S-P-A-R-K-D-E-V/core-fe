@@ -10,6 +10,7 @@ import type {
   SocialImageResult,
   SocialCaptionResult,
   SocialImageCatalog,
+  SocialImageAnalysis,
 } from 'src/lib/social';
 
 import { socialCalendarKey } from 'src/lib/social';
@@ -183,10 +184,16 @@ export function useSocialImageCatalog() {
   return data;
 }
 
-/** AI vẽ lại từ ảnh gốc (ảnh gốc gửi kèm cho model) — 10–40 giây. */
+/** AI đọc ảnh: loại hàng, đồ nhạy cảm, gợi ý cách dùng / bối cảnh + tag prompt — 5–30 giây. */
+export async function analyzeSocialImage(input: { sourceUrl: string; productId: string | null }) {
+  return (await axios.post<SocialImageAnalysis>(`${ROOT}/posts/ai/images/analyze`, input, { timeout: 120000 })).data;
+}
+
+/** AI vẽ lại từ ảnh gốc (ảnh gốc gửi kèm cho model) theo gợi ý + tag — 10–40 giây. */
 export async function generateSocialImage(input: {
   sourceUrl: string;
-  style: string;
+  preset: string;
+  tags?: string[];
   productId: string | null;
   note?: string;
 }) {

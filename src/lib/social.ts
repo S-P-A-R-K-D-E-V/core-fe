@@ -224,12 +224,12 @@ export type SocialCaptionResult = { text: string; imageUrls: string[]; productUr
 /** Một bài giới thiệu tối đa 5 sản phẩm (Threads cho tối đa 5 link). */
 export const SOCIAL_MAX_PRODUCTS = 5;
 
-/** Studio ảnh (core-be SocialImageController): "product" = đổi nền / bối cảnh, "hair" = cài lên tóc. */
-export type SocialImageStyle = { id: string; label: string; group: 'product' | 'hair'; hint: string };
-export type SocialImageBackground = { id: string; label: string; color: string };
-export type SocialImageCatalog = { items: SocialImageStyle[]; backgrounds: SocialImageBackground[]; maxNoteLength: number };
-/** style "frame" = giữ nguyên ảnh gốc đặt lên nền màu (không qua AI). */
-export type SocialImageResult = { url: string; sourceUrl: string; style: string; label: string };
+/** Studio ảnh (core-be SocialImageController) — dùng chung lõi AI ảnh với trang ảnh sản phẩm (src/lib/image-ai). */
+export type {
+  ImageAnalysis as SocialImageAnalysis,
+  ImageCatalog as SocialImageCatalog,
+  ImageResult as SocialImageResult,
+} from './image-ai';
 
 /** Giới hạn của Threads (core-be kiểm lại). */
 export const SOCIAL_TEXT_MAX = 500;

@@ -1,17 +1,15 @@
 'use client';
 
-import type { SocialImageResult } from 'src/lib/social';
+import type { SocialImageResult, SocialImageAnalysis } from 'src/lib/social';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import Tooltip from '@mui/material/Tooltip';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -19,20 +17,23 @@ import ButtonBase from '@mui/material/ButtonBase';
 import ToggleButton from '@mui/material/ToggleButton';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
-import CircularProgress from '@mui/material/CircularProgress';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { apiErrorMessage } from 'src/utils/api-error';
 
-import { frameSocialImage, generateSocialImage, useSocialImageCatalog } from 'src/api/social';
+import { defaultPreset } from 'src/lib/image-ai';
+import { frameSocialImage, analyzeSocialImage, generateSocialImage, useSocialImageCatalog } from 'src/api/social';
 
 import Iconify from 'src/components/iconify';
+import { ImageFigure } from 'src/components/image-ai/image-figure';
+import { AiPresetPicker } from 'src/components/image-ai/ai-preset-picker';
 
 // ----------------------------------------------------------------------
 // Studio ảnh: tạo ảnh mới cho bài đăng từ một ảnh sản phẩm có sẵn.
 // - "Giữ nguyên sản phẩm" (mặc định): ảnh gốc chỉ thu phóng rồi đặt lên nền màu — không qua AI, đúng 100% sản phẩm.
-// - "AI vẽ lại": ảnh gốc gửi kèm cho model sửa ảnh (đổi nền, bối cảnh, cài lên tóc vài dáng). Model có thể vẽ lệch chi
-//   tiết nên luôn hiện ảnh gốc cạnh ảnh mới để so sánh trước khi gắn vào bài.
+// - "AI vẽ lại": AI đọc ảnh trước (loại hàng, đồ nhạy cảm → manocanh) rồi gợi ý cách dùng / bối cảnh hợp đúng món
+//   (kẹp → cài tóc, túi → đeo vai…) + tag prompt; ảnh gốc gửi kèm cho model sửa ảnh. Model có thể vẽ lệch chi tiết nên
+//   luôn hiện ảnh gốc cạnh ảnh mới để so sánh trước khi gắn vào bài.
 
 type Mode = 'keep' | 'ai';
 
@@ -52,22 +53,40 @@ export function SocialImageStudioDialog({ sourceUrl, productId, aiEnabled, canAd
   const [mode, setMode] = useState<Mode>('keep');
   const [background, setBackground] = useState('pink');
   const [aspect, setAspect] = useState<'square' | 'portrait'>('square');
-  const [style, setStyle] = useState<string | null>(null);
+  const [preset, setPreset] = useState<string | null>(null);
+  const [tags, setTags] = useState<string[]>([]);
   const [note, setNote] = useState('');
+  const [analysis, setAnalysis] = useState<SocialImageAnalysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<SocialImageResult[]>([]);
   const [selected, setSelected] = useState<SocialImageResult | null>(null);
   const [used, setUsed] = useState<string[]>([]);
 
-  const styles = catalog?.items ?? [];
-  const groups = [
-    { id: 'product', label: 'Ảnh sản phẩm' },
-    { id: 'hair', label: 'Cài lên tóc' },
-  ] as const;
+  const analyze = async () => {
+    setAnalyzing(true);
+    setError(null);
+    try {
+      const result = await analyzeSocialImage({ sourceUrl, productId });
+      setAnalysis(result);
+      setPreset((current) => (current && result.presets.some((p) => p.id === current) ? current : defaultPreset(result.presets)));
+      setTags((current) => current.filter((t) => result.tags.some((x) => x.id === t)));
+    } catch (err) {
+      setError(apiErrorMessage(err, 'AI chưa đọc được ảnh — thử lại sau ít phút'));
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // Mở "AI vẽ lại" lần đầu: tự phân tích ảnh để có gợi ý hợp đúng sản phẩm.
+  useEffect(() => {
+    if (mode === 'ai' && !analysis && !analyzing) analyze();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const handleRun = async () => {
-    if (mode === 'ai' && !style) {
+    if (mode === 'ai' && !preset) {
       setError('Chọn một kiểu ảnh');
       return;
     }
@@ -77,7 +96,13 @@ export function SocialImageStudioDialog({ sourceUrl, productId, aiEnabled, canAd
       const result =
         mode === 'keep'
           ? await frameSocialImage({ sourceUrl, productId, background, aspect })
-          : await generateSocialImage({ sourceUrl, productId, style: style!, note: note.trim() || undefined });
+          : await generateSocialImage({
+              sourceUrl,
+              productId,
+              preset: preset!,
+              tags: tags.length > 0 ? tags : undefined,
+              note: note.trim() || undefined,
+            });
       setResults((prev) => [result, ...prev]);
       setSelected(result);
     } catch (err) {
@@ -144,44 +169,26 @@ export function SocialImageStudioDialog({ sourceUrl, productId, aiEnabled, canAd
               </ToggleButtonGroup>
             </Stack>
           ) : (
-            <Stack spacing={1.5}>
-              {groups.map((g) => (
-                <Box key={g.id}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    {g.label}
-                  </Typography>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    {styles
-                      .filter((s) => s.group === g.id)
-                      .map((s) => (
-                        <Tooltip key={s.id} title={s.hint}>
-                          <Chip
-                            label={s.label}
-                            color={style === s.id ? 'primary' : 'default'}
-                            variant={style === s.id ? 'filled' : 'outlined'}
-                            onClick={() => setStyle(s.id)}
-                          />
-                        </Tooltip>
-                      ))}
-                  </Stack>
-                </Box>
-              ))}
-              <TextField
-                size="small"
-                label="Ghi chú cho AI (không bắt buộc)"
-                placeholder="VD: dùng chiếc kẹp màu hồng; tóc nâu"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                inputProps={{ maxLength: catalog?.maxNoteLength ?? 200 }}
-              />
-            </Stack>
+            <AiPresetPicker
+              analysis={analysis}
+              analyzing={analyzing}
+              onAnalyze={analyze}
+              preset={preset}
+              onPreset={setPreset}
+              tags={tags}
+              onTags={setTags}
+              note={note}
+              onNote={setNote}
+              maxNoteLength={catalog?.maxNoteLength}
+              disabled={running}
+            />
           )}
 
           {error && <Alert severity="error">{error}</Alert>}
 
           <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-            <Figure title="Ảnh gốc" url={sourceUrl} />
-            <Figure
+            <ImageFigure title="Ảnh gốc" url={sourceUrl} />
+            <ImageFigure
               title={selected ? `Ảnh mới — ${selected.label}` : 'Ảnh mới'}
               url={selected?.url ?? null}
               loading={running}
@@ -246,60 +253,15 @@ export function SocialImageStudioDialog({ sourceUrl, productId, aiEnabled, canAd
             </Button>
           </>
         )}
-        <LoadingButton variant="contained" loading={running} onClick={handleRun}>
+        <LoadingButton
+          variant="contained"
+          loading={running}
+          disabled={mode === 'ai' && (analyzing || !analysis)}
+          onClick={handleRun}
+        >
           {results.length > 0 ? 'Tạo ảnh khác' : 'Tạo ảnh'}
         </LoadingButton>
       </DialogActions>
     </Dialog>
-  );
-}
-
-function Figure({
-  title,
-  url,
-  loading,
-  loadingText,
-}: {
-  title: string;
-  url: string | null;
-  loading?: boolean;
-  loadingText?: string;
-}) {
-  return (
-    <Stack spacing={1}>
-      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-        {title}
-      </Typography>
-      <Box
-        sx={{
-          position: 'relative',
-          aspectRatio: '1',
-          borderRadius: 1,
-          overflow: 'hidden',
-          bgcolor: 'background.neutral',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {url && <Box component="img" src={url} alt={title} sx={{ width: 1, height: 1, objectFit: 'contain' }} />}
-        {loading && (
-          <Stack
-            spacing={1}
-            alignItems="center"
-            justifyContent="center"
-            sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(255,255,255,0.7)' }}
-          >
-            <CircularProgress size={28} />
-            <Typography variant="caption">{loadingText}</Typography>
-          </Stack>
-        )}
-        {!url && !loading && (
-          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-            Chưa có
-          </Typography>
-        )}
-      </Box>
-    </Stack>
   );
 }
