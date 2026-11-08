@@ -18,6 +18,21 @@ export type SocialChannel = {
 
 export type SocialChannelList = { threadsConfigured: boolean; items: SocialChannel[] };
 
+/** Meta app của cửa hàng (không bao giờ có secret). source: store = cửa hàng tự nhập, platform = app dự phòng, none. */
+export type SocialAppSettings = {
+  platform: 'threads' | string;
+  clientId: string | null;
+  hasSecret: boolean;
+  source: 'store' | 'platform' | 'none';
+  callbackUrl: string;
+  updatedAt: string | null;
+};
+
+/** Threads app ID là dãy số (Use case Threads → Settings). */
+export function isValidThreadsAppId(value: string) {
+  return /^\d{5,64}$/.test(value.trim());
+}
+
 export type SocialPostStatus = 'draft' | 'scheduled' | 'publishing' | 'published' | 'partial' | 'failed';
 export type SocialTargetStatus = 'pending' | 'publishing' | 'published' | 'failed';
 

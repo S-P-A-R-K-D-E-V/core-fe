@@ -365,6 +365,11 @@ export function useNavData(
                 path: paths.dashboard.social.channels,
                 permissions: [PERMISSIONS.social.channels],
               },
+              {
+                title: 'Cấu hình',
+                path: paths.dashboard.social.settings,
+                permissions: [PERMISSIONS.social.channels],
+              },
             ],
           },
 

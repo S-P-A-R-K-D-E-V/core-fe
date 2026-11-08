@@ -3,6 +3,7 @@ import type {
   SocialPostPage,
   SocialPostInput,
   SocialChannelList,
+  SocialAppSettings,
   SocialImageResult,
   SocialCaptionResult,
   SocialImageCatalog,
@@ -69,6 +70,25 @@ export function useSocialPost(id: string | null) {
 export async function startThreadsConnect(returnPath: string): Promise<string> {
   const res = await axios.post<{ authorizeUrl: string }>(`${ROOT}/channels/threads/connect`, { returnPath });
   return res.data.authorizeUrl;
+}
+
+export function useThreadsApp() {
+  const { data, isLoading, error, mutate } = useSWR<SocialAppSettings>(`${ROOT}/apps/threads`, fetcher, {
+    revalidateOnFocus: false,
+  });
+  return useMemo(
+    () => ({ app: data, loading: isLoading && !data, error, refresh: mutate }),
+    [data, isLoading, error, mutate]
+  );
+}
+
+/** Lưu Threads app ID / secret của cửa hàng; secret để trống = giữ secret cũ (chỉ khi không đổi app ID). */
+export async function saveThreadsApp(input: { clientId: string; clientSecret: string | null }) {
+  return (await axios.put<SocialAppSettings>(`${ROOT}/apps/threads`, input)).data;
+}
+
+export async function deleteThreadsApp() {
+  await axios.delete(`${ROOT}/apps/threads`);
 }
 
 export async function disconnectSocialChannel(id: string) {
