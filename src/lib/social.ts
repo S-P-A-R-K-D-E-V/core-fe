@@ -123,6 +123,8 @@ export type SocialPost = {
   text: string;
   imageUrls: string[];
   productId: string | null;
+  /** Các sản phẩm bài giới thiệu (tối đa SOCIAL_MAX_PRODUCTS). */
+  productIds: string[];
   status: SocialPostStatus;
   scheduledAt: string | null;
   publishedAt: string | null;
@@ -153,6 +155,7 @@ export type SocialPostInput = {
   /** ISO UTC — chỉ khi mode = schedule. */
   scheduledAt: string | null;
   productId: string | null;
+  productIds: string[];
 };
 
 // ---------- Hàng đợi tự rải bài + lịch đăng ----------
@@ -215,7 +218,11 @@ export function socialCalendarKey(from: string, to: string) {
   return `/social/calendar?from=${from}&to=${to}`;
 }
 
-export type SocialCaptionResult = { text: string; imageUrls: string[]; productUrl: string | null };
+/** imageUrls: ảnh đầu của từng sản phẩm trước; productUrls: link đã gắn cuối bài (tối đa 3). */
+export type SocialCaptionResult = { text: string; imageUrls: string[]; productUrl: string | null; productUrls: string[] };
+
+/** Một bài giới thiệu tối đa 5 sản phẩm (Threads cho tối đa 5 link). */
+export const SOCIAL_MAX_PRODUCTS = 5;
 
 /** Studio ảnh (core-be SocialImageController): "product" = đổi nền / bối cảnh, "hair" = cài lên tóc. */
 export type SocialImageStyle = { id: string; label: string; group: 'product' | 'hair'; hint: string };

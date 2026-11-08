@@ -59,7 +59,14 @@ vi.mock('src/api/social', () => ({
 // Ô chọn sản phẩm đọc danh mục bán online qua SWR — trả danh sách cố định.
 vi.mock('swr', () => ({
   default: () => ({
-    data: { items: [{ id: 'p1', code: 'K25', name: 'Kẹp tóc k25', price: 25000, imageUrl: null, unit: null, categoryName: null, inStock: true }], total: 1 },
+    data: {
+      items: [
+        { id: 'p1', code: 'K25', name: 'Kẹp tóc k25', price: 25000, imageUrl: null, unit: null, categoryName: null, inStock: true },
+        { id: 'p2', code: 'SC18', name: 'Scrunchies SC18', price: 18000, imageUrl: 'https://cdn.test/sc18.jpg', unit: null, categoryName: null, inStock: true },
+        { id: 'p3', code: 'K28', name: 'Kẹp hoa K28', price: 28000, imageUrl: 'https://cdn.test/k28.jpg', unit: null, categoryName: null, inStock: true },
+      ],
+      total: 3,
+    },
   }),
 }));
 
@@ -102,6 +109,7 @@ describe('SocialPostForm', () => {
       mode: 'now',
       scheduledAt: null,
       productId: null,
+      productIds: [],
     });
     expect(router.push).toHaveBeenCalledWith('/dashboard/ban-hang-online');
   });
@@ -128,6 +136,30 @@ describe('SocialPostForm', () => {
     expect(api.createSocialPost.mock.calls[0][0]).toMatchObject({ mode: 'schedule', scheduledAt: '2030-01-03T02:00:00.000Z' });
   });
 
+  it('chọn nhiều sản phẩm: AI viết theo cả nhóm, thêm ảnh từng sản phẩm, bài gửi đủ productIds', async () => {
+    api.writeSocialCaption.mockResolvedValue({ text: 'Combo kẹp + scrunchies', imageUrls: [], productUrl: null, productUrls: [] });
+    api.createSocialPost.mockResolvedValue({});
+    renderForm();
+    const picker = screen.getByLabelText('Sản phẩm (đang bán online)');
+    await userEvent.click(picker);
+    await userEvent.click(await screen.findByText('Scrunchies SC18'));
+    await userEvent.click(picker);
+    await userEvent.click(await screen.findByText('Kẹp hoa K28'));
+    expect(screen.getByText(/AI viết một bài cho 2 sản phẩm/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dùng 2 ảnh sản phẩm' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Viết bài' }));
+    await waitFor(() => expect(api.writeSocialCaption).toHaveBeenCalledWith({ productIds: ['p2', 'p3'], brief: '' }));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Đăng bài' }));
+    await waitFor(() => expect(api.createSocialPost).toHaveBeenCalled());
+    expect(api.createSocialPost.mock.calls[0][0]).toMatchObject({
+      productId: 'p2',
+      productIds: ['p2', 'p3'],
+      imageUrls: ['https://cdn.test/sc18.jpg', 'https://cdn.test/k28.jpg'],
+    });
+  });
+
   it('quá 500 ký tự thì không cho đăng', async () => {
     renderForm();
     const box = screen.getByLabelText('Nội dung bài');
@@ -148,7 +180,7 @@ describe('SocialPostForm', () => {
     await userEvent.type(screen.getByLabelText('Ý muốn nói thêm'), 'quà 20/11');
     await userEvent.click(screen.getByRole('button', { name: 'Viết bài' }));
     await waitFor(() => expect(screen.getByLabelText('Nội dung bài')).toHaveValue('Bài AI viết\nhttps://cici21chualang.vn/product/p1'));
-    expect(api.writeSocialCaption).toHaveBeenCalledWith({ productId: null, brief: 'quà 20/11' });
+    expect(api.writeSocialCaption).toHaveBeenCalledWith({ productIds: [], brief: 'quà 20/11' });
     const srcs = Array.from(document.querySelectorAll('img')).map((i) => i.getAttribute('src'));
     expect(srcs).toContain('https://cdn.test/kep.jpg');
     expect(srcs).not.toContain('http://khong-https.test/a.jpg');
