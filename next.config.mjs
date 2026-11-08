@@ -53,6 +53,8 @@ const BACKEND_API_PREFIXES = [
   'purchase-imports',
   // Tin tức của cửa hàng (trang quản trị /dashboard/tin-tuc, trợ lý AI viết bài).
   'store-posts',
+  // Bán hàng online (core-be SocialController, SocialImageController): kênh Threads, bài đăng, studio ảnh, Tổng quan, Cấu hình.
+  'social',
 ];
 
 const nextConfig = {

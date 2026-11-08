@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { endpoints } from '../axios';
@@ -39,6 +41,26 @@ describe('next.config rewrites', () => {
     ];
 
     expect(missing).toEqual([]);
+  });
+
+  // Nhiều file src/api tự dựng đường (const ROOT = '/social', axios.get('/x/…')) thay vì dùng endpoints — /social/* của
+  // Bán hàng online từng thiếu tiền tố nên mọi trang của tính năng trả 404 trên production.
+  it('đường tự dựng trong src/api cũng có tiền tố được proxy', async () => {
+    const rewrites = (await (nextConfig as any).rewrites()) as { source: string }[];
+    const proxied = new Set(rewrites.map((r) => r.source.split('/')[1]));
+    const dir = join(__dirname, '../../api');
+    const pattern =
+      /(?:const [A-Z_]+ = |axios\.(?:get|post|put|delete|patch)(?:<[^>]*>)?\(|useSWR(?:<[^>]*>)?\()['"`]\/([a-z0-9-]+)/g;
+    const prefixes = new Set<string>();
+    readdirSync(dir)
+      .filter((f) => f.endsWith('.ts'))
+      .forEach((f) => {
+        const source = readFileSync(join(dir, f), 'utf8');
+        [...source.matchAll(pattern)].forEach((m) => prefixes.add(m[1]));
+      });
+
+    expect(prefixes.has('social')).toBe(true);
+    expect([...prefixes].filter((p) => p !== 'api' && !proxied.has(p))).toEqual([]);
   });
 
   it('F&B được proxy', async () => {
