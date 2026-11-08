@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { it, expect, describe } from 'vitest';
 
-import { countLinks, isEditable, type SocialPost, isValidThreadsAppId } from 'src/lib/social';
+import { countLinks, isEditable, type SocialPost, engagementRate, isValidThreadsAppId } from 'src/lib/social';
 import { requiredPermissionsFor } from 'src/auth/route-roles';
 import { paths } from 'src/routes/paths';
 
@@ -46,6 +46,13 @@ describe('social api / helpers', () => {
     expect(requiredPermissionsFor(paths.dashboard.social.channels)).toEqual(['social.channels']);
     expect(requiredPermissionsFor(paths.dashboard.social.new)).toEqual(['social.posts']);
     expect(requiredPermissionsFor(paths.dashboard.social.settings)).toEqual(['social.channels']);
+    expect(requiredPermissionsFor(paths.dashboard.social.overview)).toEqual(['social.posts']);
+  });
+
+  it('tỉ lệ tương tác làm tròn 1 chữ số, chưa có lượt xem thì null', () => {
+    expect(engagementRate(10, 120)).toBe(8.3);
+    expect(engagementRate(5, 0)).toBeNull();
+    expect(engagementRate(5, null)).toBeNull();
   });
 
   it('Threads app ID phải là dãy số', () => {

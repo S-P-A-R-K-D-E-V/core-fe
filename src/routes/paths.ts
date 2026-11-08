@@ -189,6 +189,8 @@ export const paths = {
     // Bán hàng online: bài đăng lên kênh mạng xã hội (Threads) + kênh kết nối — tính năng riêng social.selling.
     social: {
       root: `${ROOTS.DASHBOARD}/ban-hang-online`,
+      // Tổng quan: tương tác + đơn / doanh thu từ link bài theo kênh.
+      overview: `${ROOTS.DASHBOARD}/ban-hang-online/tong-quan`,
       new: `${ROOTS.DASHBOARD}/ban-hang-online/new`,
       edit: (id: string) => `${ROOTS.DASHBOARD}/ban-hang-online/${id}/edit`,
       channels: `${ROOTS.DASHBOARD}/ban-hang-online/kenh`,

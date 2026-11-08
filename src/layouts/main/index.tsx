@@ -8,6 +8,7 @@ import type { TenantBranding } from 'src/lib/tenant-branding';
 
 import Footer from './footer';
 import Header from './header';
+import { SocialRefCapture } from './social-ref-capture';
 
 // Trợ lý chat tải sau khi trang đã hiện (không nằm trong JS ban đầu của trang công khai — đỡ chặn luồng chính).
 const ChatbotWidget = dynamic(() => import('src/components/chatbot/chatbot-widget'), {
@@ -49,6 +50,8 @@ export default function MainLayout({ children, hasProducts, hasPosts, logoUrl, b
       <Footer branding={branding} />
 
       <ChatbotWidget />
+
+      <SocialRefCapture />
     </Box>
   );
 }

@@ -356,6 +356,11 @@ export function useNavData(
             permissions: [PERMISSIONS.social.posts, PERMISSIONS.social.channels],
             children: [
               {
+                title: 'Tổng quan',
+                path: paths.dashboard.social.overview,
+                permissions: [PERMISSIONS.social.posts],
+              },
+              {
                 title: 'Bài đăng',
                 path: paths.dashboard.social.root,
                 permissions: [PERMISSIONS.social.posts],

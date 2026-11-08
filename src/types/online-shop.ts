@@ -239,6 +239,8 @@ export type IStorefrontCheckoutRequest = {
     service?: string | null;
     quotedFee?: number | null;
   };
+  /** Mã nguồn bài đăng mạng xã hội khách đã bấm (Bán hàng online) — placeOnlineOrder tự điền. */
+  socialRef?: string | null;
 };
 
 export type IStorefrontPayment = {
