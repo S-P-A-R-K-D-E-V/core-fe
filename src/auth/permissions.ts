@@ -200,6 +200,8 @@ export const PERMISSIONS = {
   orders: { read: 'orders.read', create: 'orders.create', update: 'orders.update', delete: 'orders.delete' },
   /** Tin tức trên trang công khai của cửa hàng (/store-posts, /dashboard/tin-tuc) — kể cả trợ lý AI viết bài. */
   posts: { manage: 'posts.manage' },
+  /** Bán hàng online (/social): soạn / đăng bài (mặc định Admin, Quản lý), kết nối kênh (Admin). */
+  social: { posts: 'social.posts', channels: 'social.channels' },
   /**
    * Nhân viên — hồ sơ của mình không cần quyền. Tài khoản Admin chỉ Admin đụng được, gán vai trò / thêm quản lý chỉ Admin
    * (luật theo vai trò).

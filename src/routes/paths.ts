@@ -186,6 +186,13 @@ export const paths = {
       new: `${ROOTS.DASHBOARD}/tin-tuc/new`,
       edit: (id: string) => `${ROOTS.DASHBOARD}/tin-tuc/${id}/edit`,
     },
+    // Bán hàng online: bài đăng lên kênh mạng xã hội (Threads) + kênh kết nối — tính năng riêng social.selling.
+    social: {
+      root: `${ROOTS.DASHBOARD}/ban-hang-online`,
+      new: `${ROOTS.DASHBOARD}/ban-hang-online/new`,
+      edit: (id: string) => `${ROOTS.DASHBOARD}/ban-hang-online/${id}/edit`,
+      channels: `${ROOTS.DASHBOARD}/ban-hang-online/kenh`,
+    },
     storeSettings: {
       root: `${ROOTS.DASHBOARD}/store-settings`,
       // Thiết bị cửa hàng: máy quầy (app / web), kiosk chấm công, camera — chủ cửa hàng + quản lý.

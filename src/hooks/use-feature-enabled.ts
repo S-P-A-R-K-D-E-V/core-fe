@@ -13,6 +13,8 @@ export const FEATURE = {
   shareholders: 'finance.shareholders',
   /** Công nợ đối tác (phiếu đối tác). */
   partnerDebt: 'finance.partner-debt',
+  /** Bán hàng online: kênh Threads, soạn bài có AI, đăng ngay / hẹn giờ. */
+  socialSelling: 'social.selling',
 } as const;
 
 /** Cửa hàng hiện tại có bật tính năng này không (enabledFeatures của /users/me). Chưa tải xong = chưa bật. */
