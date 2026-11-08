@@ -43,6 +43,9 @@ vi.mock('src/api/social', () => ({
     maxNoteLength: 200,
   }),
   useSocialAi: () => ({ enabled: true, reason: null }),
+  useSocialQueue: () => ({
+    queue: { slots: ['09:00', '20:00'], days: [0, 1, 2, 3, 4, 5, 6], isDefault: true, nextSlots: ['2030-01-02T13:00:00Z'] },
+  }),
   useSocialChannels: () => ({
     loading: false,
     threadsConfigured: true,
@@ -61,7 +64,8 @@ vi.mock('swr', () => ({
 }));
 
 const router = { replace: vi.fn(), push: vi.fn() };
-vi.mock('src/routes/hooks', () => ({ useRouter: () => router }));
+let searchParams = new URLSearchParams();
+vi.mock('src/routes/hooks', () => ({ useRouter: () => router, useSearchParams: () => searchParams }));
 const snackbar = { enqueueSnackbar: vi.fn() };
 vi.mock('src/components/snackbar', () => ({ useSnackbar: () => snackbar }));
 
@@ -79,7 +83,10 @@ const renderForm = () =>
     </ThemeProvider>
   );
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.clearAllMocks();
+  searchParams = new URLSearchParams();
+});
 
 describe('SocialPostForm', () => {
   it('Đăng ngay gửi chữ + kênh đang kết nối (không gồm kênh hết hạn)', async () => {
@@ -97,6 +104,28 @@ describe('SocialPostForm', () => {
       productId: null,
     });
     expect(router.push).toHaveBeenCalledWith('/dashboard/ban-hang-online');
+  });
+
+  it('Hàng đợi: hiện khung giờ trống kế tiếp và gửi mode queue (máy chủ chọn giờ)', async () => {
+    api.createSocialPost.mockResolvedValue({ scheduledAt: '2030-01-02T13:00:00Z' });
+    renderForm();
+    await userEvent.type(screen.getByLabelText('Nội dung bài'), 'Kẹp mới về');
+    await userEvent.click(screen.getByRole('button', { name: 'Hàng đợi' }));
+    expect(screen.getByText(/khung giờ trống kế tiếp/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Thêm vào hàng đợi' }));
+    await waitFor(() => expect(api.createSocialPost).toHaveBeenCalled());
+    expect(api.createSocialPost.mock.calls[0][0]).toMatchObject({ mode: 'queue', scheduledAt: null, channelIds: ['c1'] });
+    expect(snackbar.enqueueSnackbar.mock.calls[0][0]).toMatch(/^Đã thêm vào hàng đợi — đăng lúc/);
+  });
+
+  it('mở từ ô trống trên lịch (?at=) thì hẹn đúng giờ đó', async () => {
+    searchParams = new URLSearchParams({ at: '2030-01-03T02:00:00.000Z' });
+    api.createSocialPost.mockResolvedValue({});
+    renderForm();
+    await userEvent.type(screen.getByLabelText('Nội dung bài'), 'Kẹp mới về');
+    await userEvent.click(screen.getByRole('button', { name: 'Hẹn giờ đăng' }));
+    await waitFor(() => expect(api.createSocialPost).toHaveBeenCalled());
+    expect(api.createSocialPost.mock.calls[0][0]).toMatchObject({ mode: 'schedule', scheduledAt: '2030-01-03T02:00:00.000Z' });
   });
 
   it('quá 500 ký tự thì không cho đăng', async () => {

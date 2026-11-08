@@ -8,6 +8,7 @@ import { useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Link from '@mui/material/Link';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
@@ -24,12 +25,12 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { paths } from 'src/routes/paths';
-import { useRouter } from 'src/routes/hooks';
+import { useRouter, useSearchParams } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
 import { fetcher } from 'src/utils/axios';
 import { apiErrorMessage } from 'src/utils/api-error';
-import { toDatetimeLocalStr, parseDatetimeLocalStr } from 'src/utils/format-time';
+import { fDateTime, toDatetimeLocalStr, parseDatetimeLocalStr } from 'src/utils/format-time';
 
 import { useDebounce } from 'src/hooks/use-debounce';
 
@@ -37,6 +38,7 @@ import { storefrontProductListKey } from 'src/api/product-keys';
 import { countLinks, SOCIAL_TEXT_MAX, SOCIAL_MAX_LINKS, SOCIAL_MAX_IMAGES } from 'src/lib/social';
 import {
   useSocialAi,
+  useSocialQueue,
   createSocialPost,
   updateSocialPost,
   useSocialChannels,
@@ -74,10 +76,24 @@ export function SocialPostForm({ post }: Props) {
   const [text, setText] = useState(post?.text ?? '');
   const [images, setImages] = useState<string[]>(post?.imageUrls ?? []);
   const [channelIds, setChannelIds] = useState<string[]>(post?.targets.map((t) => t.channelId) ?? []);
-  const [mode, setMode] = useState<Exclude<SocialPostMode, 'draft'>>(post?.status === 'scheduled' ? 'schedule' : 'now');
-  const [schedule, setSchedule] = useState(
-    post?.scheduledAt ? toDatetimeLocalStr(new Date(post.scheduledAt)) : defaultScheduleStr()
-  );
+  // Mở từ ô trống trên Lịch đăng: ?at=<ISO> → hẹn đúng giờ đó.
+  const searchParams = useSearchParams();
+  const presetAt = post ? null : searchParams.get('at');
+  const presetDate = presetAt && !Number.isNaN(Date.parse(presetAt)) ? new Date(presetAt) : null;
+  const { queue } = useSocialQueue();
+  const [mode, setMode] = useState<Exclude<SocialPostMode, 'draft'>>(() => {
+    if (presetDate) return 'schedule';
+    if (post?.status === 'scheduled') return post.queued ? 'queue' : 'schedule';
+    return 'now';
+  });
+  const [schedule, setSchedule] = useState(() => {
+    if (presetDate) return toDatetimeLocalStr(presetDate);
+    return post?.scheduledAt ? toDatetimeLocalStr(new Date(post.scheduledAt)) : defaultScheduleStr();
+  });
+  // Bài đang ở hàng đợi giữ chỗ cũ khi sửa; bài mới nhận khung trống kế tiếp.
+  const keptQueueSlot =
+    post?.queued && post.scheduledAt && Date.parse(post.scheduledAt) > Date.now() + 10 * 60 * 1000 ? post.scheduledAt : null;
+  const nextQueueSlot = keptQueueSlot ?? queue?.nextSlots[0] ?? null;
   const [productId, setProductId] = useState<string | null>(post?.productId ?? null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState<SocialPostMode | null>(null);
@@ -200,11 +216,14 @@ export function SocialPostForm({ post }: Props) {
     const input: SocialPostInput = { text, imageUrls: images, channelIds, mode: submitMode, scheduledAt, productId };
     setSaving(submitMode);
     try {
-      if (post) await updateSocialPost(post.id, input);
-      else await createSocialPost(input);
-      enqueueSnackbar(
-        submitMode === 'draft' ? 'Đã lưu nháp' : submitMode === 'now' ? 'Đang đăng — vài giây nữa bài sẽ lên' : 'Đã hẹn giờ đăng'
-      );
+      const saved = post ? await updateSocialPost(post.id, input) : await createSocialPost(input);
+      const messages: Record<SocialPostMode, string> = {
+        draft: 'Đã lưu nháp',
+        now: 'Đang đăng — vài giây nữa bài sẽ lên',
+        schedule: 'Đã hẹn giờ đăng',
+        queue: saved?.scheduledAt ? `Đã thêm vào hàng đợi — đăng lúc ${fDateTime(saved.scheduledAt)}` : 'Đã thêm vào hàng đợi',
+      };
+      enqueueSnackbar(messages[submitMode]);
       router.push(paths.dashboard.social.root);
     } catch (err) {
       enqueueSnackbar(apiErrorMessage(err, 'Lưu bài thất bại'), { variant: 'error' });
@@ -415,8 +434,19 @@ export function SocialPostForm({ post }: Props) {
 
           <ToggleButtonGroup exclusive size="small" value={mode} onChange={(_, v) => v && setMode(v)}>
             <ToggleButton value="now">Đăng ngay</ToggleButton>
+            <ToggleButton value="queue">Hàng đợi</ToggleButton>
             <ToggleButton value="schedule">Hẹn giờ</ToggleButton>
           </ToggleButtonGroup>
+          {mode === 'queue' && (
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              {nextQueueSlot
+                ? `Bài sẽ đăng lúc ${fDateTime(nextQueueSlot)}${keptQueueSlot ? ' (giữ chỗ cũ trong hàng đợi)' : ' — khung giờ trống kế tiếp'}.`
+                : 'Hàng đợi đã kín — thêm khung giờ ở trang Lịch đăng.'}{' '}
+              <Link component={RouterLink} href={paths.dashboard.social.calendar}>
+                Sửa khung giờ
+              </Link>
+            </Typography>
+          )}
           {mode === 'schedule' && (
             <AppDateTimePicker
               label="Giờ đăng"
@@ -460,10 +490,14 @@ export function SocialPostForm({ post }: Props) {
           variant="contained"
           loading={saving === mode}
           disabled={busy || empty || tooLong || tooManyLinks || channelIds.length === 0}
-          startIcon={<Iconify icon={mode === 'now' ? 'solar:plain-bold' : 'solar:calendar-bold'} />}
+          startIcon={
+            <Iconify
+              icon={mode === 'now' ? 'solar:plain-bold' : mode === 'queue' ? 'solar:list-check-bold' : 'solar:calendar-bold'}
+            />
+          }
           onClick={() => submit(mode)}
         >
-          {mode === 'now' ? 'Đăng bài' : 'Hẹn giờ đăng'}
+          {{ now: 'Đăng bài', queue: 'Thêm vào hàng đợi', schedule: 'Hẹn giờ đăng' }[mode]}
         </LoadingButton>
       </Stack>
     </Stack>

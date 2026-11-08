@@ -194,6 +194,8 @@ export const paths = {
       new: `${ROOTS.DASHBOARD}/ban-hang-online/new`,
       edit: (id: string) => `${ROOTS.DASHBOARD}/ban-hang-online/${id}/edit`,
       channels: `${ROOTS.DASHBOARD}/ban-hang-online/kenh`,
+      // Lịch đăng tuần / tháng + hàng đợi tự rải bài.
+      calendar: `${ROOTS.DASHBOARD}/ban-hang-online/lich`,
       // Meta app (Threads app ID / secret) của cửa hàng — mỗi cửa hàng dùng app riêng.
       settings: `${ROOTS.DASHBOARD}/ban-hang-online/cau-hinh`,
     },

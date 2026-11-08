@@ -5,10 +5,14 @@ import type {
   SocialChannelList,
   SocialAppSettings,
   SocialDashboard,
+  SocialQueue,
+  SocialCalendar,
   SocialImageResult,
   SocialCaptionResult,
   SocialImageCatalog,
 } from 'src/lib/social';
+
+import { socialCalendarKey } from 'src/lib/social';
 
 import useSWR from 'swr';
 import { useMemo } from 'react';
@@ -82,6 +86,33 @@ export function useSocialDashboard(days: number) {
     () => ({ dashboard: data, loading: isLoading && !data, error, refresh: mutate }),
     [data, isLoading, error, mutate]
   );
+}
+
+export function useSocialQueue() {
+  const { data, isLoading, error, mutate } = useSWR<SocialQueue>(`${ROOT}/queue`, fetcher, { revalidateOnFocus: true });
+  return useMemo(() => ({ queue: data, loading: isLoading && !data, error, refresh: mutate }), [data, isLoading, error, mutate]);
+}
+
+export async function saveSocialQueue(input: { slots: string[]; days: number[] }) {
+  return (await axios.put<SocialQueue>(`${ROOT}/queue`, input)).data;
+}
+
+/** Lịch đăng trong khoảng ngày (yyyy-MM-dd); null = chưa biết khoảng (lịch chưa vẽ). */
+export function useSocialCalendar(from: string | null, to: string | null) {
+  const { data, isLoading, error, mutate } = useSWR<SocialCalendar>(
+    from && to ? socialCalendarKey(from, to) : null,
+    fetcher,
+    { keepPreviousData: true, revalidateOnFocus: true }
+  );
+  return useMemo(
+    () => ({ calendar: data, loading: isLoading && !data, error, refresh: mutate }),
+    [data, isLoading, error, mutate]
+  );
+}
+
+/** Đổi giờ bài đã hẹn (kéo thả trên lịch). */
+export async function rescheduleSocialPost(id: string, scheduledAt: string) {
+  return (await axios.post<SocialPost>(`${ROOT}/posts/${id}/schedule`, { scheduledAt })).data;
 }
 
 export function useThreadsApp() {
