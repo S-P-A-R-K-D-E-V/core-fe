@@ -126,6 +126,8 @@ export type SocialPost = {
   status: SocialPostStatus;
   scheduledAt: string | null;
   publishedAt: string | null;
+  /** Giờ đăng do hàng đợi tự chọn. */
+  queued: boolean;
   createdByName: string | null;
   createdAt: string;
   updatedAt: string;
@@ -140,7 +142,8 @@ export type SocialPostPage = {
   counts: Partial<Record<SocialPostStatus, number>>;
 };
 
-export type SocialPostMode = 'draft' | 'schedule' | 'now';
+/** queue = vào hàng đợi, máy chủ chọn khung giờ trống kế tiếp. */
+export type SocialPostMode = 'draft' | 'schedule' | 'queue' | 'now';
 
 export type SocialPostInput = {
   text: string;
@@ -151,6 +154,66 @@ export type SocialPostInput = {
   scheduledAt: string | null;
   productId: string | null;
 };
+
+// ---------- Hàng đợi tự rải bài + lịch đăng ----------
+
+/** slots: "HH:mm" giờ Việt Nam; days: 0 = Chủ nhật … 6 = Thứ bảy; nextSlots: ISO UTC các khung trống sắp tới. */
+export type SocialQueue = { slots: string[]; days: number[]; isDefault: boolean; nextSlots: string[] };
+
+export type SocialCalendarItem = {
+  id: string;
+  text: string;
+  status: SocialPostStatus;
+  /** ISO UTC — giờ đã đăng, hoặc giờ hẹn. */
+  at: string;
+  queued: boolean;
+  imageUrl: string | null;
+  imageCount: number;
+  channels: string[];
+  /** Còn đổi giờ / sửa được (đã hẹn, chưa bắt đầu đăng). */
+  editable: boolean;
+};
+
+export type SocialCalendar = { from: string; to: string; items: SocialCalendarItem[]; freeSlots: string[] };
+
+/** Thứ trong tuần theo thứ tự Việt Nam (T2 … CN), giá trị theo Date.getDay(). */
+export const SOCIAL_WEEKDAYS: { value: number; label: string }[] = [
+  { value: 1, label: 'T2' },
+  { value: 2, label: 'T3' },
+  { value: 3, label: 'T4' },
+  { value: 4, label: 'T5' },
+  { value: 5, label: 'T6' },
+  { value: 6, label: 'T7' },
+  { value: 0, label: 'CN' },
+];
+
+export const SOCIAL_QUEUE_MAX_SLOTS = 12;
+
+/** "8:5" / "08:05" → "08:05"; sai dạng → null. */
+export function normalizeSlot(value: string): string | null {
+  const m = /^(\d{1,2}):(\d{1,2})$/.exec(value.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+/** Thêm khung giờ, bỏ trùng, sắp tăng dần. */
+export function addSlot(slots: string[], value: string): string[] {
+  const slot = normalizeSlot(value);
+  if (!slot) return slots;
+  return Array.from(new Set([...slots, slot])).sort();
+}
+
+/** yyyy-MM-dd theo giờ máy (người dùng ở Việt Nam) — tham số from / to của lịch. */
+export function toDateParam(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function socialCalendarKey(from: string, to: string) {
+  return `/social/calendar?from=${from}&to=${to}`;
+}
 
 export type SocialCaptionResult = { text: string; imageUrls: string[]; productUrl: string | null };
 

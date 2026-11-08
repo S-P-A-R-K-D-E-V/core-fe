@@ -366,6 +366,11 @@ export function useNavData(
                 permissions: [PERMISSIONS.social.posts],
               },
               {
+                title: 'Lịch đăng',
+                path: paths.dashboard.social.calendar,
+                permissions: [PERMISSIONS.social.posts],
+              },
+              {
                 title: 'Kênh kết nối',
                 path: paths.dashboard.social.channels,
                 permissions: [PERMISSIONS.social.channels],

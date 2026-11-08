@@ -18,6 +18,7 @@ const post = (over: Partial<SocialPost>): SocialPost => ({
   status: 'scheduled',
   scheduledAt: null,
   publishedAt: null,
+  queued: false,
   createdByName: null,
   createdAt: '',
   updatedAt: '',
