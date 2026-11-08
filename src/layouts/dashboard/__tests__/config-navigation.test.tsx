@@ -499,6 +499,7 @@ describe('useNavData — Bán hàng online', () => {
     expect(admin).toContain(paths.dashboard.social.root);
     expect(admin).toContain(paths.dashboard.social.channels);
     expect(admin).toContain(paths.dashboard.social.settings);
+    expect(admin).toContain(paths.dashboard.social.overview);
   });
 
   it('quản lý có social.posts thấy Bài đăng nhưng không thấy Kênh kết nối; nhân viên không có quyền thì không thấy', () => {

@@ -22,6 +22,8 @@ import type {
 
 import axios, { endpoints } from 'src/utils/axios';
 
+import { readSocialRef } from 'src/lib/social-ref';
+
 // ----------------------------------------------------------------------
 // Thanh toán → Cài đặt (chủ cửa hàng): phương thức theo kênh, chính sách bán online, kết nối hãng vận chuyển.
 // ----------------------------------------------------------------------
@@ -133,7 +135,11 @@ export async function getShippingQuote(
 }
 
 export async function placeOnlineOrder(data: IStorefrontCheckoutRequest): Promise<IStorefrontCheckoutResult> {
-  const res = await axios.post<IStorefrontCheckoutResult>(endpoints.storefront.checkout, data);
+  // Đơn đến từ link bài đăng mạng xã hội → gửi kèm mã nguồn để Bán hàng online tính doanh thu theo bài.
+  const res = await axios.post<IStorefrontCheckoutResult>(endpoints.storefront.checkout, {
+    ...data,
+    socialRef: data.socialRef ?? readSocialRef(),
+  });
   return res.data;
 }
 

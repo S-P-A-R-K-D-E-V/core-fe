@@ -28,6 +28,76 @@ export type SocialAppSettings = {
   updatedAt: string | null;
 };
 
+// ---------- Tổng quan (dashboard) ----------
+
+export const SOCIAL_DASHBOARD_DAYS = [7, 30, 90] as const;
+export type SocialDashboardDays = (typeof SOCIAL_DASHBOARD_DAYS)[number];
+
+export type SocialDashboardTotals = {
+  posts: number;
+  views: number;
+  interactions: number;
+  /** null = chưa đọc được số liệu Threads của kênh nào. */
+  clicks: number | null;
+  orders: number;
+  revenue: number;
+};
+
+/** Followers… clicks: số của cả tài khoản Threads (null = chưa đọc được); posts / postViews…: bài đăng từ đây. */
+export type SocialDashboardChannel = {
+  channelId: string;
+  platform: string;
+  username: string;
+  avatarUrl: string | null;
+  status: SocialChannelStatus;
+  followers: number | null;
+  profileViews: number | null;
+  likes: number | null;
+  replies: number | null;
+  reposts: number | null;
+  quotes: number | null;
+  clicks: number | null;
+  insightsError: string | null;
+  posts: number;
+  postViews: number;
+  postInteractions: number;
+  orders: number;
+  revenue: number;
+};
+
+export type SocialDashboardDay = { date: string; posts: number; views: number; orders: number; revenue: number };
+
+export type SocialDashboardPost = {
+  postId: string;
+  targetId: string;
+  channelUsername: string;
+  text: string;
+  permalink: string | null;
+  publishedAt: string | null;
+  views: number | null;
+  interactions: number;
+  clicks: number | null;
+  orders: number;
+  revenue: number;
+  insightsAt: string | null;
+};
+
+export type SocialDashboard = {
+  from: string;
+  to: string;
+  days: number;
+  totals: SocialDashboardTotals;
+  channels: SocialDashboardChannel[];
+  daily: SocialDashboardDay[];
+  topPosts: SocialDashboardPost[];
+};
+
+/** Tỉ lệ tương tác trên lượt xem (%), null khi chưa có lượt xem. */
+export function engagementRate(interactions: number, views: number | null): number | null {
+  if (!views) return null;
+  return Math.round((interactions / views) * 1000) / 10;
+}
+
 /** Threads app ID là dãy số (Use case Threads → Settings). */
 export function isValidThreadsAppId(value: string) {
   return /^\d{5,64}$/.test(value.trim());

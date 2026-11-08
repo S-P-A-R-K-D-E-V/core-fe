@@ -4,6 +4,7 @@ import type {
   SocialPostInput,
   SocialChannelList,
   SocialAppSettings,
+  SocialDashboard,
   SocialImageResult,
   SocialCaptionResult,
   SocialImageCatalog,
@@ -70,6 +71,17 @@ export function useSocialPost(id: string | null) {
 export async function startThreadsConnect(returnPath: string): Promise<string> {
   const res = await axios.post<{ authorizeUrl: string }>(`${ROOT}/channels/threads/connect`, { returnPath });
   return res.data.authorizeUrl;
+}
+
+export function useSocialDashboard(days: number) {
+  const { data, isLoading, error, mutate } = useSWR<SocialDashboard>(`${ROOT}/dashboard?days=${days}`, fetcher, {
+    keepPreviousData: true,
+    revalidateOnFocus: false,
+  });
+  return useMemo(
+    () => ({ dashboard: data, loading: isLoading && !data, error, refresh: mutate }),
+    [data, isLoading, error, mutate]
+  );
 }
 
 export function useThreadsApp() {
