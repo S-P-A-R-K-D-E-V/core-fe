@@ -491,3 +491,19 @@ describe('useNavData — tính năng tắt theo nền tảng', () => {
     expect(blocked).toContain(paths.dashboard.pos.salesOrder.list);
   });
 });
+
+describe('useNavData — Bán hàng online', () => {
+  it('chỉ hiện khi cửa hàng bật social.selling', () => {
+    expect(navPaths('Admin')).not.toContain(paths.dashboard.social.root);
+    const admin = navPaths('Admin', ['social.selling']);
+    expect(admin).toContain(paths.dashboard.social.root);
+    expect(admin).toContain(paths.dashboard.social.channels);
+  });
+
+  it('quản lý có social.posts thấy Bài đăng nhưng không thấy Kênh kết nối; nhân viên không có quyền thì không thấy', () => {
+    const manager = navPaths('Manager', ['social.selling'], ['social.posts']);
+    expect(manager).toContain(paths.dashboard.social.root);
+    expect(manager).not.toContain(paths.dashboard.social.channels);
+    expect(navPaths('Staff', ['social.selling'], [])).not.toContain(paths.dashboard.social.root);
+  });
+});

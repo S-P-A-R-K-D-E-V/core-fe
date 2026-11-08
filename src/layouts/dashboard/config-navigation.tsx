@@ -347,6 +347,27 @@ export function useNavData(
             permissions: [PERMISSIONS.posts.manage],
           },
 
+          // BÁN HÀNG ONLINE: bài đăng bán hàng lên Threads (có AI) + kênh kết nối — tính năng riêng social.selling.
+          {
+            title: 'Bán hàng online',
+            path: paths.dashboard.social.root,
+            icon: ICONS.ecommerce,
+            featureKey: 'social.selling',
+            permissions: [PERMISSIONS.social.posts, PERMISSIONS.social.channels],
+            children: [
+              {
+                title: 'Bài đăng',
+                path: paths.dashboard.social.root,
+                permissions: [PERMISSIONS.social.posts],
+              },
+              {
+                title: 'Kênh kết nối',
+                path: paths.dashboard.social.channels,
+                permissions: [PERMISSIONS.social.channels],
+              },
+            ],
+          },
+
           // CÀI ĐẶT CỬA HÀNG (thương hiệu, KiotViet riêng, khoá API cho trợ lý AI)
           {
             title: 'Cài đặt cửa hàng',
