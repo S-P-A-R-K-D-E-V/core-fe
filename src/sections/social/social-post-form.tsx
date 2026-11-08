@@ -49,6 +49,8 @@ import { Upload } from 'src/components/upload';
 import { useSnackbar } from 'src/components/snackbar';
 import { AppDateTimePicker } from 'src/components/date-time-picker';
 
+import { SocialImageStudioDialog } from './social-image-studio-dialog';
+
 // ----------------------------------------------------------------------
 // Soạn bài bán hàng: AI viết nháp từ sản phẩm (kèm ảnh + link sản phẩm), chữ ≤ 500, ≤ 10 ảnh JPEG/PNG, chọn kênh,
 // lưu nháp / hẹn giờ / đăng ngay. Đăng thật do worker của core-be làm (vài giây với "Đăng ngay").
@@ -91,6 +93,8 @@ export function SocialPostForm({ post }: Props) {
   );
   const [brief, setBrief] = useState('');
   const [writing, setWriting] = useState(false);
+  // Studio ảnh: ảnh đang mở để tạo ảnh mới từ nó.
+  const [studioUrl, setStudioUrl] = useState<string | null>(null);
 
   const connected = channels.filter((c) => c.status === 'connected');
   const links = countLinks(text);
@@ -156,6 +160,18 @@ export function SocialPostForm({ post }: Props) {
       setUploading(false);
     }
   };
+
+  const addProductImage = () => {
+    if (!product?.imageUrl) return;
+    setProductId(product.id);
+    setImages((prev) => (prev.includes(product.imageUrl!) ? prev : [...prev, product.imageUrl!].slice(0, SOCIAL_MAX_IMAGES)));
+  };
+
+  const addStudioImage = (url: string) =>
+    setImages((prev) => (prev.includes(url) ? prev : [...prev, url].slice(0, SOCIAL_MAX_IMAGES)));
+
+  const replaceStudioImage = (source: string, url: string) =>
+    setImages((prev) => (prev.includes(url) ? prev.filter((u) => u !== source) : prev.map((u) => (u === source ? url : u))));
 
   const moveImage = (index: number, delta: number) => {
     setImages((prev) => {
@@ -245,7 +261,18 @@ export function SocialPostForm({ post }: Props) {
               multiline
               minRows={2}
             />
-            <Stack direction="row" justifyContent="flex-end">
+            <Stack direction="row" justifyContent="flex-end" spacing={1}>
+              {product?.imageUrl && (
+                <Button
+                  variant="outlined"
+                  color="inherit"
+                  disabled={busy || images.includes(product.imageUrl) || images.length >= SOCIAL_MAX_IMAGES}
+                  startIcon={<Iconify icon="solar:gallery-add-bold-duotone" />}
+                  onClick={addProductImage}
+                >
+                  Dùng ảnh sản phẩm
+                </Button>
+              )}
               <LoadingButton
                 variant="soft"
                 color="primary"
@@ -293,6 +320,15 @@ export function SocialPostForm({ post }: Props) {
               {images.map((url, i) => (
                 <Box key={url} sx={{ position: 'relative', borderRadius: 1, overflow: 'hidden', aspectRatio: '1' }}>
                   <Box component="img" src={url} alt="" sx={{ width: 1, height: 1, objectFit: 'cover' }} />
+                  <IconButton
+                    size="small"
+                    onClick={() => setStudioUrl(url)}
+                    aria-label="Studio ảnh: tạo ảnh mới từ ảnh này"
+                    title="Tạo ảnh mới từ ảnh này (đổi nền, cài lên tóc…)"
+                    sx={{ position: 'absolute', top: 4, left: 4, color: 'common.white', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' } }}
+                  >
+                    <Iconify icon="solar:magic-stick-3-bold" width={16} />
+                  </IconButton>
                   <Stack
                     direction="row"
                     sx={{ position: 'absolute', top: 4, right: 4, bgcolor: 'rgba(0,0,0,0.5)', borderRadius: 1 }}
@@ -314,6 +350,12 @@ export function SocialPostForm({ post }: Props) {
                 </Box>
               ))}
             </Box>
+          )}
+          {images.length > 0 && (
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              Bấm <Iconify icon="solar:magic-stick-3-bold" width={14} sx={{ verticalAlign: 'middle' }} /> trên ảnh để tạo ảnh
+              mới: đặt lên nền màu (giữ nguyên sản phẩm) hoặc AI vẽ lại (đổi nền, cài lên tóc).
+            </Typography>
           )}
           {images.length < SOCIAL_MAX_IMAGES && (
             <Upload
@@ -389,6 +431,18 @@ export function SocialPostForm({ post }: Props) {
           </Typography>
         </Stack>
       </Card>
+
+      {studioUrl && (
+        <SocialImageStudioDialog
+          sourceUrl={studioUrl}
+          productId={productId ?? product?.id ?? null}
+          aiEnabled={!!ai?.enabled}
+          canAdd={images.length < SOCIAL_MAX_IMAGES}
+          onClose={() => setStudioUrl(null)}
+          onAdd={addStudioImage}
+          onReplace={(url) => replaceStudioImage(studioUrl, url)}
+        />
+      )}
 
       <Stack direction="row" spacing={1.5} justifyContent="flex-end">
         <Button component={RouterLink} href={paths.dashboard.social.root} color="inherit" disabled={!!saving}>
