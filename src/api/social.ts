@@ -172,7 +172,7 @@ export function useSocialAi() {
   return data;
 }
 
-export async function writeSocialCaption(input: { productId: string | null; brief: string; includeLink?: boolean }) {
+export async function writeSocialCaption(input: { productIds: string[]; brief: string; includeLink?: boolean }) {
   return (await axios.post<SocialCaptionResult>(`${ROOT}/posts/ai/caption`, input, { timeout: 120000 })).data;
 }
 

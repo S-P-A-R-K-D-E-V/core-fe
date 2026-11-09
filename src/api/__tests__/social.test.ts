@@ -15,6 +15,7 @@ const post = (over: Partial<SocialPost>): SocialPost => ({
   text: '',
   imageUrls: [],
   productId: null,
+  productIds: [],
   status: 'scheduled',
   scheduledAt: null,
   publishedAt: null,

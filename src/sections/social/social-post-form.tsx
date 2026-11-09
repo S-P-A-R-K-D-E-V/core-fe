@@ -35,7 +35,7 @@ import { fDateTime, toDatetimeLocalStr, parseDatetimeLocalStr } from 'src/utils/
 import { useDebounce } from 'src/hooks/use-debounce';
 
 import { storefrontProductListKey } from 'src/api/product-keys';
-import { countLinks, SOCIAL_TEXT_MAX, SOCIAL_MAX_LINKS, SOCIAL_MAX_IMAGES } from 'src/lib/social';
+import { countLinks, SOCIAL_TEXT_MAX, SOCIAL_MAX_LINKS, SOCIAL_MAX_IMAGES, SOCIAL_MAX_PRODUCTS } from 'src/lib/social';
 import {
   useSocialAi,
   useSocialQueue,
@@ -94,12 +94,16 @@ export function SocialPostForm({ post }: Props) {
   const keptQueueSlot =
     post?.queued && post.scheduledAt && Date.parse(post.scheduledAt) > Date.now() + 10 * 60 * 1000 ? post.scheduledAt : null;
   const nextQueueSlot = keptQueueSlot ?? queue?.nextSlots[0] ?? null;
-  const [productId, setProductId] = useState<string | null>(post?.productId ?? null);
+  // Sản phẩm của bài (gửi lên máy chủ). Bài cũ chỉ có productId.
+  const [productIds, setProductIds] = useState<string[]>(
+    post?.productIds?.length ? post.productIds : post?.productId ? [post.productId] : []
+  );
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState<SocialPostMode | null>(null);
 
   // AI
-  const [product, setProduct] = useState<StorefrontProduct | null>(null);
+  // Sản phẩm đang chọn trong ô tìm (đủ tên, giá, ảnh) — đổi ô này thì productIds đổi theo.
+  const [products, setProducts] = useState<StorefrontProduct[]>([]);
   const [productQuery, setProductQuery] = useState('');
   const debouncedQuery = useDebounce(productQuery, 400);
   const { data: productPage } = useSWR<StorefrontProductPage>(
@@ -125,15 +129,15 @@ export function SocialPostForm({ post }: Props) {
   }
 
   const handleWrite = async () => {
-    if (!product && !brief.trim()) {
+    if (products.length === 0 && !brief.trim()) {
       enqueueSnackbar('Chọn sản phẩm hoặc gõ vài ý muốn nói', { variant: 'warning' });
       return;
     }
     setWriting(true);
     try {
-      const result = await writeSocialCaption({ productId: product?.id ?? null, brief: brief.trim() });
+      const result = await writeSocialCaption({ productIds: products.map((p) => p.id), brief: brief.trim() });
       setText(result.text);
-      if (product) setProductId(product.id);
+      if (products.length > 0) setProductIds(products.map((p) => p.id));
       if (images.length === 0 && result.imageUrls.length > 0)
         setImages(result.imageUrls.filter((u) => u.startsWith('https://')).slice(0, SOCIAL_MAX_IMAGES));
     } catch (err) {
@@ -177,11 +181,22 @@ export function SocialPostForm({ post }: Props) {
     }
   };
 
-  const addProductImage = () => {
-    if (!product?.imageUrl) return;
-    setProductId(product.id);
-    setImages((prev) => (prev.includes(product.imageUrl!) ? prev : [...prev, product.imageUrl!].slice(0, SOCIAL_MAX_IMAGES)));
+  // Ảnh đầu của từng sản phẩm đang chọn (chưa có trong bài).
+  const productImages = products.map((p) => p.imageUrl).filter((u): u is string => !!u && !images.includes(u));
+  const addProductImages = () => {
+    setProductIds(products.map((p) => p.id));
+    setImages((prev) => Array.from(new Set([...prev, ...productImages])).slice(0, SOCIAL_MAX_IMAGES));
   };
+
+  const handleProductsChange = (value: StorefrontProduct[]) => {
+    const next = value.slice(0, SOCIAL_MAX_PRODUCTS);
+    setProducts(next);
+    setProductIds(next.map((p) => p.id));
+  };
+
+  // Studio kiểm ảnh nguồn thuộc sản phẩm nào: ảnh khớp ảnh đại diện của sản phẩm nào thì gửi sản phẩm đó.
+  const studioProductId =
+    (studioUrl && products.find((p) => p.imageUrl === studioUrl)?.id) || productIds[0] || null;
 
   const addStudioImage = (url: string) =>
     setImages((prev) => (prev.includes(url) ? prev : [...prev, url].slice(0, SOCIAL_MAX_IMAGES)));
@@ -213,7 +228,15 @@ export function SocialPostForm({ post }: Props) {
       }
       scheduledAt = d.toISOString();
     }
-    const input: SocialPostInput = { text, imageUrls: images, channelIds, mode: submitMode, scheduledAt, productId };
+    const input: SocialPostInput = {
+      text,
+      imageUrls: images,
+      channelIds,
+      mode: submitMode,
+      scheduledAt,
+      productId: productIds[0] ?? null,
+      productIds,
+    };
     setSaving(submitMode);
     try {
       const saved = post ? await updateSocialPost(post.id, input) : await createSocialPost(input);
@@ -240,13 +263,17 @@ export function SocialPostForm({ post }: Props) {
         <Card>
           <CardHeader
             title="AI viết giúp"
-            subheader="Chọn sản phẩm (AI lấy tên, giá, mô tả, ảnh và gắn link sản phẩm) hoặc gõ vài ý muốn nói."
+            subheader={`Chọn 1–${SOCIAL_MAX_PRODUCTS} sản phẩm (AI lấy tên, giá, mô tả, ảnh và gắn link sản phẩm) hoặc gõ vài ý muốn nói.`}
           />
           <Stack spacing={2} sx={{ p: 3 }}>
             <Autocomplete
+              multiple
               options={productPage?.items ?? []}
-              value={product}
-              onChange={(_, v) => setProduct(v)}
+              value={products}
+              onChange={(_, v) => handleProductsChange(v)}
+              getOptionDisabled={(o) => products.length >= SOCIAL_MAX_PRODUCTS && !products.some((p) => p.id === o.id)}
+              filterSelectedOptions
+              limitTags={3}
               inputValue={productQuery}
               onInputChange={(_, v) => setProductQuery(v)}
               getOptionLabel={(o) => o.name}
@@ -269,7 +296,20 @@ export function SocialPostForm({ post }: Props) {
                   </Stack>
                 </li>
               )}
-              renderInput={(params) => <TextField {...params} label="Sản phẩm (đang bán online)" placeholder="Gõ tên sản phẩm…" />}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Sản phẩm (đang bán online)"
+                  placeholder={products.length >= SOCIAL_MAX_PRODUCTS ? '' : 'Gõ tên sản phẩm…'}
+                  helperText={
+                    products.length === 0 && productIds.length > 0
+                      ? `Bài đang gắn ${productIds.length} sản phẩm — chọn lại nếu muốn AI viết theo sản phẩm khác.`
+                      : products.length > 1
+                        ? `AI viết một bài cho ${products.length} sản phẩm, gắn link ${Math.min(products.length, 3)} sản phẩm đầu.`
+                        : undefined
+                  }
+                />
+              )}
             />
             <TextField
               label="Ý muốn nói thêm"
@@ -281,15 +321,15 @@ export function SocialPostForm({ post }: Props) {
               minRows={2}
             />
             <Stack direction="row" justifyContent="flex-end" spacing={1}>
-              {product?.imageUrl && (
+              {productImages.length > 0 && (
                 <Button
                   variant="outlined"
                   color="inherit"
-                  disabled={busy || images.includes(product.imageUrl) || images.length >= SOCIAL_MAX_IMAGES}
+                  disabled={busy || images.length >= SOCIAL_MAX_IMAGES}
                   startIcon={<Iconify icon="solar:gallery-add-bold-duotone" />}
-                  onClick={addProductImage}
+                  onClick={addProductImages}
                 >
-                  Dùng ảnh sản phẩm
+                  {productImages.length > 1 ? `Dùng ${productImages.length} ảnh sản phẩm` : 'Dùng ảnh sản phẩm'}
                 </Button>
               )}
               <LoadingButton
@@ -465,7 +505,7 @@ export function SocialPostForm({ post }: Props) {
       {studioUrl && (
         <SocialImageStudioDialog
           sourceUrl={studioUrl}
-          productId={productId ?? product?.id ?? null}
+          productId={studioProductId}
           aiEnabled={!!ai?.enabled}
           canAdd={images.length < SOCIAL_MAX_IMAGES}
           onClose={() => setStudioUrl(null)}
