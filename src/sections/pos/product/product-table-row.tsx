@@ -30,6 +30,7 @@ import { IProduct, IProductChild, IProductListItem, IProductInventory, IProductA
 import { getProductById } from 'src/api/products';
 import { fCurrency, fNumber } from 'src/utils/format-number';
 import { useProductAccess } from './product-access';
+import { ProductImagesDialog } from './product-images/product-images-dialog';
 import { ColumnKey } from './view/product-list-view';
 
 // ----------------------------------------------------------------------
@@ -564,6 +565,9 @@ function ProductExpandedDetail({
   const [tab, setTab] = useState(0);
   // Theo quyền products.* — máy quầy chỉ xem hàng + in tem (server cũng chặn).
   const access = useProductAccess();
+  // Ảnh sản phẩm (bộ ảnh bán online + AI tạo ảnh) — sửa được cả hàng KiotViet.
+  const [imagesOpen, setImagesOpen] = useState(false);
+  const [savedCover, setSavedCover] = useState<string | null | undefined>(undefined);
 
   const {
     name, code, barCode, categoryName, description,
@@ -572,7 +576,7 @@ function ProductExpandedDetail({
     attributes, inventories,
   } = row;
 
-  const imageUrl = getFirstImageUrl(row);
+  const imageUrl = savedCover !== undefined ? savedCover ?? undefined : getFirstImageUrl(row);
   const totalStock = getTotalStock(row);
   const typeInfo = PRODUCT_TYPE_MAP[productType] || PRODUCT_TYPE_MAP[2];
 
@@ -601,7 +605,14 @@ function ProductExpandedDetail({
             <Avatar
               variant="rounded"
               src={imageUrl}
-              sx={{ width: 64, height: 64, bgcolor: 'primary.lighter', color: 'primary.main' }}
+              onClick={access.canUpdate ? () => setImagesOpen(true) : undefined}
+              sx={{
+                width: 64,
+                height: 64,
+                bgcolor: 'primary.lighter',
+                color: 'primary.main',
+                cursor: access.canUpdate ? 'pointer' : undefined,
+              }}
             >
               <Iconify icon="solar:gallery-bold" width={32} />
             </Avatar>
@@ -744,6 +755,16 @@ function ProductExpandedDetail({
         <Box sx={{ flex: 1 }} />
 
         {access.canUpdate && (
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<Iconify icon="solar:gallery-edit-bold" width={18} />}
+            onClick={() => setImagesOpen(true)}
+          >
+            Ảnh &amp; bán online
+          </Button>
+        )}
+        {access.canUpdate && (
           <Button size="small" variant="contained" startIcon={<Iconify icon="solar:pen-bold" width={18} />} onClick={() => onEdit(row.id)}>
             Chỉnh sửa
           </Button>
@@ -757,6 +778,14 @@ function ProductExpandedDetail({
           </Button>
         )}
       </Stack>
+
+      {imagesOpen && (
+        <ProductImagesDialog
+          productId={row.id}
+          onClose={() => setImagesOpen(false)}
+          onSaved={(images) => setSavedCover(images[0] ?? null)}
+        />
+      )}
     </Box>
   );
 }

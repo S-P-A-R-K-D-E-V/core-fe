@@ -22,6 +22,7 @@ const api = vi.hoisted(() => ({
   writeSocialCaption: vi.fn(),
   frameSocialImage: vi.fn(),
   generateSocialImage: vi.fn(),
+  analyzeSocialImage: vi.fn(),
 }));
 
 vi.mock('src/api/social', () => ({
@@ -31,11 +32,13 @@ vi.mock('src/api/social', () => ({
   writeSocialCaption: (...a: any[]) => api.writeSocialCaption(...a),
   frameSocialImage: (...a: any[]) => api.frameSocialImage(...a),
   generateSocialImage: (...a: any[]) => api.generateSocialImage(...a),
+  analyzeSocialImage: (...a: any[]) => api.analyzeSocialImage(...a),
   useSocialImageCatalog: () => ({
     items: [
-      { id: 'studio', label: 'Nền studio pastel', group: 'product', hint: '' },
-      { id: 'hair-bun', label: 'Búi thấp', group: 'hair', hint: '' },
+      { id: 'studio', label: 'Nền studio pastel', group: 'studio', hint: '' },
+      { id: 'hair-bun', label: 'Búi thấp', group: 'lifestyle', hint: '' },
     ],
+    tags: [],
     backgrounds: [
       { id: 'pink', label: 'Hồng pastel', color: '#FBE4EA' },
       { id: 'mint', label: 'Xanh bạc hà', color: '#E2F3EC' },
@@ -225,7 +228,20 @@ describe('SocialPostForm', () => {
     expect(srcs).toEqual(expect.arrayContaining(['https://cdn.test/kep.jpg', 'https://cdn.test/frame-1.jpg']));
   });
 
-  it('Studio ảnh — AI vẽ lại: gửi kiểu + ghi chú, cảnh báo so sánh, thay ảnh gốc', async () => {
+  it('Studio ảnh — AI vẽ lại: phân tích ảnh, gửi gợi ý + tag + ghi chú, cảnh báo so sánh, thay ảnh gốc', async () => {
+    api.analyzeSocialImage.mockResolvedValue({
+      category: 'Kẹp tóc',
+      kind: 'hair_accessory',
+      sensitive: false,
+      summary: null,
+      fallback: false,
+      presets: [
+        { id: 'white', label: 'Nền trắng', group: 'studio', hint: '' },
+        { id: 'hair-side', label: 'Cài bên tai', group: 'lifestyle', hint: '' },
+        { id: 'hair-bun', label: 'Búi thấp', group: 'lifestyle', hint: '' },
+      ],
+      tags: [{ id: 'soft-light', label: 'Ánh sáng mềm' }],
+    });
     api.generateSocialImage.mockResolvedValue({
       url: 'https://cdn.test/ai-1.jpg',
       sourceUrl: 'https://cdn.test/kep.jpg',
@@ -234,14 +250,18 @@ describe('SocialPostForm', () => {
     });
     await withImage();
     await userEvent.click(screen.getByRole('button', { name: 'AI vẽ lại' }));
+    expect(await screen.findByText('Kẹp tóc')).toBeInTheDocument();
+    expect(api.analyzeSocialImage).toHaveBeenCalledWith({ sourceUrl: 'https://cdn.test/kep.jpg', productId: null });
     await userEvent.click(screen.getByRole('button', { name: 'Búi thấp' }));
-    await userEvent.type(screen.getByLabelText('Ghi chú cho AI (không bắt buộc)'), 'kẹp hồng');
+    await userEvent.click(screen.getByRole('button', { name: 'Ánh sáng mềm' }));
+    await userEvent.type(screen.getByLabelText('Prompt thêm cho AI (không bắt buộc)'), 'kẹp hồng');
     await userEvent.click(screen.getByRole('button', { name: 'Tạo ảnh' }));
     await waitFor(() =>
       expect(api.generateSocialImage).toHaveBeenCalledWith({
         sourceUrl: 'https://cdn.test/kep.jpg',
         productId: null,
-        style: 'hair-bun',
+        preset: 'hair-bun',
+        tags: ['soft-light'],
         note: 'kẹp hồng',
       })
     );
