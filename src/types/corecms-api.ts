@@ -1218,6 +1218,8 @@ export interface IStatutoryPaySettings {
   updatedAt: string | null;
   /** Cửa hàng có phụ cấp làm đêm 22:00–06:00 hay không (backend cũ không gửi = không có). CiCi không có. */
   nightPremiumEnabled?: boolean;
+  /** Có phụ cấp làm thêm giờ ngày thường (150%) hay không (backend cũ không gửi = có). CiCi không có. */
+  overtimePremiumEnabled?: boolean;
 }
 
 /** Trả thưởng doanh số tuần vào lương từ tuần (thứ Hai) này; null = chỉ tính thử. */

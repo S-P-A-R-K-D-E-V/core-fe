@@ -54,13 +54,16 @@ export async function getStatutoryPaySettings(): Promise<IStatutoryPaySettings> 
   return response.data;
 }
 
+/** `overtimePremiumEnabled` bỏ trống = giữ nguyên cờ phụ cấp làm thêm giờ. */
 export async function updateStatutoryPaySettings(
   statutoryPayFrom: string | null,
-  normalHoursPerDay: number | null
+  normalHoursPerDay: number | null,
+  overtimePremiumEnabled?: boolean
 ): Promise<IStatutoryPaySettings> {
   const response = await axios.put<IStatutoryPaySettings>(endpoints.holidayPolicy.statutoryPay, {
     statutoryPayFrom,
     normalHoursPerDay,
+    ...(overtimePremiumEnabled === undefined ? {} : { overtimePremiumEnabled }),
   });
   return response.data;
 }
