@@ -39,6 +39,8 @@ export type OutboxEntry = {
   lastError?: string;
   serverId?: string;
   sentAt?: string;
+  /** Mã tạm in trên phiếu khi hoá đơn nằm chờ ("Q7-261112-003", pos-device.ts) — cũng ghi vào ghi chú hoá đơn. */
+  offlineCode?: string;
 };
 
 export const SENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;

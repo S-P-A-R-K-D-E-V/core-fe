@@ -53,6 +53,8 @@ import {
 } from './receipt-settings';
 
 import type { ReceiptPaperWidth } from './receipt-html';
+
+import { loadPrintKit, savePrintKit, rememberReceiptForKit } from '../offline/pos-print-kit';
 import type { ReceiptPrintSettings } from './receipt-settings';
 
 // ----------------------------------------------------------------------
@@ -84,25 +86,57 @@ type Props = {
   onClose: VoidFunction;
   /** Id (Guid) của hoá đơn cần in. */
   orderId: string | null;
+  /**
+   * Phiếu dựng sẵn tại máy (hoá đơn bán lúc mất mạng, chưa có trên máy chủ — offline-receipt.ts): in thẳng phiếu này,
+   * không tải từ máy chủ. Có thì bỏ qua `orderId`.
+   */
+  localReceipt?: ISalesOrderReceipt | null;
+  /** Phiếu sẵn sàng thì tự mở hộp thoại in của trình duyệt (tuỳ chọn "Tự in sau khi bán"). */
+  autoPrint?: boolean;
 };
 
-export default function ReceiptPrintDialog({ open, onClose, orderId }: Props) {
-  // Giữ id của lần mở gần nhất: nơi gọi thường đặt orderId về null khi đóng, mà nội dung phải còn đó
+type Shown = { key: string; orderId: string | null; localReceipt: ISalesOrderReceipt | null };
+
+export default function ReceiptPrintDialog({ open, onClose, orderId, localReceipt = null, autoPrint = false }: Props) {
+  // Giữ phiếu của lần mở gần nhất: nơi gọi thường đặt orderId về null khi đóng, mà nội dung phải còn đó
   // trong lúc hộp thoại mờ dần.
-  const [shownId, setShownId] = useState(orderId);
-  if (orderId && orderId !== shownId) setShownId(orderId);
+  const wanted: Shown | null = localReceipt
+    ? { key: `local:${localReceipt.invoice.id}`, orderId: null, localReceipt }
+    : orderId
+      ? { key: orderId, orderId, localReceipt: null }
+      : null;
+  const [shown, setShown] = useState<Shown | null>(wanted);
+  if (wanted && wanted.key !== shown?.key) setShown(wanted);
 
   // Nội dung chỉ được dựng khi hộp thoại mở → mỗi lần mở (hay đổi hoá đơn) là một lần tải phiếu mới.
   return (
-    <Dialog open={open && !!orderId} onClose={onClose} maxWidth="sm" fullWidth>
-      {shownId && <ReceiptPrintContent key={shownId} orderId={shownId} onClose={onClose} />}
+    <Dialog open={open && !!wanted} onClose={onClose} maxWidth="sm" fullWidth>
+      {shown && (
+        <ReceiptPrintContent
+          key={shown.key}
+          orderId={shown.orderId}
+          localReceipt={shown.localReceipt}
+          autoPrint={autoPrint}
+          onClose={onClose}
+        />
+      )}
     </Dialog>
   );
 }
 
 // ----------------------------------------------------------------------
 
-function ReceiptPrintContent({ orderId, onClose }: { orderId: string; onClose: VoidFunction }) {
+function ReceiptPrintContent({
+  orderId,
+  localReceipt,
+  autoPrint,
+  onClose,
+}: {
+  orderId: string | null;
+  localReceipt: ISalesOrderReceipt | null;
+  autoPrint: boolean;
+  onClose: VoidFunction;
+}) {
   const { enqueueSnackbar } = useSnackbar();
 
   const [settings, setSettings] = useState<ReceiptPrintSettings>(loadReceiptSettings);
@@ -133,17 +167,33 @@ function ReceiptPrintContent({ orderId, onClose }: { orderId: string; onClose: V
 
   useEffect(() => {
     let active = true;
+    if (localReceipt) {
+      // Phiếu tạm (mất mạng): dùng thẳng mẫu đã lưu — mạng treo thì gọi API có thể chờ rất lâu trước khi lỗi.
+      loadPrintKit()
+        .then((kit) => {
+          if (active) setTemplates(kit.templates ?? NO_TEMPLATES);
+        })
+        .catch(() => {
+          if (active) setTemplates(NO_TEMPLATES);
+        });
+      return () => {
+        active = false;
+      };
+    }
     getPrintTemplates('receipt')
       .then((list) => {
         if (active) setTemplates(list);
+        savePrintKit({ templates: list }).catch(() => {});
       })
-      .catch(() => {
-        if (active) setTemplates(NO_TEMPLATES);
+      .catch(async () => {
+        // Mất mạng: dùng mẫu in đã lưu trên máy; chưa từng lưu thì mẫu hệ thống.
+        const kit = await loadPrintKit().catch(() => null);
+        if (active) setTemplates(kit?.templates ?? NO_TEMPLATES);
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [localReceipt]);
 
   useEffect(() => {
     let active = true;
@@ -151,8 +201,19 @@ function ReceiptPrintContent({ orderId, onClose }: { orderId: string; onClose: V
     (async () => {
       setLoading(true);
       setError(null);
+      if (localReceipt) {
+        setBaseReceipt(localReceipt);
+        setReceipt(localReceipt);
+        setAccounts([]);
+        setAccountId('');
+        setLoading(false);
+        return;
+      }
+      if (!orderId) return;
       try {
         const base = await getSalesOrderReceipt(orderId);
+        // Nhớ thông tin cửa hàng / lời chào để in phiếu khi mất mạng.
+        rememberReceiptForKit(base).catch(() => {});
         let current = base;
         let usable: IKiotVietBankAccount[] = [];
         let picked = '';
@@ -191,12 +252,12 @@ function ReceiptPrintContent({ orderId, onClose }: { orderId: string; onClose: V
     return () => {
       active = false;
     };
-  }, [orderId, reloadCount]);
+  }, [orderId, localReceipt, reloadCount]);
 
   const changeSettings = (patch: Partial<ReceiptPrintSettings>) => {
-    const next = { ...settings, ...patch };
-    setSettings(next);
-    saveReceiptSettings(next);
+    setSettings({ ...settings, ...patch });
+    // Gộp với bản đang lưu (vd "Tự in sau khi bán" đổi ở màn bán hàng trong lúc hộp thoại mở).
+    saveReceiptSettings({ ...loadReceiptSettings(), ...patch });
   };
 
   const handlePickAccount = async (id: string) => {
@@ -212,6 +273,7 @@ function ReceiptPrintContent({ orderId, onClose }: { orderId: string; onClose: V
       return;
     }
 
+    if (!orderId) return;
     setAccountLoading(true);
     try {
       const withQr = await getSalesOrderReceipt(orderId, id);
@@ -299,12 +361,23 @@ function ReceiptPrintContent({ orderId, onClose }: { orderId: string; onClose: V
     });
   };
 
+  // "Tự in sau khi bán": phiếu sẵn sàng → mở hộp thoại in một lần.
+  const autoPrintedRef = useRef(false);
+  useEffect(() => {
+    if (!autoPrint || !canPrint || autoPrintedRef.current) return;
+    autoPrintedRef.current = true;
+    handlePrint();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPrint, canPrint]);
+
   const previewTitle = 'Xem trước phiếu thanh toán';
 
   return (
     <>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        {receipt ? `In hoá đơn ${receipt.invoice.code}` : 'In hoá đơn'}
+        {receipt
+          ? `${localReceipt ? 'In phiếu tạm' : 'In hoá đơn'} ${receipt.invoice.code}`
+          : 'In hoá đơn'}
         <IconButton onClick={onClose} size="small" aria-label="Đóng hộp thoại">
           <Iconify icon="mingcute:close-line" />
         </IconButton>
@@ -312,6 +385,12 @@ function ReceiptPrintContent({ orderId, onClose }: { orderId: string; onClose: V
 
       <DialogContent dividers>
         <Stack spacing={2}>
+          {localReceipt && (
+            <Alert severity="info">
+              Hoá đơn chưa lên hệ thống (bán lúc mất mạng) — in phiếu tạm mã <strong>{localReceipt.invoice.code}</strong>.
+              Mã hoá đơn chính thức cấp khi đồng bộ; tra lại theo mã tạm ở Đơn bán hàng.
+            </Alert>
+          )}
           {(templates?.templates.length ?? 0) > 0 && (
             <TextField
               select

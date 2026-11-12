@@ -16,11 +16,14 @@ export type ReceiptPrintSettings = {
   paperWidth: ReceiptPaperWidth;
   /** Tài khoản nhận chọn lần gần nhất cho mã QR (id của GET /bank-accounts); null = chưa chọn. */
   bankAccountId: string | null;
+  /** Màn bán hàng: bán xong tự mở hộp thoại in (cả phiếu tạm khi mất mạng). */
+  autoPrint: boolean;
 };
 
 export const DEFAULT_RECEIPT_SETTINGS: ReceiptPrintSettings = {
   paperWidth: DEFAULT_RECEIPT_PAPER_WIDTH,
   bankAccountId: null,
+  autoPrint: false,
 };
 
 type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -41,6 +44,7 @@ export function normalizeReceiptSettings(input: unknown): ReceiptPrintSettings {
       : DEFAULT_RECEIPT_SETTINGS.paperWidth,
     bankAccountId:
       typeof raw.bankAccountId === 'string' && raw.bankAccountId ? raw.bankAccountId : null,
+    autoPrint: raw.autoPrint === true,
   };
 }
 
