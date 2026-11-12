@@ -68,7 +68,12 @@ export default function DashboardLayout({ children }: Props) {
   const counterSession = useCounterSession();
   // Trang Chatbot nội bộ đã có khung chat nằm trong trang — không mở thêm khung nổi (hai kết nối cùng một phiên).
   const pathname = usePathname();
-  const showChatbotWidget = !counterSession && !pathname.startsWith(paths.dashboard.chatbotAdmin);
+  // Màn bán hàng phủ kín màn hình: nút chat nổi đè lên nút THANH TOÁN ở góc phải dưới — không hiện ở đó.
+  const showChatbotWidget =
+    !counterSession &&
+    !pathname.startsWith(paths.dashboard.chatbotAdmin) &&
+    // So đúng đoạn đường dẫn: /dashboard/pos/sales-order cũng bắt đầu bằng "/dashboard/pos/sale".
+    pathname.replace(/\/$/, '') !== paths.dashboard.pos.sale.root;
 
   // Safety net: re-sync role/permissions from JWT + server on first dashboard mount.
   // Catches cases where login (especially Google OAuth redirect) left stale auth state.

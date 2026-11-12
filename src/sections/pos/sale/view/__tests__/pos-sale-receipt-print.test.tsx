@@ -72,9 +72,11 @@ vi.mock('src/api/warehouses', () => ({
 
 const createSalesOrder = vi.fn();
 const getSalesOrderReceipt = vi.fn();
+const getAllSalesOrders = vi.fn();
 vi.mock('src/api/sales-orders', () => ({
   createSalesOrder: (...args: any[]) => createSalesOrder(...args),
   getSalesOrderReceipt: (...args: any[]) => getSalesOrderReceipt(...args),
+  getAllSalesOrders: (...args: any[]) => getAllSalesOrders(...args),
 }));
 
 vi.mock('src/api/bank-accounts', () => ({
@@ -99,8 +101,7 @@ import PosSaleView from '../pos-sale-view';
 
 const SALE_ID = '3f0c1c1e-6c0d-4a53-9d0e-2a5b8a1f4c11';
 
-const NOT_YET = 'In hoá đơn (chưa có hoá đơn vừa bán)';
-const READY = 'In hoá đơn vừa bán';
+const PRINT = 'In lại hoá đơn';
 
 const renderView = () =>
   render(
@@ -132,6 +133,7 @@ beforeEach(() => {
   window.localStorage.clear();
   createSalesOrder.mockResolvedValue({ id: SALE_ID, kiotVietSyncStatus: 'NotPushed' });
   getSalesOrderReceipt.mockResolvedValue(normalReceipt());
+  getAllSalesOrders.mockResolvedValue({ items: [], totalCount: 0, pageNumber: 1, pageSize: 8, totalPages: 0 });
 });
 
 afterEach(() => {
@@ -139,49 +141,65 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-describe('PosSaleView — nút máy in', () => {
-  it('chưa bán hoá đơn nào: bấm nút chỉ nhắc, không mở hộp thoại in', async () => {
+describe('PosSaleView — nút máy in (in lại hoá đơn gần đây)', () => {
+  it('chưa có hoá đơn nào: menu báo trống, không mở hộp thoại in', async () => {
     const user = userEvent.setup({ delay: null });
     renderView();
     await openProductGrid(user);
 
-    await user.click(screen.getByRole('button', { name: NOT_YET }));
+    await user.click(screen.getByRole('button', { name: PRINT }));
 
-    expect(snackbar.enqueueSnackbar).toHaveBeenCalledWith(
-      'Chưa có hoá đơn vừa bán để in. Hoá đơn cũ in ở trang Đơn bán hàng.',
-      { variant: 'info' }
-    );
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await screen.findByText('Chưa có hoá đơn nào.')).toBeInTheDocument();
+    expect(getAllSalesOrders).toHaveBeenCalledWith({ pageNumber: 1, pageSize: 8 });
     expect(getSalesOrderReceipt).not.toHaveBeenCalled();
   });
 
-  it('bán xong KHÔNG tự in; bấm nút máy in thì mở phiếu của đúng hoá đơn vừa tạo và in được', async () => {
+  it('bán xong KHÔNG tự in; menu in lại liệt kê hoá đơn gần đây, chọn một hoá đơn thì in đúng hoá đơn đó', async () => {
     const user = userEvent.setup({ delay: null });
     renderView();
 
     await sellOne(user);
-
-    // tạo hoá đơn xong: chưa có lệnh in nào, chưa tải phiếu
-    const printer = await screen.findByRole('button', { name: READY });
-    expect(screen.queryByRole('button', { name: NOT_YET })).not.toBeInTheDocument();
     expect(getSalesOrderReceipt).not.toHaveBeenCalled();
     expect(printHtmlDocument).not.toHaveBeenCalled();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-    await user.click(printer);
+    getAllSalesOrders.mockResolvedValue({
+      items: [
+        { id: SALE_ID, orderNumber: 'HD-20261112-0042', totalAmount: 35000, createdAt: new Date().toISOString() },
+      ],
+      totalCount: 1,
+      pageNumber: 1,
+      pageSize: 8,
+      totalPages: 1,
+    });
+    await user.click(screen.getByRole('button', { name: PRINT }));
+    await user.click(await screen.findByRole('menuitem', { name: /HD-20261112-0042/ }));
 
     const dialog = await screen.findByRole('dialog');
     const frame = await within(dialog).findByTitle('Xem trước phiếu thanh toán');
-    expect(getSalesOrderReceipt).toHaveBeenCalledTimes(1);
     expect(getSalesOrderReceipt).toHaveBeenCalledWith(SALE_ID);
 
     await user.click(within(dialog).getByRole('button', { name: 'In hoá đơn' }));
     expect(printHtmlDocument).toHaveBeenCalledWith(frame.getAttribute('srcdoc'));
   });
 
-  it('tạo hoá đơn lỗi thì nút máy in vẫn ở trạng thái chưa có hoá đơn', async () => {
+  it('không tải được danh sách (mất mạng): menu dùng hoá đơn vừa bán trên máy này', async () => {
     const user = userEvent.setup({ delay: null });
-    createSalesOrder.mockRejectedValue({ title: 'Không đủ tồn kho' });
+    getAllSalesOrders.mockRejectedValue('Something went wrong');
+    renderView();
+
+    await sellOne(user);
+    await user.click(screen.getByRole('button', { name: PRINT }));
+    expect(await screen.findByText(/hoá đơn vừa bán trên máy này/)).toBeInTheDocument();
+    await user.click(await screen.findByRole('menuitem', { name: /Vừa bán/ }));
+
+    await screen.findByRole('dialog');
+    await waitFor(() => expect(getSalesOrderReceipt).toHaveBeenCalledWith(SALE_ID));
+  });
+
+  it('tạo hoá đơn bị máy chủ từ chối thì không có trong danh sách in lại trên máy', async () => {
+    const user = userEvent.setup({ delay: null });
+    createSalesOrder.mockRejectedValue({ status: 400, title: 'Không đủ tồn kho' });
+    getAllSalesOrders.mockRejectedValue('Something went wrong');
     renderView();
 
     await sellOne(user);
@@ -191,7 +209,7 @@ describe('PosSaleView — nút máy in', () => {
         variant: 'error',
       })
     );
-    expect(screen.getByRole('button', { name: NOT_YET })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: READY })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: PRINT }));
+    expect(await screen.findByText('Chưa có hoá đơn nào.')).toBeInTheDocument();
   });
 });

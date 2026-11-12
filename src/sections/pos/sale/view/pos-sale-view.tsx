@@ -14,10 +14,6 @@ import Autocomplete from '@mui/material/Autocomplete';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Chip from '@mui/material/Chip';
-import Badge from '@mui/material/Badge';
-import Card from '@mui/material/Card';
-import Grid from '@mui/material/Grid2';
-import Paper from '@mui/material/Paper';
 import Tooltip from '@mui/material/Tooltip';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -25,8 +21,9 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
-import Radio from '@mui/material/Radio';
-import FormControlLabel from '@mui/material/FormControlLabel';
+import ButtonBase from '@mui/material/ButtonBase';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import CircularProgress from '@mui/material/CircularProgress';
 import Avatar from '@mui/material/Avatar';
 import AppBar from '@mui/material/AppBar';
@@ -36,7 +33,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 
-import { alpha, useTheme } from '@mui/material/styles';
+import { alpha, darken, lighten, useTheme, ThemeProvider, type Theme } from '@mui/material/styles';
 
 import Iconify from 'src/components/iconify';
 import { allowedPosMethods, usePosPaymentMethods } from 'src/components/payment-connection-select';
@@ -45,10 +42,15 @@ import { fCurrency } from 'src/utils/format-number';
 import { qrTransactionRef } from 'src/utils/payment-status';
 import { salesOrderCreatedMessage } from 'src/utils/kiotviet-sync-status';
 import { useAuthContext } from 'src/auth/hooks';
-import { paths } from 'src/routes/paths';
-import { RouterLink } from 'src/routes/components';
 
-import { IProduct, IProductListItem, IProductChild, ICustomer, IWarehouse } from 'src/types/corecms-api';
+import {
+  IProduct,
+  IProductListItem,
+  IProductChild,
+  ICustomer,
+  IWarehouse,
+  ICreateSalesOrderRequest,
+} from 'src/types/corecms-api';
 import { getAllProducts } from 'src/api/products';
 import { getAllCustomers } from 'src/api/customers';
 import { getAllWarehouses } from 'src/api/warehouses';
@@ -62,8 +64,32 @@ import PosVariantPickerDrawer from '../pos-variant-picker-drawer';
 import PosPaymentDrawer, { PaymentLine } from '../pos-payment-drawer';
 import PosQrPayment from '../pos-qr-payment';
 import PosQtyInput from '../pos-qty-input';
-import { findScannedProduct } from '../pos-sale-utils';
+import { newId } from 'src/sections/fnb-pos/lib/ids';
+
+import {
+  clampOrderDiscount,
+  findScannedProduct,
+  isDefinitiveRejection,
+  percentDiscount,
+  quickCashAmounts,
+  saleFingerprint,
+  saleRequestFor,
+  settlePayments,
+  type PendingSaleRequest,
+} from '../pos-sale-utils';
 import { useWorkingBranch } from 'src/store/working-branch-store';
+import { useStoreBrand } from 'src/components/branding';
+
+import {
+  addPendingSale,
+  describeSaleError,
+  removePendingSale,
+  rememberRecentSale,
+  syncPendingSales,
+  usePendingSales,
+  type PendingSale,
+} from '../pos-pending-sales';
+import { PosManageMenu, PosSyncButton, PosRecentSalesButton } from '../pos-top-bar-actions';
 import { useCustomerDisplaySync } from 'src/sections/customer-display/use-customer-display-sync';
 import {
   customerDisplay,
@@ -100,7 +126,12 @@ interface DraftOrder {
   items: CartItem[];
   note: string;
   discountAmount: number;
+  /** Ô giảm giá hoá đơn đang nhập theo tiền hay %; % thì tiền giảm tính lại khi tổng tiền hàng đổi. */
+  discountMode?: 'amount' | 'percent';
+  discountPercent?: number;
   couponCode: string;
+  /** Mã chống trùng của lần gửi gần nhất (lưu cùng đơn tạm — tải lại trang vẫn gửi lại đúng mã). */
+  pendingRequest?: PendingSaleRequest;
 }
 
 // ======================================================================
@@ -108,6 +139,12 @@ interface DraftOrder {
 // ======================================================================
 
 const POS_DRAFT_ORDERS_KEY = 'pos_draft_orders';
+
+/** Cột phụ của bảng giỏ hàng (STT, thao tác) ẩn trên điện thoại. */
+const HIDE_ON_PHONE = { xs: 'none', sm: 'table-cell' };
+
+/** Bề rộng chung của ô nhập bên cột phải (giảm giá, coupon) — các ô thẳng hàng. */
+const DISCOUNT_FIELD_WIDTH = 120;
 
 interface DraftOrdersCache {
   orders: DraftOrder[];
@@ -171,15 +208,66 @@ const POS_SALE_METHODS = [
 // Main Component
 // ======================================================================
 
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+/** Màu chính của theme đổi thành màu cửa hàng — mọi nút / ô chọn / tab của màn bán hàng cùng một tông. */
+function brandTheme(outer: Theme, brand: string): Theme {
+  const primary = {
+    ...outer.palette.primary,
+    lighter: lighten(brand, 0.8),
+    light: lighten(brand, 0.3),
+    main: brand,
+    dark: darken(brand, 0.25),
+    darker: darken(brand, 0.5),
+    contrastText: outer.palette.getContrastText(brand),
+  };
+  return { ...outer, palette: { ...outer.palette, primary } };
+}
+
+/**
+ * Màn bán hàng theo màu cửa hàng (Cài đặt cửa hàng → Thương hiệu → màu chính). Chưa đặt / sai định dạng thì giữ màu
+ * chính của giao diện.
+ */
 export default function PosSaleView() {
+  const { primaryColor } = useStoreBrand();
+  const brand = primaryColor && HEX_COLOR.test(primaryColor) ? primaryColor : null;
+  if (!brand) return <PosSaleScreen />;
+  return (
+    <ThemeProvider theme={(outer: Theme) => brandTheme(outer, brand)}>
+      <PosSaleScreen />
+    </ThemeProvider>
+  );
+}
+
+function PosSaleScreen() {
   const theme = useTheme();
-  const { enqueueSnackbar } = useSnackbar();
+  const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const { user } = useAuthContext();
   const sellerName = user ? `${user.lastName || ''} ${user.firstName || ''}`.trim() || user.email : 'Admin';
+
+  // Thanh trên cùng theo màu chính — PosSaleView đã đặt màu chính = màu cửa hàng cho cả màn bán hàng.
+  const barColor = theme.palette.primary.main;
+  const barFg = theme.palette.primary.contrastText;
+
+  // Trạng thái mạng của trình duyệt — báo "Mất mạng" trên thanh trên và tự đồng bộ hoá đơn chờ khi có mạng lại.
+  const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
 
   // Restore dialog
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   const [cachedData, setCachedData] = useState<DraftOrdersCache | null>(null);
+  // Chưa quyết định khôi phục đơn tạm → KHÔNG ghi / xoá bộ nhớ: trước đây lúc mở màn (giỏ trống) hiệu ứng đồng bộ xoá
+  // ngay đơn tạm đã lưu trong khi hộp "Khôi phục" còn đang hỏi — tải lại trang / mất điện lần nữa là mất đơn.
+  const [draftsHydrated, setDraftsHydrated] = useState(false);
 
   // Data
   const [products, setProducts] = useState<IProductListItem[]>([]);
@@ -239,9 +327,9 @@ export default function PosSaleView() {
   }, [firstPosMethod, posMethods.length]);
   const [quickMethodAmounts, setQuickMethodAmounts] = useState<Record<string, number>>({});
   const [quickMethodRefs, setQuickMethodRefs] = useState<Record<string, string>>({});
-  const [quickCustomerPayment, setQuickCustomerPayment] = useState<number>(0);
-  const [quickDiscountMode, setQuickDiscountMode] = useState<'amount' | 'percent'>('amount');
-  const [quickDiscountInput, setQuickDiscountInput] = useState<string>('');
+  // Thu ngân đã tự nhập tiền khách đưa → không tự ghi đè bằng số cần trả khi đổi giảm giá / số lượng nữa.
+  const [quickPaymentTouched, setQuickPaymentTouched] = useState(false);
+  const quickPaymentOrderRef = useRef<number | null>(null);
   const [quickPaymentLoading, setQuickPaymentLoading] = useState(false);
   const [quickQrPaymentCompleted, setQuickQrPaymentCompleted] = useState(false);
 
@@ -264,8 +352,10 @@ export default function PosSaleView() {
       if (hasItems) {
         setCachedData(cached);
         setRestoreDialogOpen(true);
+        return;
       }
     }
+    setDraftsHydrated(true);
   }, []);
 
   // Handle restore/discard cached orders
@@ -279,24 +369,25 @@ export default function PosSaleView() {
       enqueueSnackbar(`Đã khôi phục ${restored.length} đơn hàng tạm`, { variant: 'info' });
     }
     setRestoreDialogOpen(false);
-    setCachedData(null);
+    setDraftsHydrated(true);
   }, [cachedData, enqueueSnackbar]);
 
   const handleDiscardDrafts = useCallback(() => {
     clearDraftsFromStorage();
     setRestoreDialogOpen(false);
-    setCachedData(null);
+    setDraftsHydrated(true);
   }, []);
 
-  // Sync orders to localStorage whenever orders change
+  // Sync orders to localStorage whenever orders change (chỉ sau khi đã khôi phục / bỏ đơn tạm cũ)
   useEffect(() => {
+    if (!draftsHydrated) return;
     const hasItems = orders.some((o) => o.items.length > 0);
     if (hasItems) {
       saveDraftsToStorage(orders, orderCounterRef.current, selectedWarehouse?.id);
     } else {
       clearDraftsFromStorage();
     }
-  }, [orders, selectedWarehouse?.id]);
+  }, [orders, selectedWarehouse?.id, draftsHydrated]);
 
   // Load initial data
   useEffect(() => {
@@ -318,7 +409,15 @@ export default function PosSaleView() {
           setSelectedWarehouse(cachedWh || w.find((wh) => wh.isActive) || w[0]);
         }
       })
-      .catch(console.error);
+      .catch((err) => {
+        // Trước đây chỉ ghi console → mất mạng lúc mở màn thì màn trống, thu ngân không biết vì sao.
+        console.error(err);
+        enqueueSnackbar('Không tải được hàng hoá / khách hàng / kho. Kiểm tra mạng rồi bấm nút Tải lại (↻).', {
+          variant: 'error',
+          persist: true,
+        });
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Search products with debounce
@@ -453,6 +552,23 @@ export default function PosSaleView() {
     [activeId]
   );
 
+  // Tồn trên hệ thống chỉ để cảnh báo, KHÔNG chặn bán: CiCi để KiotViet giữ tồn (tồn ở đây là bản đồng bộ, có thể cũ),
+  // máy chủ cũng cho bán âm. Trước đây hàng có thật trên kệ mà tồn hệ thống ≤ 0 thì không thêm vào giỏ được.
+  // Chỉ báo lúc số lượng vừa vượt tồn (không báo lại mỗi lần bấm +).
+  const warnOverStock = useCallback(
+    (name: string, fromQty: number, toQty: number, stock: number) => {
+      if (toQty > stock && fromQty <= stock) {
+        enqueueSnackbar(
+          stock > 0
+            ? `${name}: bán vượt tồn trên hệ thống (Tồn: ${stock}) — kiểm tra hàng thực tế`
+            : `${name}: hệ thống ghi hết hàng — vẫn bán được nếu có hàng thực tế`,
+          { variant: 'warning' }
+        );
+      }
+    },
+    [enqueueSnackbar]
+  );
+
   const handleAddProduct = useCallback(
     (product: IProductListItem) => {
       // Only open variant picker if product actually has child products/variants
@@ -475,20 +591,12 @@ export default function PosSaleView() {
         const existingIdx = order.items.findIndex((item) => item.productId === product.id && !item.productVariantId);
         if (existingIdx >= 0) {
           const existing = order.items[existingIdx];
-          if (existing.quantity + 1 > stock) {
-            enqueueSnackbar(`Sản phẩm ${product.name} không đủ tồn kho (Tồn: ${stock})`, {
-              variant: 'warning',
-            });
-            return order;
-          }
+          warnOverStock(product.name, existing.quantity, existing.quantity + 1, stock);
           const newItems = [...order.items];
           newItems[existingIdx] = { ...existing, quantity: existing.quantity + 1 };
           return { ...order, items: newItems };
         }
-        if (stock <= 0) {
-          enqueueSnackbar(`Sản phẩm ${product.name} hết hàng`, { variant: 'warning' });
-          return order;
-        }
+        warnOverStock(product.name, 0, 1, stock);
         return {
           ...order,
           items: [
@@ -510,7 +618,7 @@ export default function PosSaleView() {
         };
       });
     },
-    [updateActiveOrder, enqueueSnackbar]
+    [updateActiveOrder, warnOverStock]
   );
 
   const handleAddVariant = useCallback(
@@ -526,20 +634,12 @@ export default function PosSaleView() {
         );
         if (existingIdx >= 0) {
           const existing = order.items[existingIdx];
-          if (existing.quantity + 1 > stock) {
-            enqueueSnackbar(`Sản phẩm ${child.name} không đủ tồn kho (Tồn: ${stock})`, {
-              variant: 'warning',
-            });
-            return order;
-          }
+          warnOverStock(child.name, existing.quantity, existing.quantity + 1, stock);
           const newItems = [...order.items];
           newItems[existingIdx] = { ...existing, quantity: existing.quantity + 1 };
           return { ...order, items: newItems };
         }
-        if (stock <= 0) {
-          enqueueSnackbar(`Sản phẩm ${child.name} hết hàng`, { variant: 'warning' });
-          return order;
-        }
+        warnOverStock(child.name, 0, 1, stock);
         return {
           ...order,
           items: [
@@ -565,7 +665,7 @@ export default function PosSaleView() {
         };
       });
     },
-    [updateActiveOrder, enqueueSnackbar]
+    [updateActiveOrder, warnOverStock]
   );
 
   // Enter khi chưa có lựa chọn trong danh sách (máy quét mã vạch gõ mã + Enter nhanh hơn lượt tìm 300 ms, hoặc gõ đủ mã
@@ -602,14 +702,21 @@ export default function PosSaleView() {
   );
 
   const handleRefreshData = useCallback(() => {
-    Promise.all([getAllProducts({ isActive: true }), getAllCustomers({ isActive: true })])
-      .then(([p, c]) => {
+    Promise.all([getAllProducts({ isActive: true }), getAllCustomers({ isActive: true }), getAllWarehouses()])
+      .then(([p, c, w]) => {
         setProducts(p.items);
         setCustomers(c);
+        setWarehouses(w);
+        // Lần tải đầu lỗi thì chưa có kho nào được chọn — chọn như lúc mở màn.
+        setSelectedWarehouse(
+          (current) =>
+            (current && w.find((wh) => wh.id === current.id)) || w.find((wh) => wh.isActive) || w[0] || null
+        );
+        closeSnackbar();
         enqueueSnackbar('Đã tải lại hàng hoá và khách hàng', { variant: 'success' });
       })
       .catch(() => enqueueSnackbar('Không tải lại được dữ liệu', { variant: 'error' }));
-  }, [enqueueSnackbar]);
+  }, [enqueueSnackbar, closeSnackbar]);
 
   const handleUpdateQuantity = useCallback(
     (itemKey: string, newQuantity: number) => {
@@ -621,19 +728,13 @@ export default function PosSaleView() {
           ...order,
           items: order.items.map((item) => {
             if (getItemKey(item) !== itemKey) return item;
-            if (newQuantity > item.stockOnHand) {
-              enqueueSnackbar(
-                `Không đủ tồn kho. Tồn hiện tại: ${item.stockOnHand}`,
-                { variant: 'warning' }
-              );
-              return item;
-            }
+            warnOverStock(item.name, item.quantity, newQuantity, item.stockOnHand);
             return { ...item, quantity: newQuantity };
           }),
         };
       });
     },
-    [updateActiveOrder, enqueueSnackbar]
+    [updateActiveOrder, warnOverStock]
   );
 
   const handleRemoveItem = useCallback(
@@ -680,9 +781,40 @@ export default function PosSaleView() {
     [updateActiveOrder]
   );
 
+  // Giảm giá hoá đơn lưu theo TỪNG đơn tạm (trước đây ô giảm giá "Bán nhanh" là một ô chung: chuyển tab vẫn hiện số
+  // của đơn kia, rời ô là áp nhầm sang đơn đang mở).
   const handleSetDiscount = useCallback(
     (discountAmount: number) => {
-      updateActiveOrder((order) => ({ ...order, discountAmount }));
+      updateActiveOrder((order) => ({
+        ...order,
+        discountMode: 'amount',
+        discountPercent: undefined,
+        discountAmount: clampOrderDiscount(discountAmount, orderSubTotal(order)),
+      }));
+    },
+    [updateActiveOrder]
+  );
+
+  const handleSetDiscountPercent = useCallback(
+    (percent: number) => {
+      updateActiveOrder((order) => {
+        const d = percentDiscount(percent, orderSubTotal(order));
+        return { ...order, discountMode: 'percent', discountPercent: d.percent, discountAmount: d.amount };
+      });
+    },
+    [updateActiveOrder]
+  );
+
+  const handleSetDiscountMode = useCallback(
+    (mode: 'amount' | 'percent') => {
+      updateActiveOrder((order) => {
+        if ((order.discountMode ?? 'amount') === mode) return order;
+        if (mode === 'amount') return { ...order, discountMode: 'amount', discountPercent: undefined };
+        const sub = orderSubTotal(order);
+        // Đổi sang %: giữ nguyên mức giảm đang có, quy ra % (2 chữ số lẻ).
+        const percent = sub > 0 ? Math.round((order.discountAmount * 10000) / sub) / 100 : 0;
+        return { ...order, discountMode: 'percent', discountPercent: percent };
+      });
     },
     [updateActiveOrder]
   );
@@ -713,6 +845,9 @@ export default function PosSaleView() {
     setOrders((prev) => relabelOrders([...prev, newOrder]));
     setActiveOrderId(newOrder.id);
   }, [nextEmptyOrder]);
+
+  // Đóng tab đang có hàng thì hỏi lại (trước đây bấm nhầm dấu × là mất cả giỏ).
+  const [closeTabId, setCloseTabId] = useState<number | null>(null);
 
   const handleCloseTab = useCallback(
     (orderId: number) => {
@@ -747,45 +882,65 @@ export default function PosSaleView() {
     async (payments: PaymentLine[]): Promise<boolean> => {
       if (!selectedWarehouse) return false;
 
-      try {
-        const created = await createSalesOrder({
-          customerId: activeOrder.customerId || undefined,
-          discount: activeOrder.discountAmount,
-          totalPayment: grandTotal > 0 ? grandTotal : 0,
-          method: payments[0]?.method || 'Cash',
+      const due = grandTotal > 0 ? grandTotal : 0;
+      const soldId = activeOrder.id;
+      // Khách đưa dư tiền mặt: khoản thu tiền mặt chỉ gồm phần phải trả, phần dư gửi ở cashTendered (tiền thối).
+      const settled = settlePayments(due, payments);
+      // Mã chống trùng: giỏ không đổi kể từ lần gửi trước (lỗi mạng / hết thời gian chờ) → gửi lại đúng mã đó, máy chủ
+      // trả hoá đơn đã tạo thay vì tạo hoá đơn thứ hai. Ghi vào đơn tạm (localStorage) để tải lại trang vẫn còn.
+      const request = saleRequestFor(
+        activeOrder.pendingRequest,
+        saleFingerprint({
+          customerId: activeOrder.customerId,
           warehouseId: selectedWarehouse.id,
-          note: activeOrder.note || undefined,
-          couponCode: activeOrder.couponCode || undefined,
-          soldByName: sellerName,
-          invoiceDetails: activeOrder.items.map((item) => ({
+          discount: activeOrder.discountAmount,
+          items: activeOrder.items.map((item) => ({
             productId: item.productId,
-            productVariantId: item.productVariantId || undefined,
-            productCode: item.sku || undefined,
-            productName: item.name,
+            productVariantId: item.productVariantId,
             quantity: item.quantity,
             price: item.unitPrice,
             discount: item.discountAmount,
-            note: item.note || undefined,
           })),
-          payments: payments
-            .filter((p) => p.amount > 0)
-            .map((p) => ({
-              method: p.method,
-              amount: p.amount,
-              transactionRef: p.transactionRef || undefined,
-            })),
-        });
+        }),
+        newId
+      );
+      if (request !== activeOrder.pendingRequest) {
+        setOrders((prev) => prev.map((o) => (o.id === soldId ? { ...o, pendingRequest: request } : o)));
+      }
 
-        // Chỉ nhắc KiotViet khi hoá đơn được xếp hàng đẩy (Pending); NotPushed chỉ lưu trong hệ thống
-        enqueueSnackbar(salesOrderCreatedMessage(created?.kiotVietSyncStatus), {
-          variant: 'success',
-        });
-        if (created?.id) setLastSaleId(created.id);
+      const payload: ICreateSalesOrderRequest = {
+        clientRequestId: request.id,
+        customerId: activeOrder.customerId || undefined,
+        discount: activeOrder.discountAmount,
+        totalPayment: due,
+        method: settled.payments[0]?.method || payments[0]?.method || 'Cash',
+        warehouseId: selectedWarehouse.id,
+        note: activeOrder.note || undefined,
+        couponCode: activeOrder.couponCode || undefined,
+        soldByName: sellerName,
+        invoiceDetails: activeOrder.items.map((item) => ({
+          productId: item.productId,
+          productVariantId: item.productVariantId || undefined,
+          productCode: item.sku || undefined,
+          productName: item.name,
+          quantity: item.quantity,
+          price: item.unitPrice,
+          discount: item.discountAmount,
+          note: item.note || undefined,
+        })),
+        payments: settled.payments.map((p) => ({
+          method: p.method,
+          amount: p.amount,
+          transactionRef: p.transactionRef || undefined,
+        })),
+        cashTendered: settled.cashTendered,
+      };
+      const soldAt = new Date().toISOString();
+
+      // Bỏ đơn vừa bán (hoặc vừa chuyển vào hàng chờ); còn mỗi nó thì thay bằng đơn trống
+      const releaseSoldOrder = () => {
         setPaymentDrawerOpen(false);
-        customerDisplay.paid(grandTotal > 0 ? grandTotal : 0);
-
-        // Bỏ đơn vừa bán; còn mỗi nó thì thay bằng đơn trống
-        const soldId = activeOrder.id;
+        customerDisplay.paid(due);
         const replacement = nextEmptyOrder();
         setOrders((prev) => {
           const remaining = prev.filter((o) => o.id !== soldId);
@@ -793,6 +948,32 @@ export default function PosSaleView() {
           setActiveOrderId(next[next.length - 1].id);
           return next;
         });
+      };
+
+      try {
+        const created = await createSalesOrder(payload);
+
+        // Chỉ nhắc KiotViet khi hoá đơn được xếp hàng đẩy (Pending); NotPushed chỉ lưu trong hệ thống
+        enqueueSnackbar(
+          created?.replayed
+            ? 'Hoá đơn này đã được tạo ở lần gửi trước — không tạo thêm'
+            : salesOrderCreatedMessage(created?.kiotVietSyncStatus),
+          { variant: created?.replayed ? 'info' : 'success' }
+        );
+        if (settled.change > 0) {
+          enqueueSnackbar(`Tiền thừa trả khách: ${fCurrency(settled.change)}`, { variant: 'info' });
+        }
+        if (created?.id) {
+          setLastSaleId(created.id);
+          rememberRecentSale({
+            id: created.id,
+            total: due,
+            itemCount: totalItemCount,
+            customerName: activeOrder.customerName,
+            soldAt,
+          });
+        }
+        releaseSoldOrder();
 
         // Refresh products
         getAllProducts({ isActive: true })
@@ -800,24 +981,127 @@ export default function PosSaleView() {
           .catch(console.error);
         return true;
       } catch (error: any) {
-        const message = error?.title || error?.message || 'Có lỗi xảy ra khi thanh toán';
-        enqueueSnackbar(message, { variant: 'error' });
-        return false;
+        if (isDefinitiveRejection(error)) {
+          // Máy chủ từ chối → chắc chắn chưa có hoá đơn: bỏ mã, lần sau (đã sửa giỏ) gửi mã mới.
+          setOrders((prev) => prev.map((o) => (o.id === soldId ? { ...o, pendingRequest: undefined } : o)));
+          enqueueSnackbar(error?.title || error?.message || 'Có lỗi xảy ra khi thanh toán', { variant: 'error' });
+          return false;
+        }
+        // Mất mạng / hết thời gian chờ / lỗi máy chủ: khách đã trả tiền — lưu hoá đơn vào hàng chờ đồng bộ (cùng mã
+        // chống trùng, ngày bán = bây giờ) rồi bán tiếp; có mạng lại tự gửi, máy chủ đã lưu từ lần này thì không tạo trùng.
+        addPendingSale({
+          id: request.id,
+          payload: { ...payload, purchaseDate: soldAt },
+          label: activeOrder.label,
+          customerName: activeOrder.customerName,
+          total: due,
+          itemCount: totalItemCount,
+          createdAt: soldAt,
+          attempts: 1,
+          status: 'pending',
+          lastError: describeSaleError(error),
+        });
+        enqueueSnackbar(
+          'Mất mạng — đã lưu hoá đơn trên máy, sẽ tự đồng bộ khi có mạng (nút "Chờ đồng bộ" trên thanh trên cùng).',
+          { variant: 'warning', autoHideDuration: 8000 }
+        );
+        releaseSoldOrder();
+        return true;
       }
     },
-    [activeOrder, grandTotal, nextEmptyOrder, selectedWarehouse, sellerName, enqueueSnackbar]
+    [activeOrder, grandTotal, totalItemCount, nextEmptyOrder, selectedWarehouse, sellerName, enqueueSnackbar]
   );
 
-  // Nút máy in: in phiếu thanh toán của hoá đơn vừa bán (không tự in sau khi bán)
-  const handlePrintLastSale = useCallback(() => {
-    if (!lastSaleId) {
-      enqueueSnackbar('Chưa có hoá đơn vừa bán để in. Hoá đơn cũ in ở trang Đơn bán hàng.', {
-        variant: 'info',
-      });
-      return;
-    }
+  // ====== Hoá đơn chờ đồng bộ (bán lúc mất mạng) ======
+  const pendingSales = usePendingSales();
+  const [syncing, setSyncing] = useState(false);
+  const syncingRef = useRef(false);
+
+  /** Gửi các hoá đơn chờ; `manual` = thu ngân bấm "Đồng bộ ngay" (báo cả khi chưa gửi được). */
+  const runSync = useCallback(
+    async (manual = false) => {
+      if (syncingRef.current) return;
+      syncingRef.current = true;
+      setSyncing(true);
+      try {
+        const result = await syncPendingSales(createSalesOrder, (sale, serverId) => {
+          if (!serverId) return;
+          setLastSaleId(serverId);
+          rememberRecentSale({
+            id: serverId,
+            total: sale.total,
+            itemCount: sale.itemCount,
+            customerName: sale.customerName,
+            soldAt: sale.createdAt,
+          });
+        });
+        if (result.sent > 0) {
+          enqueueSnackbar(`Đã đồng bộ ${result.sent} hoá đơn bán lúc mất mạng`, { variant: 'success' });
+        }
+        if (result.failed > 0) {
+          enqueueSnackbar(`${result.failed} hoá đơn bị máy chủ từ chối — mở nút trên thanh trên cùng để xử lý`, {
+            variant: 'error',
+          });
+        }
+        if (manual && result.stillPending > 0) {
+          enqueueSnackbar('Chưa gửi được — vẫn chưa có mạng. Hệ thống sẽ tự thử lại.', { variant: 'warning' });
+        }
+      } finally {
+        syncingRef.current = false;
+        setSyncing(false);
+      }
+    },
+    [enqueueSnackbar]
+  );
+
+  // Tự đồng bộ: lúc mở màn, khi có mạng lại, và 30 giây một lần khi còn hoá đơn chờ.
+  const hasQueued = pendingSales.some((sale) => sale.status === 'pending');
+  useEffect(() => {
+    if (!hasQueued || !online) return undefined;
+    runSync();
+    const timer = setInterval(() => runSync(), 30000);
+    return () => clearInterval(timer);
+  }, [hasQueued, online, runSync]);
+
+  /** Hoá đơn bị máy chủ từ chối: mở lại thành một đơn tạm để sửa rồi thanh toán lại (mã chống trùng mới). */
+  const handleReopenPendingSale = useCallback(
+    (sale: PendingSale) => {
+      const order: DraftOrder = {
+        ...nextEmptyOrder(),
+        customerId: sale.payload.customerId,
+        customerName: sale.customerName,
+        note: sale.payload.note ?? '',
+        couponCode: sale.payload.couponCode ?? '',
+        discountAmount: sale.payload.discount ?? 0,
+        items: sale.payload.invoiceDetails.map((d) => ({
+          productId: d.productId,
+          productVariantId: d.productVariantId,
+          name: d.productName ?? d.productCode ?? '',
+          sku: d.productCode ?? '',
+          quantity: d.quantity,
+          unitPrice: d.price,
+          vatRate: 0,
+          discountAmount: d.discount ?? 0,
+          note: d.note ?? '',
+          // Không biết tồn lúc mở lại — không cảnh báo vượt tồn cho các dòng này.
+          stockOnHand: Number.MAX_SAFE_INTEGER,
+          stockOnOrder: 0,
+        })),
+      };
+      setOrders((prev) => relabelOrders([...prev.filter((o) => o.items.length > 0), order]));
+      setActiveOrderId(order.id);
+      removePendingSale(sale.id);
+      enqueueSnackbar('Đã mở lại hoá đơn thành đơn tạm — sửa rồi thanh toán lại', { variant: 'info' });
+    },
+    [nextEmptyOrder, enqueueSnackbar]
+  );
+
+  // Nút máy in: chọn một hoá đơn gần đây để in lại (không tự in sau khi bán)
+  const [printOrderId, setPrintOrderId] = useState<string | null>(null);
+  const handlePrintSale = useCallback((salesOrderId: string) => {
+    setPrintOrderId(salesOrderId);
     setReceiptDialogOpen(true);
-  }, [lastSaleId, enqueueSnackbar]);
+  }, []);
 
   // Quick sale payment
   const handleQuickPayment = useCallback(async () => {
@@ -852,8 +1136,7 @@ export default function PosSaleView() {
       setQuickSelectedMethods([firstPosMethod]);
       setQuickMethodAmounts({});
       setQuickMethodRefs({});
-      setQuickCustomerPayment(0);
-      setQuickDiscountInput('');
+      setQuickPaymentTouched(false);
       setQuickQrPaymentCompleted(false);
     } finally {
       setQuickPaymentLoading(false);
@@ -870,34 +1153,92 @@ export default function PosSaleView() {
     firstPosMethod,
   ]);
 
-  // Quick discount apply
-  const handleQuickDiscountApply = useCallback(() => {
-    const numVal = Number(quickDiscountInput) || 0;
-    if (quickDiscountMode === 'percent') {
-      handleSetDiscount(Math.round((subTotal * numVal) / 100));
-    } else {
-      handleSetDiscount(numVal);
+  // Giảm theo %: tổng tiền hàng đổi (thêm / bớt hàng) thì tính lại tiền giảm; giảm theo tiền thì không vượt tổng tiền hàng.
+  useEffect(() => {
+    const expected =
+      activeOrder.discountMode === 'percent'
+        ? percentDiscount(activeOrder.discountPercent ?? 0, subTotal).amount
+        : clampOrderDiscount(activeOrder.discountAmount, subTotal);
+    if (expected !== activeOrder.discountAmount) {
+      updateActiveOrder((order) => ({ ...order, discountAmount: expected }));
     }
-  }, [quickDiscountInput, quickDiscountMode, subTotal, handleSetDiscount]);
+  }, [subTotal, activeOrder.discountMode, activeOrder.discountPercent, activeOrder.discountAmount, updateActiveOrder]);
 
-  // Auto-fill customer payment when grand total changes (cả khi giỏ về 0 — không giữ số tiền của giỏ cũ)
+  // Tự điền "Khách thanh toán" = số cần trả khi tổng đổi (cả khi giỏ về 0 — không giữ số tiền của giỏ cũ). Thu ngân đã
+  // tự nhập tiền khách đưa thì giữ nguyên (trước đây đổi giảm giá là mất số khách đưa); sang đơn tạm khác thì điền lại.
   useEffect(() => {
     const due = grandTotal > 0 ? grandTotal : 0;
-    setQuickCustomerPayment(due);
+    const switchedOrder = quickPaymentOrderRef.current !== activeId;
+    quickPaymentOrderRef.current = activeId;
+    if (!switchedOrder && quickPaymentTouched) return;
+    if (switchedOrder) setQuickPaymentTouched(false);
     if (quickSelectedMethods.length === 1) {
       setQuickMethodAmounts({ [quickSelectedMethods[0]]: due });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grandTotal]);
+  }, [grandTotal, activeId]);
 
   // Quick payment — chọn duy nhất 1 phương thức
   const handleQuickSelectMethod = useCallback((method: string) => {
     setQuickSelectedMethods([method]);
     setQuickMethodAmounts({ [method]: grandTotal });
     setQuickMethodRefs({});
-    setQuickCustomerPayment(grandTotal);
+    setQuickPaymentTouched(false);
     setQuickQrPaymentCompleted(false);
   }, [grandTotal]);
+
+  const quickDue = grandTotal > 0 ? grandTotal : 0;
+  const quickMethod: string | undefined = quickSelectedMethods[0];
+  const quickPaid = quickSelectedMethods.reduce((sum, m) => sum + (quickMethodAmounts[m] || 0), 0);
+
+  // Ô giảm giá hoá đơn dùng chung cho cả hai tab: chọn ₫ / % rồi nhập; số tiền giảm hiện ngay dưới.
+  const renderOrderDiscount = () => {
+    const percentMode = activeOrder.discountMode === 'percent';
+    return (
+      <Stack alignItems="flex-end" spacing={0.25}>
+        <Stack direction="row" spacing={0.75} alignItems="center">
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={percentMode ? 'percent' : 'amount'}
+            onChange={(_, mode) => mode && handleSetDiscountMode(mode)}
+            aria-label="Giảm theo"
+            sx={{ '& .MuiToggleButton-root': { px: 1, py: 0.25, minWidth: 34, fontWeight: 700 } }}
+          >
+            <ToggleButton value="amount" aria-label="Giảm theo tiền">
+              ₫
+            </ToggleButton>
+            <ToggleButton value="percent" aria-label="Giảm theo %">
+              %
+            </ToggleButton>
+          </ToggleButtonGroup>
+          <TextField
+            size="small"
+            type="number"
+            placeholder="0"
+            value={percentMode ? activeOrder.discountPercent || '' : activeOrder.discountAmount || ''}
+            onChange={(e) => {
+              const val = Number(e.target.value) || 0;
+              if (percentMode) handleSetDiscountPercent(val);
+              else handleSetDiscount(val);
+            }}
+            sx={{ width: DISCOUNT_FIELD_WIDTH }}
+            inputProps={{
+              'aria-label': 'Giảm giá hoá đơn',
+              min: 0,
+              max: percentMode ? 100 : undefined,
+              style: { textAlign: 'right' },
+            }}
+          />
+        </Stack>
+        {activeOrder.discountAmount > 0 && (
+          <Typography variant="caption" color="error.main">
+            −{fCurrency(activeOrder.discountAmount)}
+          </Typography>
+        )}
+      </Stack>
+    );
+  };
 
   // ====== Render ======
 
@@ -915,7 +1256,13 @@ export default function PosSaleView() {
       }}
     >
       {/* ========== Restore Draft Orders Dialog ========== */}
-      <Dialog open={restoreDialogOpen} maxWidth="xs" fullWidth>
+      {/* Xoá dữ liệu đơn tạm cũ khi hộp đã đóng hẳn — xoá ngay thì lúc mờ dần chữ nhảy thành "0 đơn". */}
+      <Dialog
+        open={restoreDialogOpen}
+        maxWidth="xs"
+        fullWidth
+        TransitionProps={{ onExited: () => setCachedData(null) }}
+      >
         <DialogTitle>Khôi phục đơn hàng tạm</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
@@ -933,9 +1280,49 @@ export default function PosSaleView() {
         </DialogActions>
       </Dialog>
 
+      {/* ========== Xác nhận đóng tab có hàng ========== */}
+      <Dialog open={closeTabId !== null} onClose={() => setCloseTabId(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Đóng hoá đơn tạm?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            {(() => {
+              const order = orders.find((o) => o.id === closeTabId);
+              return order
+                ? `${order.label} đang có ${order.items.length} mặt hàng chưa thanh toán. Đóng sẽ bỏ cả giỏ này.`
+                : '';
+            })()}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCloseTabId(null)} color="inherit">
+            Giữ lại
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              if (closeTabId !== null) handleCloseTab(closeTabId);
+              setCloseTabId(null);
+            }}
+          >
+            Đóng hoá đơn
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* ========== TOP BAR (AppBar) ========== */}
-      <AppBar position="static" elevation={1} style={{backgroundColor: theme.palette.primary.main}}>
-        <Toolbar variant="dense" sx={{ minHeight: 52, gap: 1 }}>
+      <AppBar position="static" elevation={0} sx={{ bgcolor: barColor, color: barFg }}>
+        {/* Dưới 900 px (máy tính bảng dọc): 2 hàng — ô tìm + nút ở trên, tab hoá đơn ở dưới. */}
+        <Toolbar
+          variant="dense"
+          sx={{
+            minHeight: 56,
+            gap: 0.5,
+            px: { xs: 1, sm: 1.5 },
+            pt: { xs: 0.75, md: 0 },
+            flexWrap: { xs: 'wrap', md: 'nowrap' },
+          }}
+        >
           {/* Product search */}
         <Autocomplete
           freeSolo
@@ -1039,13 +1426,15 @@ export default function PosSaleView() {
           slotProps={{
             paper: {
               sx: {
-                width: 420,
+                width: { xs: 'calc(100vw - 16px)', sm: 420 },
                 '& .MuiAutocomplete-listbox': { maxHeight: 360 },
               },
             },
           }}
           sx={{
-            width: 320,
+            flex: { xs: '1 1 160px', md: '0 0 auto' },
+            width: { md: 220, lg: 320 },
+            minWidth: 0,
             '& .MuiOutlinedInput-root': { bgcolor: 'white', borderRadius: 1 },
           }}
         />
@@ -1053,103 +1442,189 @@ export default function PosSaleView() {
         <Tooltip title="Quét mã vạch: đặt con trỏ vào ô tìm rồi quét (Enter tự thêm)">
           <IconButton
             aria-label="Quét mã vạch"
-            sx={{ color: 'white', ml: 1 }}
+            sx={{ color: barFg, ml: 0.5, display: { xs: 'none', sm: 'inline-flex' } }}
             onClick={() => searchInputRef.current?.focus()}
           >
             <Iconify icon="solar:barcode-bold" />
           </IconButton>
         </Tooltip>
 
-        {/* Invoice tabs */}
+        {/* Tab hoá đơn tạm dạng thẻ: tab đang mở nền sáng nối liền phần nội dung bên dưới, tab khác nền mờ — trước đây
+            chỉ khác nhau một gạch chân mảnh, khó thấy đang ở hoá đơn nào. */}
+        <Box
+          sx={{
+            order: { xs: 2, md: 0 },
+            flex: { xs: '1 1 100%', md: '1 1 auto' },
+            minWidth: 0,
+            display: 'flex',
+            alignItems: 'flex-end',
+            alignSelf: 'flex-end',
+            ml: { md: 1 },
+            mt: { xs: 0.5, md: 0 },
+          }}
+        >
         <Tabs
           value={activeOrderId}
           onChange={(_, v) => setActiveOrderId(v)}
+          variant="scrollable"
+          scrollButtons="auto"
           sx={{
-            ml: 2,
-            '& .MuiTab-root': { color: alpha('#fff', 0.7), minHeight: 40, py: 0 },
-            '& .Mui-selected': { color: '#fff !important' },
-            '& .MuiTabs-indicator': { bgcolor: '#fff' },
+            flex: '0 1 auto',
+            minHeight: 44,
+            minWidth: 0,
+            '& .MuiTabs-indicator': { display: 'none' },
+            '& .MuiTabs-scrollButtons': { color: barFg },
+            '& .MuiTab-root': {
+              minHeight: 40,
+              height: 40,
+              mt: 0.5,
+              mr: 0.5,
+              px: 1.25,
+              opacity: 1,
+              borderRadius: '10px 10px 0 0',
+              fontWeight: 500,
+              bgcolor: alpha(barFg, 0.14),
+              transition: theme.transitions.create(['background-color', 'color']),
+              '&:hover': { bgcolor: alpha(barFg, 0.24) },
+            },
+            // Theme tô tab chưa chọn màu chữ phụ (xám) với độ ưu tiên cao — trên nền màu gần như không đọc được.
+            '& .MuiTab-root:not(.Mui-selected)': { color: barFg },
+            '& .MuiTab-root.Mui-selected': {
+              color: barColor,
+              fontWeight: 700,
+              bgcolor: 'background.default',
+            },
           }}
         >
-          {orders.map((order) => (
-            <Tab
-              key={order.id}
-              value={order.id}
-              label={
-                <Stack direction="row" alignItems="center" spacing={0.5} style={{width: 140}}>
-                  <Iconify icon="solar:document-text-bold" width={16} />
-                  <span>{order.label}</span>
-                  <Badge badgeContent={order.items.length} color="error" sx={{ ml: 1 }}>
-                    <span />
-                  </Badge>
-                  {orders.length > 1 && (
-                    <IconButton
-                      size="small"
-                      sx={{ color: alpha('#fff', 0.6), p: 0.25 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCloseTab(order.id);
-                      }}
-                    >
-                      <Iconify icon="mingcute:close-line" width={14} />
-                    </IconButton>
-                  )}
-                </Stack>
-              }
-            />
-          ))}
+          {orders.map((order) => {
+            const active = order.id === activeOrder.id;
+            return (
+              <Tab
+                key={order.id}
+                value={order.id}
+                label={
+                  <Stack direction="row" alignItems="center" spacing={0.75}>
+                    <Box component="span" sx={{ display: { xs: 'none', lg: 'inline-flex' } }}>
+                      <Iconify icon="solar:bill-list-bold" width={16} />
+                    </Box>
+                    <span>{order.label}</span>
+                    {order.items.length > 0 && (
+                      <Box
+                        component="span"
+                        sx={{
+                          minWidth: 20,
+                          height: 20,
+                          px: 0.5,
+                          borderRadius: 10,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          lineHeight: '20px',
+                          textAlign: 'center',
+                          bgcolor: active ? barColor : barFg,
+                          color: active ? barFg : barColor,
+                        }}
+                      >
+                        {order.items.length}
+                      </Box>
+                    )}
+                    {orders.length > 1 && (
+                      <IconButton
+                        size="small"
+                        component="span"
+                        sx={{ color: 'inherit', p: 0.25, opacity: 0.7, '&:hover': { opacity: 1 } }}
+                        aria-label={`Đóng ${order.label}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (order.items.length > 0) setCloseTabId(order.id);
+                          else handleCloseTab(order.id);
+                        }}
+                      >
+                        <Iconify icon="mingcute:close-line" width={14} />
+                      </IconButton>
+                    )}
+                  </Stack>
+                }
+              />
+            );
+          })}
         </Tabs>
 
-        <IconButton sx={{ color: 'white' }} onClick={handleAddTab}>
-          <Iconify icon="mingcute:add-circle-line" />
-        </IconButton>
+        <Tooltip title="Thêm hoá đơn tạm">
+          <IconButton aria-label="Thêm hoá đơn tạm" sx={{ color: barFg, mb: 0.25 }} onClick={handleAddTab}>
+            <Iconify icon="mingcute:add-circle-line" />
+          </IconButton>
+        </Tooltip>
+        </Box>
 
-        <Box sx={{ flexGrow: 1 }} />
-
-        {/* Right side icons */}
-        <Stack direction="row" alignItems="center" spacing={1}>
+        {/* Bên phải: đồng bộ hoá đơn mất mạng (chỉ hiện khi cần), công cụ, kho, quản lý */}
+        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0, ml: 'auto' }}>
+          <PosSyncButton
+            online={online}
+            pendingSales={pendingSales}
+            syncing={syncing}
+            onSync={() => runSync(true)}
+            onReopen={handleReopenPendingSale}
+            onDiscard={(sale) => {
+              removePendingSale(sale.id);
+              enqueueSnackbar(`Đã bỏ ${sale.label}`, { variant: 'info' });
+            }}
+          />
           <Tooltip title="Tải lại hàng hoá, khách hàng">
-            <IconButton aria-label="Tải lại dữ liệu" sx={{ color: 'white' }} onClick={handleRefreshData}>
+            <IconButton aria-label="Tải lại dữ liệu" sx={{ color: barFg }} onClick={handleRefreshData}>
               <Iconify icon="solar:refresh-bold" />
             </IconButton>
           </Tooltip>
           <Tooltip title="Mở màn hình khách (màn phụ hướng về khách)">
-            <IconButton sx={{ color: 'white' }} onClick={() => openCustomerDisplayWindow()}>
+            <IconButton
+              aria-label="Mở màn hình khách"
+              sx={{ color: barFg, display: { xs: 'none', md: 'inline-flex' } }}
+              onClick={() => openCustomerDisplayWindow()}
+            >
               <Iconify icon="solar:monitor-bold" />
             </IconButton>
           </Tooltip>
-          <Tooltip title={lastSaleId ? 'In hoá đơn vừa bán' : 'In hoá đơn (chưa có hoá đơn vừa bán)'}>
-            <IconButton sx={{ color: 'white' }} onClick={handlePrintLastSale}>
-              <Badge color="warning" variant="dot" invisible={!lastSaleId}>
-                <Iconify icon="solar:printer-bold" />
-              </Badge>
-            </IconButton>
-          </Tooltip>
-          <Typography variant="caption" sx={{ opacity: 0.8 }}>
-            {selectedWarehouse?.name || 'Chọn kho'}
-          </Typography>
-          {/* Màn bán hàng phủ kín dashboard — đây là lối ra (đơn tạm vẫn được lưu trên máy). */}
-          <Tooltip title="Thoát màn bán hàng">
-            <IconButton
-              aria-label="Thoát màn bán hàng"
-              component={RouterLink}
-              href={paths.dashboard.root}
-              sx={{ color: 'white' }}
-            >
-              <Iconify icon="eva:menu-fill" />
-            </IconButton>
-          </Tooltip>
+          <PosRecentSalesButton fg={barFg} lastSaleId={lastSaleId} onPrint={handlePrintSale} />
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={0.5}
+            sx={{
+              px: 1,
+              py: 0.5,
+              mx: 0.5,
+              borderRadius: 1,
+              bgcolor: alpha(barFg, 0.14),
+              color: barFg,
+              display: { xs: 'none', lg: 'flex' },
+            }}
+          >
+            <Iconify icon="solar:shop-bold" width={16} />
+            <Typography variant="caption" fontWeight={600} noWrap sx={{ maxWidth: 120 }}>
+              {selectedWarehouse?.name || 'Chọn kho'}
+            </Typography>
+          </Stack>
+          <PosManageMenu fg={barFg} />
         </Stack>
       </Toolbar>
       </AppBar>
 
       {/* ========== MAIN CONTENT ========== */}
-      <Box sx={{ flexGrow: 1, display: 'flex', overflow: 'hidden' }}>
+      {/* Từ 900 px: giỏ hàng trái, thanh toán phải. Hẹp hơn (máy tính bảng dọc): giỏ trên, thanh toán dưới. */}
+      <Box
+        sx={{
+          flexGrow: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          overflow: 'hidden',
+        }}
+      >
         {/* ===== LEFT PANEL (70%) - Product list in order ===== */}
         <Box
           sx={{
-            flex: '0 0 70%',
-            maxWidth: '70%',
+            flex: { xs: '1 1 auto', md: '1 1 70%' },
+            minWidth: 0,
+            minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -1169,10 +1644,10 @@ export default function PosSaleView() {
                 </Typography>
               </Stack>
             ) : (
-              <Table size="small" stickyHeader>
+              <Table size="small" stickyHeader sx={{ '& th': { whiteSpace: 'nowrap' } }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell width={40} align="center">
+                    <TableCell width={40} align="center" sx={{ display: HIDE_ON_PHONE }}>
                       STT
                     </TableCell>
                     <TableCell width={40} />
@@ -1186,7 +1661,7 @@ export default function PosSaleView() {
                     <TableCell width={120} align="right">
                       Thành tiền
                     </TableCell>
-                    <TableCell width={80} align="center">
+                    <TableCell width={80} align="center" sx={{ display: HIDE_ON_PHONE }}>
                       Thao tác
                     </TableCell>
                   </TableRow>
@@ -1197,6 +1672,7 @@ export default function PosSaleView() {
                     const lineTotal = item.quantity * item.unitPrice - item.discountAmount;
                     const stt = activeOrder.items.length - idx;
                     const isLowStock = item.quantity >= item.stockOnHand;
+                    const isOverStock = item.quantity > item.stockOnHand;
 
                     return (
                       <TableRow
@@ -1209,7 +1685,7 @@ export default function PosSaleView() {
                         }}
                       >
                         {/* STT */}
-                        <TableCell align="center">
+                        <TableCell align="center" sx={{ display: HIDE_ON_PHONE }}>
                           <Typography variant="body2" color="text.secondary">
                             {stt}
                           </Typography>
@@ -1229,29 +1705,27 @@ export default function PosSaleView() {
                         {/* Product name + attributes */}
                         <TableCell>
                           <Box>
-                            <Typography variant="subtitle2">{item.sku}</Typography>
-                            <Typography variant="body2" color="text.secondary">
+                            {/* Tên hàng là thứ thu ngân nhìn — đậm; mã hàng + thuộc tính phiên bản ở dòng phụ. */}
+                            <Typography variant="subtitle2" sx={{ lineHeight: 1.4 }}>
                               {item.name}
                             </Typography>
-                            {item.attributes && item.attributes.length > 0 && (
-                              <Stack
-                                direction="row"
-                                flexWrap="wrap"
-                                spacing={0.5}
-                                sx={{ mt: 0.5 }}
-                              >
-                                {item.attributes.map((attr, attrIdx) => (
-                                  <Chip
-                                    key={attrIdx}
-                                    size="small"
-                                    label={attr.attributeValue}
-                                    color="info"
-                                    variant="filled"
-                                    sx={{ height: 20, fontSize: '0.7rem' }}
-                                  />
-                                ))}
-                              </Stack>
-                            )}
+                            <Stack direction="row" alignItems="center" flexWrap="wrap" sx={{ gap: 0.5, mt: 0.25 }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                                {item.sku}
+                              </Typography>
+                              {item.attributes?.map((attr, attrIdx) => (
+                                <Chip
+                                  key={attrIdx}
+                                  size="small"
+                                  label={
+                                    attr.attributeName ? `${attr.attributeName}: ${attr.attributeValue}` : attr.attributeValue
+                                  }
+                                  color="info"
+                                  variant="soft"
+                                  sx={{ height: 20, fontSize: '0.7rem' }}
+                                />
+                              ))}
+                            </Stack>
                             {/* Item note */}
                             {item.note && (
                               <Typography
@@ -1272,8 +1746,10 @@ export default function PosSaleView() {
                               <Box>
                                 <div>Tồn kho: {item.stockOnHand}</div>
                                 <div>Đã đặt: {item.stockOnOrder}</div>
-                                {isLowStock && (
-                                  <div style={{ color: '#ff5252' }}>⚠ Đã lấy hết số tồn</div>
+                                {isOverStock ? (
+                                  <div style={{ color: '#ff5252' }}>⚠ Bán vượt tồn trên hệ thống</div>
+                                ) : (
+                                  isLowStock && <div style={{ color: '#ff5252' }}>⚠ Đã lấy hết số tồn</div>
                                 )}
                               </Box>
                             }
@@ -1282,7 +1758,7 @@ export default function PosSaleView() {
                             <PosQtyInput
                               value={item.quantity}
                               onChange={(quantity) => handleUpdateQuantity(itemKey, quantity)}
-                              error={isLowStock}
+                              error={isOverStock}
                             />
                           </Tooltip>
                         </TableCell>
@@ -1313,7 +1789,7 @@ export default function PosSaleView() {
                         </TableCell>
 
                         {/* Actions */}
-                        <TableCell align="center">
+                        <TableCell align="center" sx={{ display: HIDE_ON_PHONE }}>
                           <Stack direction="row" spacing={0.25} justifyContent="center">
                             <Tooltip title="Chi tiết sản phẩm">
                               <IconButton
@@ -1378,9 +1854,13 @@ export default function PosSaleView() {
         {/* ===== RIGHT PANEL (30%) ===== */}
         <Box
           sx={{
-            flex: '0 0 30%',
-            maxWidth: '30%',
-            borderLeft: `1px solid ${theme.palette.divider}`,
+            flex: { xs: '0 0 auto', md: '0 0 30%' },
+            maxWidth: { xs: '100%', md: '30%' },
+            minWidth: { xs: 0, md: 340 },
+            height: { xs: '58%', md: 'auto' },
+            minHeight: 0,
+            borderLeft: { md: `1px solid ${theme.palette.divider}` },
+            borderTop: { xs: `1px solid ${theme.palette.divider}`, md: 'none' },
             display: 'flex',
             flexDirection: 'column',
             bgcolor: 'background.paper',
@@ -1415,253 +1895,252 @@ export default function PosSaleView() {
           </Tabs>
 
           {/* ===== TAB: BÁN NHANH ===== */}
+          {/* Phần trên cuộn được; chân (khách cần trả + THANH TOÁN) luôn nằm trong màn — trước đây ở màn cao 768 px nút
+              THANH TOÁN bị đẩy khuất dưới đáy, phải cuộn mới thấy. */}
           {rightTab === 0 && (
-            <Box sx={{ flexGrow: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-              {/* Seller & Time info */}
-              <Stack spacing={0.75} sx={{ px: 2, py: 1.5, bgcolor: theme.palette.grey[50] }}>
-                <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="caption" color="text.secondary">Người bán</Typography>
-                  <Typography variant="caption" fontWeight={600}>{sellerName}</Typography>
-                </Stack>
-                <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="caption" color="text.secondary">Thời gian</Typography>
-                  <Typography variant="caption">
-                    {now.toLocaleDateString('vi-VN')} {now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                  </Typography>
-                </Stack>
-                <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="caption" color="text.secondary">Kho xuất</Typography>
-                  <Autocomplete
-                    size="small"
-                    options={warehouses.filter((w) => w.isActive)}
-                    getOptionLabel={(o) => o.name}
-                    // Kiểm soát ngay từ đầu (null khi chưa tải): trước đây undefined → ô hiện trống dù đã chọn kho.
-                    value={selectedWarehouse as IWarehouse}
-                    isOptionEqualToValue={(o, v) => o.id === v.id}
-                    onChange={(_, v) => setSelectedWarehouse(v)}
-                    sx={{ width: 140 }}
-                    renderInput={(params) => <TextField {...params} variant="standard" />}
-                    disableClearable
-                  />
-                </Stack>
-              </Stack>
-
-              <Divider />
-
-              {/* Customer */}
-              <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
-                <Autocomplete
-                  size="small"
-                  options={customers}
-                  getOptionLabel={(option) =>
-                    `${option.name}${option.phone ? ` (${option.phone})` : ''}`
-                  }
-                  value={customers.find((c) => c.id === activeOrder.customerId) || null}
-                  onChange={(_, v) => handleSetCustomer(v)}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      inputRef={customerInputRef}
-                      placeholder="Tìm khách hàng (F4)"
-                      InputProps={{
-                        ...params.InputProps,
-                        startAdornment: (
-                          <>
-                            <InputAdornment position="start">
-                              <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
-                            </InputAdornment>
-                            {params.InputProps.startAdornment}
-                          </>
-                        ),
-                      }}
-                    />
-                  )}
-                />
-                {!activeOrder.customerId && (
-                  <Typography variant="caption" color="text.secondary">
-                    Mặc định: Khách lẻ
-                  </Typography>
-                )}
-              </Box>
-
-              <Divider />
-
-              {/* Totals */}
-              <Stack spacing={0.75} sx={{ px: 2, py: 1.5, flexGrow: 0 }}>
-                <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="body2" color="text.secondary">
-                    Tổng tiền hàng
-                  </Typography>
-                  <Stack direction="row" spacing={1}>
-                    <Typography variant="body2" color="text.secondary">
-                      {totalItemCount} SP
-                    </Typography>
-                    <Typography variant="body2" fontWeight={500}>
-                      {fCurrency(subTotal)}
+            <Box sx={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <Box sx={{ flexGrow: 1, minHeight: 0, overflow: 'auto' }}>
+                {/* Seller & Time info */}
+                <Stack spacing={0.75} sx={{ px: 2, py: 1.25, bgcolor: 'background.neutral' }}>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="caption" color="text.secondary">Người bán</Typography>
+                    <Typography variant="caption" fontWeight={600}>{sellerName}</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="caption" color="text.secondary">Thời gian</Typography>
+                    <Typography variant="caption">
+                      {now.toLocaleDateString('vi-VN')} {now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     </Typography>
                   </Stack>
-                </Stack>
-
-                {/* Discount */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="body2" color="text.secondary">
-                    Giảm giá
-                  </Typography>
-                  <Stack direction="row" spacing={0.5} alignItems="center">
-                    <Button
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="caption" color="text.secondary">Kho xuất</Typography>
+                    <Autocomplete
                       size="small"
-                      variant={quickDiscountMode === 'percent' ? 'contained' : 'outlined'}
-                      onClick={() => setQuickDiscountMode('percent')}
-                      sx={{ minWidth: 28, px: 0.5, fontSize: '0.65rem' }}
-                    >
-                      %
-                    </Button>
-                    <Button
-                      size="small"
-                      variant={quickDiscountMode === 'amount' ? 'contained' : 'outlined'}
-                      onClick={() => setQuickDiscountMode('amount')}
-                      sx={{ minWidth: 34, px: 0.5, fontSize: '0.65rem' }}
-                    >
-                      VNĐ
-                    </Button>
-                    <TextField
-                      size="small"
-                      type="number"
-                      value={quickDiscountInput}
-                      onChange={(e) => setQuickDiscountInput(e.target.value)}
-                      onBlur={handleQuickDiscountApply}
-                      onKeyDown={(e) => e.key === 'Enter' && handleQuickDiscountApply()}
-                      sx={{ width: 80 }}
-                      inputProps={{ min: 0, style: { textAlign: 'right', fontSize: '0.8rem' } }}
+                      options={warehouses.filter((w) => w.isActive)}
+                      getOptionLabel={(o) => o.name}
+                      // Kiểm soát ngay từ đầu (null khi chưa tải): trước đây undefined → ô hiện trống dù đã chọn kho.
+                      value={selectedWarehouse as IWarehouse}
+                      isOptionEqualToValue={(o, v) => o.id === v.id}
+                      onChange={(_, v) => setSelectedWarehouse(v)}
+                      sx={{ width: 140 }}
+                      renderInput={(params) => <TextField {...params} variant="standard" />}
+                      disableClearable
                     />
                   </Stack>
-                </Stack>
-
-                {activeOrder.discountAmount > 0 && (
-                  <Typography variant="caption" color="error.main" sx={{ textAlign: 'right' }}>
-                    -{fCurrency(activeOrder.discountAmount)}
-                  </Typography>
-                )}
-
-                {/* Coupon */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="body2" color="text.secondary">
-                    Mã coupon
-                  </Typography>
-                  <TextField
-                    size="small"
-                    placeholder="Nhập mã"
-                    value={activeOrder.couponCode}
-                    onChange={(e) => handleSetCoupon(e.target.value)}
-                    sx={{ width: 120 }}
-                    inputProps={{ style: { textAlign: 'right', fontSize: '0.8rem' } }}
-                  />
                 </Stack>
 
                 <Divider />
 
-                {/* Grand total */}
-                <Stack direction="row" justifyContent="space-between">
+                {/* Customer */}
+                <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
+                  <Autocomplete
+                    size="small"
+                    options={customers}
+                    getOptionLabel={(option) =>
+                      `${option.name}${option.phone ? ` (${option.phone})` : ''}`
+                    }
+                    value={customers.find((c) => c.id === activeOrder.customerId) || null}
+                    onChange={(_, v) => handleSetCustomer(v)}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        inputRef={customerInputRef}
+                        placeholder="Tìm khách hàng (F4)"
+                        InputProps={{
+                          ...params.InputProps,
+                          startAdornment: (
+                            <>
+                              <InputAdornment position="start">
+                                <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+                              </InputAdornment>
+                              {params.InputProps.startAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
+                  />
+                  {!activeOrder.customerId && (
+                    <Typography variant="caption" color="text.secondary">
+                      Mặc định: Khách lẻ
+                    </Typography>
+                  )}
+                </Box>
+
+                <Divider />
+
+                <Divider />
+
+                {/* Totals */}
+                <Stack spacing={1} sx={{ px: 2, py: 1.5 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="body2" color="text.secondary">
+                      Tổng tiền hàng{totalItemCount > 0 ? ` (${totalItemCount} SP)` : ''}
+                    </Typography>
+                    <Typography variant="subtitle2">{fCurrency(subTotal)}</Typography>
+                  </Stack>
+
+                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                    <Typography variant="body2" color="text.secondary" sx={{ pt: 0.75 }}>
+                      Giảm giá
+                    </Typography>
+                    {renderOrderDiscount()}
+                  </Stack>
+
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="body2" color="text.secondary">
+                      Mã coupon
+                    </Typography>
+                    <TextField
+                      size="small"
+                      placeholder="Nhập mã"
+                      value={activeOrder.couponCode}
+                      onChange={(e) => handleSetCoupon(e.target.value)}
+                      sx={{ width: DISCOUNT_FIELD_WIDTH }}
+                      inputProps={{ style: { textAlign: 'right' } }}
+                    />
+                  </Stack>
+                </Stack>
+
+                <Divider />
+
+                {/* Phương thức thanh toán: 4 nút ô vuông thay danh sách radio; một ô số tiền cho phương thức đang chọn */}
+                <Box sx={{ px: 2, py: 1.5 }}>
+                  <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+                    Phương thức thanh toán
+                  </Typography>
+                  <Box
+                    role="radiogroup"
+                    aria-label="Phương thức thanh toán"
+                    sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1 }}
+                  >
+                    {posMethods.map((pm) => {
+                      const selected = quickSelectedMethods.includes(pm.value);
+                      return (
+                        <ButtonBase
+                          key={pm.value}
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => handleQuickSelectMethod(pm.value)}
+                          sx={{
+                            justifyContent: 'flex-start',
+                            gap: 1,
+                            px: 1.25,
+                            py: 1,
+                            borderRadius: 1,
+                            typography: 'body2',
+                            fontWeight: selected ? 600 : 400,
+                            border: `1px solid ${selected ? theme.palette.primary.main : theme.palette.divider}`,
+                            bgcolor: selected ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
+                            color: selected ? 'primary.main' : 'text.primary',
+                            transition: theme.transitions.create(['background-color', 'border-color']),
+                            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) },
+                          }}
+                        >
+                          <Iconify icon={pm.icon} width={18} />
+                          {pm.label}
+                        </ButtonBase>
+                      );
+                    })}
+                  </Box>
+
+                  {quickMethod && (
+                    <Box sx={{ mt: 1.5 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="number"
+                        label={quickMethod === 'Cash' ? 'Khách đưa' : 'Số tiền'}
+                        placeholder="Số tiền"
+                        value={quickMethodAmounts[quickMethod] || ''}
+                        onChange={(e) => {
+                          const val = Number(e.target.value) || 0;
+                          setQuickPaymentTouched(true);
+                          setQuickMethodAmounts((prev) => ({ ...prev, [quickMethod]: val }));
+                        }}
+                        InputProps={{ endAdornment: <InputAdornment position="end">₫</InputAdornment> }}
+                        inputProps={{ min: 0, style: { textAlign: 'right', fontWeight: 600 } }}
+                      />
+
+                      {quickMethod === 'Cash' && quickDue > 0 && (
+                        <Stack direction="row" flexWrap="wrap" sx={{ gap: 0.75, mt: 1 }}>
+                          {quickCashAmounts(quickDue, 4).map((value) => (
+                            <Chip
+                              key={value}
+                              size="small"
+                              clickable
+                              label={value === quickDue ? 'Đúng tiền' : fCurrency(value)}
+                              color={quickPaid === value ? 'primary' : 'default'}
+                              variant={quickPaid === value ? 'filled' : 'outlined'}
+                              onClick={() => {
+                                setQuickPaymentTouched(value !== quickDue);
+                                setQuickMethodAmounts({ Cash: value });
+                              }}
+                            />
+                          ))}
+                        </Stack>
+                      )}
+
+                      {quickMethod === 'BankTransfer' && (
+                        <Box sx={{ mt: 1 }}>
+                          <PosQrPayment
+                            amount={quickMethodAmounts.BankTransfer || grandTotal}
+                            onPaymentCompleted={(qrStatus) => {
+                              setQuickQrPaymentCompleted(true);
+                              setQuickPaymentTouched(true);
+                              setQuickMethodAmounts((prev) => ({ ...prev, BankTransfer: qrStatus.amount }));
+                              setQuickMethodRefs((prev) => ({
+                                ...prev,
+                                BankTransfer: qrTransactionRef(qrStatus),
+                              }));
+                            }}
+                          />
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+
+                </Box>
+              </Box>
+
+              {/* Chân cố định */}
+              <Box sx={{ px: 2, pt: 1.25, pb: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1 }}>
                   <Typography variant="subtitle1" fontWeight={700}>
                     Khách cần trả
                   </Typography>
-                  <Typography variant="h6" fontWeight={700} color="error.main">
-                    {fCurrency(grandTotal > 0 ? grandTotal : 0)}
+                  <Typography variant="h5" fontWeight={700} color="error.main">
+                    {fCurrency(quickDue)}
                   </Typography>
                 </Stack>
-
-                {/* Customer payment */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="body2" color="text.secondary">
-                    Khách thanh toán
-                  </Typography>
-                  <TextField
-                    size="small"
-                    type="number"
-                    value={quickCustomerPayment || ''}
-                    onChange={(e) => {
-                      const val = Number(e.target.value) || 0;
-                      setQuickCustomerPayment(val);
-                      if (quickSelectedMethods.length === 1) {
-                        setQuickMethodAmounts({ [quickSelectedMethods[0]]: val });
-                      }
+                {/* Tiền thừa / còn thiếu ở chân cố định — thu ngân luôn thấy, không phải cuộn. */}
+                {activeOrder.items.length > 0 && quickPaid !== quickDue && (quickPaid < quickDue || quickMethod === 'Cash') && (
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    sx={{
+                      mb: 1,
+                      px: 1.25,
+                      py: 0.5,
+                      borderRadius: 1,
+                      bgcolor: alpha(
+                        quickPaid > quickDue ? theme.palette.success.main : theme.palette.error.main,
+                        0.08
+                      ),
                     }}
-                    sx={{ width: 120 }}
-                    inputProps={{ min: 0, style: { textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' } }}
-                  />
-                </Stack>
-              </Stack>
-
-              <Divider />
-
-              {/* Payment methods */}
-              <Box sx={{ px: 2, py: 1, flexGrow: 0 }}>
-                <Typography variant="caption" fontWeight={600} sx={{ mb: 0.5, display: 'block' }}>
-                  Phương thức thanh toán
-                </Typography>
-                <Stack spacing={0.5}>
-                  {posMethods.map((pm) => {
-                    const isSelected = quickSelectedMethods.includes(pm.value);
-                    return (
-                      <Box key={pm.value}>
-                        <FormControlLabel
-                          control={
-                            <Radio
-                              size="small"
-                              checked={isSelected}
-                              onChange={() => handleQuickSelectMethod(pm.value)}
-                            />
-                          }
-                          label={
-                            <Stack direction="row" alignItems="center" spacing={0.5}>
-                              <Iconify icon={pm.icon} width={16} />
-                              <Typography variant="body2">{pm.label}</Typography>
-                            </Stack>
-                          }
-                        />
-                        {isSelected && (
-                          <Box sx={{ pl: 4, pb: 0.5 }}>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              type="number"
-                              placeholder="Số tiền"
-                              value={quickMethodAmounts[pm.value] || ''}
-                              onChange={(e) =>
-                                setQuickMethodAmounts((prev) => ({
-                                  ...prev,
-                                  [pm.value]: Number(e.target.value) || 0,
-                                }))
-                              }
-                              inputProps={{ min: 0 }}
-                              sx={{ mb: 0.5 }}
-                            />
-                            {pm.value === 'BankTransfer' && (
-                              <PosQrPayment
-                                amount={quickMethodAmounts[pm.value] || grandTotal}
-                                onPaymentCompleted={(qrStatus) => {
-                                  setQuickQrPaymentCompleted(true);
-                                  setQuickMethodAmounts((prev) => ({ ...prev, BankTransfer: qrStatus.amount }));
-                                  setQuickMethodRefs((prev) => ({
-                                    ...prev,
-                                    BankTransfer: qrTransactionRef(qrStatus),
-                                  }));
-                                }}
-                              />
-                            )}
-                          </Box>
-                        )}
-                      </Box>
-                    );
-                  })}
-                </Stack>
-              </Box>
-
-              {/* Quick sale payment button */}
-              <Box sx={{ p: 2, mt: 'auto' }}>
+                  >
+                    <Typography variant="body2" color={quickPaid > quickDue ? 'success.dark' : 'error.dark'}>
+                      {quickPaid > quickDue ? 'Tiền thừa trả khách' : 'Còn thiếu'}
+                    </Typography>
+                    <Typography variant="subtitle2" color={quickPaid > quickDue ? 'success.dark' : 'error.dark'}>
+                      {fCurrency(Math.abs(quickPaid - quickDue))}
+                    </Typography>
+                  </Stack>
+                )}
                 <Button
                   fullWidth
                   variant="contained"
+                  color="primary"
                   size="large"
                   onClick={handleQuickPayment}
                   disabled={activeOrder.items.length === 0 || quickPaymentLoading}
@@ -1675,7 +2154,7 @@ export default function PosSaleView() {
 
           {/* ===== TAB: BÁN THƯỜNG ===== */}
           {rightTab === 1 && (
-            <Box sx={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ flexGrow: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               {/* Warehouse + datetime */}
               <Stack
                 direction="row"
@@ -1739,7 +2218,7 @@ export default function PosSaleView() {
               </Box>
 
               {/* Product suggestions grid */}
-              <Box sx={{ flexGrow: 1, overflow: 'auto', px: 2, py: 1 }}>
+              <Box sx={{ flexGrow: 1, minHeight: 0, overflow: 'auto', px: 2, py: 1 }}>
                 {filteredProducts.length === 0 ? (
                   <Stack
                     alignItems="center"
@@ -1752,112 +2231,102 @@ export default function PosSaleView() {
                     </Typography>
                   </Stack>
                 ) : (
-                  <Grid container spacing={1}>
-                    {filteredProducts.map((product) => (
-                      <Grid size={{ xs: 6 }} key={product.id}>
-                        <Card
+                  // Thẻ ngang gọn: hàng của cửa hàng gần như không có ảnh — ô ảnh trống to chỉ để thấy được 4 món.
+                  <Box
+                    sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 1 }}
+                  >
+                    {filteredProducts.map((product) => {
+                      const stock =
+                        product.totalStock ??
+                        product.inventories?.reduce((sum, inv) => sum + (inv.onHand || 0), 0) ??
+                        0;
+                      const variantCount = product.childProducts?.length ?? 0;
+                      return (
+                        <ButtonBase
+                          key={product.id}
                           onClick={() => handleAddProduct(product)}
                           sx={{
                             p: 1,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s',
+                            gap: 1,
+                            borderRadius: 1,
+                            textAlign: 'left',
+                            alignItems: 'flex-start',
+                            justifyContent: 'flex-start',
+                            border: `1px solid ${theme.palette.divider}`,
+                            transition: theme.transitions.create(['border-color', 'background-color']),
                             '&:hover': {
-                              boxShadow: theme.shadows[8],
-                              transform: 'translateY(-1px)',
+                              borderColor: theme.palette.primary.main,
+                              bgcolor: alpha(theme.palette.primary.main, 0.04),
                             },
                           }}
                         >
-                          <Box
-                            sx={{
-                              width: '100%',
-                              pt: '80%',
-                              position: 'relative',
-                              borderRadius: 0.75,
-                              overflow: 'hidden',
-                              bgcolor: theme.palette.grey[100],
-                              mb: 0.75,
-                            }}
+                          <Avatar
+                            variant="rounded"
+                            src={product.imageUrl || undefined}
+                            alt={product.name}
+                            sx={{ width: 40, height: 40, bgcolor: 'background.neutral', color: 'text.disabled' }}
                           >
-                            {product.imageUrl ? (
-                              <Box
-                                component="img"
-                                src={product.imageUrl}
-                                alt={product.name}
-                                sx={{
-                                  position: 'absolute',
-                                  top: 0,
-                                  left: 0,
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover',
-                                }}
-                              />
-                            ) : (
-                              <Stack
-                                alignItems="center"
-                                justifyContent="center"
-                                sx={{ position: 'absolute', inset: 0 }}
+                            <Iconify icon="solar:box-minimalistic-bold" width={20} />
+                          </Avatar>
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography
+                              variant="caption"
+                              fontWeight={600}
+                              sx={{
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                lineHeight: 1.35,
+                              }}
+                            >
+                              {product.name}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.disabled"
+                              noWrap
+                              display="block"
+                              sx={{ fontFamily: 'monospace', fontSize: '0.68rem' }}
+                            >
+                              {product.code || product.sku}
+                            </Typography>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={0.5}>
+                              <Typography variant="caption" fontWeight={700} color="primary.main" noWrap>
+                                {fCurrency(product.sellingPrice || product.basePrice)}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                noWrap
+                                color={variantCount > 0 ? 'info.main' : stock > 0 ? 'text.secondary' : 'error.main'}
                               >
-                                <Iconify
-                                  icon="solar:box-minimalistic-bold"
-                                  width={28}
-                                  sx={{ color: theme.palette.grey[400] }}
-                                />
-                              </Stack>
-                            )}
+                                {variantCount > 0 ? `${variantCount} phiên bản` : `Tồn ${stock}`}
+                              </Typography>
+                            </Stack>
                           </Box>
-
-                          <Typography variant="caption" fontWeight={600} noWrap>
-                            {product.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" noWrap display="block">
-                            {product.sku}
-                          </Typography>
-                          <Stack direction="row" justifyContent="space-between" alignItems="center">
-                            <Typography variant="caption" fontWeight={600} color="primary.main">
-                              {fCurrency(product.sellingPrice || product.basePrice)}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Tồn: {product.totalStock ?? 0}
-                            </Typography>
-                          </Stack>
-                        </Card>
-                      </Grid>
-                    ))}
-                  </Grid>
+                        </ButtonBase>
+                      );
+                    })}
+                  </Box>
                 )}
               </Box>
 
               <Divider />
 
               {/* Order summary */}
-              <Stack spacing={0.75} sx={{ px: 2, py: 1.5 }}>
-                <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="body2" color="text.secondary">
-                    Tổng tiền hàng
-                  </Typography>
-                  <Stack direction="row" spacing={1}>
-                    <Typography variant="body2" color="text.secondary">
-                      {totalItemCount}
-                    </Typography>
-                    <Typography variant="body2" fontWeight={500}>
-                      {fCurrency(subTotal)}
-                    </Typography>
-                  </Stack>
-                </Stack>
-
+              <Stack spacing={1} sx={{ px: 2, py: 1.5 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                   <Typography variant="body2" color="text.secondary">
+                    Tổng tiền hàng{totalItemCount > 0 ? ` (${totalItemCount} SP)` : ''}
+                  </Typography>
+                  <Typography variant="subtitle2">{fCurrency(subTotal)}</Typography>
+                </Stack>
+
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                  <Typography variant="body2" color="text.secondary" sx={{ pt: 0.75 }}>
                     Giảm giá
                   </Typography>
-                  <TextField
-                    size="small"
-                    type="number"
-                    value={activeOrder.discountAmount || ''}
-                    onChange={(e) => handleSetDiscount(Number(e.target.value) || 0)}
-                    sx={{ width: 100 }}
-                    inputProps={{ min: 0, style: { textAlign: 'right' } }}
-                  />
+                  {renderOrderDiscount()}
                 </Stack>
 
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -1869,28 +2338,26 @@ export default function PosSaleView() {
                     placeholder="Nhập mã"
                     value={activeOrder.couponCode}
                     onChange={(e) => handleSetCoupon(e.target.value)}
-                    sx={{ width: 120 }}
+                    sx={{ width: DISCOUNT_FIELD_WIDTH }}
                     inputProps={{ style: { textAlign: 'right' } }}
                   />
-                </Stack>
-
-                <Divider />
-
-                <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="subtitle1" fontWeight={700}>
-                    Khách cần trả
-                  </Typography>
-                  <Typography variant="h6" fontWeight={700} color="error.main">
-                    {fCurrency(grandTotal > 0 ? grandTotal : 0)}
-                  </Typography>
                 </Stack>
               </Stack>
 
               {/* Payment button */}
-              <Box sx={{ p: 2, pt: 0 }}>
+              <Box sx={{ px: 2, pt: 1.25, pb: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1 }}>
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    Khách cần trả
+                  </Typography>
+                  <Typography variant="h5" fontWeight={700} color="error.main">
+                    {fCurrency(grandTotal > 0 ? grandTotal : 0)}
+                  </Typography>
+                </Stack>
                 <Button
                   fullWidth
                   variant="contained"
+                  color="primary"
                   size="large"
                   onClick={handleOpenPayment}
                   disabled={activeOrder.items.length === 0}
@@ -1964,7 +2431,7 @@ export default function PosSaleView() {
       <ReceiptPrintDialog
         open={receiptDialogOpen}
         onClose={() => setReceiptDialogOpen(false)}
-        orderId={lastSaleId}
+        orderId={printOrderId}
       />
     </Box>
   );
@@ -1973,6 +2440,11 @@ export default function PosSaleView() {
 // ======================================================================
 // Utility
 // ======================================================================
+
+/** Tổng tiền hàng của một đơn tạm (Σ số lượng × đơn giá − giảm dòng), như `subTotal` của đơn đang mở. */
+function orderSubTotal(order: DraftOrder): number {
+  return order.items.reduce((sum, item) => sum + item.quantity * item.unitPrice - item.discountAmount, 0);
+}
 
 function getItemKey(item: CartItem): string {
   return item.productVariantId
