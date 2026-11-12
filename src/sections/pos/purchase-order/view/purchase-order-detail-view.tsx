@@ -20,6 +20,7 @@ import TextField from '@mui/material/TextField';
 import LoadingButton from '@mui/lab/LoadingButton';
 import Label from 'src/components/label';
 import Chip from '@mui/material/Chip';
+import Container from '@mui/material/Container';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
@@ -42,28 +43,12 @@ import { getShareholders } from 'src/api/shareholders';
 import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 
 import { lockedByPaidBy, usePurchaseAccess } from '../purchase-access';
+import { purchaseSubTotal, receivedQuantityOf, purchaseStatusMeta } from '../purchase-status';
 
 const fmtQty = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 4 });
 
 // ----------------------------------------------------------------------
 
-const STATUS_COLOR_MAP: Record<string, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
-  Draft: 'default',
-  Confirmed: 'info',
-  PartiallyReceived: 'warning',
-  Completed: 'success',
-  Cancelled: 'error',
-  Returned: 'error',
-};
-
-const STATUS_LABEL_MAP: Record<string, string> = {
-  Draft: 'Nháp',
-  Confirmed: 'Đã duyệt',
-  PartiallyReceived: 'Nhận một phần',
-  Completed: 'Hoàn thành',
-  Cancelled: 'Đã hủy',
-  Returned: 'Đã trả',
-};
 
 type Props = { id: string };
 
@@ -189,8 +174,14 @@ export default function PurchaseOrderDetailView({ id }: Props) {
   };
 
   if (loading || !order) {
-    return <Typography>Đang tải...</Typography>;
+    return (
+      <Container maxWidth="xl">
+        <Typography color="text.secondary">Đang tải...</Typography>
+      </Container>
+    );
   }
+
+  const statusMeta = purchaseStatusMeta(order.status);
 
   // Theo quyền purchase.* — đơn do cổ đông chi hộ: sửa / huỷ cần thêm quyền ghi chi hộ.
   const paidByLocked = lockedByPaidBy(access, order);
@@ -200,15 +191,26 @@ export default function PurchaseOrderDetailView({ id }: Props) {
   const canReceive = (order.status === 'Confirmed' || order.status === 'PartiallyReceived') && access.canReceive;
 
   return (
+    <Container maxWidth="xl">
     <Grid container spacing={3}>
       {/* Header */}
       <Grid size={{ xs: 12 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
           <Stack direction="row" alignItems="center" spacing={2}>
-            <Typography variant="h4">Đơn nhập hàng #{order.orderNumber}</Typography>
-            <Label color={STATUS_COLOR_MAP[order.status]}>{STATUS_LABEL_MAP[order.status] || order.status}</Label>
+            <IconButton onClick={() => router.push(paths.dashboard.pos.purchaseOrder.list)} size="small">
+              <Iconify icon="eva:arrow-ios-back-fill" />
+            </IconButton>
+            <Typography variant="h4">Phiếu nhập {order.orderNumber}</Typography>
+            <Label color={statusMeta.color}>{statusMeta.label}</Label>
           </Stack>
           <Stack direction="row" spacing={1}>
+            {access.canCreate && (
+              <Button variant="outlined" color="inherit"
+                onClick={() => router.push(`${paths.dashboard.pos.purchaseOrder.new}?copy=${id}`)}
+                startIcon={<Iconify icon="solar:copy-outline" />}>
+                Sao chép
+              </Button>
+            )}
             {canEdit && (
               <Button variant="contained" color="primary"
                 onClick={() => router.push(paths.dashboard.pos.purchaseOrder.edit(id))}
@@ -249,7 +251,7 @@ export default function PurchaseOrderDetailView({ id }: Props) {
             </Stack>
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">Kho nhập</Typography>
-              <Typography variant="body2">{order.warehouseName}</Typography>
+              <Typography variant="body2">{order.warehouseName || order.branchName || '—'}</Typography>
             </Stack>
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">Ngày tạo</Typography>
@@ -261,7 +263,7 @@ export default function PurchaseOrderDetailView({ id }: Props) {
             </Stack>
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">Người tạo</Typography>
-              <Typography variant="body2">{order.createdByName}</Typography>
+              <Typography variant="body2">{order.createdByName || '—'}</Typography>
             </Stack>
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">Người duyệt</Typography>
@@ -326,7 +328,7 @@ export default function PurchaseOrderDetailView({ id }: Props) {
           <Stack spacing={1.5}>
             <Stack direction="row" justifyContent="space-between">
               <Typography variant="body2" color="text.secondary">Tạm tính</Typography>
-              <Typography variant="body2">{fCurrency(order.subTotal)}</Typography>
+              <Typography variant="body2">{fCurrency(purchaseSubTotal(order))}</Typography>
             </Stack>
             <Stack direction="row" justifyContent="space-between">
               <Typography variant="body2" color="text.secondary">VAT</Typography>
@@ -370,7 +372,8 @@ export default function PurchaseOrderDetailView({ id }: Props) {
             <TableBody>
               {(order.items || []).map((item: IPurchaseOrderItem) => {
                 // Số lẻ được (M7 bước 1): làm tròn 4 chữ số để tránh 0,30000000004.
-                const remaining = Math.round((item.quantity - item.receivedQuantity) * 10000) / 10000;
+                const received = receivedQuantityOf(order.status, item);
+                const remaining = Math.round((item.quantity - received) * 10000) / 10000;
                 const factor = item.conversionFactor ?? 1;
                 return (
                   <TableRow key={item.id}>
@@ -393,8 +396,8 @@ export default function PurchaseOrderDetailView({ id }: Props) {
                     <TableCell align="right">{fmtQty(item.quantity)}</TableCell>
                     <TableCell>{item.unitName || ''}</TableCell>
                     <TableCell align="right">
-                      {fmtQty(item.receivedQuantity)}
-                      {item.receivedQuantity >= item.quantity && (
+                      {fmtQty(received)}
+                      {received >= item.quantity && (
                         <Iconify icon="eva:checkmark-circle-2-fill" sx={{ ml: 0.5, color: 'success.main', width: 16 }} />
                       )}
                     </TableCell>
@@ -436,5 +439,6 @@ export default function PurchaseOrderDetailView({ id }: Props) {
         </Card>
       </Grid>
     </Grid>
+    </Container>
   );
 }

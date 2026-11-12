@@ -217,10 +217,13 @@ const nowLocalIso = () => {
 };
 
 type Props = {
+  /** Phiếu tạm đang sửa. */
   currentPurchaseOrder?: IPurchaseOrder;
+  /** Sao chép: phiếu mới điền sẵn từ phiếu này (NCC, kho, hàng, giá, ghi chú) — ngày nhập là bây giờ. */
+  templateOrder?: IPurchaseOrder;
 };
 
-export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
+export default function PurchaseOrderNewForm({ currentPurchaseOrder, templateOrder }: Props) {
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
   const { user } = useAuthContext();
@@ -265,20 +268,24 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
   const paymentIdRef = useRef<string | null>(null);
 
   const defaultValues = useMemo(() => {
-    if (currentPurchaseOrder) {
-      const { invoiceNumber, note } = splitNote(currentPurchaseOrder.note);
+    const source = currentPurchaseOrder ?? templateOrder;
+    if (source) {
+      const { invoiceNumber, note } = splitNote(source.note);
       return {
-        supplierId: currentPurchaseOrder.supplierId || '',
-        warehouseId: currentPurchaseOrder.warehouseId || '',
+        supplierId: source.supplierId || '',
+        warehouseId: source.warehouseId || '',
         note,
-        invoiceNumber,
-        expectedDate: currentPurchaseOrder.expectedDate
-          ? new Date(currentPurchaseOrder.expectedDate).toISOString().slice(0, 16)
-          : '',
+        // Sao chép: phiếu mới của hoá đơn mới — không mang số hoá đơn, ngày nhập, người chi hộ của phiếu cũ.
+        invoiceNumber: currentPurchaseOrder ? invoiceNumber : '',
+        expectedDate: !currentPurchaseOrder
+          ? nowLocalIso()
+          : source.expectedDate
+            ? new Date(source.expectedDate).toISOString().slice(0, 16)
+            : '',
         discountType: 'amount' as 'amount' | 'percent',
-        discountAmount: currentPurchaseOrder.discountAmount || 0,
-        paidByShareholderId: currentPurchaseOrder.paidByShareholderId || null,
-        items: (currentPurchaseOrder.items || []).map((item) => ({
+        discountAmount: source.discountAmount || 0,
+        paidByShareholderId: currentPurchaseOrder ? source.paidByShareholderId || null : null,
+        items: (source.items || []).map((item) => ({
           ...EMPTY_ITEM,
           productId: item.productId,
           productVariantId: item.productVariantId || '',
@@ -286,14 +293,17 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
           unitPrice: item.unitPrice,
           vatRate: item.vatRate || 0,
           discountAmount: item.discountAmount || 0,
+          // Sao chép: giữ đúng thành tiền từng dòng của phiếu gốc (phiếu KiotViet làm tròn thành tiền, đơn giá lẻ
+          // 19.166,66 × 12 sẽ lệch vài xu). Sửa SL / đơn giá thì thành tiền tính lại như thường.
+          lineTotal: !currentPurchaseOrder && item.totalPrice ? item.totalPrice : null,
           note: item.note || '',
           _productName: item.variantName ? `${item.productName} — ${item.variantName}` : item.productName,
           _productCode: item.productCode || '',
           unitId: item.unitId || '',
           unitName: item.unitName || '',
           conversionFactor: item.conversionFactor || 1,
-          expiryDate: item.expiryDate || '',
-          _rowKey: item.id,
+          expiryDate: currentPurchaseOrder ? item.expiryDate || '' : '',
+          _rowKey: currentPurchaseOrder ? item.id : newRowKey(),
         })),
       };
     }
@@ -308,7 +318,7 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
       paidByShareholderId: null,
       items: [],
     };
-  }, [currentPurchaseOrder]);
+  }, [currentPurchaseOrder, templateOrder]);
 
   const methods = useForm({ resolver: yupResolver(Schema), defaultValues });
   const { control, watch, setValue, reset, getValues, handleSubmit, formState } = methods;
@@ -341,9 +351,9 @@ export default function PurchaseOrderNewForm({ currentPurchaseOrder }: Props) {
     if (shareholdersOn) getShareholders(true).then(setShareholders).catch(() => {});
   }, [shareholdersOn]);
 
-  // Bản nháp chưa xong lần trước (chỉ màn tạo mới)
+  // Bản nháp chưa xong lần trước (chỉ màn tạo mới, không hỏi khi đang sao chép phiếu)
   useEffect(() => {
-    if (isEdit || draftLoadedRef.current) return;
+    if (isEdit || templateOrder || draftLoadedRef.current) return;
     draftLoadedRef.current = true;
     getPurchaseOrderDraft()
       .then((draft) => {

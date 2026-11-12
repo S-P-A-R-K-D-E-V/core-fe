@@ -2982,6 +2982,8 @@ export interface IPurchaseOrderPagedResponse {
   pageSize: number;
   totalPages: number;
   items: IPurchaseOrder[];
+  /** Tổng "cần trả NCC" của mọi phiếu khớp bộ lọc (không chỉ trang này). */
+  totalAmount?: number;
 }
 
 export interface IPurchaseOrder {
@@ -3006,6 +3008,10 @@ export interface IPurchaseOrder {
   createdAt: string;
   updatedAt?: string;
   items: IPurchaseOrderItem[];
+  branchName?: string | null;
+  /** Đã trả NCC (các khoản chưa huỷ) / còn nợ — máy chủ tính như báo cáo công nợ phải trả. */
+  paidAmount?: number;
+  remainingAmount?: number;
 }
 
 export interface IPurchaseOrderItem {
