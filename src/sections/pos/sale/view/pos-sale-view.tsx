@@ -50,11 +50,12 @@ import {
   ICustomer,
   IWarehouse,
   ICreateSalesOrderRequest,
+  ISalesOrderReceipt,
 } from 'src/types/corecms-api';
 import { getAllProducts } from 'src/api/products';
 import { getAllCustomers } from 'src/api/customers';
 import { getAllWarehouses } from 'src/api/warehouses';
-import { createSalesOrder } from 'src/api/sales-orders';
+import { createSalesOrder, getAllSalesOrders, getSalesOrderReceipt } from 'src/api/sales-orders';
 
 import ReceiptPrintDialog from 'src/sections/pos/receipt-print/receipt-print-dialog';
 
@@ -96,6 +97,17 @@ import {
   type CatalogSnapshot,
 } from '../../offline/pos-catalog';
 import { useConnectivity, useOutboxEntries, useOutboxSender } from '../../offline/use-pos-outbox';
+import { buildOfflineReceipt } from '../../offline/offline-receipt';
+import OfflineTransferQr from '../../offline/offline-transfer-qr';
+import { nextOfflineCode, noteWithOfflineCode } from '../../offline/pos-device';
+import { loadPrintKit, refreshPrintKit, EMPTY_PRINT_KIT, type PrintKit } from '../../offline/pos-print-kit';
+import { getPrintTemplates } from 'src/api/print-templates';
+import { loadPosBankAccounts } from 'src/components/account-capability';
+import {
+  loadReceiptSettings,
+  saveReceiptSettings,
+  usableTransferAccounts,
+} from 'src/sections/pos/receipt-print/receipt-settings';
 import { PosManageMenu, PosSyncButton, PosRecentSalesButton } from '../pos-top-bar-actions';
 import { useCustomerDisplaySync } from 'src/sections/customer-display/use-customer-display-sync';
 import {
@@ -139,6 +151,8 @@ interface DraftOrder {
   couponCode: string;
   /** Mã chống trùng của lần gửi gần nhất (lưu cùng đơn tạm — tải lại trang vẫn gửi lại đúng mã). */
   pendingRequest?: PendingSaleRequest;
+  /** Mã tạm (pos-device.ts) — cấp sớm khi hiện QR tĩnh (làm nội dung chuyển khoản), dùng lại nếu hoá đơn phải nằm chờ. */
+  offlineCode?: string;
 }
 
 // ======================================================================
@@ -263,6 +277,7 @@ export default function PosSaleView() {
 function PosSaleScreen() {
   const theme = useTheme();
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
+  const { brandName } = useStoreBrand();
   const { user } = useAuthContext();
   const sellerName = user ? `${user.lastName || ''} ${user.firstName || ''}`.trim() || user.email : 'Admin';
 
@@ -275,6 +290,36 @@ function PosSaleScreen() {
 
   // Hàng chờ hoá đơn trên máy (IndexedDB) — mọi lần bán đều ghi vào đây trước khi gửi.
   const outbox = posOutbox();
+
+  // Bộ in lưu trên máy (thông tin cửa hàng, mẫu in, tài khoản nhận) — in phiếu tạm / QR tĩnh khi mất mạng.
+  const [printKit, setPrintKit] = useState<PrintKit>(EMPTY_PRINT_KIT);
+  const printKitRef = useRef(printKit);
+  printKitRef.current = printKit;
+  useEffect(() => {
+    loadPrintKit().then(setPrintKit).catch(() => {});
+  }, []);
+  const refreshKit = useCallback(() => {
+    refreshPrintKit({
+      getPrintTemplates: () => getPrintTemplates('receipt'),
+      latestReceipt: async () => {
+        const latest = (await getAllSalesOrders({ pageNumber: 1, pageSize: 1 })).items?.[0];
+        return latest ? getSalesOrderReceipt(latest.id) : null;
+      },
+      bankAccounts: async () => usableTransferAccounts((await loadPosBankAccounts()).accounts),
+    })
+      .then(setPrintKit)
+      .catch(() => {});
+  }, []);
+
+  // In: hoá đơn trên máy chủ (printOrderId) hoặc phiếu tạm dựng tại máy (localReceipt); "Tự in sau khi bán" nhớ theo máy.
+  const [printOrderId, setPrintOrderId] = useState<string | null>(null);
+  const [localReceipt, setLocalReceipt] = useState<ISalesOrderReceipt | null>(null);
+  const [printAuto, setPrintAuto] = useState(false);
+  const [autoPrint, setAutoPrint] = useState(() => loadReceiptSettings().autoPrint);
+  const handleToggleAutoPrint = useCallback((value: boolean) => {
+    setAutoPrint(value);
+    saveReceiptSettings({ ...loadReceiptSettings(), autoPrint: value });
+  }, []);
   const outboxEntries = useOutboxEntries(outbox);
   const [outboxDurable, setOutboxDurable] = useState(true);
   useEffect(() => {
@@ -361,6 +406,19 @@ function PosSaleScreen() {
   const [lastSaleId, setLastSaleId] = useState<string | null>(null);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
 
+  /** In phiếu tạm của hoá đơn chưa lên hệ thống (dựng tại máy). */
+  const openLocalReceipt = useCallback(
+    (sale: OutboxEntry, auto = false) => {
+      setLocalReceipt(
+        buildOfflineReceipt(sale, { kit: printKitRef.current, fallbackStoreName: brandName, cashierName: sellerName })
+      );
+      setPrintOrderId(null);
+      setPrintAuto(auto);
+      setReceiptDialogOpen(true);
+    },
+    [brandName, sellerName]
+  );
+
   // Current time
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -442,6 +500,7 @@ function PosSaleScreen() {
         catalogFromServerRef.current = true;
         applyCatalog(snap);
         saveCatalogSnapshot(snap);
+        refreshKit();
         if (manual) {
           closeSnackbar();
           enqueueSnackbar(`Đã tải lại ${snap.products.length} mặt hàng và khách hàng`, { variant: 'success' });
@@ -452,7 +511,7 @@ function PosSaleScreen() {
         return false;
       }
     },
-    [applyCatalog, enqueueSnackbar, closeSnackbar]
+    [applyCatalog, enqueueSnackbar, closeSnackbar, refreshKit]
   );
 
   useEffect(() => {
@@ -1042,6 +1101,7 @@ function PosSaleScreen() {
         status: 'sending',
         attempts: 1,
         lastAttemptAt: soldAt,
+        offlineCode: activeOrder.offlineCode,
       };
       let queued = true;
       try {
@@ -1070,7 +1130,15 @@ function PosSaleScreen() {
         if (settled.change > 0) {
           enqueueSnackbar(`Tiền thừa trả khách: ${fCurrency(settled.change)}`, { variant: 'info' });
         }
-        if (created?.id) setLastSaleId(created.id);
+        if (created?.id) {
+          setLastSaleId(created.id);
+          if (autoPrint) {
+            setLocalReceipt(null);
+            setPrintOrderId(created.id);
+            setPrintAuto(true);
+            setReceiptDialogOpen(true);
+          }
+        }
         releaseSoldOrder();
 
         return true;
@@ -1093,13 +1161,41 @@ function PosSaleScreen() {
         // Mất mạng / hết thời gian chờ / lỗi máy chủ: khách đã trả tiền — hoá đơn nằm trong hàng chờ (cùng mã chống
         // trùng, giờ bán = bây giờ), bán tiếp; bộ gửi thử lại ngay rồi lùi dần, máy chủ đã lưu thì không tạo trùng.
         reportReachable(false);
-        await outbox
-          .update(entry.id, { status: 'pending', lastError: describeSaleError(error), nextAttemptAt: undefined })
-          .catch(console.error);
+        // Mã tạm in trên phiếu + ghi vào ghi chú hoá đơn (tra lại ở Đơn bán hàng sau khi có mã chính thức).
+        const offlineCode = entry.offlineCode ?? nextOfflineCode();
+        const queuedEntry =
+          (await outbox
+            .update(entry.id, {
+              status: 'pending',
+              lastError: describeSaleError(error),
+              nextAttemptAt: undefined,
+              offlineCode,
+              payload: { ...payload, note: noteWithOfflineCode(payload.note, offlineCode) },
+            })
+            .catch((err) => {
+              console.error(err);
+              return undefined;
+            })) ?? { ...entry, status: 'pending' as const, offlineCode };
         enqueueSnackbar(
-          'Mất mạng — đã lưu hoá đơn trên máy, sẽ tự đồng bộ khi có mạng (nút "Chờ đồng bộ" trên thanh trên cùng).',
-          { variant: 'warning', autoHideDuration: 8000 }
+          `Mất mạng — đã lưu hoá đơn trên máy (mã tạm ${offlineCode}), sẽ tự đồng bộ khi có mạng (nút "Chờ đồng bộ" trên thanh trên cùng).`,
+          {
+            variant: 'warning',
+            autoHideDuration: 10000,
+            action: (key) => (
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => {
+                  closeSnackbar(key);
+                  openLocalReceipt(queuedEntry);
+                }}
+              >
+                In phiếu tạm
+              </Button>
+            ),
+          }
         );
+        if (autoPrint) openLocalReceipt(queuedEntry, true);
         releaseSoldOrder();
         return true;
       }
@@ -1114,6 +1210,9 @@ function PosSaleScreen() {
       enqueueSnackbar,
       outbox,
       reportReachable,
+      autoPrint,
+      openLocalReceipt,
+      closeSnackbar,
     ]
   );
 
@@ -1220,9 +1319,10 @@ function PosSaleScreen() {
   );
 
   // Nút máy in: chọn một hoá đơn gần đây để in lại (không tự in sau khi bán)
-  const [printOrderId, setPrintOrderId] = useState<string | null>(null);
   const handlePrintSale = useCallback((salesOrderId: string) => {
+    setLocalReceipt(null);
     setPrintOrderId(salesOrderId);
+    setPrintAuto(false);
     setReceiptDialogOpen(true);
   }, []);
 
@@ -1261,6 +1361,7 @@ function PosSaleScreen() {
       setQuickMethodRefs({});
       setQuickPaymentTouched(false);
       setQuickQrPaymentCompleted(false);
+      setUseStaticQr(false);
     } finally {
       setQuickPaymentLoading(false);
     }
@@ -1312,6 +1413,16 @@ function PosSaleScreen() {
 
   const quickDue = grandTotal > 0 ? grandTotal : 0;
   const quickMethod: string | undefined = quickSelectedMethods[0];
+
+  // Chuyển khoản lúc mất mạng (hoặc QR qua máy chủ lỗi): QR tĩnh dựng tại máy, nội dung = mã tạm của đơn.
+  const [useStaticQr, setUseStaticQr] = useState(false);
+  const showStaticQr = quickMethod === 'BankTransfer' && (!online || useStaticQr);
+  useEffect(() => {
+    if (showStaticQr && !activeOrder.offlineCode) {
+      const code = nextOfflineCode();
+      updateActiveOrder((order) => (order.offlineCode ? order : { ...order, offlineCode: code }));
+    }
+  }, [showStaticQr, activeOrder.offlineCode, updateActiveOrder]);
   const quickPaid = quickSelectedMethods.reduce((sum, m) => sum + (quickMethodAmounts[m] || 0), 0);
 
   // Ô giảm giá hoá đơn dùng chung cho cả hai tab: chọn ₫ / % rồi nhập; số tiền giảm hiện ngay dưới.
@@ -1716,8 +1827,11 @@ function PosSaleScreen() {
             fg={barFg}
             lastSaleId={lastSaleId}
             deviceSales={deviceSentSales}
-            unsentCount={unsentCount}
+            unsentSales={unsentSales}
             onPrint={handlePrintSale}
+            onPrintLocal={(sale) => openLocalReceipt(sale)}
+            autoPrint={autoPrint}
+            onAutoPrintChange={handleToggleAutoPrint}
           />
           <Stack
             direction="row"
@@ -2216,7 +2330,7 @@ function PosSaleScreen() {
                         </Stack>
                       )}
 
-                      {quickMethod === 'BankTransfer' && (
+                      {quickMethod === 'BankTransfer' && !showStaticQr && (
                         <Box sx={{ mt: 1 }}>
                           <PosQrPayment
                             amount={quickMethodAmounts.BankTransfer || grandTotal}
@@ -2230,7 +2344,25 @@ function PosSaleScreen() {
                               }));
                             }}
                           />
+                          <Button size="small" color="inherit" sx={{ mt: 0.5 }} onClick={() => setUseStaticQr(true)}>
+                            Mất mạng / không tạo được QR? Dùng QR tĩnh
+                          </Button>
                         </Box>
+                      )}
+                      {showStaticQr && (
+                        <OfflineTransferQr
+                          amount={quickDue}
+                          code={activeOrder.offlineCode ?? null}
+                          accounts={printKit.bankAccounts}
+                          confirmed={quickQrPaymentCompleted}
+                          onConfirm={(reference) => {
+                            setQuickQrPaymentCompleted(true);
+                            setQuickPaymentTouched(true);
+                            setQuickMethodAmounts({ BankTransfer: quickDue });
+                            setQuickMethodRefs({ BankTransfer: reference });
+                          }}
+                          onUseDynamic={online ? () => setUseStaticQr(false) : undefined}
+                        />
                       )}
                     </Box>
                   )}
@@ -2572,6 +2704,8 @@ function PosSaleScreen() {
         open={receiptDialogOpen}
         onClose={() => setReceiptDialogOpen(false)}
         orderId={printOrderId}
+        localReceipt={localReceipt}
+        autoPrint={printAuto}
       />
     </Box>
   );

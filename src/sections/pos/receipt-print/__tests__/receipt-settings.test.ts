@@ -41,20 +41,21 @@ const account = (id: string, extra: Partial<IKiotVietBankAccount> = {}): IKiotVi
 
 describe('lựa chọn in hoá đơn', () => {
   it('mặc định: giấy 80 mm, chưa chọn tài khoản nhận', () => {
-    expect(DEFAULT_RECEIPT_SETTINGS).toEqual({ paperWidth: 80, bankAccountId: null });
-    expect(loadReceiptSettings(fakeStorage())).toEqual({ paperWidth: 80, bankAccountId: null });
-    expect(loadReceiptSettings(null)).toEqual({ paperWidth: 80, bankAccountId: null });
+    expect(DEFAULT_RECEIPT_SETTINGS).toEqual({ paperWidth: 80, bankAccountId: null, autoPrint: false });
+    expect(loadReceiptSettings(fakeStorage())).toEqual({ paperWidth: 80, bankAccountId: null, autoPrint: false });
+    expect(loadReceiptSettings(null)).toEqual({ paperWidth: 80, bankAccountId: null, autoPrint: false });
   });
 
   it('lưu rồi đọc lại đúng khổ giấy và tài khoản đã chọn, dưới khoá pos-receipt-print-settings', () => {
     const storage = fakeStorage();
-    saveReceiptSettings({ paperWidth: 58, bankAccountId: 'acc-2' }, storage);
+    saveReceiptSettings({ paperWidth: 58, bankAccountId: 'acc-2', autoPrint: false }, storage);
     expect(RECEIPT_SETTINGS_STORAGE_KEY).toBe('pos-receipt-print-settings');
     expect(JSON.parse(storage.data.get(RECEIPT_SETTINGS_STORAGE_KEY) as string)).toEqual({
       paperWidth: 58,
       bankAccountId: 'acc-2',
+      autoPrint: false,
     });
-    expect(loadReceiptSettings(storage)).toEqual({ paperWidth: 58, bankAccountId: 'acc-2' });
+    expect(loadReceiptSettings(storage)).toEqual({ paperWidth: 58, bankAccountId: 'acc-2', autoPrint: false });
   });
 
   it('dữ liệu hỏng hoặc giá trị lạ → về mặc định, không ném lỗi', () => {
@@ -82,7 +83,7 @@ describe('lựa chọn in hoá đơn', () => {
     };
     expect(loadReceiptSettings(blocked)).toEqual(DEFAULT_RECEIPT_SETTINGS);
     expect(() =>
-      saveReceiptSettings({ paperWidth: 58, bankAccountId: null }, blocked)
+      saveReceiptSettings({ paperWidth: 58, bankAccountId: null, autoPrint: false }, blocked)
     ).not.toThrow();
   });
 });

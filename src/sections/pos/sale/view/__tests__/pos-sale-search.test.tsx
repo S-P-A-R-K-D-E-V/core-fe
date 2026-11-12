@@ -111,7 +111,8 @@ vi.mock('src/api/sales-orders', () => ({
   getSalesOrderReceipt: () => Promise.resolve(null),
   getAllSalesOrders: () => Promise.resolve({ items: [], totalCount: 0 }),
 }));
-vi.mock('src/api/bank-accounts', () => ({ getBankAccounts: () => Promise.resolve([]) }));
+const getBankAccounts = vi.fn((): Promise<any[]> => Promise.resolve([]));
+vi.mock('src/api/bank-accounts', () => ({ getBankAccounts: () => getBankAccounts() }));
 
 vi.mock('../../pos-discount-popover', () => ({ default: () => null }));
 vi.mock('../../pos-product-detail-drawer', () => ({ default: () => null }));
@@ -368,6 +369,13 @@ describe('PosSaleView — dòng hàng, thanh toán, phím tắt', { timeout: 300
     expect(queued[0]).toMatchObject({ status: 'pending' });
     expect(queued[0].attempts).toBeGreaterThanOrEqual(2);
     expect(queued[0].nextAttemptAt).toBeTruthy();
+    // mã tạm in trên phiếu + ghi vào ghi chú hoá đơn (tra lại ở Đơn bán hàng)
+    expect(queued[0].offlineCode).toMatch(/^[A-Z0-9]{2}-\d{6}-\d{3}$/);
+    expect(queued[0].payload.note).toBe(`Mã tạm: ${queued[0].offlineCode}`);
+    expect(snackbar.enqueueSnackbar).toHaveBeenCalledWith(
+      expect.stringContaining(`mã tạm ${queued[0].offlineCode}`),
+      expect.objectContaining({ variant: 'warning', action: expect.any(Function) })
+    );
 
     await user.click(syncButton);
     expect(await screen.findByText('Hoá đơn chờ đồng bộ')).toBeInTheDocument();
@@ -556,5 +564,62 @@ describe('PosSaleView — mất mạng vẫn tra được hàng', { timeout: 300
       expect(saved[0]).toMatchObject({ id: 'catalog', complete: true });
       expect(saved[0].products).toHaveLength(3);
     });
+  });
+});
+
+describe('PosSaleView — chuyển khoản lúc mất mạng (QR tĩnh)', { timeout: 30000 }, () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('mất mạng: QR tĩnh dựng tại máy, thu ngân xác nhận tay → khoản thu ghi "chưa đối soát"', async () => {
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    getBankAccounts.mockResolvedValue([
+      { id: 'acc-1', shortName: 'MB', bin: '970422', accountNumber: '0123456789', isDefault: true },
+    ]);
+    window.localStorage.setItem(
+      'pos_meta',
+      JSON.stringify([
+        {
+          id: 'printKit',
+          store: null,
+          branch: null,
+          footer: null,
+          templates: null,
+          bankAccounts: [{ id: 'acc-1', shortName: 'MB', bin: '970422', accountNumber: '0123456789', isDefault: true }],
+          savedAt: '2026-11-12T08:00:00.000Z',
+        },
+      ])
+    );
+    const user = userEvent.setup({ delay: null });
+    renderView();
+    await ready();
+    await user.type(searchBox(), '8930001{Enter}');
+    await waitFor(() => expect(within(cart()).getByText('SP000123')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('radio', { name: /Chuyển khoản/ }));
+    expect(await screen.findByText('QR tĩnh — xác nhận tay')).toBeInTheDocument();
+    expect(screen.getByLabelText('Mã QR chuyển khoản tĩnh')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Đã nhận chuyển khoản' }));
+    await user.click(screen.getByRole('button', { name: 'XÁC NHẬN ĐƠN HÀNG' }));
+
+    await waitFor(() => expect(createSalesOrder).toHaveBeenCalledTimes(1));
+    const sent = createSalesOrder.mock.calls[0][0];
+    expect(sent.payments).toEqual([
+      { method: 'BankTransfer', amount: 35000, transactionRef: expect.stringMatching(/^QR tĩnh [A-Z0-9]{2}-\d{6}-\d{3} — chưa đối soát$/) },
+    ]);
+  });
+
+  it('chưa lưu tài khoản nhận trên máy → nhắc thu tiền mặt / thẻ', async () => {
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    const user = userEvent.setup({ delay: null });
+    renderView();
+    await ready();
+    await user.type(searchBox(), '8930001{Enter}');
+    await waitFor(() => expect(within(cart()).getByText('SP000123')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('radio', { name: /Chuyển khoản/ }));
+    expect(await screen.findByText(/chưa lưu tài khoản nhận chuyển khoản/)).toBeInTheDocument();
   });
 });

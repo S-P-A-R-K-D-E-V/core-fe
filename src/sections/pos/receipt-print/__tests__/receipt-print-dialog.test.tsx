@@ -199,7 +199,7 @@ describe('ReceiptPrintDialog', () => {
     expect(narrow).toContain('@page{size:58mm ');
     expect(narrow).toContain('.rc{width:48mm;');
     expect(screen.getByText(/Trang in 58 × \d+ mm/)).toBeInTheDocument();
-    expect(savedSettings()).toEqual({ paperWidth: 58, bankAccountId: null });
+    expect(savedSettings()).toEqual({ paperWidth: 58, bankAccountId: null, autoPrint: false });
 
     await user.click(printButton());
     expect(printHtmlDocument).toHaveBeenCalledWith(narrow);
@@ -293,14 +293,14 @@ describe('ReceiptPrintDialog', () => {
     await waitFor(async () =>
       expect(parse(await previewHtml()).querySelectorAll('svg.qc')).toHaveLength(1)
     );
-    expect(savedSettings()).toEqual({ paperWidth: 80, bankAccountId: 'acc-tcb' });
+    expect(savedSettings()).toEqual({ paperWidth: 80, bankAccountId: 'acc-tcb', autoPrint: false });
 
     // bỏ chọn → về phiếu không có mã QR, không gọi lại core-be
     const callsBefore = getSalesOrderReceipt.mock.calls.length;
     await choose(user, ACCOUNT_FIELD, 'Không in mã QR');
     await waitFor(async () => expect(parse(await previewHtml()).querySelector('svg')).toBeNull());
     expect(getSalesOrderReceipt.mock.calls.length).toBe(callsBefore);
-    expect(savedSettings()).toEqual({ paperWidth: 80, bankAccountId: null });
+    expect(savedSettings()).toEqual({ paperWidth: 80, bankAccountId: null, autoPrint: false });
   });
 
   it('tài khoản đã chọn lần trước được dùng lại cho hoá đơn sau', async () => {
@@ -483,5 +483,55 @@ describe('ReceiptPrintDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Đóng' }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ----------------------------------------------------------------------
+// Phiếu tạm dựng tại máy (hoá đơn bán lúc mất mạng, chưa có trên máy chủ) — GĐ3 POS offline.
+// ----------------------------------------------------------------------
+
+describe('ReceiptPrintDialog — phiếu tạm dựng tại máy', () => {
+  const local = (): ISalesOrderReceipt => ({
+    ...normalReceipt(),
+    invoice: { ...normalReceipt().invoice, id: 'req-1', code: 'Q7-261112-003' },
+  });
+
+  it('không tải phiếu từ máy chủ; tiêu đề "In phiếu tạm", báo mã chính thức cấp sau; in được', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <ReceiptPrintDialog open onClose={vi.fn()} orderId={null} localReceipt={local()} />
+      </ThemeProvider>
+    );
+
+    expect(await screen.findByText('In phiếu tạm Q7-261112-003')).toBeInTheDocument();
+    expect(screen.getByText(/Hoá đơn chưa lên hệ thống/)).toBeInTheDocument();
+    expect(await previewHtml()).toContain('Q7-261112-003');
+    expect(getSalesOrderReceipt).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(printButton()).toBeEnabled());
+    await user.click(printButton());
+    expect(printHtmlDocument).toHaveBeenCalledTimes(1);
+  });
+
+  it('phiếu tạm dùng mẫu in đã lưu trên máy (không gọi máy chủ — mạng treo); "Tự in" mở hộp thoại in ngay', async () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <ReceiptPrintDialog open onClose={vi.fn()} orderId={null} localReceipt={local()} autoPrint />
+      </ThemeProvider>
+    );
+
+    await waitFor(() => expect(printHtmlDocument).toHaveBeenCalledTimes(1));
+    expect(printHtmlDocument.mock.calls[0][0]).toContain('Q7-261112-003');
+    expect(getPrintTemplates).not.toHaveBeenCalled();
+  });
+
+  it('tải được phiếu từ máy chủ → nhớ thông tin cửa hàng cho lần in khi mất mạng', async () => {
+    renderDialog();
+    await previewHtml();
+    await waitFor(() => {
+      const meta = JSON.parse(window.localStorage.getItem('pos_meta') ?? '[]');
+      expect(meta.find((r: any) => r.id === 'printKit')?.store?.name).toBe(normalReceipt().store.name);
+    });
   });
 });

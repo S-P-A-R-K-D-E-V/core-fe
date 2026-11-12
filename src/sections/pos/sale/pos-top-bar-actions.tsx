@@ -8,7 +8,9 @@ import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Popover from '@mui/material/Popover';
 import Tooltip from '@mui/material/Tooltip';
+import Switch from '@mui/material/Switch';
 import MenuItem from '@mui/material/MenuItem';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -252,12 +254,25 @@ type PrintProps = {
   lastSaleId: string | null;
   /** Hoá đơn đã gửi lên từ máy này (hàng chờ, giữ 7 ngày) — dùng khi không tải được danh sách. */
   deviceSales: OutboxEntry[];
-  /** Hoá đơn chưa lên hệ thống — chưa in được (chưa có trên máy chủ). */
-  unsentCount: number;
+  /** Hoá đơn chưa lên hệ thống — in được phiếu tạm dựng tại máy (mã tạm). */
+  unsentSales: OutboxEntry[];
   onPrint: (salesOrderId: string) => void;
+  onPrintLocal: (sale: OutboxEntry) => void;
+  /** "Tự in sau khi bán" (nhớ theo máy). */
+  autoPrint: boolean;
+  onAutoPrintChange: (value: boolean) => void;
 };
 
-export function PosRecentSalesButton({ fg, lastSaleId, deviceSales, unsentCount, onPrint }: PrintProps) {
+export function PosRecentSalesButton({
+  fg,
+  lastSaleId,
+  deviceSales,
+  unsentSales,
+  onPrint,
+  onPrintLocal,
+  autoPrint,
+  onAutoPrintChange,
+}: PrintProps) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [rows, setRows] = useState<RecentRow[] | null>(null);
   const [fromDevice, setFromDevice] = useState(false);
@@ -317,12 +332,46 @@ export function PosRecentSalesButton({ fg, lastSaleId, deviceSales, unsentCount,
           <Typography variant="caption" color="text.secondary">
             {fromDevice ? 'Không tải được danh sách — hoá đơn vừa bán trên máy này' : 'Hoá đơn gần đây'}
           </Typography>
-          {unsentCount > 0 && (
-            <Typography variant="caption" color="warning.dark" display="block">
-              {unsentCount} hoá đơn chưa lên hệ thống — in được sau khi đồng bộ
-            </Typography>
-          )}
         </Box>
+        {unsentSales.length > 0 && <Divider />}
+        {unsentSales.length > 0 && (
+          <Typography variant="caption" color="warning.dark" sx={{ px: 2, pt: 1, display: 'block' }}>
+            Chưa lên hệ thống — in phiếu tạm
+          </Typography>
+        )}
+        {unsentSales.map((sale) => (
+          <MenuItem
+            key={sale.id}
+            onClick={() => {
+              setAnchorEl(null);
+              onPrintLocal(sale);
+            }}
+            sx={{ py: 1 }}
+          >
+            <ListItemIcon>
+              <Iconify icon="solar:cloud-upload-bold" width={18} />
+            </ListItemIcon>
+            <ListItemText
+              primary={
+                <Stack direction="row" justifyContent="space-between" spacing={1}>
+                  <Typography variant="body2" fontWeight={600} noWrap sx={{ fontFamily: 'monospace' }}>
+                    {sale.offlineCode ?? sale.label}
+                  </Typography>
+                  <Typography variant="body2" fontWeight={600}>
+                    {fCurrency(sale.total)}
+                  </Typography>
+                </Stack>
+              }
+              secondary={
+                <Typography variant="caption" color="text.secondary" noWrap component="span" display="block">
+                  {dayHhmm(sale.createdAt)} · {sale.status === 'failed' ? 'bị từ chối' : 'chờ đồng bộ'}
+                  {sale.customerName ? ` · ${sale.customerName}` : ''}
+                </Typography>
+              }
+            />
+          </MenuItem>
+        ))}
+        {unsentSales.length > 0 && <Divider />}
         {rows === null && (
           <Stack alignItems="center" sx={{ py: 2 }}>
             <CircularProgress size={20} />
@@ -367,6 +416,14 @@ export function PosRecentSalesButton({ fg, lastSaleId, deviceSales, unsentCount,
           </MenuItem>
         ))}
         <Divider />
+        <Box sx={{ px: 2, py: 0.5 }}>
+          <FormControlLabel
+            control={
+              <Switch size="small" checked={autoPrint} onChange={(e) => onAutoPrintChange(e.target.checked)} />
+            }
+            label={<Typography variant="body2">Tự in sau khi bán</Typography>}
+          />
+        </Box>
         <MenuItem component={RouterLink} href={paths.dashboard.pos.salesOrder.root} onClick={() => setAnchorEl(null)}>
           <ListItemIcon>
             <Iconify icon="solar:list-bold" width={18} />
