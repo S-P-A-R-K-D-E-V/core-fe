@@ -3263,6 +3263,8 @@ export interface ICreateSalesOrderRequest {
   cashTendered?: number;
   /** Mã chống trùng do máy sinh: gửi lại cùng mã thì máy chủ trả đúng hoá đơn đã tạo, không tạo thêm */
   clientRequestId?: string;
+  /** Hoá đơn bán lúc mất mạng gửi lại từ hàng chờ (máy chủ ghi "Bán offline lúc …", nhận purchaseDate ≤ 72 giờ) */
+  offline?: boolean;
 }
 
 export interface ICreateInvoiceDetailRequest {

@@ -81,14 +81,21 @@ import { useWorkingBranch } from 'src/store/working-branch-store';
 import { useStoreBrand } from 'src/components/branding';
 
 import {
-  addPendingSale,
+  isUnsent,
+  posOutbox,
   describeSaleError,
-  removePendingSale,
-  rememberRecentSale,
-  syncPendingSales,
-  usePendingSales,
-  type PendingSale,
-} from '../pos-pending-sales';
+  type OutboxEntry,
+  type ProcessResult,
+} from '../../offline/pos-outbox';
+import { requestPersistentStorage } from '../../offline/pos-store';
+import {
+  fetchCatalog,
+  searchCatalog,
+  saveCatalogSnapshot,
+  loadCatalogSnapshot,
+  type CatalogSnapshot,
+} from '../../offline/pos-catalog';
+import { useConnectivity, useOutboxEntries, useOutboxSender } from '../../offline/use-pos-outbox';
 import { PosManageMenu, PosSyncButton, PosRecentSalesButton } from '../pos-top-bar-actions';
 import { useCustomerDisplaySync } from 'src/sections/customer-display/use-customer-display-sync';
 import {
@@ -139,6 +146,20 @@ interface DraftOrder {
 // ======================================================================
 
 const POS_DRAFT_ORDERS_KEY = 'pos_draft_orders';
+
+/** Số thẻ hàng tối đa vẽ ở lưới "Bán thường" (cả danh mục ~600 hàng — gõ để lọc). */
+const GRID_LIMIT = 120;
+
+/** Hiển thị giờ lưu danh mục: "16:05 12/11". */
+function fDateTimeShort(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? ''
+    : `${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${d.toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+      })}`;
+}
 
 /** Cột phụ của bảng giỏ hàng (STT, thao tác) ẩn trên điện thoại. */
 const HIDE_ON_PHONE = { xs: 'none', sm: 'table-cell' };
@@ -249,18 +270,21 @@ function PosSaleScreen() {
   const barColor = theme.palette.primary.main;
   const barFg = theme.palette.primary.contrastText;
 
-  // Trạng thái mạng của trình duyệt — báo "Mất mạng" trên thanh trên và tự đồng bộ hoá đơn chờ khi có mạng lại.
-  const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
+  // Trạng thái mạng (trình duyệt + gõ nhịp tới máy chủ) — báo "Mất mạng" trên thanh trên.
+  const { online, browserOnline, report: reportReachable } = useConnectivity();
+
+  // Hàng chờ hoá đơn trên máy (IndexedDB) — mọi lần bán đều ghi vào đây trước khi gửi.
+  const outbox = posOutbox();
+  const outboxEntries = useOutboxEntries(outbox);
+  const [outboxDurable, setOutboxDurable] = useState(true);
   useEffect(() => {
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener('online', on);
-    window.addEventListener('offline', off);
-    return () => {
-      window.removeEventListener('online', on);
-      window.removeEventListener('offline', off);
-    };
-  }, []);
+    requestPersistentStorage();
+    outbox.prune().catch(() => {});
+    outbox
+      .durable()
+      .then(setOutboxDurable)
+      .catch(() => setOutboxDurable(false));
+  }, [outbox]);
 
   // Restore dialog
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
@@ -389,42 +413,95 @@ function PosSaleScreen() {
     }
   }, [orders, selectedWarehouse?.id, draftsHydrated]);
 
-  // Load initial data
-  useEffect(() => {
-    Promise.all([
-      getAllProducts({ isActive: true }),
-      getAllCustomers({ isActive: true }),
-      getAllWarehouses(),
-    ])
-      .then(([p, c, w]) => {
-        setProducts(p.items);
-        setCustomers(c);
-        setWarehouses(w);
-        if (w.length > 0) {
-          // If we have a cached warehouse, try to select it
-          const cached = loadDraftsFromStorage();
-          const cachedWh = cached?.selectedWarehouseId
-            ? w.find((wh) => wh.id === cached.selectedWarehouseId)
-            : null;
-          setSelectedWarehouse(cachedWh || w.find((wh) => wh.isActive) || w[0]);
+  // Danh mục (hàng + khách + kho): hiện ngay bản lưu trên máy (mất mạng vẫn bán được), rồi tải bản mới từ máy chủ
+  // (đủ mọi trang — trước đây chỉ 25 hàng đầu) và lưu lại. Tìm hàng / quét mã làm tại máy khi đã có danh mục đầy đủ.
+  const [catalogComplete, setCatalogComplete] = useState(false);
+  const [catalogSyncedAt, setCatalogSyncedAt] = useState<string | null>(null);
+  const catalogFromServerRef = useRef(false);
+
+  const applyCatalog = useCallback((snap: CatalogSnapshot) => {
+    setProducts(snap.products);
+    setCustomers(snap.customers);
+    setWarehouses(snap.warehouses);
+    setCatalogComplete(snap.complete);
+    setCatalogSyncedAt(snap.syncedAt);
+    // Chưa chọn kho / kho đang chọn không còn: kho của đơn tạm đã lưu → kho đang hoạt động → kho đầu.
+    setSelectedWarehouse((current) => {
+      const w = snap.warehouses;
+      if (current && w.some((wh) => wh.id === current.id)) return current;
+      const cachedId = loadDraftsFromStorage()?.selectedWarehouseId;
+      return (cachedId && w.find((wh) => wh.id === cachedId)) || w.find((wh) => wh.isActive) || w[0] || null;
+    });
+  }, []);
+
+  /** Tải danh mục từ máy chủ; `manual` = bấm nút Tải lại (báo kết quả). */
+  const refreshCatalog = useCallback(
+    async (manual = false) => {
+      try {
+        const snap = await fetchCatalog({ getAllProducts, getAllCustomers, getAllWarehouses });
+        catalogFromServerRef.current = true;
+        applyCatalog(snap);
+        saveCatalogSnapshot(snap);
+        if (manual) {
+          closeSnackbar();
+          enqueueSnackbar(`Đã tải lại ${snap.products.length} mặt hàng và khách hàng`, { variant: 'success' });
         }
-      })
-      .catch((err) => {
-        // Trước đây chỉ ghi console → mất mạng lúc mở màn thì màn trống, thu ngân không biết vì sao.
+        return true;
+      } catch (err) {
         console.error(err);
+        return false;
+      }
+    },
+    [applyCatalog, enqueueSnackbar, closeSnackbar]
+  );
+
+  useEffect(() => {
+    let alive = true;
+    const cached = loadCatalogSnapshot().then((snap) => {
+      // Máy chủ trả trước thì không đè bằng bản cũ.
+      if (alive && snap && !catalogFromServerRef.current) applyCatalog(snap);
+      return snap;
+    });
+    refreshCatalog().then(async (ok) => {
+      if (ok || !alive) return;
+      const snap = await cached;
+      if (snap) {
+        enqueueSnackbar(
+          `Không tải được danh mục mới — đang dùng danh mục lưu trên máy lúc ${fDateTimeShort(snap.syncedAt)}.`,
+          { variant: 'warning' }
+        );
+      } else {
+        // Chưa từng lưu danh mục trên máy này mà lại mất mạng → không có gì để bán.
         enqueueSnackbar('Không tải được hàng hoá / khách hàng / kho. Kiểm tra mạng rồi bấm nút Tải lại (↻).', {
           variant: 'error',
           persist: true,
         });
-      });
+      }
+    });
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Search products with debounce
+  // Danh mục mới mỗi 10 phút khi có mạng (giá, tồn, hàng mới).
+  useEffect(() => {
+    if (!online) return undefined;
+    const timer = setInterval(() => refreshCatalog(), 10 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [online, refreshCatalog]);
+
+  // Tìm hàng: có danh mục đầy đủ thì tìm tại máy (tức thì, chạy cả khi mất mạng); chưa có thì hỏi máy chủ như trước.
   useEffect(() => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     if (!productSearch.trim()) {
       setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    if (catalogComplete) {
+      searchSeqRef.current += 1;
+      setSearchResults(searchCatalog(products, productSearch));
       setSearchLoading(false);
       return;
     }
@@ -443,7 +520,11 @@ function PosSaleScreen() {
             return newItems.length > 0 ? [...prev, ...newItems] : prev;
           });
         })
-        .catch(console.error)
+        .catch((err) => {
+          console.error(err);
+          // Không hỏi được máy chủ: tìm trong những hàng đã có trên máy.
+          if (seq === searchSeqRef.current) setSearchResults(searchCatalog(products, productSearch));
+        })
         .finally(() => {
           if (seq === searchSeqRef.current) setSearchLoading(false);
         });
@@ -451,7 +532,8 @@ function PosSaleScreen() {
     return () => {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
-  }, [productSearch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productSearch, catalogComplete]);
 
   // F3: ô tìm hàng hoá; F4: ô tìm khách hàng (cả hai đều ghi trên ô nhập)
   useEffect(() => {
@@ -529,17 +611,12 @@ function PosSaleScreen() {
   );
   useCustomerDisplaySync(displayCart, workingBranchId);
 
-  // Filtered products for the right sidebar
-  const filteredProducts = useMemo(() => {
-    if (!productSearch.trim()) return products;
-    const keyword = productSearch.toLowerCase();
-    return products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(keyword) ||
-        (p.sku && p.sku.toLowerCase().includes(keyword)) ||
-        (p.barcode && p.barcode.toLowerCase().includes(keyword))
-    );
-  }, [products, productSearch]);
+  // Lưới "Bán thường": cả danh mục (tìm theo ô tìm hàng, không phân biệt dấu); vẽ tối đa GRID_LIMIT thẻ.
+  const matchedProducts = useMemo(
+    () => (productSearch.trim() ? searchCatalog(products, productSearch, products.length) : products),
+    [products, productSearch]
+  );
+  const filteredProducts = useMemo(() => matchedProducts.slice(0, GRID_LIMIT), [matchedProducts]);
 
   // ====== Order handlers ======
 
@@ -679,8 +756,14 @@ function PosSaleScreen() {
       const seq = searchSeqRef.current;
       setSearchLoading(true);
       try {
-        const r = await getAllProducts({ keyword: code, isActive: true });
+        // Danh mục đầy đủ trên máy → tra tại máy (quét mã khi mất mạng); không thì hỏi máy chủ, lỗi thì tra tại máy.
+        const items = catalogComplete
+          ? searchCatalog(products, code, 50)
+          : await getAllProducts({ keyword: code, isActive: true })
+              .then((r) => r.items)
+              .catch(() => searchCatalog(products, code, 50));
         if (seq !== searchSeqRef.current) return;
+        const r = { items };
         const hit = findScannedProduct(r.items, code);
         if (hit) {
           if (hit.child) handleAddVariant(hit.product, hit.child);
@@ -698,25 +781,21 @@ function PosSaleScreen() {
         if (seq === searchSeqRef.current) setSearchLoading(false);
       }
     },
-    [handleAddProduct, handleAddVariant, enqueueSnackbar]
+    [handleAddProduct, handleAddVariant, enqueueSnackbar, catalogComplete, products]
   );
 
   const handleRefreshData = useCallback(() => {
-    Promise.all([getAllProducts({ isActive: true }), getAllCustomers({ isActive: true }), getAllWarehouses()])
-      .then(([p, c, w]) => {
-        setProducts(p.items);
-        setCustomers(c);
-        setWarehouses(w);
-        // Lần tải đầu lỗi thì chưa có kho nào được chọn — chọn như lúc mở màn.
-        setSelectedWarehouse(
-          (current) =>
-            (current && w.find((wh) => wh.id === current.id)) || w.find((wh) => wh.isActive) || w[0] || null
+    refreshCatalog(true).then((ok) => {
+      if (!ok) {
+        enqueueSnackbar(
+          catalogSyncedAt
+            ? `Không tải lại được — đang dùng danh mục lưu trên máy lúc ${fDateTimeShort(catalogSyncedAt)}.`
+            : 'Không tải lại được dữ liệu',
+          { variant: 'error' }
         );
-        closeSnackbar();
-        enqueueSnackbar('Đã tải lại hàng hoá và khách hàng', { variant: 'success' });
-      })
-      .catch(() => enqueueSnackbar('Không tải lại được dữ liệu', { variant: 'error' }));
-  }, [enqueueSnackbar, closeSnackbar]);
+      }
+    });
+  }, [refreshCatalog, enqueueSnackbar, catalogSyncedAt]);
 
   const handleUpdateQuantity = useCallback(
     (itemKey: string, newQuantity: number) => {
@@ -950,8 +1029,36 @@ function PosSaleScreen() {
         });
       };
 
+      // Ghi hoá đơn xuống máy TRƯỚC khi gửi (ghi bền): trình duyệt tắt / mất điện giữa lúc gửi thì mở lại màn bán hàng
+      // vẫn gửi tiếp được, cùng mã chống trùng. Không ghi được (hết chỗ, trình duyệt chặn) thì vẫn gửi như trước.
+      const entry: OutboxEntry = {
+        id: request.id,
+        payload,
+        label: activeOrder.label,
+        customerName: activeOrder.customerName,
+        total: due,
+        itemCount: totalItemCount,
+        createdAt: soldAt,
+        status: 'sending',
+        attempts: 1,
+        lastAttemptAt: soldAt,
+      };
+      let queued = true;
+      try {
+        await outbox.put(entry);
+      } catch (err) {
+        queued = false;
+        console.error('Không ghi được hoá đơn vào hàng chờ trên máy', err);
+      }
+
       try {
         const created = await createSalesOrder(payload);
+        if (queued) {
+          outbox
+            .update(entry.id, { status: 'sent', serverId: created?.id, sentAt: new Date().toISOString() })
+            .catch(console.error);
+        }
+        reportReachable(true);
 
         // Chỉ nhắc KiotViet khi hoá đơn được xếp hàng đẩy (Pending); NotPushed chỉ lưu trong hệ thống
         enqueueSnackbar(
@@ -963,44 +1070,32 @@ function PosSaleScreen() {
         if (settled.change > 0) {
           enqueueSnackbar(`Tiền thừa trả khách: ${fCurrency(settled.change)}`, { variant: 'info' });
         }
-        if (created?.id) {
-          setLastSaleId(created.id);
-          rememberRecentSale({
-            id: created.id,
-            total: due,
-            itemCount: totalItemCount,
-            customerName: activeOrder.customerName,
-            soldAt,
-          });
-        }
+        if (created?.id) setLastSaleId(created.id);
         releaseSoldOrder();
 
-        // Refresh products
-        getAllProducts({ isActive: true })
-          .then((r) => setProducts(r.items))
-          .catch(console.error);
         return true;
       } catch (error: any) {
         if (isDefinitiveRejection(error)) {
-          // Máy chủ từ chối → chắc chắn chưa có hoá đơn: bỏ mã, lần sau (đã sửa giỏ) gửi mã mới.
+          // Máy chủ từ chối → chắc chắn chưa có hoá đơn: bỏ khỏi hàng chờ + bỏ mã, giỏ giữ nguyên để thu ngân sửa.
+          if (queued) outbox.remove(entry.id).catch(console.error);
           setOrders((prev) => prev.map((o) => (o.id === soldId ? { ...o, pendingRequest: undefined } : o)));
           enqueueSnackbar(error?.title || error?.message || 'Có lỗi xảy ra khi thanh toán', { variant: 'error' });
           return false;
         }
-        // Mất mạng / hết thời gian chờ / lỗi máy chủ: khách đã trả tiền — lưu hoá đơn vào hàng chờ đồng bộ (cùng mã
-        // chống trùng, ngày bán = bây giờ) rồi bán tiếp; có mạng lại tự gửi, máy chủ đã lưu từ lần này thì không tạo trùng.
-        addPendingSale({
-          id: request.id,
-          payload: { ...payload, purchaseDate: soldAt },
-          label: activeOrder.label,
-          customerName: activeOrder.customerName,
-          total: due,
-          itemCount: totalItemCount,
-          createdAt: soldAt,
-          attempts: 1,
-          status: 'pending',
-          lastError: describeSaleError(error),
-        });
+        if (!queued) {
+          // Không lưu được trên máy → không thể hứa gửi sau: giữ giỏ để thu ngân thử lại.
+          enqueueSnackbar(
+            'Mất mạng và máy này không lưu được hoá đơn. Giữ nguyên giỏ — bấm thanh toán lại khi có mạng (không tạo trùng).',
+            { variant: 'error', autoHideDuration: 10000 }
+          );
+          return false;
+        }
+        // Mất mạng / hết thời gian chờ / lỗi máy chủ: khách đã trả tiền — hoá đơn nằm trong hàng chờ (cùng mã chống
+        // trùng, giờ bán = bây giờ), bán tiếp; bộ gửi thử lại ngay rồi lùi dần, máy chủ đã lưu thì không tạo trùng.
+        reportReachable(false);
+        await outbox
+          .update(entry.id, { status: 'pending', lastError: describeSaleError(error), nextAttemptAt: undefined })
+          .catch(console.error);
         enqueueSnackbar(
           'Mất mạng — đã lưu hoá đơn trên máy, sẽ tự đồng bộ khi có mạng (nút "Chờ đồng bộ" trên thanh trên cùng).',
           { variant: 'warning', autoHideDuration: 8000 }
@@ -1009,63 +1104,89 @@ function PosSaleScreen() {
         return true;
       }
     },
-    [activeOrder, grandTotal, totalItemCount, nextEmptyOrder, selectedWarehouse, sellerName, enqueueSnackbar]
+    [
+      activeOrder,
+      grandTotal,
+      totalItemCount,
+      nextEmptyOrder,
+      selectedWarehouse,
+      sellerName,
+      enqueueSnackbar,
+      outbox,
+      reportReachable,
+    ]
   );
 
   // ====== Hoá đơn chờ đồng bộ (bán lúc mất mạng) ======
-  const pendingSales = usePendingSales();
-  const [syncing, setSyncing] = useState(false);
-  const syncingRef = useRef(false);
-
-  /** Gửi các hoá đơn chờ; `manual` = thu ngân bấm "Đồng bộ ngay" (báo cả khi chưa gửi được). */
-  const runSync = useCallback(
-    async (manual = false) => {
-      if (syncingRef.current) return;
-      syncingRef.current = true;
-      setSyncing(true);
-      try {
-        const result = await syncPendingSales(createSalesOrder, (sale, serverId) => {
-          if (!serverId) return;
-          setLastSaleId(serverId);
-          rememberRecentSale({
-            id: serverId,
-            total: sale.total,
-            itemCount: sale.itemCount,
-            customerName: sale.customerName,
-            soldAt: sale.createdAt,
-          });
-        });
-        if (result.sent > 0) {
-          enqueueSnackbar(`Đã đồng bộ ${result.sent} hoá đơn bán lúc mất mạng`, { variant: 'success' });
-        }
-        if (result.failed > 0) {
-          enqueueSnackbar(`${result.failed} hoá đơn bị máy chủ từ chối — mở nút trên thanh trên cùng để xử lý`, {
-            variant: 'error',
-          });
-        }
-        if (manual && result.stillPending > 0) {
-          enqueueSnackbar('Chưa gửi được — vẫn chưa có mạng. Hệ thống sẽ tự thử lại.', { variant: 'warning' });
-        }
-      } finally {
-        syncingRef.current = false;
-        setSyncing(false);
-      }
-    },
-    [enqueueSnackbar]
+  const unsentSales = useMemo(() => outboxEntries.filter(isUnsent), [outboxEntries]);
+  const deviceSentSales = useMemo(
+    () => outboxEntries.filter((e) => e.status === 'sent' && e.serverId).reverse(),
+    [outboxEntries]
   );
 
-  // Tự đồng bộ: lúc mở màn, khi có mạng lại, và 30 giây một lần khi còn hoá đơn chờ.
-  const hasQueued = pendingSales.some((sale) => sale.status === 'pending');
+  const handleSyncResult = useCallback(
+    (result: ProcessResult, manual: boolean) => {
+      if (result.sent.length > 0) {
+        reportReachable(true);
+        const last = result.sent[result.sent.length - 1];
+        if (last.serverId) setLastSaleId(last.serverId);
+        enqueueSnackbar(`Đã đồng bộ ${result.sent.length} hoá đơn bán lúc mất mạng`, { variant: 'success' });
+      }
+      if (result.failed.length > 0) {
+        enqueueSnackbar(
+          `${result.failed.length} hoá đơn bị máy chủ từ chối — mở nút trên thanh trên cùng để xử lý`,
+          { variant: 'error' }
+        );
+      }
+      if (result.networkDown) {
+        reportReachable(false);
+        if (manual) {
+          enqueueSnackbar('Chưa gửi được — vẫn chưa có mạng. Hệ thống sẽ tự thử lại.', { variant: 'warning' });
+        }
+      }
+    },
+    [reportReachable, enqueueSnackbar]
+  );
+
+  const { syncing, syncNow } = useOutboxSender({
+    outbox,
+    entries: outboxEntries,
+    browserOnline,
+    send: createSalesOrder,
+    onResult: handleSyncResult,
+  });
+
+  /** Hoá đơn lỗi: gửi lại (vd quản lý đã sửa giá / khách) — vẫn cùng mã chống trùng. */
+  const handleRetryOutboxSale = useCallback(
+    async (sale: OutboxEntry) => {
+      await outbox.update(sale.id, { status: 'pending', nextAttemptAt: undefined });
+      syncNow();
+    },
+    [outbox, syncNow]
+  );
+
+  // Còn hoá đơn chưa gửi mà đóng / tải lại trang: trình duyệt hỏi lại (hoá đơn vẫn nằm trên máy, mở lại sẽ gửi tiếp).
+  const unsentCount = unsentSales.length;
   useEffect(() => {
-    if (!hasQueued || !online) return undefined;
-    runSync();
-    const timer = setInterval(() => runSync(), 30000);
-    return () => clearInterval(timer);
-  }, [hasQueued, online, runSync]);
+    if (unsentCount === 0) return undefined;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [unsentCount]);
 
   /** Hoá đơn bị máy chủ từ chối: mở lại thành một đơn tạm để sửa rồi thanh toán lại (mã chống trùng mới). */
   const handleReopenPendingSale = useCallback(
-    (sale: PendingSale) => {
+    (sale: OutboxEntry) => {
+      // Giá hiện hành của hàng (lỗi hay gặp nhất của hoá đơn offline là giá đã đổi trong lúc mất mạng).
+      const currentPrice = (productId: string, variantId?: string): number | undefined => {
+        const product = products.find((p) => p.id === productId);
+        if (!product) return undefined;
+        if (variantId) return product.childProducts?.find((c) => c.id === variantId)?.basePrice;
+        return product.sellingPrice || product.basePrice;
+      };
       const order: DraftOrder = {
         ...nextEmptyOrder(),
         customerId: sale.payload.customerId,
@@ -1079,7 +1200,7 @@ function PosSaleScreen() {
           name: d.productName ?? d.productCode ?? '',
           sku: d.productCode ?? '',
           quantity: d.quantity,
-          unitPrice: d.price,
+          unitPrice: currentPrice(d.productId, d.productVariantId) ?? d.price,
           vatRate: 0,
           discountAmount: d.discount ?? 0,
           note: d.note ?? '',
@@ -1090,10 +1211,12 @@ function PosSaleScreen() {
       };
       setOrders((prev) => relabelOrders([...prev.filter((o) => o.items.length > 0), order]));
       setActiveOrderId(order.id);
-      removePendingSale(sale.id);
-      enqueueSnackbar('Đã mở lại hoá đơn thành đơn tạm — sửa rồi thanh toán lại', { variant: 'info' });
+      outbox.remove(sale.id).catch(console.error);
+      enqueueSnackbar('Đã mở lại hoá đơn thành đơn tạm (theo giá hiện hành) — kiểm tra rồi thanh toán lại', {
+        variant: 'info',
+      });
     },
-    [nextEmptyOrder, enqueueSnackbar]
+    [nextEmptyOrder, enqueueSnackbar, outbox, products]
   );
 
   // Nút máy in: chọn một hoá đơn gần đây để in lại (không tự in sau khi bán)
@@ -1347,7 +1470,11 @@ function PosSaleScreen() {
             if (typeof value === 'string') {
               handleScanCode(value);
             } else if (value) {
-              handleAddProduct(value);
+              // Quét / gõ đúng mã của một phiên bản rồi Enter (kết quả tìm tại máy về tức thì nên Enter chọn luôn hàng cha):
+              // thêm thẳng phiên bản đó, không mở ngăn chọn phiên bản.
+              const hit = findScannedProduct([value], productSearch);
+              if (hit?.child) handleAddVariant(hit.product, hit.child);
+              else handleAddProduct(value);
               setProductSearch('');
               setSearchResults([]);
             }
@@ -1560,12 +1687,14 @@ function PosSaleScreen() {
         <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0, ml: 'auto' }}>
           <PosSyncButton
             online={online}
-            pendingSales={pendingSales}
+            durable={outboxDurable}
+            pendingSales={unsentSales}
             syncing={syncing}
-            onSync={() => runSync(true)}
+            onSync={syncNow}
+            onRetry={handleRetryOutboxSale}
             onReopen={handleReopenPendingSale}
             onDiscard={(sale) => {
-              removePendingSale(sale.id);
+              outbox.remove(sale.id).catch(console.error);
               enqueueSnackbar(`Đã bỏ ${sale.label}`, { variant: 'info' });
             }}
           />
@@ -1583,7 +1712,13 @@ function PosSaleScreen() {
               <Iconify icon="solar:monitor-bold" />
             </IconButton>
           </Tooltip>
-          <PosRecentSalesButton fg={barFg} lastSaleId={lastSaleId} onPrint={handlePrintSale} />
+          <PosRecentSalesButton
+            fg={barFg}
+            lastSaleId={lastSaleId}
+            deviceSales={deviceSentSales}
+            unsentCount={unsentCount}
+            onPrint={handlePrintSale}
+          />
           <Stack
             direction="row"
             alignItems="center"
@@ -1603,7 +1738,7 @@ function PosSaleScreen() {
               {selectedWarehouse?.name || 'Chọn kho'}
             </Typography>
           </Stack>
-          <PosManageMenu fg={barFg} />
+          <PosManageMenu fg={barFg} unsentCount={unsentCount} />
         </Stack>
       </Toolbar>
       </AppBar>
@@ -2308,6 +2443,11 @@ function PosSaleScreen() {
                       );
                     })}
                   </Box>
+                )}
+                {matchedProducts.length > filteredProducts.length && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
+                    Đang hiện {filteredProducts.length} / {matchedProducts.length} mặt hàng — gõ tên hoặc mã ở ô tìm để lọc
+                  </Typography>
                 )}
               </Box>
 

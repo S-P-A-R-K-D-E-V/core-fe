@@ -134,13 +134,16 @@ export function saleRequestFor(
   return pending && pending.fingerprint === fingerprint ? pending : { id: makeId(), fingerprint };
 }
 
+/** 4xx không phải lỗi của hoá đơn: hết phiên đăng nhập, hết thời gian chờ, gửi quá nhiều — gửi lại sau là được. */
+const RETRYABLE_4XX = new Set([401, 408, 429]);
+
 /**
- * Máy chủ đã trả lời từ chối (4xx, lỗi có `status`) → chắc chắn chưa có hoá đơn, bỏ mã. Mất mạng / hết thời gian chờ /
- * 5xx / cổng trả HTML → không biết máy chủ đã lưu chưa → giữ mã để lần bấm lại không tạo hoá đơn thứ hai.
+ * Máy chủ đã trả lời từ chối (4xx nghiệp vụ, lỗi có `status`) → chắc chắn chưa có hoá đơn, bỏ mã. Mất mạng / hết thời
+ * gian chờ / 5xx / cổng trả HTML / 401 hết phiên → không biết hoặc chưa xử lý → giữ mã để gửi lại không tạo trùng.
  */
 export function isDefinitiveRejection(error: unknown): boolean {
   const status = error && typeof error === 'object' ? (error as { status?: unknown }).status : undefined;
-  return typeof status === 'number' && status >= 400 && status < 500;
+  return typeof status === 'number' && status >= 400 && status < 500 && !RETRYABLE_4XX.has(status);
 }
 
 // ----------------------------------------------------------------------

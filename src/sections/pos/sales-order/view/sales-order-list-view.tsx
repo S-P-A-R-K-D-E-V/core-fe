@@ -51,6 +51,7 @@ import { getBankAccounts } from 'src/api/bank-accounts';
 import ReceiptPrintDialog from 'src/sections/pos/receipt-print/receipt-print-dialog';
 
 import KiotVietSyncLabel from '../kiotviet-sync-label';
+import PosOutboxNotice from 'src/sections/pos/offline/pos-outbox-notice';
 
 // ----------------------------------------------------------------------
 
@@ -212,6 +213,8 @@ export default function SalesOrderListView() {
         }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
+
+      <PosOutboxNotice />
 
       <Card>
         <Stack spacing={2} sx={{ p: 2.5 }}>
