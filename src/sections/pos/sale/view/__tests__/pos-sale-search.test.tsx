@@ -109,6 +109,7 @@ const createSalesOrder = vi.fn();
 vi.mock('src/api/sales-orders', () => ({
   createSalesOrder: (...args: any[]) => createSalesOrder(...args),
   getSalesOrderReceipt: () => Promise.resolve(null),
+  getAllSalesOrders: () => Promise.resolve({ items: [], totalCount: 0 }),
 }));
 vi.mock('src/api/bank-accounts', () => ({ getBankAccounts: () => Promise.resolve([]) }));
 
@@ -203,7 +204,7 @@ describe('PosSaleView — tìm và chọn sản phẩm', { timeout: 30000 }, () 
     await user.click(within(drawer).getByText('SP015259'));
 
     await waitFor(() => expect(within(cart()).getByText('SP015259')).toBeInTheDocument());
-    expect(within(cart()).getByText('85')).toBeInTheDocument();
+    expect(within(cart()).getByText('GIÁ TRỊ: 85')).toBeInTheDocument();
   });
 
   it('↓ rồi Enter thêm đúng sản phẩm đang chọn, chỉ một lần', async () => {
@@ -283,7 +284,7 @@ describe('PosSaleView — dòng hàng, thanh toán, phím tắt', { timeout: 300
 
   it('tạo hoá đơn lỗi: giữ đơn và số tiền khách trả để thử lại', async () => {
     const user = userEvent.setup({ delay: null });
-    createSalesOrder.mockRejectedValueOnce({ title: 'Mất kết nối' });
+    createSalesOrder.mockRejectedValueOnce({ status: 400, title: 'Hàng không còn bán' });
     renderView();
     await ready();
     await addKep(user);
@@ -293,7 +294,7 @@ describe('PosSaleView — dòng hàng, thanh toán, phím tắt', { timeout: 300
     await user.click(screen.getByRole('button', { name: 'THANH TOÁN' }));
 
     await waitFor(() =>
-      expect(snackbar.enqueueSnackbar).toHaveBeenCalledWith('Mất kết nối', { variant: 'error' })
+      expect(snackbar.enqueueSnackbar).toHaveBeenCalledWith('Hàng không còn bán', { variant: 'error' })
     );
     expect(screen.getByPlaceholderText('Số tiền')).toHaveValue(35000);
     expect(within(cart()).getByText('SP000123')).toBeInTheDocument();
@@ -305,9 +306,87 @@ describe('PosSaleView — dòng hàng, thanh toán, phím tắt', { timeout: 300
       warehouseId: 'wh-1',
       payments: [{ method: 'Cash', amount: 35000 }],
     });
+    // Máy chủ đã từ chối (4xx) → chắc chắn chưa có hoá đơn: lần sau gửi mã chống trùng mới.
+    expect(createSalesOrder.mock.calls[1][0].clientRequestId).not.toBe(
+      createSalesOrder.mock.calls[0][0].clientRequestId
+    );
   });
 
-  it('F4 đưa con trỏ vào ô tìm khách hàng; nút thoát dẫn về dashboard', async () => {
+  it('mất mạng khi tạo hoá đơn: lưu vào hàng chờ, bán tiếp; có mạng tự gửi lại ĐÚNG mã chống trùng + giờ bán', async () => {
+    const user = userEvent.setup({ delay: null });
+    createSalesOrder.mockRejectedValueOnce('Something went wrong');
+    createSalesOrder.mockResolvedValueOnce({ id: 'so-1', kiotVietSyncStatus: 'NotPushed', replayed: true });
+    renderView();
+    await ready();
+    await addKep(user);
+
+    await waitFor(() => expect(screen.getByPlaceholderText('Số tiền')).toHaveValue(35000));
+    await user.click(screen.getByRole('button', { name: 'THANH TOÁN' }));
+    await waitFor(() =>
+      expect(snackbar.enqueueSnackbar).toHaveBeenCalledWith(
+        expect.stringContaining('đã lưu hoá đơn trên máy'),
+        expect.objectContaining({ variant: 'warning' })
+      )
+    );
+    // giỏ được giải phóng để bán đơn khác
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+
+    // trình duyệt đang "có mạng" → tự đồng bộ ngay
+    await waitFor(() => expect(createSalesOrder).toHaveBeenCalledTimes(2));
+    const [first, second] = createSalesOrder.mock.calls.map((c) => c[0]);
+    expect(first.clientRequestId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(second.clientRequestId).toBe(first.clientRequestId);
+    expect(first.purchaseDate).toBeUndefined();
+    expect(second.purchaseDate).toMatch(/Z$/);
+    await waitFor(() =>
+      expect(snackbar.enqueueSnackbar).toHaveBeenCalledWith('Đã đồng bộ 1 hoá đơn bán lúc mất mạng', {
+        variant: 'success',
+      })
+    );
+    expect(window.localStorage.getItem('pos_pending_sales')).toBeNull();
+  });
+
+  it('vẫn mất mạng: hoá đơn nằm chờ, thanh trên có nút "Chờ đồng bộ"', async () => {
+    const user = userEvent.setup({ delay: null });
+    createSalesOrder.mockRejectedValue('Something went wrong');
+    renderView();
+    await ready();
+    await addKep(user);
+
+    await waitFor(() => expect(screen.getByPlaceholderText('Số tiền')).toHaveValue(35000));
+    await user.click(screen.getByRole('button', { name: 'THANH TOÁN' }));
+
+    const syncButton = await screen.findByRole('button', { name: /Chờ đồng bộ \(1\)/ });
+    await waitFor(() => expect(createSalesOrder.mock.calls.length).toBeGreaterThanOrEqual(2));
+    expect(JSON.parse(window.localStorage.getItem('pos_pending_sales') ?? '[]')).toHaveLength(1);
+
+    await user.click(syncButton);
+    expect(await screen.findByText('Hoá đơn chờ đồng bộ')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Đồng bộ ngay' })).toBeInTheDocument();
+  });
+
+  it('khách đưa dư tiền mặt: khoản thu = số phải trả, gửi tiền khách đưa; đổi giảm giá không xoá số khách đưa', async () => {
+    const user = userEvent.setup({ delay: null });
+    renderView();
+    await ready();
+    await addKep(user);
+
+    const paid = screen.getByPlaceholderText('Số tiền');
+    await waitFor(() => expect(paid).toHaveValue(35000));
+    await user.clear(paid);
+    await user.type(paid, '50000');
+    expect(screen.getByText('Tiền thừa trả khách')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'THANH TOÁN' }));
+    await waitFor(() => expect(createSalesOrder).toHaveBeenCalledTimes(1));
+    expect(createSalesOrder.mock.calls[0][0]).toMatchObject({
+      totalPayment: 35000,
+      payments: [{ method: 'Cash', amount: 35000 }],
+      cashTendered: 50000,
+    });
+  });
+
+  it('F4 đưa con trỏ vào ô tìm khách hàng; nút Quản lý dẫn về trang quản lý', async () => {
     const user = userEvent.setup({ delay: null });
     renderView();
     await ready();
@@ -315,9 +394,113 @@ describe('PosSaleView — dòng hàng, thanh toán, phím tắt', { timeout: 300
     await user.keyboard('{F4}');
     expect(screen.getByPlaceholderText('Tìm khách hàng (F4)')).toHaveFocus();
 
-    expect(screen.getByRole('link', { name: 'Thoát màn bán hàng' })).toHaveAttribute(
-      'href',
-      '/dashboard'
+    await user.click(screen.getByRole('button', { name: 'Vào trang quản lý' }));
+    expect(await screen.findByRole('menuitem', { name: 'Trang quản lý' })).toHaveAttribute('href', '/dashboard');
+    expect(screen.getByRole('menuitem', { name: 'Đơn bán hàng' })).toHaveAttribute('href', '/dashboard/pos/sales-order');
+  });
+});
+
+// ----------------------------------------------------------------------
+// GĐ0 (docs/cici/plans/pos-offline-plan.md): đơn tạm không bị xoá khi đang hỏi khôi phục, tồn hệ thống chỉ cảnh báo,
+// giảm giá theo từng đơn tạm, đóng tab có hàng phải hỏi lại.
+// ----------------------------------------------------------------------
+
+describe('PosSaleView — GĐ0', { timeout: 30000 }, () => {
+  async function addKep(user: ReturnType<typeof userEvent.setup>) {
+    await user.type(searchBox(), '8930001{Enter}');
+    await waitFor(() => expect(within(cart()).getByText('SP000123')).toBeInTheDocument());
+  }
+
+  it('hộp "Khôi phục đơn hàng tạm" đang mở thì đơn tạm vẫn còn trong bộ nhớ (tải lại không mất)', async () => {
+    const saved = {
+      orderCounter: 2,
+      orders: [
+        {
+          id: 1,
+          label: 'Hóa đơn 1',
+          note: '',
+          discountAmount: 0,
+          couponCode: '',
+          items: [
+            {
+              productId: 'p-kep',
+              name: 'Kẹp tóc nơ nhung đỏ',
+              sku: 'SP000123',
+              quantity: 1,
+              unitPrice: 35000,
+              vatRate: 0,
+              discountAmount: 0,
+              note: '',
+              stockOnHand: 10,
+              stockOnOrder: 0,
+            },
+          ],
+        },
+      ],
+    };
+    window.localStorage.setItem('pos_draft_orders', JSON.stringify(saved));
+    renderView();
+    await ready();
+
+    expect(await screen.findByText('Khôi phục đơn hàng tạm')).toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem('pos_draft_orders') ?? 'null')?.orders).toHaveLength(1);
+
+    const user = userEvent.setup({ delay: null });
+    await user.click(screen.getByRole('button', { name: 'Khôi phục' }));
+    await waitFor(() => expect(within(cart()).getByText('SP000123')).toBeInTheDocument());
+    expect(JSON.parse(window.localStorage.getItem('pos_draft_orders') ?? 'null')?.orders).toHaveLength(1);
+  });
+
+  it('hàng hệ thống ghi hết tồn vẫn thêm được vào giỏ (chỉ cảnh báo)', async () => {
+    const user = userEvent.setup({ delay: null });
+    getAllProducts.mockImplementation(async (params?: { keyword?: string }) => {
+      const items = search(params?.keyword).map((p) => ({ ...p, inventories: inv(0) }));
+      return { items, totalCount: items.length, page: 1, pageSize: 25 };
+    });
+    renderView();
+    await ready();
+    await addKep(user);
+
+    expect(cartRows()).toHaveLength(1);
+    expect(snackbar.enqueueSnackbar).toHaveBeenCalledWith(
+      expect.stringContaining('hệ thống ghi hết hàng'),
+      { variant: 'warning' }
     );
+  });
+
+  it('giảm giá hoá đơn theo từng đơn tạm: sang đơn khác không mang theo số giảm', async () => {
+    const user = userEvent.setup({ delay: null });
+    renderView();
+    await ready();
+    await addKep(user);
+
+    await user.type(screen.getByLabelText('Giảm giá hoá đơn'), '5000');
+    await waitFor(() => expect(screen.getByPlaceholderText('Số tiền')).toHaveValue(30000));
+
+    await user.click(screen.getByRole('button', { name: 'Thêm hoá đơn tạm' }));
+    await addKep(user);
+    expect(screen.getByLabelText('Giảm giá hoá đơn')).toHaveValue(null);
+    await waitFor(() => expect(screen.getByPlaceholderText('Số tiền')).toHaveValue(35000));
+
+    await user.click(screen.getByRole('tab', { name: /Hóa đơn 1/ }));
+    expect(screen.getByLabelText('Giảm giá hoá đơn')).toHaveValue(5000);
+  });
+
+  it('đóng tab hoá đơn đang có hàng phải xác nhận', async () => {
+    const user = userEvent.setup({ delay: null });
+    renderView();
+    await ready();
+    await addKep(user);
+    await user.click(screen.getByRole('button', { name: 'Thêm hoá đơn tạm' }));
+
+    await user.click(screen.getByRole('button', { name: 'Đóng Hóa đơn 1' }));
+    expect(await screen.findByText('Đóng hoá đơn tạm?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Giữ lại' }));
+    // Hộp thoại đóng xong (hết ẩn phần nền) thì tab vẫn còn.
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Hóa đơn 1/ })).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Đóng Hóa đơn 1' }));
+    await user.click(await screen.findByRole('button', { name: 'Đóng hoá đơn' }));
+    await waitFor(() => expect(screen.getAllByRole('tab', { name: /Hóa đơn/ })).toHaveLength(1));
   });
 });

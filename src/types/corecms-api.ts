@@ -3213,6 +3213,8 @@ export interface ICreateSalesOrderResponse {
   id: string;
   /** Core-be cũ không trả field này */
   kiotVietSyncStatus?: KiotVietSyncStatusValue;
+  /** true = gửi lại cùng clientRequestId: hoá đơn đã tạo ở lần gửi trước, không tạo thêm */
+  replayed?: boolean;
 }
 
 export interface ISalesOrderItem {
@@ -3255,6 +3257,10 @@ export interface ICreateSalesOrderRequest {
   couponCode?: string;
   /** Tên nhân viên bán (user đăng nhập) */
   soldByName?: string;
+  /** Tiền mặt khách đưa (khi đưa dư); khoản thu tiền mặt chỉ gồm phần phải trả */
+  cashTendered?: number;
+  /** Mã chống trùng do máy sinh: gửi lại cùng mã thì máy chủ trả đúng hoá đơn đã tạo, không tạo thêm */
+  clientRequestId?: string;
 }
 
 export interface ICreateInvoiceDetailRequest {
