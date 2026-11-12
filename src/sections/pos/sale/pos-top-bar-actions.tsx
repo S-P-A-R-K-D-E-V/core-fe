@@ -61,6 +61,8 @@ const barButtonSx = (fg: string) => ({
 
 type SyncProps = {
   online: boolean;
+  /** Mở màn lúc mất mạng, chưa đăng nhập lại — hàng chờ gửi sau khi đăng nhập lại. */
+  offlineSession?: boolean;
   /** false = máy này không mở được IndexedDB, hàng chờ đang ở localStorage (kém bền hơn). */
   durable: boolean;
   /** Hoá đơn chưa lên hệ thống (chờ gửi / đang gửi / lỗi). */
@@ -81,6 +83,7 @@ function pendingStatusText(sale: OutboxEntry): string {
 
 export function PosSyncButton({
   online,
+  offlineSession = false,
   durable,
   pendingSales,
   syncing,
@@ -95,7 +98,25 @@ export function PosSyncButton({
   const [confirmDiscardId, setConfirmDiscardId] = useState<string | null>(null);
   const failed = pendingSales.filter((s) => s.status === 'failed').length;
 
-  const offlineChip = online ? null : (
+  const offlineChip = online && !offlineSession ? null : (
+    offlineSession ? (
+      <Tooltip title="Màn bán hàng mở lúc mất mạng bằng người đăng nhập gần nhất trên máy này. Vẫn bán được, hoá đơn lưu trên máy; có mạng lại hệ thống tự đăng nhập lại rồi gửi hoá đơn.">
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={0.5}
+          sx={{ px: 1, py: 0.5, borderRadius: 1, bgcolor: alpha(theme.palette.error.main, 0.9), color: '#fff' }}
+        >
+          <Iconify icon="solar:shield-warning-bold" width={16} />
+          <Typography variant="caption" fontWeight={700} noWrap>
+            Phiên offline
+            <Box component="span" sx={{ display: { xs: 'none', lg: 'inline' } }}>
+              {' '}— chưa đăng nhập lại
+            </Box>
+          </Typography>
+        </Stack>
+      </Tooltip>
+    ) : (
     <Tooltip title="Không tới được máy chủ. Vẫn bán được: hoá đơn lưu trên máy này và tự gửi lên khi có mạng lại.">
       <Stack
         direction="row"
@@ -112,6 +133,7 @@ export function PosSyncButton({
         </Typography>
       </Stack>
     </Tooltip>
+    )
   );
 
   const notDurableIcon = durable ? null : (
