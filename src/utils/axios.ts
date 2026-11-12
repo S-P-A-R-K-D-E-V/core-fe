@@ -827,6 +827,8 @@ export const endpoints = {
     cancel: (id: string) => `/purchase-orders/${id}/cancel`,
     paidBy: (id: string) => `/purchase-orders/${id}/paid-by`,
     draft: '/purchase-orders/draft',
+    capabilities: '/purchase-orders/capabilities',
+    complete: '/purchase-orders/complete',
   },
   // Nhập phiếu từ ảnh hoá đơn NCC (Core-be PurchaseImportsController).
   purchaseImports: {

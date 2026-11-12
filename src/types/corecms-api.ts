@@ -3044,6 +3044,39 @@ export interface ICreatePurchaseOrderRequest {
   paidByShareholderId?: string | null;
 }
 
+/** GET purchase-orders/capabilities — nút "Hoàn thành" và phần trả tiền NCC theo cửa hàng + quyền. */
+export interface IPurchaseOrderCapabilities {
+  /** Cửa hàng nối KiotViet: KiotViet giữ tồn, giá vốn, công nợ NCC. */
+  kiotVietConnected: boolean;
+  canComplete: boolean;
+  canPayOnComplete: boolean;
+  completeBlockedReason?: string | null;
+}
+
+/** POST purchase-orders/complete — phiếu mới (order) HOẶC phiếu tạm đã có (existingOrderId). */
+export interface ICompletePurchaseOrderRequest {
+  existingOrderId?: string;
+  order?: ICreatePurchaseOrderRequest;
+  payment?: {
+    amount: number;
+    method: 'Cash' | 'Transfer';
+    fromTill?: boolean;
+    bankAccountId?: string;
+    id?: string;
+  };
+}
+
+export interface ICompletePurchaseOrderResponse {
+  id: string;
+  orderNumber: string;
+  /** false = đã lưu tạm, KiotViet chưa nhận phiếu (kiotVietError). */
+  completed: boolean;
+  kiotVietCode?: string | null;
+  kiotVietError?: string | null;
+  paidAmount?: number | null;
+  remainingAmount?: number | null;
+}
+
 export interface ICreatePurchaseOrderItemRequest {
   productId: string;
   productVariantId?: string;
