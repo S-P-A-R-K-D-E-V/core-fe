@@ -5,6 +5,9 @@ import {
   ICreatePurchaseOrderRequest,
   IUpdatePurchaseOrderRequest,
   IReceivePurchaseOrderRequest,
+  IPurchaseOrderCapabilities,
+  ICompletePurchaseOrderRequest,
+  ICompletePurchaseOrderResponse,
 } from 'src/types/corecms-api';
 
 // ----------------------------------------------------------------------
@@ -33,6 +36,20 @@ export async function createPurchaseOrder(data: ICreatePurchaseOrderRequest): Pr
 
 export async function updatePurchaseOrder(id: string, data: IUpdatePurchaseOrderRequest): Promise<void> {
   await axios.put(endpoints.purchaseOrders.update(id), data);
+}
+
+/** Màn tạo phiếu hỏi trước: "Hoàn thành" và trả tiền NCC có dùng được không (cửa hàng nối KiotViet, quyền). */
+export async function getPurchaseOrderCapabilities(): Promise<IPurchaseOrderCapabilities> {
+  const response = await axios.get<IPurchaseOrderCapabilities>(endpoints.purchaseOrders.capabilities);
+  return response.data;
+}
+
+/** Nút "Hoàn thành": tạo / lấy phiếu tạm → duyệt → nhận đủ hàng → trả NCC (nếu có) trong một lần gọi. */
+export async function completePurchaseOrder(
+  data: ICompletePurchaseOrderRequest
+): Promise<ICompletePurchaseOrderResponse> {
+  const response = await axios.post<ICompletePurchaseOrderResponse>(endpoints.purchaseOrders.complete, data);
+  return response.data;
 }
 
 export async function confirmPurchaseOrder(id: string): Promise<void> {

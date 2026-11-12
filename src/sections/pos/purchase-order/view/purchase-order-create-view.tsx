@@ -4,25 +4,15 @@ import Container from '@mui/material/Container';
 
 import { paths } from 'src/routes/paths';
 
-import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
-
 import PurchaseOrderNewForm from '../purchase-order-new-form';
+import PurchaseOrderFormHeader from '../purchase-order-form-header';
 
 // ----------------------------------------------------------------------
 
 export default function PurchaseOrderCreateView() {
   return (
-    <Container maxWidth="xl">
-      <CustomBreadcrumbs
-        heading="Tạo đơn nhập hàng"
-        links={[
-          { name: 'Dashboard', href: paths.dashboard.root },
-          { name: 'Đơn nhập hàng', href: paths.dashboard.pos.purchaseOrder.list },
-          { name: 'Tạo mới' },
-        ]}
-        sx={{ mb: { xs: 3, md: 5 } }}
-      />
-
+    <Container maxWidth={false} sx={{ px: { xs: 1.5, md: 2.5 } }}>
+      <PurchaseOrderFormHeader title="Nhập hàng" backHref={paths.dashboard.pos.purchaseOrder.list} />
       <PurchaseOrderNewForm />
     </Container>
   );

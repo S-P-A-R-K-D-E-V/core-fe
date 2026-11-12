@@ -8,12 +8,12 @@ import Typography from '@mui/material/Typography';
 import { paths } from 'src/routes/paths';
 
 import { useSnackbar } from 'src/components/snackbar';
-import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 
 import { IPurchaseOrder } from 'src/types/corecms-api';
 import { getPurchaseOrderById } from 'src/api/purchase-orders';
 
 import PurchaseOrderNewForm from '../purchase-order-new-form';
+import PurchaseOrderFormHeader from '../purchase-order-form-header';
 
 // ----------------------------------------------------------------------
 
@@ -66,16 +66,11 @@ export default function PurchaseOrderEditView({ id }: Props) {
   }
 
   return (
-    <Container maxWidth="lg">
-      <CustomBreadcrumbs
-        heading="Sửa đơn nhập hàng"
-        links={[
-          { name: 'Dashboard', href: paths.dashboard.root },
-          { name: 'Kho hàng', href: paths.dashboard.pos.root },
-          { name: 'Đơn nhập hàng', href: paths.dashboard.pos.purchaseOrder.list },
-          { name: order.orderNumber },
-        ]}
-        sx={{ mb: { xs: 3, md: 5 } }}
+    <Container maxWidth={false} sx={{ px: { xs: 1.5, md: 2.5 } }}>
+      <PurchaseOrderFormHeader
+        title="Sửa phiếu nhập"
+        subtitle={`${order.orderNumber} · phiếu tạm`}
+        backHref={paths.dashboard.pos.purchaseOrder.details(order.id)}
       />
 
       <PurchaseOrderNewForm currentPurchaseOrder={order} />
