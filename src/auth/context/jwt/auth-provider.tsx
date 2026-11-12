@@ -17,6 +17,7 @@ import {
 
 import { AuthContext } from './auth-context';
 import { setSession, isValidToken, getRefreshToken } from './utils';
+import { saveCachedProfile, withCachedProfile } from './profile-cache';
 import { AuthUserType, ActionMapType, AuthStateType } from '../../types';
 
 // ----------------------------------------------------------------------
@@ -240,6 +241,7 @@ export function AuthProvider({ children }: Props) {
       const enabledFeatures: string[] | undefined = res.data?.enabledFeatures;
       const permissions: string[] | undefined = res.data?.permissions;
       const blockedFeatures: string[] | undefined = res.data?.blockedFeatures;
+      saveCachedProfile(baseUser?.id, { enabledFeatures, blockedFeatures, permissions });
       dispatch({
         type: Types.LOGIN,
         payload: {
@@ -256,7 +258,12 @@ export function AuthProvider({ children }: Props) {
         },
       });
     } catch {
-      // non-blocking — keep existing photoURL/hasFaceEmbedding (refreshUser nạp lại /users/me khi vào dashboard)
+      // non-blocking — keep existing photoURL/hasFaceEmbedding (refreshUser nạp lại /users/me khi vào dashboard).
+      // Mất mạng: dùng tính năng / quyền đã lưu lần trước để trang (vd màn bán hàng) vẫn mở được.
+      const cached = withCachedProfile({ ...baseUser });
+      if (cached.enabledFeatures !== baseUser?.enabledFeatures) {
+        dispatch({ type: Types.LOGIN, payload: { user: cached } });
+      }
     }
   }, []);
 
@@ -504,6 +511,7 @@ export function AuthProvider({ children }: Props) {
       const enabledFeatures: string[] | undefined = res.data?.enabledFeatures;
       const permissions: string[] | undefined = res.data?.permissions;
       const blockedFeatures: string[] | undefined = res.data?.blockedFeatures;
+      saveCachedProfile((merged as any).id, { enabledFeatures, blockedFeatures, permissions });
       dispatch({
         type: Types.LOGIN,
         payload: {
@@ -518,8 +526,13 @@ export function AuthProvider({ children }: Props) {
         },
       });
     } catch {
-      // /users/me lỗi: cập nhật vai trò từ JWT; quyền chưa từng nạp thì coi như không có (màn chặn thay vì chờ mãi).
-      dispatch({ type: Types.LOGIN, payload: { user: { ...merged, permissions: (merged as any).permissions ?? [] } } });
+      // /users/me lỗi: cập nhật vai trò từ JWT; tính năng / quyền chưa nạp thì lấy bản đã lưu trên máy (mất mạng vẫn mở
+      // được trang), không có bản lưu thì quyền coi như không có (màn chặn thay vì chờ mãi).
+      const withCache = withCachedProfile({ ...(merged as any) });
+      dispatch({
+        type: Types.LOGIN,
+        payload: { user: { ...withCache, permissions: withCache.permissions ?? [] } },
+      });
     }
   }, [state.user]);
 

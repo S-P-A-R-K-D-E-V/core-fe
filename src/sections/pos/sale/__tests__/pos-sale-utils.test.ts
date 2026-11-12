@@ -140,6 +140,10 @@ describe('mã chống trùng', () => {
     expect(isDefinitiveRejection({ status: 400, title: 'x' })).toBe(true);
     expect(isDefinitiveRejection({ status: 409 })).toBe(true);
     expect(isDefinitiveRejection({ status: 500 })).toBe(false);
+    // hết phiên / hết thời gian chờ / gửi quá nhiều: gửi lại sau
+    expect(isDefinitiveRejection({ status: 401 })).toBe(false);
+    expect(isDefinitiveRejection({ status: 408 })).toBe(false);
+    expect(isDefinitiveRejection({ status: 429 })).toBe(false);
     expect(isDefinitiveRejection('Something went wrong')).toBe(false);
     expect(isDefinitiveRejection('<html>502</html>')).toBe(false);
     expect(isDefinitiveRejection(undefined)).toBe(false);

@@ -25,7 +25,7 @@ import Iconify from 'src/components/iconify';
 
 import { getAllSalesOrders } from 'src/api/sales-orders';
 
-import { loadRecentSales, type PendingSale } from './pos-pending-sales';
+import type { OutboxEntry } from '../offline/pos-outbox';
 
 // ----------------------------------------------------------------------
 // Nút trên thanh trên cùng của màn bán hàng: hoá đơn chờ đồng bộ, in lại hoá đơn gần đây, vào trang quản lý.
@@ -59,40 +59,80 @@ const barButtonSx = (fg: string) => ({
 
 type SyncProps = {
   online: boolean;
-  pendingSales: PendingSale[];
+  /** false = máy này không mở được IndexedDB, hàng chờ đang ở localStorage (kém bền hơn). */
+  durable: boolean;
+  /** Hoá đơn chưa lên hệ thống (chờ gửi / đang gửi / lỗi). */
+  pendingSales: OutboxEntry[];
   syncing: boolean;
   onSync: () => void;
-  onReopen: (sale: PendingSale) => void;
-  onDiscard: (sale: PendingSale) => void;
+  onRetry: (sale: OutboxEntry) => void;
+  onReopen: (sale: OutboxEntry) => void;
+  onDiscard: (sale: OutboxEntry) => void;
 };
 
-export function PosSyncButton({ online, pendingSales, syncing, onSync, onReopen, onDiscard }: SyncProps) {
+function pendingStatusText(sale: OutboxEntry): string {
+  if (sale.status === 'sending') return 'Đang gửi…';
+  const tried = sale.attempts > 1 ? ` · đã thử ${sale.attempts} lần` : '';
+  const next = sale.nextAttemptAt ? ` · thử lại lúc ${hhmm(sale.nextAttemptAt)}` : '';
+  return `Chờ gửi${tried}${next}`;
+}
+
+export function PosSyncButton({
+  online,
+  durable,
+  pendingSales,
+  syncing,
+  onSync,
+  onRetry,
+  onReopen,
+  onDiscard,
+}: SyncProps) {
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   // Bỏ hoá đơn lỗi: bấm 2 lần (lần đầu đổi thành "Chắc chắn bỏ?").
   const [confirmDiscardId, setConfirmDiscardId] = useState<string | null>(null);
   const failed = pendingSales.filter((s) => s.status === 'failed').length;
 
+  const offlineChip = online ? null : (
+    <Tooltip title="Không tới được máy chủ. Vẫn bán được: hoá đơn lưu trên máy này và tự gửi lên khi có mạng lại.">
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.5}
+        sx={{ px: 1, py: 0.5, borderRadius: 1, bgcolor: alpha(theme.palette.error.main, 0.9), color: '#fff' }}
+      >
+        <Iconify icon="solar:wi-fi-router-minimalistic-bold" width={16} />
+        <Typography variant="caption" fontWeight={700} noWrap>
+          Mất mạng
+          <Box component="span" sx={{ display: { xs: 'none', lg: 'inline' } }}>
+            {' '}— bán offline
+          </Box>
+        </Typography>
+      </Stack>
+    </Tooltip>
+  );
+
+  const notDurableIcon = durable ? null : (
+    <Tooltip title="Trình duyệt này không cho lưu bền (IndexedDB bị chặn) — hoá đơn chờ gửi đang để ở bộ nhớ tạm của trình duyệt. Nên dùng Chrome thường, không ẩn danh.">
+      <Box component="span" sx={{ display: 'inline-flex', color: theme.palette.warning.light }}>
+        <Iconify icon="solar:danger-triangle-bold" width={20} />
+      </Box>
+    </Tooltip>
+  );
+
   if (pendingSales.length === 0) {
-    return online ? null : (
-      <Tooltip title="Không có mạng. Nếu bán lúc này, hoá đơn được lưu trên máy và tự gửi lên khi có mạng lại.">
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={0.5}
-          sx={{ px: 1, py: 0.5, borderRadius: 1, bgcolor: alpha(theme.palette.error.main, 0.9), color: '#fff' }}
-        >
-          <Iconify icon="solar:wi-fi-router-minimalistic-bold" width={16} />
-          <Typography variant="caption" fontWeight={700}>
-            Mất mạng
-          </Typography>
-        </Stack>
-      </Tooltip>
+    return (
+      <>
+        {notDurableIcon}
+        {offlineChip}
+      </>
     );
   }
 
   return (
     <>
+      {notDurableIcon}
+      {offlineChip}
       <Button
         size="small"
         variant="contained"
@@ -147,7 +187,10 @@ export function PosSyncButton({ online, pendingSales, syncing, onSync, onReopen,
                   <Typography variant="caption" color="error.main" display="block" sx={{ mt: 0.5 }}>
                     Máy chủ từ chối: {sale.lastError}
                   </Typography>
-                  <Stack direction="row" spacing={1} sx={{ mt: 0.75 }}>
+                  <Stack direction="row" spacing={1} sx={{ mt: 0.75 }} flexWrap="wrap" useFlexGap>
+                    <Button size="small" variant="outlined" disabled={syncing} onClick={() => onRetry(sale)}>
+                      Gửi lại
+                    </Button>
                     <Button
                       size="small"
                       variant="outlined"
@@ -175,7 +218,7 @@ export function PosSyncButton({ online, pendingSales, syncing, onSync, onReopen,
                 </>
               ) : (
                 <Typography variant="caption" color="warning.dark" display="block">
-                  Chờ gửi{sale.attempts > 1 ? ` · đã thử ${sale.attempts} lần` : ''}
+                  {pendingStatusText(sale)}
                 </Typography>
               )}
             </Box>
@@ -207,37 +250,49 @@ type RecentRow = { id: string; code?: string; total: number; customerName?: stri
 type PrintProps = {
   fg: string;
   lastSaleId: string | null;
+  /** Hoá đơn đã gửi lên từ máy này (hàng chờ, giữ 7 ngày) — dùng khi không tải được danh sách. */
+  deviceSales: OutboxEntry[];
+  /** Hoá đơn chưa lên hệ thống — chưa in được (chưa có trên máy chủ). */
+  unsentCount: number;
   onPrint: (salesOrderId: string) => void;
 };
 
-export function PosRecentSalesButton({ fg, lastSaleId, onPrint }: PrintProps) {
+export function PosRecentSalesButton({ fg, lastSaleId, deviceSales, unsentCount, onPrint }: PrintProps) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [rows, setRows] = useState<RecentRow[] | null>(null);
   const [fromDevice, setFromDevice] = useState(false);
 
-  const open = useCallback(async (target: HTMLElement) => {
-    setAnchorEl(target);
-    setRows(null);
-    try {
-      const res = await getAllSalesOrders({ pageNumber: 1, pageSize: 8 });
-      setFromDevice(false);
-      setRows(
-        res.items.map((o) => ({
-          id: o.id,
-          code: o.orderNumber,
-          total: o.totalAmount,
-          customerName: o.customerName,
-          at: o.createdAt,
-        }))
-      );
-    } catch {
-      // Không đọc được danh sách (mất mạng / không có quyền): dùng hoá đơn vừa bán trên máy này.
-      setFromDevice(true);
-      setRows(
-        loadRecentSales().map((s) => ({ id: s.id, total: s.total, customerName: s.customerName, at: s.soldAt }))
-      );
-    }
-  }, []);
+  const open = useCallback(
+    async (target: HTMLElement) => {
+      setAnchorEl(target);
+      setRows(null);
+      try {
+        const res = await getAllSalesOrders({ pageNumber: 1, pageSize: 8 });
+        setFromDevice(false);
+        setRows(
+          res.items.map((o) => ({
+            id: o.id,
+            code: o.orderNumber,
+            total: o.totalAmount,
+            customerName: o.customerName,
+            at: o.createdAt,
+          }))
+        );
+      } catch {
+        // Không đọc được danh sách (mất mạng / không có quyền): dùng hoá đơn đã gửi lên từ máy này.
+        setFromDevice(true);
+        setRows(
+          deviceSales.slice(0, 8).map((sale) => ({
+            id: sale.serverId as string,
+            total: sale.total,
+            customerName: sale.customerName,
+            at: sale.createdAt,
+          }))
+        );
+      }
+    },
+    [deviceSales]
+  );
 
   return (
     <>
@@ -262,6 +317,11 @@ export function PosRecentSalesButton({ fg, lastSaleId, onPrint }: PrintProps) {
           <Typography variant="caption" color="text.secondary">
             {fromDevice ? 'Không tải được danh sách — hoá đơn vừa bán trên máy này' : 'Hoá đơn gần đây'}
           </Typography>
+          {unsentCount > 0 && (
+            <Typography variant="caption" color="warning.dark" display="block">
+              {unsentCount} hoá đơn chưa lên hệ thống — in được sau khi đồng bộ
+            </Typography>
+          )}
         </Box>
         {rows === null && (
           <Stack alignItems="center" sx={{ py: 2 }}>
@@ -330,7 +390,7 @@ const MANAGE_LINKS = [
   { label: 'Khách hàng', icon: 'solar:users-group-rounded-bold', href: paths.dashboard.pos.customer.root },
 ];
 
-export function PosManageMenu({ fg }: { fg: string }) {
+export function PosManageMenu({ fg, unsentCount = 0 }: { fg: string; unsentCount?: number }) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   return (
     <>
@@ -362,6 +422,11 @@ export function PosManageMenu({ fg }: { fg: string }) {
         <Typography variant="caption" color="text.secondary" sx={{ px: 2, display: 'block' }}>
           Đơn tạm vẫn được giữ trên máy
         </Typography>
+        {unsentCount > 0 && (
+          <Typography variant="caption" color="warning.dark" sx={{ px: 2, pb: 0.5, display: 'block', maxWidth: 260 }}>
+            Còn {unsentCount} hoá đơn chưa gửi — chỉ gửi khi màn bán hàng đang mở. Quay lại màn này để đồng bộ.
+          </Typography>
+        )}
         {MANAGE_LINKS.map((link) => (
           <MenuItem key={link.href} component={RouterLink} href={link.href} onClick={() => setAnchorEl(null)}>
             <ListItemIcon>

@@ -343,7 +343,12 @@ describe('PosSaleView — dòng hàng, thanh toán, phím tắt', { timeout: 300
         variant: 'success',
       })
     );
-    expect(window.localStorage.getItem('pos_pending_sales')).toBeNull();
+    // Không có IndexedDB trong jsdom → hàng chờ ở localStorage "pos_outbox"; hoá đơn đã lên hệ thống giữ để in lại.
+    await waitFor(() =>
+      expect(JSON.parse(window.localStorage.getItem('pos_outbox') ?? '[]')).toEqual([
+        expect.objectContaining({ id: first.clientRequestId, status: 'sent', serverId: 'so-1' }),
+      ])
+    );
   });
 
   it('vẫn mất mạng: hoá đơn nằm chờ, thanh trên có nút "Chờ đồng bộ"', async () => {
@@ -358,7 +363,11 @@ describe('PosSaleView — dòng hàng, thanh toán, phím tắt', { timeout: 300
 
     const syncButton = await screen.findByRole('button', { name: /Chờ đồng bộ \(1\)/ });
     await waitFor(() => expect(createSalesOrder.mock.calls.length).toBeGreaterThanOrEqual(2));
-    expect(JSON.parse(window.localStorage.getItem('pos_pending_sales') ?? '[]')).toHaveLength(1);
+    const queued = JSON.parse(window.localStorage.getItem('pos_outbox') ?? '[]');
+    expect(queued).toHaveLength(1);
+    expect(queued[0]).toMatchObject({ status: 'pending' });
+    expect(queued[0].attempts).toBeGreaterThanOrEqual(2);
+    expect(queued[0].nextAttemptAt).toBeTruthy();
 
     await user.click(syncButton);
     expect(await screen.findByText('Hoá đơn chờ đồng bộ')).toBeInTheDocument();
@@ -502,5 +511,50 @@ describe('PosSaleView — GĐ0', { timeout: 30000 }, () => {
     await user.click(screen.getByRole('button', { name: 'Đóng Hóa đơn 1' }));
     await user.click(await screen.findByRole('button', { name: 'Đóng hoá đơn' }));
     await waitFor(() => expect(screen.getAllByRole('tab', { name: /Hóa đơn/ })).toHaveLength(1));
+  });
+});
+
+describe('PosSaleView — mất mạng vẫn tra được hàng', { timeout: 30000 }, () => {
+  it('mở màn lúc mất mạng: dùng danh mục đã lưu trên máy, tìm không dấu và thêm được vào giỏ', async () => {
+    window.localStorage.setItem(
+      'pos_meta',
+      JSON.stringify([
+        {
+          id: 'catalog',
+          products: [KEP, VI],
+          customers: [],
+          warehouses: [{ id: 'wh-1', name: 'Kho chính', isDefault: true, isActive: true, createdAt: '2026-01-01T00:00:00Z' }],
+          syncedAt: '2026-11-12T08:00:00.000Z',
+          complete: true,
+        },
+      ])
+    );
+    getAllProducts.mockRejectedValue('Something went wrong');
+    const user = userEvent.setup({ delay: null });
+    renderView();
+
+    await waitFor(() =>
+      expect(snackbar.enqueueSnackbar).toHaveBeenCalledWith(
+        expect.stringContaining('đang dùng danh mục lưu trên máy'),
+        { variant: 'warning' }
+      )
+    );
+    await user.type(searchBox(), 'kep toc do');
+    await user.click(await screen.findByRole('option', { name: /Kẹp tóc nơ nhung đỏ/ }));
+    await waitFor(() => expect(within(cart()).getByText('SP000123')).toBeInTheDocument());
+
+    // quét mã phiên bản khi mất mạng → thêm thẳng phiên bản
+    await user.type(searchBox(), '8935259{Enter}');
+    await waitFor(() => expect(within(cart()).getByText('SP015259')).toBeInTheDocument());
+  });
+
+  it('tải được danh mục từ máy chủ thì lưu lại trên máy cho lần mất mạng sau', async () => {
+    renderView();
+    await ready();
+    await waitFor(() => {
+      const saved = JSON.parse(window.localStorage.getItem('pos_meta') ?? '[]');
+      expect(saved[0]).toMatchObject({ id: 'catalog', complete: true });
+      expect(saved[0].products).toHaveLength(3);
+    });
   });
 });
