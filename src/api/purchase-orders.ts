@@ -19,6 +19,10 @@ export async function getAllPurchaseOrders(params?: {
   toDate?: string;
   pageNumber?: number;
   pageSize?: number;
+  /** Một trong các trạng thái, cách nhau dấu phẩy ("Completed,Returned"). */
+  statuses?: string;
+  /** Tìm theo mã phiếu, mã KiotViet, tên NCC, ghi chú (số hoá đơn NCC). */
+  keyword?: string;
 }): Promise<IPurchaseOrderPagedResponse> {
   const response = await axios.get<IPurchaseOrderPagedResponse>(endpoints.purchaseOrders.list, { params });
   return response.data;
