@@ -6,7 +6,8 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 // ----------------------------------------------------------------------
 // "Phụ cấp giờ làm": lưu ngày + giờ làm bình thường sau khi xác nhận; giờ ngoài 4–10 không lưu được; bỏ ngày áp dụng
-// gửi null; dòng làm đêm 22:00–06:00 chỉ hiện ở cửa hàng có phụ cấp làm đêm (CiCi không có).
+// gửi null; dòng làm đêm 22:00–06:00 chỉ hiện ở cửa hàng có phụ cấp làm đêm, dòng làm thêm giờ 150% chỉ hiện khi bật công
+// tắc phụ cấp làm thêm giờ (CiCi không có cả hai).
 // ----------------------------------------------------------------------
 
 const enqueueSnackbar = vi.fn();
@@ -72,6 +73,34 @@ describe('StatutoryPayCard', () => {
 
     expect(await screen.findByText('Làm việc 22:00–06:00: thêm 30% lương giờ.')).toBeTruthy();
     expect(screen.getByText('Làm thêm giờ ban đêm: thêm 20% lương giờ ban ngày.')).toBeTruthy();
+  });
+
+  it('cửa hàng không có phụ cấp làm thêm giờ (CiCi): không hiện dòng 150%, công tắc tắt', async () => {
+    getStatutoryPaySettings.mockResolvedValue({
+      statutoryPayFrom: '2026-11-01', normalHoursPerDay: 8, updatedAt: 'x', nightPremiumEnabled: false, overtimePremiumEnabled: false,
+    });
+    renderCard();
+
+    expect(await screen.findByText(/không có phụ cấp làm thêm giờ/)).toBeTruthy();
+    expect(screen.queryByText('Làm quá số giờ bình thường trong ngày: 150%.')).toBeNull();
+    expect(screen.getByText('Ngày lễ, Tết: tối thiểu 300% (tự bù phần thưởng lễ còn thiếu).')).toBeTruthy();
+    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('tắt phụ cấp làm thêm giờ: gửi ngày + giờ đang áp dụng và cờ false sau khi xác nhận', async () => {
+    getStatutoryPaySettings.mockResolvedValue({ statutoryPayFrom: '2026-11-01', normalHoursPerDay: 8, updatedAt: 'x' });
+    updateStatutoryPaySettings.mockResolvedValue({
+      statutoryPayFrom: '2026-11-01', normalHoursPerDay: 8, updatedAt: 'y', overtimePremiumEnabled: false,
+    });
+    renderCard();
+
+    const toggle = (await screen.findByRole('checkbox')) as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+    await userEvent.click(toggle);
+    await confirmInDialog('Tắt');
+
+    await waitFor(() => expect(updateStatutoryPaySettings).toHaveBeenCalledWith('2026-11-01', 8, false));
+    expect(await screen.findByText(/không có phụ cấp làm thêm giờ/)).toBeTruthy();
   });
 
   it('giờ làm bình thường ngoài 4–10 thì khoá nút Lưu', async () => {
