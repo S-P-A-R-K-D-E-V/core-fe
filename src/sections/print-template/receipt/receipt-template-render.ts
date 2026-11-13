@@ -75,7 +75,16 @@ const ALLOWED_TAGS = new Set([
   'IMG',
 ]);
 
-/** Lớp được giữ: khối chia cột (columns-node) và ảnh logo cửa hàng — như PrintTemplateHtmlService của core-be. */
+/** Dòng luôn in (trình soạn theo khối, "Ẩn khi rỗng" tắt): không bị bỏ khi mọi trường của nó đều rỗng. */
+export const KEEP_CLASS = 'keep';
+
+/** Kiểu kẻ ngang riêng của một đường kẻ (trình soạn theo khối); không có thì theo `ruleStyle` của mẫu. */
+export const RULE_CLASSES = { dashed: 'hr-dashed', solid: 'hr-solid', dotted: 'hr-dotted' } as const;
+
+/**
+ * Lớp được giữ: khối chia cột (columns-node), ảnh logo cửa hàng, dòng luôn in và kiểu kẻ ngang — như
+ * PrintTemplateHtmlService của core-be.
+ */
 const ALLOWED_CLASSES = new Set([
   'cols',
   'cols-2',
@@ -84,6 +93,8 @@ const ALLOWED_CLASSES = new Set([
   'cols-21',
   'col',
   STORE_LOGO_CLASS,
+  KEEP_CLASS,
+  ...Object.values(RULE_CLASSES),
 ]);
 
 // Bỏ cả nội dung (không chỉ thẻ): mã chạy, nhúng, đồ hoạ ngoài, biểu mẫu.
@@ -281,13 +292,14 @@ function replaceTokens(root: Element, resolve: Resolver) {
   });
 }
 
-/** Bỏ khối mà mọi trường đều rỗng (kể cả chính `root` nếu nó là một khối như vậy). */
+/** Bỏ khối mà mọi trường đều rỗng (kể cả chính `root` nếu nó là một khối như vậy) — trừ khối đánh dấu "luôn in". */
 function hideEmptyBlocks(root: Element, resolve: Resolver) {
   const blocks = [root, ...Array.from(root.querySelectorAll(HIDEABLE))].filter((el) =>
     el.matches(HIDEABLE)
   );
   blocks.forEach((block) => {
     if (!block.isConnected && block !== root) return;
+    if (block.classList.contains(KEEP_CLASS)) return;
     const keys = tokensIn(block);
     if (keys.length > 0 && keys.every((key) => isEmpty(resolve(key)))) block.remove();
   });
@@ -440,6 +452,7 @@ export function receiptTemplateContentCss(settings: ReceiptTemplateSettings): st
     '.rt h1{font-size:1.6em;font-weight:700}.rt h2{font-size:1.35em;font-weight:700}.rt h3{font-size:1.15em;font-weight:700}.rt h4{font-size:1em;font-weight:700}',
     '.rt ul,.rt ol{margin:0;padding-left:1.4em}',
     `.rt hr{border:0;border-top:0.3mm ${settings.ruleStyle} #000;margin:1.2mm 0;height:0}`,
+    `.rt hr.${RULE_CLASSES.dashed}{border-top-style:dashed}.rt hr.${RULE_CLASSES.solid}{border-top-style:solid}.rt hr.${RULE_CLASSES.dotted}{border-top-style:dotted}`,
     '.rt table{width:100%;border-collapse:collapse;margin:0.5mm 0;table-layout:auto}',
     '.rt td,.rt th{padding:0.3mm 0.6mm;vertical-align:top;text-align:left}',
     '.rt th{font-weight:700}',

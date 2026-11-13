@@ -39,6 +39,14 @@ import type { PrintTemplateKind } from 'src/types/print-template';
 import { PRINT_KIND_LABEL } from '../print-template-resolve';
 import { LabelDesigner } from '../label/label-designer';
 import { ReceiptTemplateEditor } from '../receipt/receipt-template-editor';
+import { ReceiptBlockEditor } from '../receipt/blocks/receipt-block-editor';
+import { compileReceiptBlocks } from '../receipt/blocks/receipt-blocks-compile';
+import {
+  starterBlocks,
+  readReceiptBlocks,
+  RECEIPT_BLOCKS_VERSION,
+  RECEIPT_BLOCK_STARTERS,
+} from '../receipt/blocks/receipt-blocks';
 import { ReceiptTemplatePreview } from '../receipt/receipt-template-preview';
 import { renderDesignSheetHtml, snapDesignToDots } from '../label/label-design-render';
 import { sampleReceipt, defaultReceiptTemplate } from '../receipt/receipt-template-default';
@@ -50,13 +58,17 @@ import {
 } from '../receipt/receipt-template-settings';
 
 import type { LabelDesign } from '../label/label-design';
+import type { ReceiptBlock } from '../receipt/blocks/receipt-blocks';
 import type { RenderedReceiptTemplate } from '../receipt/receipt-template-render';
 import type { ReceiptTemplateSettings } from '../receipt/receipt-template-settings';
 import type { DesignLabelSource, DesignPrintContext } from '../label/label-design-render';
 
 // ----------------------------------------------------------------------
-// Soạn một mẫu in: hoá đơn (trình soạn tiptap + thiết lập trang + xem trước) hoặc tem mã (khung thiết kế tem). Mẫu mới
-// (id = 'new') bắt đầu từ mẫu giống phiếu hệ thống / bố cục gợi ý; Lưu lần đầu tạo mẫu rồi chuyển sang địa chỉ của mẫu.
+// Soạn một mẫu in: hoá đơn (soạn theo khối HOẶC soạn tự do bằng tiptap + thiết lập trang + xem trước) hoặc tem mã (khung
+// thiết kế tem). Mẫu mới (id = 'new') bắt đầu từ bố cục khối giấy cuộn 80 mm / bố cục tem gợi ý; Lưu lần đầu tạo mẫu rồi
+// chuyển sang địa chỉ của mẫu.
+// Soạn theo khối: khối lưu ở `settings.blocks`, `content` là HTML dịch từ khối (bộ in chỉ đọc `content`). "Soạn tự do"
+// chuyển một chiều: lấy HTML đã dịch làm nội dung tiptap, lưu thì bỏ `settings.blocks`.
 // ----------------------------------------------------------------------
 
 const SAMPLE_LABEL_ITEMS: DesignLabelSource[] = [
@@ -89,8 +101,10 @@ type Props = {
 
 type Draft = {
   name: string;
-  /** Hoá đơn */
+  /** Hoá đơn — soạn tự do (khi `blocks` = null). */
   html: string;
+  /** Hoá đơn — soạn theo khối; null = soạn tự do. */
+  blocks: ReceiptBlock[] | null;
   receiptSettings: ReceiptTemplateSettings;
   /** Tem */
   design: LabelDesign;
@@ -98,10 +112,12 @@ type Draft = {
 
 function initialDraft(kind: PrintTemplateKind): Draft {
   const receipt = defaultReceiptTemplate('80');
+  const starter = starterBlocks(RECEIPT_BLOCK_STARTERS[0].key);
   return {
     name: kind === 'receipt' ? 'Hoá đơn giấy cuộn 80 mm' : 'Tem mã',
     html: receipt.content,
-    receiptSettings: receipt.settings,
+    blocks: kind === 'receipt' ? starter.items : null,
+    receiptSettings: defaultReceiptSettings(starter.paper),
     design: defaultLabelDesign(),
   };
 }
@@ -135,6 +151,8 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
         setDraft({
           name: template.name,
           html: template.kind === 'receipt' ? template.content : '',
+          blocks:
+            template.kind === 'receipt' ? (readReceiptBlocks(template.settings)?.items ?? null) : null,
           receiptSettings:
             template.kind === 'receipt'
               ? normalizeReceiptSettings(template.settings)
@@ -186,6 +204,34 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
   );
   const sample = useMemo(() => sampleReceipt(brandName, logoUrl), [brandName, logoUrl]);
 
+  /** Nội dung sẽ lưu / in: HTML dịch từ khối, hoặc HTML soạn tự do. */
+  const receiptContent = useMemo(
+    () => (draft.blocks ? compileReceiptBlocks(draft.blocks, draft.receiptSettings) : draft.html),
+    [draft.blocks, draft.receiptSettings, draft.html]
+  );
+
+  const onBlocksChange = useCallback((blocks: ReceiptBlock[]) => {
+    setDraft((prev) => ({ ...prev, blocks }));
+    setDirty(true);
+  }, []);
+
+  const applyStarter = (key: string) => {
+    const starter = RECEIPT_BLOCK_STARTERS.find((s) => s.key === key);
+    if (!starter) return;
+    const { paper, items } = starterBlocks(key);
+    change({ blocks: items, receiptSettings: defaultReceiptSettings(paper) });
+  };
+
+  const switchToFreeMode = () => {
+    if (
+      !window.confirm(
+        'Chuyển sang soạn tự do? Bố cục hiện tại được chép sang trình soạn văn bản. Sau khi lưu, mẫu này không mở lại theo khối được.'
+      )
+    )
+      return;
+    change({ html: receiptContent, blocks: null });
+  };
+
   const handleSave = async () => {
     const name = draft.name.trim();
     if (!name) {
@@ -194,7 +240,15 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
     }
     const payload =
       kind === 'receipt'
-        ? { name, content: draft.html, settings: JSON.stringify(draft.receiptSettings) }
+        ? {
+            name,
+            content: receiptContent,
+            settings: JSON.stringify(
+              draft.blocks
+                ? { ...draft.receiptSettings, blocks: { v: RECEIPT_BLOCKS_VERSION, items: draft.blocks } }
+                : draft.receiptSettings
+            ),
+          }
         : { name, content: serializeLabelDesign(snapDesignToDots(draft.design)), settings: '{}' };
     setSaving(true);
     try {
@@ -206,7 +260,9 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
       } else {
         const updated = await updatePrintTemplate(id, payload);
         // Máy chủ lọc lại HTML — nạp bản đã lọc để trình soạn khớp với thứ sẽ in.
-        if (updated.kind === 'receipt') setDraft((prev) => ({ ...prev, html: updated.content }));
+        // Soạn theo khối: nội dung luôn dịch lại từ khối nên không cần nạp.
+        if (updated.kind === 'receipt')
+          setDraft((prev) => (prev.blocks ? prev : { ...prev, html: updated.content }));
         setDirty(false);
         enqueueSnackbar('Đã lưu mẫu in');
       }
@@ -293,7 +349,7 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
           sx={{ flexGrow: 1, maxWidth: 420 }}
         />
         <Box sx={{ flexGrow: 1 }} />
-        {kind === 'receipt' && (
+        {kind === 'receipt' && !draft.blocks && (
           <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 180 }}>
             <Iconify icon="eva:search-fill" width={18} sx={{ color: 'text.disabled' }} />
             <Slider
@@ -335,13 +391,22 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
           gridTemplateColumns={{ xs: 'minmax(0, 1fr)', xl: 'minmax(0, 1fr) 380px' }}
           alignItems="start"
         >
-          <ReceiptTemplateEditor
-            value={draft.html}
-            onChange={onHtmlChange}
-            settings={draft.receiptSettings}
-            zoom={zoom}
-            logoUrl={logoUrl}
-          />
+          {draft.blocks ? (
+            <ReceiptBlockEditor
+              blocks={draft.blocks}
+              onChange={onBlocksChange}
+              onStarter={applyStarter}
+              onFreeMode={switchToFreeMode}
+            />
+          ) : (
+            <ReceiptTemplateEditor
+              value={draft.html}
+              onChange={onHtmlChange}
+              settings={draft.receiptSettings}
+              zoom={zoom}
+              logoUrl={logoUrl}
+            />
+          )}
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Tabs value={panel} onChange={(_, next) => setPanel(next)} sx={{ mb: 2 }}>
               <Tab value="preview" label="Xem trước" />
@@ -356,24 +421,26 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
             {/* Xem trước luôn dựng (ẩn khi đang ở thẻ thiết lập) để "In thử" in đúng bản mới nhất. */}
             <Box sx={{ display: panel === 'preview' ? 'block' : 'none' }}>
               <ReceiptTemplatePreview
-                content={draft.html}
+                content={receiptContent}
                 settings={draft.receiptSettings}
                 sample={sample}
                 onRendered={setRendered}
               />
             </Box>
-            <Button
-              size="small"
-              color="inherit"
-              sx={{ mt: 2 }}
-              onClick={() => {
-                if (window.confirm('Thay nội dung bằng mẫu giống phiếu hệ thống?')) {
-                  change({ html: defaultReceiptTemplate(draft.receiptSettings.paper).content });
-                }
-              }}
-            >
-              Đặt lại nội dung mẫu chuẩn
-            </Button>
+            {!draft.blocks && (
+              <Button
+                size="small"
+                color="inherit"
+                sx={{ mt: 2 }}
+                onClick={() => {
+                  if (window.confirm('Thay nội dung bằng mẫu giống phiếu hệ thống?')) {
+                    change({ html: defaultReceiptTemplate(draft.receiptSettings.paper).content });
+                  }
+                }}
+              >
+                Đặt lại nội dung mẫu chuẩn
+              </Button>
+            )}
           </Paper>
         </Box>
       ) : (
