@@ -20,11 +20,54 @@ export type IPaymentOption = {
   feeNote?: string | null;
 };
 
+// ---------------- Tài khoản nhận theo kênh (TransferRouting của core-be) ----------------
+
+/** priority: ưu tiên theo thứ tự · round_robin: luân phiên · weighted: chia theo tỷ lệ · cashier: thu ngân chọn (như trước). */
+export type TransferStrategy = 'priority' | 'round_robin' | 'weighted' | 'cashier';
+/** Thu ngân đổi tài khoản ở quầy: none | pool (danh sách + quy tắc + dự phòng) | any. */
+export type CashierOverride = 'none' | 'pool' | 'any';
+
+export type IRoutingAccount = { id: string; weight?: number | null };
+
+/** amountMin ≤ hoá đơn < amountMax (đồng); from–to giờ VN "HH:mm" (to < from = qua đêm); days 0 = CN … 6 = T7. */
+export type IRoutingWhen = {
+  amountMin?: number | null;
+  amountMax?: number | null;
+  from?: string | null;
+  to?: string | null;
+  days?: number[] | null;
+};
+
+export type IRoutingRule = {
+  id: string;
+  name?: string | null;
+  when?: IRoutingWhen | null;
+  accounts: IRoutingAccount[];
+  strategy?: TransferStrategy | null;
+  /** Tài khoản của quy tắc không dùng được → xét tiếp danh sách của kênh. */
+  thenDefault: boolean;
+};
+
+export type ITransferRouting = {
+  strategy: TransferStrategy;
+  accounts: IRoutingAccount[];
+  rules?: IRoutingRule[] | null;
+  fallbackId?: string | null;
+  cashierOverride?: CashierOverride | null;
+  weightBasis?: 'amount' | 'count' | null;
+};
+
+export type IBranchRouting = { transfer?: ITransferRouting | null };
+
 export type IPaymentChannelView = {
   /** false = chưa lưu (POS dùng mọi lựa chọn như trước; Online chưa nhận thanh toán) */
   configured: boolean;
   enabled: string[];
   defaultTransfer?: string | null;
+  /** Tài khoản nhận theo kênh — null = quầy: thu ngân chọn; online: ưu tiên mọi tài khoản tự xác nhận. */
+  transfer?: ITransferRouting | null;
+  /** Quầy: chi nhánh có cấu hình riêng (khoá = Id chi nhánh). */
+  branches?: Record<string, IBranchRouting> | null;
 };
 
 export type IPaymentChannels = {

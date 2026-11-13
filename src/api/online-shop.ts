@@ -1,6 +1,8 @@
 import type {
   IAdminUnit,
   IPaymentChannels,
+  IBranchRouting,
+  ITransferRouting,
   IShippingCarrier,
   IStorefrontOrder,
   IShippingConnection,
@@ -36,6 +38,19 @@ export async function getPaymentChannels(): Promise<IPaymentChannels> {
 /** Kênh không gửi (undefined) = giữ nguyên cấu hình đã lưu của kênh đó. */
 export async function updatePaymentChannels(data: IUpdatePaymentChannels): Promise<IPaymentChannels> {
   const res = await axios.put<IPaymentChannels>(endpoints.paymentChannels.channels, data);
+  return res.data;
+}
+
+/** Lưu "Tài khoản nhận theo kênh" của một kênh; transfer null = bỏ cấu hình (quầy: thu ngân chọn như trước). */
+export async function updateTransferRouting(
+  channel: 'pos' | 'online',
+  transfer: ITransferRouting | null,
+  branches?: Record<string, IBranchRouting> | null
+): Promise<IPaymentChannels> {
+  const res = await axios.put<IPaymentChannels>(endpoints.paymentChannels.routing(channel), {
+    transfer,
+    branches: branches ?? null,
+  });
   return res.data;
 }
 

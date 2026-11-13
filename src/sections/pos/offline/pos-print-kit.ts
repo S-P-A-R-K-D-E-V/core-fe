@@ -1,4 +1,5 @@
 import type { IPrintTemplateList } from 'src/types/print-template';
+import type { IBranchRouting, ITransferRouting } from 'src/types/online-shop';
 import type {
   ISalesOrderReceipt,
   IKiotVietBankAccount,
@@ -12,8 +13,11 @@ import { openPosStore, type PosKvStore } from './pos-store';
 // "Bộ in" lưu trên máy — đủ để in phiếu khi mất mạng (docs/cici/plans/pos-offline-plan.md mục 3.6):
 // - thông tin cửa hàng + lời chào cuối phiếu: lấy từ phiếu gần nhất máy chủ trả về (đúng thứ máy chủ sẽ in);
 // - mẫu in hoá đơn của cửa hàng (Mẫu in);
-// - tài khoản nhận chuyển khoản dựng được VietQR (QR tĩnh khi mất mạng).
+// - tài khoản nhận chuyển khoản dựng được VietQR (QR tĩnh khi mất mạng) + cài đặt "Tài khoản nhận theo kênh" của quầy (QR tĩnh
+//   chọn tài khoản theo cùng quy tắc giá trị hoá đơn / khung giờ / thứ tự).
 // ----------------------------------------------------------------------
+
+export type KitTransferRouting = { transfer: ITransferRouting | null; branches: Record<string, IBranchRouting> | null };
 
 export type PrintKit = {
   store: ISalesOrderReceiptStore | null;
@@ -21,6 +25,8 @@ export type PrintKit = {
   footer: string | null;
   templates: IPrintTemplateList | null;
   bankAccounts: IKiotVietBankAccount[];
+  /** null = chưa lưu / quầy chưa cấu hình (thu ngân chọn). */
+  transferRouting: KitTransferRouting | null;
   savedAt: string | null;
 };
 
@@ -33,6 +39,7 @@ export const EMPTY_PRINT_KIT: PrintKit = {
   footer: null,
   templates: null,
   bankAccounts: [],
+  transferRouting: null,
   savedAt: null,
 };
 
@@ -73,14 +80,16 @@ type KitApi = {
   getPrintTemplates: () => Promise<IPrintTemplateList>;
   latestReceipt: () => Promise<ISalesOrderReceipt | null>;
   bankAccounts: () => Promise<IKiotVietBankAccount[]>;
+  transferRouting?: () => Promise<KitTransferRouting | null>;
 };
 
 /** Tải lại bộ in khi có mạng; phần nào lỗi thì giữ bản đã lưu của phần đó. */
 export async function refreshPrintKit(api: KitApi): Promise<PrintKit> {
-  const [templates, receipt, bankAccounts] = await Promise.allSettled([
+  const [templates, receipt, bankAccounts, routing] = await Promise.allSettled([
     api.getPrintTemplates(),
     api.latestReceipt(),
     api.bankAccounts(),
+    api.transferRouting ? api.transferRouting() : Promise.reject(new Error('skip')),
   ]);
   const patch: Partial<PrintKit> = {};
   if (templates.status === 'fulfilled') patch.templates = templates.value;
@@ -90,5 +99,6 @@ export async function refreshPrintKit(api: KitApi): Promise<PrintKit> {
     patch.footer = receipt.value.footer;
   }
   if (bankAccounts.status === 'fulfilled') patch.bankAccounts = bankAccounts.value;
+  if (routing.status === 'fulfilled') patch.transferRouting = routing.value;
   return Object.keys(patch).length > 0 ? savePrintKit(patch) : loadPrintKit();
 }

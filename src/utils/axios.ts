@@ -939,6 +939,7 @@ export const endpoints = {
   // Thanh toán → Cài đặt: phương thức theo kênh (POS / Online), chính sách bán online (chủ cửa hàng)
   paymentChannels: {
     channels: '/payment/settings/channels',
+    routing: (channel: 'pos' | 'online') => `/payment/settings/channels/${channel}/routing`,
     onlineShop: '/payment/settings/online-shop',
     branchPickupAddress: (branchId: string) => `/payment/settings/online-shop/branches/${branchId}/pickup-address`,
   },

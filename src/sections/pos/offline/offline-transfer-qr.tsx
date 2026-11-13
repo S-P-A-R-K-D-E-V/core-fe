@@ -16,10 +16,13 @@ import { customerDisplay } from 'src/sections/customer-display/customer-display-
 
 import type { IKiotVietBankAccount } from 'src/types/corecms-api';
 
+import type { KitTransferRouting } from './pos-print-kit';
+
 import { buildReceiptQr } from '../receipt-print/receipt-qr';
 import { transferAccountLabel } from '../receipt-print/receipt-settings';
 
 import { buildVietQrPayload, normalizeTransferContent } from './vietqr';
+import { localStats, rememberUsed, offlineTransferChoice } from './offline-transfer-choice';
 
 // ----------------------------------------------------------------------
 // QR chuyển khoản TĨNH dựng tại máy — khi mất mạng không tạo được QR qua máy chủ (spark-payment). Máy không biết tiền đã
@@ -35,14 +38,29 @@ type Props = {
   /** Mã tạm của hoá đơn — nội dung chuyển khoản. */
   code: string | null;
   accounts: IKiotVietBankAccount[];
+  /** Tài khoản nhận theo kênh đã lưu trên máy (bộ in) + chi nhánh làm việc. */
+  routing?: KitTransferRouting | null;
+  branchId?: string | null;
   confirmed: boolean;
   onConfirm: (reference: string) => void;
   /** Có mạng: quay lại QR tự xác nhận. */
   onUseDynamic?: () => void;
 };
 
-export default function OfflineTransferQr({ amount, code, accounts, confirmed, onConfirm, onUseDynamic }: Props) {
-  const [accountId, setAccountId] = useState(() => accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? '');
+export default function OfflineTransferQr({
+  amount,
+  code,
+  accounts: allAccounts,
+  routing,
+  branchId,
+  confirmed,
+  onConfirm,
+  onUseDynamic,
+}: Props) {
+  // Chọn một lần khi mở (không nhảy tài khoản khi giỏ đổi tiền), thu ngân đổi được trong danh sách cho phép.
+  const [choice] = useState(() => offlineTransferChoice(allAccounts, routing, branchId, amount, new Date(), localStats()));
+  const accounts = choice.pool;
+  const [accountId, setAccountId] = useState(choice.accountId);
   const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
 
   const qr = useMemo(() => {
@@ -137,7 +155,11 @@ export default function OfflineTransferQr({ amount, code, accounts, confirmed, o
           color="success"
           disabled={!code || confirmed}
           startIcon={<Iconify icon={confirmed ? 'solar:check-circle-bold' : 'solar:hand-money-bold'} />}
-          onClick={() => code && onConfirm(staticQrReference(code))}
+          onClick={() => {
+            if (!code) return;
+            if (account) rememberUsed(account.id);
+            onConfirm(staticQrReference(code));
+          }}
         >
           {confirmed ? 'Đã xác nhận nhận tiền' : 'Đã nhận chuyển khoản'}
         </Button>
