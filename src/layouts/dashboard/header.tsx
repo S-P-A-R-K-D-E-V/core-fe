@@ -15,6 +15,7 @@ import { useSettingsContext } from 'src/components/settings';
 
 import Searchbar from '../common/searchbar';
 import { NAV, HEADER } from '../config-layout';
+import SettingsButton from '../common/settings-button';
 import BranchSwitcher from '../common/branch-switcher';
 import AccountPopover from '../common/account-popover';
 import UsersPopover from '../common/users-popover';
@@ -78,7 +79,11 @@ export default function Header({ onOpenNav }: Props) {
 
         {!counterSession && <UsersPopover />}
 
-        <NavSettingsButton tree={tree} />
+        {/* Cài đặt cửa hàng (module ⚙ của menu) — chỉ hiện khi người này có mục nào trong đó. */}
+        {tree.settings && <NavSettingsButton tree={tree} />}
+
+        {/* Cài đặt giao diện: sáng / tối, màu, cỡ chữ, kiểu menu (Thanh ngang / Thanh bên / Thanh bên thu gọn). */}
+        <SettingsButton />
 
         <AccountPopover meModule={tree.me} />
 
