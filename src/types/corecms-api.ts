@@ -1,4 +1,5 @@
 import type { IPersonHourWarnings } from './hr';
+import type { IBranchRouting, ITransferRouting } from './online-shop';
 
 // Core CMS Backend API Types
 // ----------------------------------------------------------------------
@@ -3428,6 +3429,22 @@ export interface ICreateQrPaymentRequest {
   description?: string;
   /** Kết nối xác nhận chuyển khoản (GET payment/qr/connections) — null = theo tài khoản như cũ. */
   connectionId?: string | null;
+  /** Tài khoản nhận theo kênh: không gửi bankAccountId + auto → máy chủ tự chọn tài khoản theo cài đặt quầy của chi nhánh. */
+  auto?: boolean;
+  branchId?: string | null;
+  /** Mã đang hiện (tạo lại khi giỏ đổi tiền) → giữ tài khoản nếu vẫn cùng quy tắc. */
+  previousAccountId?: string | null;
+  previousRuleId?: string | null;
+}
+
+/** Vì sao QR vào tài khoản này — auto = tự chọn theo cài đặt; false = thu ngân chọn. */
+export interface IQrRouting {
+  accountId?: string | null;
+  ruleId?: string | null;
+  ruleName?: string | null;
+  strategy?: string | null;
+  note?: string | null;
+  auto: boolean;
 }
 
 /**
@@ -3518,6 +3535,9 @@ export interface IPosPaymentConnectionsResponse {
   allowBankAccount?: boolean;
   /** Nguồn chuyển khoản mặc định: '' = theo tài khoản, khoá kết nối; null = máy tự nhớ như trước. */
   defaultKey?: string | null;
+  /** Tài khoản nhận theo kênh của quầy (null = thu ngân chọn) + chi nhánh có cấu hình riêng. */
+  transfer?: ITransferRouting | null;
+  branches?: Record<string, IBranchRouting> | null;
 }
 
 /** INIT | PENDING | COMPLETED | CANCELLED | ERRORCORRECTED | EXPIRED (EXPIRED chỉ có khi bật dịch vụ thanh toán). */
@@ -3549,6 +3569,8 @@ export interface IQrPaymentResponse extends IQrPaymentServiceFields {
   accountNumber?: string;
   /** Kết nối xác nhận chuyển khoản đã dùng (null = theo tài khoản). */
   connectionId?: string | null;
+  /** Tài khoản nhận theo kênh: vì sao dùng tài khoản này. */
+  routing?: IQrRouting | null;
 }
 
 export interface IQrPaymentStatusResponse extends IQrPaymentServiceFields {

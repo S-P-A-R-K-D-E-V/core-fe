@@ -1,6 +1,7 @@
 'use client';
 
 import type { IPosPaymentConnection } from 'src/types/corecms-api';
+import type { IBranchRouting, ITransferRouting } from 'src/types/online-shop';
 
 import { useState, useEffect, useCallback } from 'react';
 
@@ -39,6 +40,9 @@ export type PosPaymentConnectionsState = {
   allowBankAccount: boolean;
   /** Phương thức hiện ở quầy ('Cash' | 'BankTransfer' | 'Card' | 'EWallet'); null = chưa cấu hình → mọi phương thức. */
   methods: string[] | null;
+  /** Tài khoản nhận theo kênh của quầy (null = thu ngân chọn) + chi nhánh có cấu hình riêng. */
+  transfer: ITransferRouting | null;
+  branches: Record<string, IBranchRouting> | null;
 };
 
 export function usePosPaymentConnections(): PosPaymentConnectionsState {
@@ -47,23 +51,27 @@ export function usePosPaymentConnections(): PosPaymentConnectionsState {
   const [loaded, setLoaded] = useState(false);
   const [allowBankAccount, setAllowBankAccount] = useState(true);
   const [methods, setMethods] = useState<string[] | null>(null);
+  const [transfer, setTransfer] = useState<ITransferRouting | null>(null);
+  const [branches, setBranches] = useState<Record<string, IBranchRouting> | null>(null);
 
   useEffect(() => {
     let alive = true;
     getPosPaymentConnections()
       .then((res) => {
         if (!alive) return;
+        setTransfer(res.configured ? (res.transfer ?? null) : null);
+        setBranches(res.configured ? (res.branches ?? null) : null);
         const list = res.enabled ? (res.connections ?? []) : [];
         const allowAccount = res.configured ? res.allowBankAccount !== false : true;
         setConnections(list);
         setAllowBankAccount(allowAccount);
         setMethods(res.configured && res.methods?.length ? res.methods : null);
         setSelectionKeyState(initialSelection(res.configured ? res.defaultKey : null, readSavedConnectionId(), list, allowAccount));
+        // Cùng lượt với cấu hình ở trên: quầy không tạo QR theo tài khoản trước khi biết có "Tự chọn theo cài đặt".
+        setLoaded(true);
       })
       .catch(() => {
         // Không lấy được kết nối → theo tài khoản như cũ.
-      })
-      .finally(() => {
         if (alive) setLoaded(true);
       });
     return () => {
@@ -86,6 +94,8 @@ export function usePosPaymentConnections(): PosPaymentConnectionsState {
     loaded,
     allowBankAccount,
     methods,
+    transfer,
+    branches,
   };
 }
 

@@ -1,0 +1,121 @@
+{
+  "_comment": "Bộ ca dùng chung cho TransferAccountPlanner (C#, core-be) và src/utils/transfer-routing.ts (core-fe). Sửa ở một nơi thì chép sang nơi kia. Tài khoản: A …6668, B …9005, C …1115, D …0068 (chủ khác), F …7318 (dự phòng, xác nhận tay). nowUtc: 2026-11-11 = thứ 4, 2026-11-14 = thứ 7.",
+  "configs": {
+    "base": {
+      "strategy": "priority",
+      "accounts": [
+        { "id": "00000000-0000-0000-0000-00000000000a" },
+        { "id": "00000000-0000-0000-0000-00000000000b" },
+        { "id": "00000000-0000-0000-0000-00000000000c" }
+      ],
+      "rules": [
+        { "id": "big", "name": "Hoá đơn lớn", "when": { "amountMin": 5000000 },
+          "accounts": [{ "id": "00000000-0000-0000-0000-00000000000d" }], "strategy": "priority", "thenDefault": true },
+        { "id": "eve", "name": "Tối cuối tuần", "when": { "from": "18:00", "to": "22:00", "days": [6, 0] },
+          "accounts": [{ "id": "00000000-0000-0000-0000-00000000000a" }, { "id": "00000000-0000-0000-0000-00000000000c" }],
+          "strategy": "round_robin", "thenDefault": true },
+        { "id": "sun", "name": "Chủ nhật", "when": { "days": [0] },
+          "accounts": [{ "id": "00000000-0000-0000-0000-00000000000b" }], "strategy": "priority", "thenDefault": false }
+      ],
+      "fallbackId": "00000000-0000-0000-0000-00000000000f",
+      "cashierOverride": "pool"
+    },
+    "night": {
+      "strategy": "priority",
+      "accounts": [{ "id": "00000000-0000-0000-0000-00000000000a" }],
+      "rules": [
+        { "id": "late", "name": "Đêm", "when": { "from": "22:00", "to": "02:00" },
+          "accounts": [{ "id": "00000000-0000-0000-0000-00000000000c" }], "thenDefault": false }
+      ],
+      "fallbackId": "00000000-0000-0000-0000-00000000000f"
+    },
+    "weighted": {
+      "strategy": "weighted",
+      "accounts": [
+        { "id": "00000000-0000-0000-0000-00000000000a", "weight": 50 },
+        { "id": "00000000-0000-0000-0000-00000000000b", "weight": 30 },
+        { "id": "00000000-0000-0000-0000-00000000000c", "weight": 20 }
+      ],
+      "fallbackId": "00000000-0000-0000-0000-00000000000f"
+    },
+    "cashier": { "strategy": "cashier", "accounts": [] }
+  },
+  "branches": {
+    "00000000-0000-0000-0000-0000000000e1": {
+      "transfer": {
+        "strategy": "priority",
+        "accounts": [{ "id": "00000000-0000-0000-0000-00000000000b" }],
+        "fallbackId": "00000000-0000-0000-0000-00000000000f"
+      }
+    }
+  },
+  "cases": [
+    { "name": "Hoá đơn nhỏ ngày thường: danh sách kênh rồi dự phòng", "config": "base", "amount": 300000,
+      "nowUtc": "2026-11-11T03:00:00Z", "plan": ["a", "b", "c", "f"], "rule": null },
+    { "name": "Hoá đơn lớn: tài khoản của quy tắc trước", "config": "base", "amount": 6000000,
+      "nowUtc": "2026-11-11T03:00:00Z", "plan": ["d", "a", "b", "c", "f"], "rule": "big" },
+    { "name": "Đúng ngưỡng 5 triệu là khớp (≥)", "config": "base", "amount": 5000000,
+      "nowUtc": "2026-11-11T03:00:00Z", "plan": ["d", "a", "b", "c", "f"], "rule": "big" },
+    { "name": "Dưới ngưỡng 1 đồng không khớp", "config": "base", "amount": 4999999,
+      "nowUtc": "2026-11-11T03:00:00Z", "plan": ["a", "b", "c", "f"], "rule": null },
+    { "name": "Tối thứ 7: luân phiên A, C (C lâu chưa nhận lên trước)", "config": "base", "amount": 300000,
+      "nowUtc": "2026-11-14T12:30:00Z",
+      "stats": { "lastUsed": { "a": "2026-11-14T11:00:00Z", "c": "2026-11-13T11:00:00Z" } },
+      "plan": ["c", "a", "b", "f"], "rule": "eve" },
+    { "name": "22:00 thứ 7 đã hết khung (giờ kết thúc không tính)", "config": "base", "amount": 300000,
+      "nowUtc": "2026-11-14T15:00:00Z", "plan": ["a", "b", "c", "f"], "rule": null },
+    { "name": "Chủ nhật buổi sáng: chỉ B (không xét tiếp danh sách kênh)", "config": "base", "amount": 300000,
+      "nowUtc": "2026-11-15T02:00:00Z", "plan": ["b", "f"], "rule": "sun" },
+    { "name": "Khung qua đêm 22:00–02:00 lúc 01:00", "config": "night", "amount": 100000,
+      "nowUtc": "2026-11-11T18:00:00Z", "plan": ["c", "f"], "rule": "late" },
+    { "name": "Khung qua đêm lúc 02:00 đã hết", "config": "night", "amount": 100000,
+      "nowUtc": "2026-11-11T19:00:00Z", "plan": ["a", "f"], "rule": null },
+    { "name": "Chia tỷ lệ: tài khoản nhận thiếu nhiều nhất lên trước", "config": "weighted", "amount": 100000,
+      "nowUtc": "2026-11-11T03:00:00Z",
+      "stats": { "received": { "a": 4200000, "b": 900000, "c": 1500000 } },
+      "plan": ["b", "c", "a", "f"], "rule": null },
+    { "name": "Chia tỷ lệ chưa nhận đồng nào: tỷ lệ lớn trước", "config": "weighted", "amount": 100000,
+      "nowUtc": "2026-11-11T03:00:00Z", "plan": ["a", "b", "c", "f"], "rule": null },
+    { "name": "Tạo lại QR cùng quy tắc: giữ tài khoản đang hiện", "config": "base", "amount": 350000,
+      "nowUtc": "2026-11-11T03:00:00Z", "previous": { "accountId": "b", "ruleId": null },
+      "plan": ["b", "a", "c", "f"], "rule": null },
+    { "name": "Tạo lại QR mà vượt ngưỡng: theo quy tắc mới, không giữ", "config": "base", "amount": 6000000,
+      "nowUtc": "2026-11-11T03:00:00Z", "previous": { "accountId": "b", "ruleId": null },
+      "plan": ["d", "a", "b", "c", "f"], "rule": "big" },
+    { "name": "Thu ngân chọn: không tự chọn", "config": "cashier", "amount": 100000,
+      "nowUtc": "2026-11-11T03:00:00Z", "plan": null },
+    { "name": "Chi nhánh có cấu hình riêng", "config": "base", "branchId": "00000000-0000-0000-0000-0000000000e1",
+      "amount": 6000000, "nowUtc": "2026-11-11T03:00:00Z", "plan": ["b", "f"], "rule": null },
+    { "name": "Chi nhánh khác dùng cấu hình kênh", "config": "base", "branchId": "00000000-0000-0000-0000-0000000000e2",
+      "amount": 300000, "nowUtc": "2026-11-11T03:00:00Z", "plan": ["a", "b", "c", "f"], "rule": null },
+    { "name": "Xếp hạng: A hết lượt miễn phí (tính phí) xuống sau B, C xác nhận tay", "config": "base", "amount": 300000,
+      "nowUtc": "2026-11-11T03:00:00Z",
+      "capabilities": { "a": { "confirmation": "auto_paid" }, "b": { "confirmation": "auto" }, "c": { "confirmation": "manual" },
+        "f": { "confirmation": "manual" } },
+      "plan": ["a", "b", "c", "f"], "ranked": ["b", "a", "c", "f"] },
+    { "name": "Xếp hạng: A bị S Payment chặn (chạm trần) thì bỏ", "config": "base", "amount": 300000,
+      "nowUtc": "2026-11-11T03:00:00Z",
+      "capabilities": { "a": { "confirmation": "auto", "blocked": "cap_reached" }, "b": { "confirmation": "auto" },
+        "c": { "confirmation": "auto" }, "f": { "confirmation": "manual" } },
+      "plan": ["a", "b", "c", "f"], "ranked": ["b", "c", "f"] },
+    { "name": "Xếp hạng: kênh báo có của A đang lỗi thì A sau B", "config": "base", "amount": 300000,
+      "nowUtc": "2026-11-11T03:00:00Z",
+      "capabilities": { "a": { "confirmation": "auto", "down": true }, "b": { "confirmation": "auto" },
+        "c": { "confirmation": "auto" }, "f": { "confirmation": "manual" } },
+      "plan": ["a", "b", "c", "f"], "ranked": ["b", "c", "a", "f"] },
+    { "name": "Quầy: mọi tài khoản bị chặn thì vẫn dùng như cũ", "config": "base", "amount": 300000,
+      "nowUtc": "2026-11-11T03:00:00Z",
+      "capabilities": { "a": { "confirmation": "auto", "blocked": "account_disabled" }, "b": { "confirmation": "auto", "blocked": "cap_reached" },
+        "c": { "confirmation": "manual", "blocked": "cap_reached" }, "f": { "confirmation": "manual", "blocked": "cap_reached" } },
+      "plan": ["a", "b", "c", "f"], "ranked": ["a", "b", "c", "f"] },
+    { "name": "Online: chỉ nhận tài khoản tự xác nhận", "config": "base", "online": true, "amount": 300000,
+      "nowUtc": "2026-11-11T03:00:00Z",
+      "capabilities": { "a": { "confirmation": "auto" }, "b": { "confirmation": "manual" }, "c": { "confirmation": "auto_paid" },
+        "f": { "confirmation": "manual" } },
+      "plan": ["a", "b", "c", "f"], "ranked": ["a", "c"] },
+    { "name": "Tài khoản S Payment không biết coi như xác nhận tay", "config": "base", "amount": 300000,
+      "nowUtc": "2026-11-11T03:00:00Z",
+      "capabilities": { "b": { "confirmation": "auto" } },
+      "plan": ["a", "b", "c", "f"], "ranked": ["b", "a", "c", "f"] }
+  ]
+}

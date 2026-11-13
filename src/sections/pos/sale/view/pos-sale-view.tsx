@@ -55,6 +55,7 @@ import {
 import { getAllProducts } from 'src/api/products';
 import { getAllCustomers } from 'src/api/customers';
 import { getAllWarehouses } from 'src/api/warehouses';
+import { getPosPaymentConnections } from 'src/api/payment-qr';
 import { createSalesOrder, getAllSalesOrders, getSalesOrderReceipt } from 'src/api/sales-orders';
 
 import ReceiptPrintDialog from 'src/sections/pos/receipt-print/receipt-print-dialog';
@@ -307,6 +308,11 @@ function PosSaleScreen() {
         return latest ? getSalesOrderReceipt(latest.id) : null;
       },
       bankAccounts: async () => usableTransferAccounts((await loadPosBankAccounts()).accounts),
+      // Tài khoản nhận theo kênh của quầy — QR tĩnh lúc mất mạng chọn tài khoản theo cùng quy tắc.
+      transferRouting: async () => {
+        const res = await getPosPaymentConnections();
+        return res.configured && res.transfer ? { transfer: res.transfer, branches: res.branches ?? null } : null;
+      },
     })
       .then(setPrintKit)
       .catch(() => {});
@@ -2361,6 +2367,8 @@ function PosSaleScreen() {
                           amount={quickDue}
                           code={activeOrder.offlineCode ?? null}
                           accounts={printKit.bankAccounts}
+                          routing={printKit.transferRouting}
+                          branchId={workingBranchId}
                           confirmed={quickQrPaymentCompleted}
                           onConfirm={(reference) => {
                             setQuickQrPaymentCompleted(true);

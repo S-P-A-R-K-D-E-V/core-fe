@@ -12,6 +12,7 @@ import { SPayLogo } from 'src/components/spay-logo';
 import BankAccountsTab from 'src/sections/store-settings/bank-accounts-tab';
 
 import SPayKeyCard from '../settings/spay-key-card';
+import TransferRoutingCard from '../settings/transfer-routing-card';
 import PaymentChannelsCard from '../settings/payment-channels-card';
 import OnlineShopSettingsCard from '../settings/online-shop-settings-card';
 import { paymentSettingsHref, paymentSettingsTabOf, PAYMENT_SETTINGS_TABS } from '../payment-pages';
@@ -56,8 +57,10 @@ export default function PaymentSettingsView() {
       {tab === 'channels' && (
         <PaymentChannelsCard
           onOpenConnections={() => router.replace(paymentSettingsHref('connections'))}
+          onOpenRouting={() => router.replace(paymentSettingsHref('routing'))}
         />
       )}
+      {tab === 'routing' && <TransferRoutingCard />}
       {tab === 'online' && <OnlineShopSettingsCard />}
       {tab === 'accounts' && <BankAccountsTab />}
       {/* Kết nối S Payment bằng khoá ứng dụng — liên kết ngân hàng, báo có, đối soát quản lý trên S Payment. */}

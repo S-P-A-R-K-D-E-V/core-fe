@@ -36,6 +36,7 @@ import {
   posDefaultChoices,
   type ChannelDraft,
 } from './payment-channels-utils';
+import { routingSummary } from './transfer-routing-utils';
 
 // ----------------------------------------------------------------------
 // Phương thức theo kênh: một bảng, mỗi dòng một lựa chọn thanh toán (tiền mặt, thẻ, VietQR theo tài khoản, chuyển khoản
@@ -51,9 +52,11 @@ const CHANNELS: { value: PaymentChannel; label: string }[] = [
 type Props = {
   /** Mở tab Báo có & kết nối (thêm kết nối ApiPay / ngân hàng). */
   onOpenConnections?: () => void;
+  /** Mở tab Tài khoản nhận theo kênh. */
+  onOpenRouting?: () => void;
 };
 
-export default function PaymentChannelsCard({ onOpenConnections }: Props) {
+export default function PaymentChannelsCard({ onOpenConnections, onOpenRouting }: Props) {
   const { enqueueSnackbar } = useSnackbar();
   const [data, setData] = useState<IPaymentChannels | null>(null);
   const [draft, setDraft] = useState<ChannelDraft | null>(null);
@@ -125,7 +128,7 @@ export default function PaymentChannelsCard({ onOpenConnections }: Props) {
     <Card>
       <CardHeader
         title="Phương thức thanh toán theo kênh"
-        subheader='Tích ô để bật phương thức cho từng kênh bán. Chuyển khoản ở quầy: bật dòng "VietQR theo tài khoản ngân hàng" — S Payment tự chọn kênh báo tiền về. Trang bán online chỉ cho khách chọn các ô ở cột Bán online.'
+        subheader='Tích ô để bật phương thức cho từng kênh bán. Chuyển khoản: bật dòng "VietQR theo tài khoản ngân hàng" — tài khoản nào nhận ở kênh nào chọn ở tab "Tài khoản nhận theo kênh", S Payment tự chọn kênh báo tiền về. Trang bán online chỉ cho khách chọn các ô ở cột Bán online.'
       />
 
       <Stack spacing={2} sx={{ p: 3, pt: 2 }}>
@@ -180,13 +183,20 @@ export default function PaymentChannelsCard({ onOpenConnections }: Props) {
             </TableHead>
             <TableBody>
               {data.options.map((option) => (
-                <OptionRow key={option.key} option={option} draft={draft} onToggle={toggle} />
+                <OptionRow
+                  key={option.key}
+                  option={option}
+                  draft={draft}
+                  onToggle={toggle}
+                  routing={option.key === 'transfer:account' ? routingSummary(data) : undefined}
+                  onOpenRouting={option.key === 'transfer:account' ? onOpenRouting : undefined}
+                />
               ))}
             </TableBody>
           </Table>
         </TableContainer>
 
-        {(defaultChoices.length > 1 || !!draft.posDefault) && (
+        {!data.pos.transfer && (defaultChoices.length > 1 || !!draft.posDefault) && (
           <TextField
             select
             label="Nguồn chuyển khoản mặc định ở quầy"
@@ -228,9 +238,12 @@ type RowProps = {
   option: IPaymentOption;
   draft: ChannelDraft;
   onToggle: (channel: PaymentChannel, key: string) => void;
+  /** Dòng "Chuyển khoản theo tài khoản": tóm tắt + nút sang tab Tài khoản nhận theo kênh. */
+  routing?: string;
+  onOpenRouting?: () => void;
 };
 
-function OptionRow({ option, draft, onToggle }: RowProps) {
+function OptionRow({ option, draft, onToggle, routing, onOpenRouting }: RowProps) {
   return (
     <TableRow hover>
       <TableCell>
@@ -248,6 +261,18 @@ function OptionRow({ option, draft, onToggle }: RowProps) {
             <Typography variant="caption" color="text.secondary">
               {option.detail}
             </Typography>
+          )}
+          {routing && (
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="caption" color="primary.main">
+                {routing}
+              </Typography>
+              {onOpenRouting && (
+                <Button size="small" variant="outlined" onClick={onOpenRouting} sx={{ py: 0 }}>
+                  Chọn tài khoản…
+                </Button>
+              )}
+            </Stack>
           )}
           {option.feeNote && (
             <Typography variant="caption" color="text.secondary" sx={{ display: { md: 'none' } }}>

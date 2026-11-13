@@ -26,6 +26,8 @@ import PaymentConnectionSelect, {
   usePosPaymentConnections,
 } from 'src/components/payment-connection-select';
 import { fCurrency } from 'src/utils/format-number';
+import { configFor, manualPool } from 'src/utils/transfer-routing';
+import { useWorkingBranch } from 'src/store/working-branch-store';
 import { apiErrorMessage } from 'src/utils/api-error';
 import { qrTarget } from 'src/utils/payment-connection';
 import { qrOutcome, isEventForQr } from 'src/utils/payment-status';
@@ -33,6 +35,7 @@ import { usePaymentStatusEvents } from 'src/hooks/use-payment-status-events';
 import { getVietQRBanks } from 'src/api/bank-accounts';
 import { createQrPayment, getQrPaymentStatus, cancelQrPayment } from 'src/api/payment-qr';
 import {
+  IQrRouting,
   IKiotVietBankAccount,
   IVietQRBank,
   IQrPaymentResponse,
@@ -60,6 +63,9 @@ const STATUS_LABELS: Record<string, { label: string; color: 'default' | 'info' |
   EXPIRED: { label: 'Hết hạn', color: 'default' },
 };
 
+/** Giá trị ô tài khoản = "Tự chọn theo cài đặt" (Tài khoản nhận theo kênh — máy chủ chọn tài khoản). */
+const AUTO_ACCOUNT = '__auto__';
+
 const POLL_INTERVAL = 4000; // 4 giây — đồng bộ trạng thái từ OpsBridge report lên
 const DEBOUNCE_MS = 1000; // giỏ hàng đổi giá/SL/sản phẩm → chờ 1s mới tạo lại QR
 
@@ -81,7 +87,21 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     setSelectionKey,
     loaded: connectionsLoaded,
     allowBankAccount,
+    transfer,
+    branches,
   } = usePosPaymentConnections();
+  // Tài khoản nhận theo kênh: quầy có cấu hình → mặc định "Tự chọn theo cài đặt" (máy chủ chọn tài khoản theo chi nhánh, giá trị
+  // hoá đơn, khung giờ; S Payment chọn kênh báo có). Thu ngân đổi tay được trong danh sách chủ cửa hàng cho phép.
+  const workingBranchId = useWorkingBranch((st) => st.branch?.id ?? null);
+  const routingCfg = useMemo(
+    () => configFor(transfer, branches, workingBranchId).config,
+    [transfer, branches, workingBranchId]
+  );
+  const autoAvailable = !!routingCfg && routingCfg.strategy !== 'cashier';
+  const manualAllowed = useMemo(() => manualPool(routingCfg), [routingCfg]);
+  const lockedToAuto = autoAvailable && routingCfg?.cashierOverride === 'none';
+  const [userPicked, setUserPicked] = useState(false);
+  const [lastRouting, setLastRouting] = useState<IQrRouting | null>(null);
   // Tài khoản nào tiền về được tự xác nhận (S Payment, đi kèm danh sách tài khoản) — nhãn + gợi ý đổi tài khoản.
   const [capabilities, setCapabilities] = useState<AccountCapabilities>({});
 
@@ -90,6 +110,27 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
   const [qrOrder, setQrOrder] = useState<IQrPaymentResponse | null>(null);
   const [statusData, setStatusData] = useState<IQrPaymentStatusResponse | null>(null);
   const [error, setError] = useState('');
+  /** Ô tài khoản: AUTO_ACCOUNT (tự chọn) hoặc Id tài khoản thu ngân chọn. */
+  const accountKey = autoAvailable && (!userPicked || lockedToAuto) ? AUTO_ACCOUNT : selectedAccountId;
+  const isAuto = accountKey === AUTO_ACCOUNT && !connection;
+  /** Nơi nhận của mã: theo kết nối thì tài khoản trong ô không ảnh hưởng (QR vào tài khoản của kết nối). */
+  const targetKey = connection ? '' : accountKey;
+  const pickAccount = useCallback((id: string) => {
+    if (id === AUTO_ACCOUNT) {
+      setUserPicked(false);
+      return;
+    }
+    setUserPicked(true);
+    setSelectedAccountId(id);
+  }, []);
+
+  // Chủ cửa hàng giới hạn tài khoản thu ngân được chọn → tài khoản mặc định phải nằm trong danh sách đó.
+  useEffect(() => {
+    if (!manualAllowed || !selectedAccountId || manualAllowed.has(selectedAccountId)) return;
+    const first = bankAccounts.find((a) => manualAllowed.has(a.id));
+    if (first) setSelectedAccountId(first.id);
+  }, [manualAllowed, selectedAccountId, bankAccounts]);
+
   const [createdFor, setCreatedFor] = useState<{
     amount: number;
     bankAccountId: string;
@@ -186,7 +227,7 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
 
   // Tạo / tạo lại QR — "phiên kiểm tra QR" (PaymentQrOrder) để OpsBridge report lên cập nhật trạng thái
   const handleGenerateQr = useCallback(async () => {
-    if (debouncedAmount <= 0 || (!selectedAccountId && !connectionId)) return;
+    if (debouncedAmount <= 0 || (!accountKey && !connectionId)) return;
 
     setQrState((prev) =>
       prev === 'idle' || prev === 'error' || prev === 'cancelled' || prev === 'expired' ? 'loading' : prev
@@ -196,8 +237,18 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     try {
       const result = await createQrPayment({
         salesOrderId,
-        // Theo kết nối: QR vào tài khoản / VA của kết nối; tài khoản chỉ gửi khi kết nối trùng tài khoản của cửa hàng.
-        ...qrTarget(connectionId, connection ? connection.bankAccountId : selectedAccountId),
+        // Tự chọn: máy chủ chọn tài khoản (giữ tài khoản của mã đang hiện nếu vẫn cùng quy tắc). Theo kết nối: QR vào tài khoản / VA
+        // của kết nối; tài khoản chỉ gửi khi kết nối trùng tài khoản của cửa hàng.
+        ...(isAuto
+          ? {
+              auto: true,
+              bankAccountId: null,
+              connectionId: null,
+              branchId: workingBranchId,
+              previousAccountId: lastRouting?.accountId ?? null,
+              previousRuleId: lastRouting?.ruleId ?? null,
+            }
+          : qrTarget(connectionId, connection ? connection.bankAccountId : selectedAccountId)),
         amount: debouncedAmount,
         description: orderCode ? `Thanh toan ${orderCode}` : undefined,
       });
@@ -205,7 +256,9 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
 
       setQrOrder(result);
       setStatusData(null);
-      setCreatedFor({ amount: debouncedAmount, bankAccountId: selectedAccountId, selectionKey });
+      setCreatedFor({ amount: debouncedAmount, bankAccountId: targetKey, selectionKey });
+      if (isAuto)
+        setLastRouting(result.routing ?? (result.bankAccountId ? { accountId: result.bankAccountId, auto: true } : null));
       setQrState('active');
       startPolling(result.id);
     } catch (err: any) {
@@ -222,6 +275,11 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
     }
   }, [
     debouncedAmount,
+    accountKey,
+    targetKey,
+    isAuto,
+    workingBranchId,
+    lastRouting,
     selectedAccountId,
     connectionId,
     selectionKey,
@@ -237,18 +295,18 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
   // danh sách kết nối — tránh tạo mã theo tài khoản rồi lại đổi sang kết nối thu ngân đã chọn lần trước.
   useEffect(() => {
     if (!connectionsLoaded) return;
-    if (debouncedAmount <= 0 || (!selectedAccountId && !connectionId)) return;
+    if (debouncedAmount <= 0 || (!accountKey && !connectionId)) return;
     if (qrState === 'completed') return; // đã thanh toán — không tự tạo lại
     if (
       createdFor &&
       createdFor.amount === debouncedAmount &&
-      createdFor.bankAccountId === selectedAccountId &&
+      createdFor.bankAccountId === targetKey &&
       createdFor.selectionKey === selectionKey
     )
       return;
     handleGenerateQr();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedAmount, selectedAccountId, selectionKey, connectionsLoaded]);
+  }, [debouncedAmount, targetKey, selectionKey, connectionsLoaded]);
 
   const handleCheckPayment = useCallback(async () => {
     if (!qrOrder) return;
@@ -363,11 +421,25 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
       fullWidth
       size="small"
       label="Tài khoản ngân hàng"
-      value={selectedAccountId}
-      onChange={(e) => setSelectedAccountId(e.target.value)}
+      value={accountKey}
+      onChange={(e) => pickAccount(e.target.value)}
       disabled={qrState === 'completed'}
+      helperText={isAuto ? (qrOrder?.routing?.note ?? undefined) : undefined}
     >
-      {options.map((acc) => (
+      {autoAvailable && (
+        <MenuItem value={AUTO_ACCOUNT}>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Iconify icon="solar:magic-stick-3-bold" width={16} />
+            <span>
+              Tự chọn theo cài đặt
+              {isAuto && qrOrder?.accountNumber
+                ? `: ${qrOrder.bankName ?? ''} …${qrOrder.accountNumber.slice(-4)}`
+                : ''}
+            </span>
+          </Stack>
+        </MenuItem>
+      )}
+      {(lockedToAuto ? [] : options.filter((acc) => !manualAllowed || manualAllowed.has(acc.id))).map((acc) => (
         <MenuItem key={acc.id} value={acc.id}>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ width: '100%' }}>
             {acc.logo ? (
@@ -396,12 +468,12 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
         allowBankAccount={allowBankAccount}
       />
       {!connection && allowBankAccount && bankAccounts.length > 0 && bankSelector}
-      {!connection && allowBankAccount && (
+      {!connection && allowBankAccount && !isAuto && (
         <AccountCapabilityHint
-          accounts={bankAccounts}
+          accounts={manualAllowed ? bankAccounts.filter((a) => manualAllowed.has(a.id)) : bankAccounts}
           selectedId={selectedAccountId}
           capabilities={capabilities}
-          onSelect={setSelectedAccountId}
+          onSelect={pickAccount}
           disabled={qrState === 'completed'}
         />
       )}

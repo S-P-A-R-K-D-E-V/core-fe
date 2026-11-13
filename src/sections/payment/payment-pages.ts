@@ -42,10 +42,11 @@ export const PAYMENT_PAGES: readonly PaymentPage[] = [
 ];
 
 /** Tab trong trang Cài đặt (?tab=...). */
-export type PaymentSettingsTab = 'channels' | 'online' | 'accounts' | 'connections';
+export type PaymentSettingsTab = 'channels' | 'routing' | 'online' | 'accounts' | 'connections';
 
 export const PAYMENT_SETTINGS_TABS: readonly { value: PaymentSettingsTab; label: string; icon: string }[] = [
   { value: 'channels', label: 'Phương thức theo kênh', icon: 'solar:checklist-bold' },
+  { value: 'routing', label: 'Tài khoản nhận theo kênh', icon: 'solar:card-transfer-bold' },
   { value: 'online', label: 'Bán online & giao hàng', icon: 'solar:delivery-bold' },
   { value: 'accounts', label: 'Tài khoản ngân hàng', icon: 'solar:wallet-money-bold' },
   { value: 'connections', label: 'Kết nối S Payment', icon: 'solar:link-round-bold' },

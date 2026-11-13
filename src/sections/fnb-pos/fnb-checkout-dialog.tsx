@@ -3,7 +3,7 @@
 import type { IOpenOrder, FnbPaymentMethod } from 'src/types/fnb';
 import type { IQrPaymentResponse, IKiotVietBankAccount } from 'src/types/corecms-api';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useMemo, useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 
@@ -27,6 +27,8 @@ import { usePaymentStatusEvents } from 'src/hooks/use-payment-status-events';
 import { apiErrorMessage } from 'src/utils/api-error';
 import { fCurrency } from 'src/utils/format-number';
 import { qrTarget } from 'src/utils/payment-connection';
+import { configFor, manualPool, planTransfer } from 'src/utils/transfer-routing';
+import { useWorkingBranch } from 'src/store/working-branch-store';
 import { qrOutcome, isEventForQr } from 'src/utils/payment-status';
 
 import AccountCapabilityHint, {
@@ -84,8 +86,18 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
   const [qr, setQr] = useState<IQrPaymentResponse | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
-  const { connections, selectionKey, connectionId, connection, setSelectionKey, allowBankAccount, methods } =
+  const { connections, selectionKey, connectionId, connection, setSelectionKey, allowBankAccount, methods, transfer, branches } =
     usePosPaymentConnections();
+  // Tài khoản nhận theo kênh: quầy có cấu hình → "Tự chọn theo cài đặt" (máy chủ chọn tài khoản khi hiện mã QR; chưa hiện mã thì
+  // gợi ý theo cùng quy tắc tại máy). Thu ngân đổi tay chỉ trong danh sách chủ cửa hàng cho phép.
+  const workingBranchId = useWorkingBranch((st) => st.branch?.id ?? null);
+  const routingCfg = useMemo(() => configFor(transfer, branches, workingBranchId).config, [transfer, branches, workingBranchId]);
+  const autoAvailable = !!routingCfg && routingCfg.strategy !== 'cashier';
+  const pool = useMemo(() => manualPool(routingCfg), [routingCfg]);
+  const [autoPick, setAutoPick] = useState(true);
+  const isAuto = autoAvailable && autoPick && !connectionId;
+  /** Máy chủ vừa chọn tài khoản cho mã QR → đổi ô tài khoản theo, không huỷ mã. */
+  const keepQrOnAccountChange = useRef(false);
   // Phương thức chủ cửa hàng bật cho quầy (Thanh toán → Cài đặt → Phương thức theo kênh).
   const fnbMethods = allowedPosMethods(FNB_METHODS, methods);
   const firstMethod = fnbMethods[0].value;
@@ -122,6 +134,7 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
       .then(({ accounts: list, capabilities: caps }) => {
         setAccounts(list);
         setCapabilities(caps);
+        setAutoPick(true);
         setAccountId((current) => (list.some((a) => a.id === current) ? current : list[0]?.id || ''));
       })
       .catch(() => setAccounts([]));
@@ -150,8 +163,20 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
     return paymentCode ? { ...input, transferRef: paymentCode } : input;
   };
 
+  // Tự chọn: tài khoản gợi ý theo quy tắc (giá trị hoá đơn, khung giờ, thứ tự) cho lúc chưa hiện mã QR.
+  useEffect(() => {
+    if (!isAuto || accounts.length === 0) return;
+    const plan = planTransfer(routingCfg, { amount: total, now: new Date() });
+    const pick = plan?.candidates.find((id) => accounts.some((a) => a.id === id));
+    if (pick) setAccountId(pick);
+  }, [isAuto, routingCfg, total, accounts]);
+
   // Mã QR cũ không còn đúng khi đổi tài khoản / nguồn xác nhận / số tiền / phương thức.
   useEffect(() => {
+    if (keepQrOnAccountChange.current) {
+      keepQrOnAccountChange.current = false;
+      return;
+    }
     dropQr();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [method, accountId, selectionKey, total]);
@@ -214,17 +239,22 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
   useEffect(() => () => customerDisplay.setQr(null), []);
 
   const showQr = async () => {
-    if ((!accountId && !connectionId) || total <= 0) return;
+    if ((!accountId && !connectionId && !isAuto) || total <= 0) return;
     setQrLoading(true);
     setQrError(null);
     try {
-      setQr(
-        await createQrPayment({
-          ...qrTarget(connectionId, connection?.bankAccountId || accountId),
-          amount: total,
-          description: transferRef.trim() || undefined,
-        })
-      );
+      const created = await createQrPayment({
+        ...(isAuto
+          ? { auto: true, bankAccountId: null, connectionId: null, branchId: workingBranchId }
+          : qrTarget(connectionId, connection?.bankAccountId || accountId)),
+        amount: total,
+        description: transferRef.trim() || undefined,
+      });
+      if (isAuto && created.bankAccountId && created.bankAccountId !== accountId) {
+        keepQrOnAccountChange.current = true;
+        setAccountId(created.bankAccountId);
+      }
+      setQr(created);
     } catch (err) {
       // Đã chọn kết nối mà lỗi: báo đúng lý do (kết nối tắt, ApiPay lỗi...) — máy chủ không tự đổi sang VietQR thường.
       const reason = apiErrorMessage(err, 'Không tạo được mã QR qua kết nối đã chọn.');
@@ -284,19 +314,44 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
               <TextField
                 select
                 label="Tài khoản nhận"
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-                helperText={accounts.length === 0 ? 'Chưa khai tài khoản ngân hàng của cửa hàng — vẫn ghi nhận được.' : undefined}
+                value={isAuto ? '__auto__' : accountId}
+                onChange={(e) => {
+                  if (e.target.value === '__auto__') {
+                    setAutoPick(true);
+                    return;
+                  }
+                  setAutoPick(false);
+                  setAccountId(e.target.value);
+                }}
+                helperText={
+                  accounts.length === 0
+                    ? 'Chưa khai tài khoản ngân hàng của cửa hàng — vẫn ghi nhận được.'
+                    : isAuto
+                      ? (qr?.routing?.note ?? undefined)
+                      : undefined
+                }
               >
-                <MenuItem value="">— Không chọn —</MenuItem>
-                {accounts.map((a) => (
+                {autoAvailable && (
+                  <MenuItem value="__auto__">
+                    Tự chọn theo cài đặt
+                    {(() => {
+                      const a = accounts.find((x) => x.id === accountId);
+                      return a ? `: ${a.shortName || a.bankName || ''} …${(a.accountNumber ?? '').slice(-4)}` : '';
+                    })()}
+                  </MenuItem>
+                )}
+                {!pool && <MenuItem value="">— Không chọn —</MenuItem>}
+                {(autoAvailable && routingCfg?.cashierOverride === 'none'
+                  ? []
+                  : accounts.filter((a) => !pool || pool.has(a.id))
+                ).map((a) => (
                   <MenuItem key={a.id} value={a.id} sx={{ gap: 1 }}>
                     {[a.shortName || a.bankName, a.accountNumber, a.description].filter(Boolean).join(' · ')}
                     <AccountCapabilityTag capability={capabilities[a.id]} />
                   </MenuItem>
                 ))}
               </TextField>
-              {!connection && (
+              {!connection && !isAuto && (
                 <AccountCapabilityHint
                   accounts={accounts}
                   selectedId={accountId}
@@ -318,7 +373,7 @@ export default function FnbCheckoutDialog({ open, order, total, hasDrafts, busy,
                   if (qr) dropQr();
                 }}
               />
-              {(accountId || connectionId) && !qr && (
+              {(accountId || connectionId || isAuto) && !qr && (
                 <LoadingButton variant="outlined" loading={qrLoading} onClick={showQr} sx={{ alignSelf: 'flex-start' }}>
                   Hiện mã QR
                 </LoadingButton>
