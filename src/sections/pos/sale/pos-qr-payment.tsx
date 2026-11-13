@@ -403,13 +403,14 @@ export default function PosQrPayment({ amount, salesOrderId, orderCode, onPaymen
         accountNumber: qrOrder?.accountNumber ?? null,
         paymentCode: paymentCode ?? null,
         expiresAt: qrExpiresAt,
+        payload: qrOrder?.qrPayload ?? null,
       });
     } else if (qrState === 'completed') {
       customerDisplay.paid(amountReceived || expectedAmount);
     } else {
       customerDisplay.setQr(null);
     }
-  }, [qrShowing, qrImageSrc, qrState, expectedAmount, qrOrder?.bankName, qrOrder?.accountNumber, paymentCode, qrExpiresAt, amountReceived]);
+  }, [qrShowing, qrImageSrc, qrState, expectedAmount, qrOrder?.bankName, qrOrder?.accountNumber, qrOrder?.qrPayload, paymentCode, qrExpiresAt, amountReceived]);
   useEffect(() => () => customerDisplay.setQr(null), []);
 
   const currentStatus = statusData?.status || qrOrder?.status || '';

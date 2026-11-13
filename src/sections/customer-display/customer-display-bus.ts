@@ -38,6 +38,8 @@ export type CustomerDisplayQr = {
   accountName?: string | null;
   paymentCode?: string | null;
   expiresAt?: string | null;
+  /** Chuỗi VietQR gốc — máy hiện QR cắm USB tự vẽ mã từ chuỗi này (src/sections/pos/qr-device). */
+  payload?: string | null;
 };
 
 export type CustomerDisplaySlide = { url: string; kind: 'image' | 'video'; title?: string | null };
@@ -85,12 +87,33 @@ function getChannel(): BroadcastChannel | null {
   return channel;
 }
 
+// Người nghe trong cùng tab (vd máy hiện QR cắm USB) — nhận mỗi lần trạng thái đổi.
+type ViewListener = (view: CustomerDisplayView) => void;
+const listeners = new Set<ViewListener>();
+
+/** Theo dõi trạng thái màn khách trong cùng tab. Trả hàm huỷ. */
+export function subscribeCustomerDisplayView(listener: ViewListener): () => void {
+  listeners.add(listener);
+  listener(composeView(state));
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 function publish() {
+  const view = composeView(state);
+  listeners.forEach((listener) => {
+    try {
+      listener(view);
+    } catch (error) {
+      console.error(error);
+    }
+  });
   const ch = getChannel();
   if (!ch) return;
   const message: CustomerDisplayMessage = {
     type: 'state',
-    view: composeView(state),
+    view,
     ads: state.ads,
     storeName: state.storeName,
     sentAt: Date.now(),
@@ -140,6 +163,7 @@ export function resetCustomerDisplayForTests() {
   state.paid = null;
   state.ads = null;
   state.storeName = null;
+  listeners.clear();
   channel?.close();
   channel = null;
 }
