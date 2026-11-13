@@ -264,6 +264,8 @@ export function AuthProvider({ children }: Props) {
             permissions: Array.isArray(permissions) ? permissions : baseUser.permissions ?? [],
             // Tính năng chủ cửa hàng tắt trên web với người này (src/auth/platform-features.ts).
             blockedFeatures: Array.isArray(blockedFeatures) ? blockedFeatures : [],
+            // "Menu theo vai trò" đã gộp (null = chưa cấu hình / Core-be cũ).
+            navMenu: res.data?.navMenu ?? null,
           },
         },
       });
@@ -570,6 +572,8 @@ export function AuthProvider({ children }: Props) {
             enabledFeatures: enabledFeatures ?? (merged as any).enabledFeatures ?? [],
             permissions: Array.isArray(permissions) ? permissions : (merged as any).permissions ?? [],
             blockedFeatures: Array.isArray(blockedFeatures) ? blockedFeatures : [],
+            // "Menu theo vai trò" đã gộp (null = chưa cấu hình / Core-be cũ).
+            navMenu: res.data?.navMenu ?? null,
           },
         },
       });

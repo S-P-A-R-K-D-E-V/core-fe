@@ -134,6 +134,13 @@ export const endpoints = {
     changePassword: '/users/me/change-password',
     schedulingPriority: (id: string) => `/users/${id}/scheduling-priority`,
     branches: (id: string) => `/users/${id}/branches`,
+    // Tuỳ chọn giao diện của chính mình, đồng bộ giữa các máy (vd nav.pins — ghim menu).
+    uiPreference: (key: string) => `/users/me/ui-preferences/${encodeURIComponent(key)}`,
+  },
+  // "Menu theo vai trò": ẩn mục / ghim sẵn / trang mở đầu cho từng vai trò — chỉ Admin.
+  navMenuPolicies: {
+    list: '/nav-menu-policies',
+    item: (roleCode: string) => `/nav-menu-policies/${encodeURIComponent(roleCode)}`,
   },
   roles: {
     list: '/roles',

@@ -6,48 +6,37 @@ import Paper from '@mui/material/Paper';
 import BottomNavigation from '@mui/material/BottomNavigation';
 import BottomNavigationAction from '@mui/material/BottomNavigationAction';
 
-import { useRouter, usePathname } from 'src/routes/hooks';
-
-import { paths } from 'src/routes/paths';
-
-import { useAuthContext } from 'src/auth/hooks';
-import { PLATFORM_FEATURES, isPlatformFeatureBlocked } from 'src/auth/platform-features';
+import { useRouter } from 'src/routes/hooks';
 
 import Iconify from 'src/components/iconify';
 
 import { BOTTOM_NAV } from '../config-layout';
+import { useNavTree } from './config-navigation';
+import { useNavPins, useActiveNavPage } from './nav/use-nav-state';
 
 // ----------------------------------------------------------------------
-
-type NavBottomItem = { label: string; path: string; icon: string; platformFeature?: string };
-
-const NAV_ITEMS: NavBottomItem[] = [
-  {
-    label: 'Kiểm tiền',
-    path: paths.dashboard.shiftCash.root,
-    icon: 'solar:wallet-money-bold-duotone',
-    platformFeature: PLATFORM_FEATURES.shiftCash,
-  },
-  {
-    label: 'Check-in',
-    path: paths.dashboard.attendance.checkin,
-    icon: 'solar:clock-circle-bold-duotone',
-    platformFeature: PLATFORM_FEATURES.selfCheckIn,
-  },
-  {
-    label: 'Lịch làm',
-    path: paths.dashboard.attendance.mySchedule,
-    icon: 'solar:calendar-bold-duotone',
-  },
-  {
-    label: 'Lương',
-    path: paths.dashboard.payroll.myPayroll,
-    icon: 'solar:money-bag-bold-duotone',
-    platformFeature: PLATFORM_FEATURES.payrollSelf,
-  },
-];
-
+// Thanh dưới (giao diện mobile): 4 nút đầu là mục đã ghim (của mình, rồi ghim mặc định của vai trò); chưa ghim gì thì
+// dùng bộ quen thuộc Kiểm quầy · Chấm công · Lịch làm · Lương. Nút cuối mở ngăn kéo menu.
 // ----------------------------------------------------------------------
+
+const DEFAULT_KEYS = ['cash.shift', 'me.checkin', 'me.schedule', 'me.payroll'];
+
+const ICONS: Record<string, string> = {
+  'cash.shift': 'solar:wallet-money-bold-duotone',
+  'me.checkin': 'solar:clock-circle-bold-duotone',
+  'me.schedule': 'solar:calendar-bold-duotone',
+  'me.payroll': 'solar:money-bag-bold-duotone',
+  'sales.pos': 'solar:cart-large-2-bold-duotone',
+};
+
+/** Nhãn ngắn cho nút nhỏ. */
+function shortLabel(title: string) {
+  return title
+    .replace(' của tôi', '')
+    .replace('Chấm công vào / ra', 'Chấm công')
+    .replace('Màn bán hàng', 'Bán hàng')
+    .replace(/\s*\(.+\)$/, '');
+}
 
 type Props = {
   onOpenMenu: VoidFunction;
@@ -55,27 +44,23 @@ type Props = {
 
 export default function NavBottom({ onOpenMenu }: Props) {
   const router = useRouter();
-  const pathname = usePathname();
-  const { user } = useAuthContext();
+  const tree = useNavTree();
+  const pins = useNavPins(tree);
+  const active = useActiveNavPage(tree);
 
-  // Chủ cửa hàng tắt tính năng trên web với người này (vd tự chấm công, kiểm quầy) → bỏ nút tương ứng.
-  const blockedKey = ((user?.blockedFeatures as string[] | undefined) ?? []).join('|');
-  const items = useMemo(
-    () =>
-      NAV_ITEMS.filter(
-        (item) => !item.platformFeature || !isPlatformFeatureBlocked({ blockedFeatures: blockedKey.split('|') }, item.platformFeature)
-      ),
-    [blockedKey]
-  );
+  const items = useMemo(() => {
+    const visible = new Map(tree.pages.map((p) => [p.key, p]));
+    const source = pins.pinned.length
+      ? pins.pinned
+      : DEFAULT_KEYS.map((k) => visible.get(k)).filter((p): p is NonNullable<typeof p> => !!p);
+    return source.slice(0, 4);
+  }, [pins.pinned, tree.pages]);
 
-  const activeIndex = items.findIndex((item) => pathname.startsWith(item.path));
+  const activeIndex = items.findIndex((item) => item.key === active?.key);
 
   const handleChange = (_: React.SyntheticEvent, newValue: number) => {
-    if (newValue === items.length) {
-      onOpenMenu();
-    } else {
-      router.push(items[newValue].path);
-    }
+    if (newValue === items.length) onOpenMenu();
+    else router.push(items[newValue].path);
   };
 
   return (
@@ -100,20 +85,15 @@ export default function NavBottom({ onOpenMenu }: Props) {
         showLabels
         sx={{
           height: BOTTOM_NAV.H,
-          '& .MuiBottomNavigationAction-label': {
-            fontSize: '0.65rem',
-          },
-          '& .MuiBottomNavigationAction-root': {
-            minWidth: 0,
-            px: 0.5,
-          },
+          '& .MuiBottomNavigationAction-label': { fontSize: '0.65rem' },
+          '& .MuiBottomNavigationAction-root': { minWidth: 0, px: 0.5 },
         }}
       >
         {items.map((item) => (
           <BottomNavigationAction
-            key={item.path}
-            label={item.label}
-            icon={<Iconify icon={item.icon} width={22} />}
+            key={item.key}
+            label={shortLabel(item.title)}
+            icon={<Iconify icon={ICONS[item.key] ?? item.moduleIcon} width={22} />}
           />
         ))}
         <BottomNavigationAction

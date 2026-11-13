@@ -113,13 +113,20 @@ export default function SettingsDrawer() {
   const renderLayout = (
     <div>
       <Typography variant="caption" component="div" sx={{ ...labelStyles }}>
-        Bố cục
+        Kiểu menu
       </Typography>
       <LayoutOptions
         value={settings.themeLayout}
         onChange={(newValue: string) => settings.onUpdate('themeLayout', newValue)}
-        options={['vertical', 'horizontal', 'mini']}
+        options={['horizontal', 'vertical', 'mini']}
       />
+      <Typography variant="caption" component="div" sx={{ mt: 1, color: 'text.secondary' }}>
+        {settings.themeLayout === 'horizontal'
+          ? 'Thanh ngang theo nghiệp vụ (như KiotViet)'
+          : settings.themeLayout === 'mini'
+            ? 'Thanh bên thu gọn (chỉ icon)'
+            : 'Thanh bên mở rộng'}
+      </Typography>
     </div>
   );
 

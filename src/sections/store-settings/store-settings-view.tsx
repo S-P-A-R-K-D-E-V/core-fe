@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Container from '@mui/material/Container';
 
 import { paths } from 'src/routes/paths';
-import { useRouter } from 'src/routes/hooks';
+import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import Iconify from 'src/components/iconify';
 import { useSettingsContext } from 'src/components/settings';
@@ -44,8 +44,17 @@ const LINKED_TABS: Partial<Record<TabValue, string>> = {
 
 export default function StoreSettingsView() {
   const settings = useSettingsContext();
-  const [tab, setTab] = useState<TabValue>('branding');
   const router = useRouter();
+  // ?tab=agent-keys | platform-features | … — mở thẳng tab từ menu ⚙ Cài đặt / ô tìm nhanh.
+  const searchParams = useSearchParams();
+  const urlTab = TABS.find(
+    (t) => t.value === searchParams.get('tab') && !LINKED_TABS[t.value]
+  )?.value;
+  const [tab, setTab] = useState<TabValue>(urlTab ?? 'branding');
+
+  useEffect(() => {
+    if (urlTab) setTab(urlTab);
+  }, [urlTab]);
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'lg'}>
@@ -67,7 +76,12 @@ export default function StoreSettingsView() {
         sx={{ mb: { xs: 3, md: 5 } }}
       >
         {TABS.map((t) => (
-          <Tab key={t.value} value={t.value} label={t.label} icon={<Iconify icon={t.icon} width={24} />} />
+          <Tab
+            key={t.value}
+            value={t.value}
+            label={t.label}
+            icon={<Iconify icon={t.icon} width={24} />}
+          />
         ))}
       </Tabs>
 
