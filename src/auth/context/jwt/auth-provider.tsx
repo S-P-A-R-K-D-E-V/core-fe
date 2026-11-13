@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect, useReducer, useCallback } from 'react';
+import { useRef, useMemo, useState, useEffect, useReducer, useCallback } from 'react';
 
 import axios, { endpoints } from 'src/utils/axios';
 import { getStorageUrl } from 'src/utils/storage';
@@ -18,6 +18,7 @@ import {
 import { AuthContext } from './auth-context';
 import { setSession, isValidToken, getRefreshToken } from './utils';
 import { saveCachedProfile, withCachedProfile } from './profile-cache';
+import { saveOfflineUser, clearOfflineUser, offlineStartUser } from './offline-session';
 import { AuthUserType, ActionMapType, AuthStateType } from '../../types';
 
 // ----------------------------------------------------------------------
@@ -205,7 +206,11 @@ export function AuthProvider({ children }: Props) {
   const [pendingVerification, setPendingVerification] = useState<{ email: string } | null>(null);
 
   // Try to restore session from localStorage (trượt 30 ngày: mỗi lần restore BE gia hạn phiên)
+  // restore-session lần gần nhất không tới được máy chủ (mất mạng / 5xx) — khác với bị từ chối (phiên hết hạn).
+  const restoreUnreachableRef = useRef(false);
+
   const tryRestoreSession = useCallback(async (): Promise<boolean> => {
+    restoreUnreachableRef.current = false;
     try {
       const savedSessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
       if (!savedSessionToken) return false;
@@ -221,10 +226,14 @@ export function AuthProvider({ children }: Props) {
         localStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
       }
 
-      const user = buildUserFromResponse(res.data);
+      // Tính năng / quyền đã lưu trên máy: màn có PlatformFeatureGuard (vd màn bán hàng) không bị gỡ ra rồi dựng lại
+      // trong lúc chờ /users/me — nhất là khi đăng nhập lại sau phiên offline.
+      const user = withCachedProfile(buildUserFromResponse(res.data));
+      saveOfflineUser(user);
       dispatch({ type: Types.INITIAL, payload: { user } });
       return true;
     } catch (error) {
+      restoreUnreachableRef.current = !isSessionRejected(error);
       // Chỉ bỏ sessionToken khi BE đã trả lời từ chối (4xx: phiên hết hạn / bị thu hồi / tài khoản khoá).
       // Mất mạng, 5xx, cổng lỗi trả HTML… → giữ lại để lần mở sau tự khôi phục: phiên thiết bị trượt 30
       // ngày không được mất chỉ vì một lần mạng chập chờn lúc mở trang.
@@ -242,6 +251,7 @@ export function AuthProvider({ children }: Props) {
       const permissions: string[] | undefined = res.data?.permissions;
       const blockedFeatures: string[] | undefined = res.data?.blockedFeatures;
       saveCachedProfile(baseUser?.id, { enabledFeatures, blockedFeatures, permissions });
+      saveOfflineUser(baseUser);
       dispatch({
         type: Types.LOGIN,
         payload: {
@@ -295,6 +305,17 @@ export function AuthProvider({ children }: Props) {
         return;
       }
 
+      // Mất mạng lúc mở lại màn bán hàng: vào bằng người đăng nhập gần nhất (phiên offline, chỉ bán; tự đăng nhập lại khi
+      // có mạng) thay vì đẩy về trang đăng nhập — trang đó cũng cần mạng.
+      const offlineUser = offlineStartUser({
+        restoreUnreachable: restoreUnreachableRef.current,
+        pathname: window.location.pathname,
+      });
+      if (offlineUser) {
+        dispatch({ type: Types.INITIAL, payload: { user: offlineUser } });
+        return;
+      }
+
       dispatch({ type: Types.INITIAL, payload: { user: null } });
     } catch (error) {
       console.error(error);
@@ -313,6 +334,33 @@ export function AuthProvider({ children }: Props) {
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  // Phiên offline: có mạng lại (sự kiện online / 30 giây một lần) thì đăng nhập lại bằng restore-session; được thì người
+  // dùng thật thay phiên offline, hàng chờ hoá đơn gửi đi. Bị từ chối (phiên hết hạn) → về trang đăng nhập.
+  const offlineSession = !!(state.user as any)?.offlineSession;
+  useEffect(() => {
+    if (!offlineSession) return undefined;
+    let busy = false;
+    const retry = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const ok = await tryRestoreSession();
+        if (!ok && !restoreUnreachableRef.current) {
+          clearOfflineUser();
+          dispatch({ type: Types.INITIAL, payload: { user: null } });
+        }
+      } finally {
+        busy = false;
+      }
+    };
+    window.addEventListener('online', retry);
+    const timer = setInterval(retry, 30 * 1000);
+    return () => {
+      window.removeEventListener('online', retry);
+      clearInterval(timer);
+    };
+  }, [offlineSession, tryRestoreSession]);
 
   // LOGIN
   const login = useCallback(async (email: string, password: string) => {
@@ -555,6 +603,8 @@ export function AuthProvider({ children }: Props) {
     } finally {
       setSession(null);
       localStorage.removeItem(SESSION_TOKEN_KEY);
+      // Đăng xuất chủ động: máy này không còn mở được màn bán hàng ở phiên offline bằng người vừa đăng xuất.
+      clearOfflineUser();
       setPendingVerification(null);
       dispatch({ type: Types.LOGOUT });
     }

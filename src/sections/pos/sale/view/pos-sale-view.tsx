@@ -89,6 +89,7 @@ import {
   type ProcessResult,
 } from '../../offline/pos-outbox';
 import { requestPersistentStorage } from '../../offline/pos-store';
+import { registerPosServiceWorker } from '../../offline/register-pos-sw';
 import {
   fetchCatalog,
   searchCatalog,
@@ -322,8 +323,12 @@ function PosSaleScreen() {
   }, []);
   const outboxEntries = useOutboxEntries(outbox);
   const [outboxDurable, setOutboxDurable] = useState(true);
+  // Phiên offline (mở màn lúc mất mạng, chưa đăng nhập lại — auth/context/jwt/offline-session.ts): chưa gửi hàng chờ.
+  const offlineSession = !!(user as any)?.offlineSession;
+
   useEffect(() => {
     requestPersistentStorage();
+    registerPosServiceWorker();
     outbox.prune().catch(() => {});
     outbox
       .durable()
@@ -1250,7 +1255,8 @@ function PosSaleScreen() {
   const { syncing, syncNow } = useOutboxSender({
     outbox,
     entries: outboxEntries,
-    browserOnline,
+    // Chưa đăng nhập lại (phiên offline) thì chưa gửi — máy chủ sẽ trả 401; đăng nhập lại xong tự gửi.
+    browserOnline: browserOnline && !offlineSession,
     send: createSalesOrder,
     onResult: handleSyncResult,
   });
@@ -1798,6 +1804,7 @@ function PosSaleScreen() {
         <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0, ml: 'auto' }}>
           <PosSyncButton
             online={online}
+            offlineSession={offlineSession}
             durable={outboxDurable}
             pendingSales={unsentSales}
             syncing={syncing}
