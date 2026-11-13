@@ -355,6 +355,83 @@ describe('PrintTemplateEditView', () => {
     expect(router.replace).toHaveBeenCalledWith('/dashboard/store-settings/print-templates/new-id');
   });
 
+  it('soạn theo khối: thêm khối, tắt dòng đầu phiếu; lưu khối vào settings và HTML dịch từ khối vào content', async () => {
+    api.createPrintTemplate.mockResolvedValue({ id: 'blk-id', kind: 'receipt' });
+    const user = userEvent.setup();
+    wrap(<PrintTemplateEditView id="new" kind="receipt" />);
+
+    expect(await screen.findByText(/Bố cục phiếu · 12 khối/)).toBeInTheDocument();
+    // Bấm loại khối → thêm sau khối đang chọn (khối đầu).
+    await user.click(screen.getByRole('button', { name: 'Thêm khối Chữ tự do' }));
+    expect(screen.getByText(/Bố cục phiếu · 13 khối/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Nội dung')).toHaveValue('Đổi hàng trong 3 ngày kèm hoá đơn');
+
+    // Chọn khối Đầu cửa hàng, bỏ Mã số thuế.
+    // Tên khối có ở cả cột loại khối và bố cục — lấy cái trong bố cục (sau cùng).
+    await user.click(screen.getAllByText('Đầu cửa hàng').at(-1)!);
+    await user.click(screen.getByRole('checkbox', { name: 'Mã số thuế' }));
+
+    await user.click(screen.getByRole('button', { name: 'Tạo mẫu' }));
+    await waitFor(() => expect(api.createPrintTemplate).toHaveBeenCalledTimes(1));
+    const [, payload] = api.createPrintTemplate.mock.calls[0];
+    const settings = JSON.parse(payload.settings);
+    expect(settings.paper).toBe('80');
+    expect(settings.blocks.v).toBe(1);
+    expect(settings.blocks.items).toHaveLength(13);
+    expect(settings.blocks.items[1].type).toBe('text');
+    expect(payload.content).toContain('Đổi hàng trong 3 ngày kèm hoá đơn');
+    expect(payload.content).toContain('{{store_name}}');
+    expect(payload.content).not.toContain('{{store_tax_code}}');
+  });
+
+  it('mở mẫu có khối thì soạn theo khối; "Soạn tự do" chuyển một chiều và lưu bỏ khối', async () => {
+    const blocks = [
+      { id: 'a', type: 'storeHeader', lines: { name: true, branch: false, address: false, phone: false, taxCode: false } },
+      { id: 'b', type: 'text', text: 'Xin cảm ơn' },
+    ];
+    api.getPrintTemplate.mockResolvedValue({
+      id: 't1',
+      kind: 'receipt',
+      name: 'Mẫu khối',
+      content: '<p>cũ</p>',
+      settings: JSON.stringify({ paper: '58', blocks: { v: 1, items: blocks } }),
+      createdAt: '2026-11-13T00:00:00Z',
+      updatedAt: null,
+    });
+    api.updatePrintTemplate.mockResolvedValue({ id: 't1', kind: 'receipt', content: '<p>x</p>' });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    wrap(<PrintTemplateEditView id="t1" />);
+
+    expect(await screen.findByText(/Bố cục phiếu · 2 khối/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Soạn tự do' }));
+    await waitFor(() => expect(document.querySelector('.ProseMirror')).not.toBeNull());
+    expect(screen.queryByText(/Bố cục phiếu/)).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Lưu' }));
+    await waitFor(() => expect(api.updatePrintTemplate).toHaveBeenCalledTimes(1));
+    const [, payload] = api.updatePrintTemplate.mock.calls[0];
+    expect(JSON.parse(payload.settings).blocks).toBeUndefined();
+    expect(JSON.parse(payload.settings).paper).toBe('58');
+    expect(payload.content).toContain('Xin cảm ơn');
+    confirm.mockRestore();
+  });
+
+  it('mẫu HTML cũ (không có khối) vẫn mở bằng trình soạn tự do', async () => {
+    api.getPrintTemplate.mockResolvedValue({
+      id: 't2',
+      kind: 'receipt',
+      name: 'Mẫu cũ',
+      content: '<p>{{store_name}}</p>',
+      settings: '{"paper":"80"}',
+      createdAt: '2026-11-13T00:00:00Z',
+      updatedAt: null,
+    });
+    wrap(<PrintTemplateEditView id="t2" />);
+    await waitFor(() => expect(document.querySelector('.ProseMirror')).not.toBeNull());
+    expect(screen.queryByText(/Bố cục phiếu/)).toBeNull();
+  });
+
   it('mẫu tem mới lưu bố cục JSON đã về lưới điểm in', async () => {
     api.createPrintTemplate.mockResolvedValue({ id: 'tem-id', kind: 'label' });
     const user = userEvent.setup();
