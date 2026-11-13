@@ -381,6 +381,7 @@ export const paths = {
         new: `${ROOTS.DASHBOARD}/pos/customer/new`,
         edit: (id: string) => `${ROOTS.DASHBOARD}/pos/customer/${id}/edit`,
       },
+      qrDevice: `${ROOTS.DASHBOARD}/pos/qr-device`,
       sale: {
         root: `${ROOTS.DASHBOARD}/pos/sale`,
       },
