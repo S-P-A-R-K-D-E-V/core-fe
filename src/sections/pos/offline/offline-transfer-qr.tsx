@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Alert from '@mui/material/Alert';
@@ -11,6 +11,8 @@ import Typography from '@mui/material/Typography';
 import { fCurrency } from 'src/utils/format-number';
 
 import Iconify from 'src/components/iconify';
+
+import { customerDisplay } from 'src/sections/customer-display/customer-display-bus';
 
 import type { IKiotVietBankAccount } from 'src/types/corecms-api';
 
@@ -47,11 +49,32 @@ export default function OfflineTransferQr({ amount, code, accounts, confirmed, o
     if (!account || !code || amount <= 0) return null;
     try {
       const payload = buildVietQrPayload(account.bin, account.accountNumber, Math.round(amount), code);
-      return buildReceiptQr(payload, 48);
+      const image = buildReceiptQr(payload, 48);
+      return image ? { ...image, payload } : null;
     } catch {
       return null;
     }
   }, [account, code, amount]);
+
+  // Màn khách + máy hiện QR cắm USB: hiện QR tĩnh cho khách quét; thu ngân xác nhận → "Cảm ơn quý khách".
+  useEffect(() => {
+    if (confirmed) {
+      customerDisplay.paid(Math.round(amount));
+    } else if (qr && account) {
+      customerDisplay.setQr({
+        amount: Math.round(amount),
+        imageSrc: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qr.svg)}`,
+        bankName: account.shortName || account.bankName || null,
+        accountNumber: account.accountNumber ?? null,
+        accountName: account.accountHolder ?? null,
+        paymentCode: normalizeTransferContent(code) || null,
+        payload: qr.payload,
+      });
+    } else {
+      customerDisplay.setQr(null);
+    }
+  }, [qr, account, amount, code, confirmed]);
+  useEffect(() => () => customerDisplay.setQr(null), []);
 
   if (accounts.length === 0) {
     return (

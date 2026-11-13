@@ -100,6 +100,7 @@ import {
 import { useConnectivity, useOutboxEntries, useOutboxSender } from '../../offline/use-pos-outbox';
 import { buildOfflineReceipt } from '../../offline/offline-receipt';
 import OfflineTransferQr from '../../offline/offline-transfer-qr';
+import { QrDeviceButton } from '../../qr-device/qr-device-button';
 import { nextOfflineCode, noteWithOfflineCode } from '../../offline/pos-device';
 import { loadPrintKit, refreshPrintKit, EMPTY_PRINT_KIT, type PrintKit } from '../../offline/pos-print-kit';
 import { getPrintTemplates } from 'src/api/print-templates';
@@ -1830,6 +1831,7 @@ function PosSaleScreen() {
               <Iconify icon="solar:monitor-bold" />
             </IconButton>
           </Tooltip>
+          <QrDeviceButton fg={barFg} />
           <PosRecentSalesButton
             fg={barFg}
             lastSaleId={lastSaleId}
