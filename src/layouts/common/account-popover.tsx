@@ -25,6 +25,10 @@ import { useSnackbar } from 'src/components/snackbar';
 import CustomPopover, { usePopover } from 'src/components/custom-popover';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 
+import NavModuleContent from '../dashboard/nav/nav-module-content';
+
+import type { NavModule } from '../dashboard/nav/nav-types';
+
 // ----------------------------------------------------------------------
 
 const OPTIONS = [
@@ -40,7 +44,12 @@ const OPTIONS = [
 
 // ----------------------------------------------------------------------
 
-export default function AccountPopover() {
+type Props = {
+  /** Module "Cá nhân" của menu quản trị — có thì hiện thay cho danh sách mặc định. */
+  meModule?: NavModule | null;
+};
+
+export default function AccountPopover({ meModule }: Props = {}) {
   const router = useRouter();
 
   const { user } = useAuthContext();
@@ -118,7 +127,16 @@ export default function AccountPopover() {
         </Avatar>
       </IconButton>
 
-      <CustomPopover open={popover.open} onClose={popover.onClose} sx={{ width: 200, p: 0 }}>
+      <CustomPopover
+        open={popover.open}
+        onClose={popover.onClose}
+        sx={{
+          width: meModule ? 300 : 200,
+          p: 0,
+          maxHeight: 'calc(100vh - 96px)',
+          overflowY: 'auto',
+        }}
+      >
         <Box sx={{ p: 2, pb: 1.5 }}>
           <Typography variant="subtitle2" noWrap>
             {user?.displayName}
@@ -134,7 +152,9 @@ export default function AccountPopover() {
         {counterSession ? (
           <Stack sx={{ p: 1 }}>
             <Typography variant="caption" sx={{ px: 1, color: 'text.secondary' }}>
-              {counterDevice ? `${counterDevice.deviceName} · ${counterDevice.branchName}` : 'Máy quầy'}
+              {counterDevice
+                ? `${counterDevice.deviceName} · ${counterDevice.branchName}`
+                : 'Máy quầy'}
             </Typography>
             {isManager && (
               <MenuItem
@@ -148,6 +168,10 @@ export default function AccountPopover() {
               </MenuItem>
             )}
           </Stack>
+        ) : meModule ? (
+          <Box sx={{ p: 1 }}>
+            <NavModuleContent module={meModule} variant="list" onNavigate={popover.onClose} />
+          </Box>
         ) : (
           <Stack sx={{ p: 1 }}>
             {OPTIONS.map((option) => (

@@ -15,13 +15,14 @@ import { useSettingsContext } from 'src/components/settings';
 
 import Searchbar from '../common/searchbar';
 import { NAV, HEADER } from '../config-layout';
-import SettingsButton from '../common/settings-button';
 import BranchSwitcher from '../common/branch-switcher';
 import AccountPopover from '../common/account-popover';
 import UsersPopover from '../common/users-popover';
 import LanguagePopover from '../common/language-popover';
 import NotificationsPopover from '../common/notifications-popover';
+import { useNavTree } from './config-navigation';
 import { useCounterSession } from '../../sections/counter/counter-scope';
+import { NavPinsButton, NavSellButton, NavSettingsButton } from './nav/nav-header-tools';
 
 // ----------------------------------------------------------------------
 
@@ -43,6 +44,8 @@ export default function Header({ onOpenNav }: Props) {
   const offset = useOffSetTop(HEADER.H_DESKTOP);
 
   const counterSession = useCounterSession();
+
+  const tree = useNavTree();
 
   const offsetTop = offset && !isNavHorizontal;
 
@@ -69,13 +72,17 @@ export default function Header({ onOpenNav }: Props) {
       >
         <LanguagePopover />
 
+        {lgUp && !counterSession && <NavPinsButton tree={tree} />}
+
         {!counterSession && <NotificationsPopover />}
 
         {!counterSession && <UsersPopover />}
 
-        <SettingsButton />
+        <NavSettingsButton tree={tree} />
 
-        <AccountPopover />
+        <AccountPopover meModule={tree.me} />
+
+        <NavSellButton tree={tree} />
       </Stack>
     </>
   );

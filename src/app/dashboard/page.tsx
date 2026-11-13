@@ -1,11 +1,9 @@
-import { redirect } from 'next/navigation';
-
-import { paths } from 'src/routes/paths';
-
-export const dynamic = 'force-dynamic';
+import NavHomeRedirect from 'src/layouts/dashboard/nav/nav-home-redirect';
 
 // ----------------------------------------------------------------------
+// /dashboard → trang mở đầu của vai trò (chủ cửa hàng chọn trong Vai trò & quyền › Menu hiển thị); chưa chọn thì
+// Kiểm quầy như trước.
 
 export default function DashboardRootPage() {
-  redirect(paths.dashboard.shiftCash.root);
+  return <NavHomeRedirect />;
 }

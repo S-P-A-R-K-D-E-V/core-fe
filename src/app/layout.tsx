@@ -181,7 +181,7 @@ export default async function RootLayout({ children }: Props) {
                 themeMode: 'light', // 'light' | 'dark'
                 themeDirection: 'ltr', //  'rtl' | 'ltr'
                 themeContrast: 'default', // 'default' | 'bold'
-                themeLayout: 'vertical', // 'vertical' | 'horizontal' | 'mini'
+                themeLayout: 'horizontal', // 'horizontal' (thanh ngang kiểu KiotViet) | 'vertical' (thanh bên) | 'mini' (thanh bên thu gọn)
                 themeColorPresets: 'default', // 'default' | 'cyan' | 'purple' | 'blue' | 'orange' | 'red'
                 themeStretch: false,
                 themeFont: 'Public Sans', // v6.3.0: font family selector

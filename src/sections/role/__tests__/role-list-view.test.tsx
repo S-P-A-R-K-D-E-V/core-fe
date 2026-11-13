@@ -23,7 +23,14 @@ vi.mock('src/components/custom-breadcrumbs', () => ({
 vi.mock('src/components/iconify', () => ({ default: () => null }));
 vi.mock('src/components/scrollbar', () => ({ default: ({ children }: any) => <div>{children}</div> }));
 const push = vi.fn();
-vi.mock('src/routes/hooks', () => ({ useRouter: () => ({ push }) }));
+const replace = vi.fn();
+const search = vi.hoisted(() => ({ value: '' }));
+vi.mock('src/routes/hooks', () => ({
+  useRouter: () => ({ push, replace }),
+  useSearchParams: () => new URLSearchParams(search.value),
+}));
+// Tab "Menu hiển thị" có test riêng (nav-menu-policy-tab.test.tsx).
+vi.mock('src/sections/role/nav-menu-policy-tab', () => ({ default: () => <div>Bảng menu theo vai trò</div> }));
 vi.mock('src/routes/components', () => ({
   RouterLink: ({ href, children, ...rest }: any) => (
     <a href={href} {...rest}>
@@ -84,6 +91,7 @@ const role = (name: string, userCount: number): ICustomRole => ({
 });
 
 afterEach(() => {
+  search.value = '';
   vi.clearAllMocks();
 });
 
@@ -148,5 +156,18 @@ describe('RoleListView', () => {
     const boxes = within(dialog).getAllByRole('checkbox');
     boxes.forEach((b) => expect(b).toBeDisabled());
     expect(within(dialog).getByRole('checkbox', { name: /Báo cáo doanh thu/ })).toBeChecked();
+  });
+
+  it('tab "Menu hiển thị" theo ?tab=menu; bấm tab thì đổi đường dẫn', async () => {
+    getCustomRoles.mockResolvedValue([]);
+    getPermissionCatalog.mockResolvedValue(catalog);
+    search.value = 'tab=menu';
+    render(<RoleListView />);
+
+    expect(await screen.findByText('Bảng menu theo vai trò')).toBeInTheDocument();
+    expect(screen.queryByText('Vai trò tuỳ chỉnh')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: /Vai trò & quyền/ }));
+    expect(replace).toHaveBeenCalledWith('/dashboard/role/list');
   });
 });

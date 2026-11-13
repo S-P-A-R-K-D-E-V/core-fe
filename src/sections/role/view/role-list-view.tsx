@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+import Tab from '@mui/material/Tab';
 import Card from '@mui/material/Card';
+import Tabs from '@mui/material/Tabs';
 import Table from '@mui/material/Table';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
@@ -23,7 +25,7 @@ import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
 
 import { paths } from 'src/routes/paths';
-import { useRouter } from 'src/routes/hooks';
+import { useRouter, useSearchParams } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
 import { apiErrorMessage } from 'src/utils/api-error';
@@ -44,6 +46,7 @@ import {
   getPermissionCatalog,
 } from 'src/api/custom-roles';
 
+import NavMenuPolicyTab from '../nav-menu-policy-tab';
 import SystemRoleBaseline from '../system-role-baseline';
 import PermissionChecklist from '../permission-checklist';
 
@@ -53,6 +56,9 @@ import PermissionChecklist from '../permission-checklist';
 
 export default function RoleListView() {
   const router = useRouter();
+  // ?tab=menu: tab "Menu hiển thị" (ẩn / ghim mục menu, trang mở đầu theo vai trò).
+  const searchParams = useSearchParams();
+  const tab = searchParams.get('tab') === 'menu' ? 'menu' : 'roles';
   const { enqueueSnackbar } = useSnackbar();
 
   const [catalog, setCatalog] = useState<IPermissionCatalog | null>(null);
@@ -112,9 +118,24 @@ export default function RoleListView() {
               Thêm vai trò
             </Button>
           }
-          sx={{ mb: { xs: 3, md: 5 } }}
+          sx={{ mb: 3 }}
         />
 
+        <Tabs
+          value={tab}
+          onChange={(_, value) =>
+            router.replace(value === 'menu' ? `${paths.dashboard.role.list}?tab=menu` : paths.dashboard.role.list)
+          }
+          sx={{ mb: 3 }}
+        >
+          <Tab value="roles" label="Vai trò & quyền" icon={<Iconify icon="solar:shield-user-bold" width={22} />} />
+          <Tab value="menu" label="Menu hiển thị" icon={<Iconify icon="solar:hamburger-menu-bold" width={22} />} />
+        </Tabs>
+
+        {tab === 'menu' && <NavMenuPolicyTab catalog={catalog} customRoles={customRoles} />}
+
+        {tab === 'roles' && (
+          <>
         <Alert severity="info" sx={{ mb: 3 }}>
           Vai trò hệ thống có quyền cố định: việc làm được sẵn theo vai trò (bấm Xem quyền) cộng các quyền chi tiết. Muốn
           cấp quyền khác (vd Thu ngân chỉ bán hàng, Kế toán xem báo cáo) thì tạo vai trò tuỳ chỉnh rồi gán trong mục Người
@@ -226,6 +247,8 @@ export default function RoleListView() {
             </Table>
           </TableContainer>
         </Card>
+          </>
+        )}
       </Container>
 
       <Dialog fullWidth maxWidth="md" open={!!viewing} onClose={() => setViewing(null)}>

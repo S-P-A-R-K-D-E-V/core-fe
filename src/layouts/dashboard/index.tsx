@@ -40,6 +40,7 @@ import NavMini from './nav-mini';
 import NavBottom from './nav-bottom';
 import NavVertical from './nav-vertical';
 import NavHorizontal from './nav-horizontal';
+import NavPrefsSync from './nav/nav-prefs-sync';
 import { BOTTOM_NAV } from '../config-layout';
 
 // ----------------------------------------------------------------------
@@ -54,6 +55,10 @@ function ShiftNotificationAlert() {
 function MaybeMessenger({ off, children }: { off: boolean; children: React.ReactNode }) {
   return off ? <>{children}</> : <MessengerProvider>{children}</MessengerProvider>;
 }
+
+// Menu quản trị đổi sang thanh ngang kiểu KiotViet (13/11/2026): chuyển mọi người sang kiểu mới MỘT lần, sau đó ai muốn
+// thanh bên thì tự chọn lại trong Giao diện & kiểu menu.
+const NAV_LAYOUT_V2_KEY = 'core-fe:nav-layout-v2';
 
 // ----------------------------------------------------------------------
 
@@ -95,6 +100,17 @@ export default function DashboardLayout({ children }: Props) {
   const { pref, loaded, savePref } = useMobileView();
   const [rememberPref, setRememberPref] = useState(true);
 
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(NAV_LAYOUT_V2_KEY)) return;
+      window.localStorage.setItem(NAV_LAYOUT_V2_KEY, '1');
+      if (settings.themeLayout !== 'horizontal') settings.onUpdate('themeLayout', 'horizontal');
+    } catch {
+      // Không lưu được (ẩn danh): dùng mặc định của app.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const isHorizontal = settings.themeLayout === 'horizontal';
   const isMini = settings.themeLayout === 'mini';
 
@@ -120,8 +136,8 @@ export default function DashboardLayout({ children }: Props) {
 
       <DialogContent sx={{ pb: 1 }}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Bạn đang dùng thiết bị màn hình nhỏ. Bạn có muốn chuyển sang giao diện mobile không?
-          Giao diện mobile có thanh điều hướng ở dưới để thao tác dễ dàng hơn.
+          Bạn đang dùng thiết bị màn hình nhỏ. Bạn có muốn chuyển sang giao diện mobile không? Giao
+          diện mobile có thanh điều hướng ở dưới để thao tác dễ dàng hơn.
         </Typography>
 
         <FormControlLabel
@@ -161,6 +177,7 @@ export default function DashboardLayout({ children }: Props) {
         <MaybeMessenger off={counterSession}>
           {!counterSession && <ShiftNotificationAlert />}
           <CounterSessionGuard />
+          <NavPrefsSync />
           <Header onOpenNav={nav.onTrue} />
           {lgUp ? renderHorizontal : renderNavVertical}
           <Main sx={mobileNavSx}>{children}</Main>
@@ -184,6 +201,7 @@ export default function DashboardLayout({ children }: Props) {
         <MaybeMessenger off={counterSession}>
           {!counterSession && <ShiftNotificationAlert />}
           <CounterSessionGuard />
+          <NavPrefsSync />
           <Header onOpenNav={nav.onTrue} />
           <Box
             sx={{
@@ -214,6 +232,7 @@ export default function DashboardLayout({ children }: Props) {
       <MaybeMessenger off={counterSession}>
         {!counterSession && <ShiftNotificationAlert />}
         <CounterSessionGuard />
+        <NavPrefsSync />
         <Header onOpenNav={nav.onTrue} />
         <Box
           sx={{

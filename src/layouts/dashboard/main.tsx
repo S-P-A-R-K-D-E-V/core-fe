@@ -29,8 +29,9 @@ export default function Main({ children, sx, ...other }: BoxProps) {
           flexDirection: 'column',
           pt: `${HEADER.H_MOBILE + 24}px`,
           pb: 10,
+          // Header + thanh module ngang (kiểu KiotViet) cố định ở trên.
           ...(lgUp && {
-            pt: `${HEADER.H_MOBILE * 2 + 40}px`,
+            pt: `${HEADER.H_DESKTOP_OFFSET + NAV.H_MODULE_BAR + 24}px`,
             pb: 15,
           }),
         }}
