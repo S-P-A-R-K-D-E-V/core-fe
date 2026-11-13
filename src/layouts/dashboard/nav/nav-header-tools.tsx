@@ -21,7 +21,8 @@ import { useNavPins, useActiveNavPage } from './use-nav-state';
 import type { NavTree } from './nav-types';
 
 // ----------------------------------------------------------------------
-// Nút trên header: ★ Ghim & gần đây, ⚙ Cài đặt (module Cài đặt + Giao diện & kiểu menu), nút "Bán hàng".
+// Nút trên header: ★ Ghim & gần đây, Cài đặt cửa hàng (module Cài đặt + lối tắt Giao diện & kiểu menu), nút "Bán hàng".
+// Nút Cài đặt giao diện (bánh răng) vẫn là layouts/common/settings-button như trước.
 // ----------------------------------------------------------------------
 
 export function NavPinsButton({ tree }: { tree: NavTree }) {
@@ -100,13 +101,14 @@ export function NavSettingsButton({ tree }: { tree: NavTree }) {
 
   return (
     <>
-      <Tooltip title="Cài đặt">
+      <Tooltip title="Cài đặt cửa hàng">
         <IconButton
           onClick={popover.onOpen}
           color={popover.open || active?.moduleKey === 'settings' ? 'primary' : 'default'}
-          aria-label="Cài đặt"
+          aria-label="Cài đặt cửa hàng"
         >
-          <Iconify icon="solar:settings-bold-duotone" width={22} />
+          {/* Không dùng bánh răng — bánh răng là nút Cài đặt giao diện ngay bên cạnh. */}
+          <Iconify icon="solar:shop-2-bold-duotone" width={22} />
         </IconButton>
       </Tooltip>
       <CustomPopover
