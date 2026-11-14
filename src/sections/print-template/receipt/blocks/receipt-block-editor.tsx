@@ -44,29 +44,34 @@ import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 
 import { uploadTemplateImage } from '../../print-image-upload';
-import { RECEIPT_FIELDS, isItemField, isPaymentField } from '../receipt-template-fields';
+import { PURCHASE_FIELD_SET } from '../../purchase/purchase-template-fields';
+import { isItemField, isPaymentField, RECEIPT_FIELD_SET } from '../receipt-template-fields';
 import {
   INFO_ROWS,
   TOTAL_ROWS,
-  BLOCK_TYPES,
   createBlock,
   STORE_LINES,
   ITEM_COLUMNS,
+  blockTypeInfo,
   duplicateBlock,
+  BLOCK_STARTERS,
   TRANSFER_LINES,
   INFO_ROW_LABELS,
-  BLOCK_TYPE_ORDER,
   TOTAL_ROW_LABELS,
+  BLOCK_TYPE_ORDERS,
   RULE_STYLE_LABELS,
   STORE_LINE_LABELS,
+  PURCHASE_INFO_ROWS,
   MAX_RECEIPT_BLOCKS,
   ITEM_COLUMN_LABELS,
+  PURCHASE_TOTAL_ROWS,
   ITEMS_LAYOUT_LABELS,
   TRANSFER_LINE_LABELS,
-  RECEIPT_BLOCK_STARTERS,
+  PURCHASE_INFO_ROW_LABELS,
+  PURCHASE_TOTAL_ROW_LABELS,
 } from './receipt-blocks';
 
-import type { ReceiptBlock, ReceiptBlockType } from './receipt-blocks';
+import type { ReceiptBlock, ReceiptBlockType, BlockDocumentKind } from './receipt-blocks';
 
 // ----------------------------------------------------------------------
 // Trình soạn mẫu hoá đơn theo khối: cột trái là các loại khối (kéo thả vào danh sách hoặc bấm để thêm sau khối đang chọn),
@@ -78,9 +83,10 @@ const NEW_PREFIX = 'new:';
 const LIST_END = 'list-end';
 
 /** Trường chèn được vào chữ tự do / tiêu đề (không gồm trường dòng hàng, khoản thu, hình). */
-const TEXT_FIELDS = RECEIPT_FIELDS.filter(
-  (field) => !field.block && !isItemField(field.key) && !isPaymentField(field.key)
-);
+const textFieldsOf = (kind: BlockDocumentKind) =>
+  (kind === 'purchase' ? PURCHASE_FIELD_SET : RECEIPT_FIELD_SET).fields.filter(
+    (field) => !field.block && !isItemField(field.key) && !isPaymentField(field.key)
+  );
 
 type Props = {
   blocks: ReceiptBlock[];
@@ -89,6 +95,8 @@ type Props = {
   onStarter: (key: string) => void;
   /** Chuyển sang soạn tự do (một chiều). */
   onFreeMode: () => void;
+  /** Loại chứng từ: quyết định các khối, mẫu khởi đầu và trường chèn được. */
+  kind?: BlockDocumentKind;
 };
 
 function summary(block: ReceiptBlock): string {
@@ -127,6 +135,12 @@ function summary(block: ReceiptBlock): string {
       return [block.showFooter ? 'Lời chào' : '', block.showPrintedAt ? 'In lúc …' : '']
         .filter(Boolean)
         .join(' · ');
+    case 'purchaseInfo':
+      return on(block.rows, PURCHASE_INFO_ROW_LABELS);
+    case 'purchaseTotals':
+      return on(block.rows, PURCHASE_TOTAL_ROW_LABELS);
+    case 'signatures':
+      return [block.left, block.right].filter((side) => side.trim()).join(' · ');
     default:
       return '';
   }
@@ -134,9 +148,17 @@ function summary(block: ReceiptBlock): string {
 
 // ── Cột trái: loại khối ──────────────────────────────────────────────────
 
-function PaletteItem({ type, onAdd }: { type: ReceiptBlockType; onAdd: (type: ReceiptBlockType) => void }) {
+function PaletteItem({
+  type,
+  kind,
+  onAdd,
+}: {
+  type: ReceiptBlockType;
+  kind: BlockDocumentKind;
+  onAdd: (type: ReceiptBlockType) => void;
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `${NEW_PREFIX}${type}` });
-  const info = BLOCK_TYPES[type];
+  const info = blockTypeInfo(type, kind);
   return (
     <Box
       ref={setNodeRef}
@@ -180,6 +202,7 @@ function PaletteItem({ type, onAdd }: { type: ReceiptBlockType; onAdd: (type: Re
 
 type RowProps = {
   block: ReceiptBlock;
+  kind: BlockDocumentKind;
   selected: boolean;
   first: boolean;
   last: boolean;
@@ -192,6 +215,7 @@ type RowProps = {
 
 function BlockRow({
   block,
+  kind,
   selected,
   first,
   last,
@@ -203,7 +227,7 @@ function BlockRow({
 }: RowProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: block.id });
-  const info = BLOCK_TYPES[block.type];
+  const info = blockTypeInfo(block.type, kind);
   return (
     <Paper
       ref={setNodeRef}
@@ -338,10 +362,10 @@ function FlagGroup<K extends string>({
   );
 }
 
-function FieldChips({ onInsert }: { onInsert: (token: string) => void }) {
+function FieldChips({ kind, onInsert }: { kind: BlockDocumentKind; onInsert: (token: string) => void }) {
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-      {TEXT_FIELDS.map((field) => (
+      {textFieldsOf(kind).map((field) => (
         <Chip
           key={field.key}
           size="small"
@@ -354,15 +378,26 @@ function FieldChips({ onInsert }: { onInsert: (token: string) => void }) {
   );
 }
 
-function BlockProperties({ block, onChange }: { block: ReceiptBlock; onChange: (next: ReceiptBlock) => void }) {
+function BlockProperties({
+  block,
+  kind,
+  onChange,
+}: {
+  block: ReceiptBlock;
+  kind: BlockDocumentKind;
+  onChange: (next: ReceiptBlock) => void;
+}) {
   const { enqueueSnackbar } = useSnackbar();
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const set = (patch: Partial<ReceiptBlock>) => onChange({ ...block, ...patch } as ReceiptBlock);
-  const info = BLOCK_TYPES[block.type];
+  const info = blockTypeInfo(block.type, kind);
+  const doc = kind === 'purchase' ? 'phiếu' : 'hoá đơn';
   const textual = !['logo', 'divider', 'spacer', 'image'].includes(block.type);
-  const alignable = !['divider', 'spacer', 'items', 'totals', 'payments'].includes(block.type);
-  const hideable = !['logo', 'divider', 'spacer', 'image', 'code'].includes(block.type);
+  const alignable = !['divider', 'spacer', 'items', 'totals', 'payments', 'purchaseTotals', 'signatures'].includes(
+    block.type
+  );
+  const hideable = !['logo', 'divider', 'spacer', 'image', 'code', 'signatures'].includes(block.type);
 
   const upload = async (file: File | undefined) => {
     if (!file || block.type !== 'image') return;
@@ -453,7 +488,7 @@ function BlockProperties({ block, onChange }: { block: ReceiptBlock; onChange: (
             onChange={(lines) => onChange({ ...block, lines })}
           />
           <Typography variant="caption" color="text.secondary">
-            Tên chi nhánh, địa chỉ, ĐT lấy theo chi nhánh của hoá đơn (KiotViet). Tên chi nhánh trùng ý với tên cửa hàng thì
+            Tên chi nhánh, địa chỉ, ĐT lấy theo chi nhánh của {doc} (KiotViet). Tên chi nhánh trùng ý với tên cửa hàng thì
             tắt dòng &quot;Tên chi nhánh&quot;.
           </Typography>
         </>
@@ -468,9 +503,15 @@ function BlockProperties({ block, onChange }: { block: ReceiptBlock; onChange: (
             label={block.type === 'title' ? 'Tiêu đề' : 'Nội dung'}
             value={block.text}
             onChange={(event) => onChange({ ...block, text: event.target.value.slice(0, 500) })}
-            helperText={block.type === 'title' ? '{{invoice_title}} = tiêu đề theo trạng thái hoá đơn' : undefined}
+            helperText={
+              block.type === 'title'
+                ? kind === 'purchase'
+                  ? '{{invoice_title}} = PHIẾU NHẬP HÀNG'
+                  : '{{invoice_title}} = tiêu đề theo trạng thái hoá đơn'
+                : undefined
+            }
           />
-          <FieldChips onInsert={(token) => onChange({ ...block, text: `${block.text}${token}` })} />
+          <FieldChips kind={kind} onInsert={(token) => onChange({ ...block, text: `${block.text}${token}` })} />
           {block.type === 'title' && (
             <FormControlLabel
               control={
@@ -480,7 +521,7 @@ function BlockProperties({ block, onChange }: { block: ReceiptBlock; onChange: (
                   onChange={(e) => onChange({ ...block, showCancelled: e.target.checked })}
                 />
               }
-              label='Hiện dấu "ĐÃ HUỶ" khi hoá đơn huỷ'
+              label={`Hiện dấu "ĐÃ HUỶ" khi ${doc} huỷ`}
             />
           )}
         </>
@@ -574,8 +615,79 @@ function BlockProperties({ block, onChange }: { block: ReceiptBlock; onChange: (
           </TextField>
           <FormControlLabel
             control={<Checkbox size="small" checked={block.showCode} onChange={(e) => onChange({ ...block, showCode: e.target.checked })} />}
-            label="In mã hoá đơn dưới mã"
+            label={`In mã ${doc} dưới mã`}
           />
+        </>
+      )}
+
+      {block.type === 'purchaseInfo' && (
+        <FlagGroup
+          keys={PURCHASE_INFO_ROWS}
+          labels={PURCHASE_INFO_ROW_LABELS}
+          value={block.rows}
+          onChange={(rows) => onChange({ ...block, rows })}
+        />
+      )}
+
+      {block.type === 'purchaseTotals' && (
+        <>
+          <FlagGroup
+            keys={PURCHASE_TOTAL_ROWS}
+            labels={PURCHASE_TOTAL_ROW_LABELS}
+            value={block.rows}
+            onChange={(rows) => onChange({ ...block, rows })}
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                checked={block.emphasizeTotal}
+                onChange={(e) => onChange({ ...block, emphasizeTotal: e.target.checked })}
+              />
+            }
+            label='Nhấn mạnh "Cần trả NCC"'
+          />
+        </>
+      )}
+
+      {block.type === 'signatures' && (
+        <>
+          <TextField
+            size="small"
+            label="Cột trái"
+            value={block.left}
+            onChange={(event) => onChange({ ...block, left: event.target.value.slice(0, 60) })}
+          />
+          <TextField
+            size="small"
+            label="Cột phải"
+            value={block.right}
+            onChange={(event) => onChange({ ...block, right: event.target.value.slice(0, 60) })}
+            helperText="Để trống một cột = chỉ một chữ ký"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                checked={block.showNote}
+                onChange={(e) => onChange({ ...block, showNote: e.target.checked })}
+              />
+            }
+            label='"(Ký, ghi rõ họ tên)"'
+          />
+          <TextField
+            select
+            size="small"
+            label="Chỗ trống để ký"
+            value={block.lines}
+            onChange={(event) => onChange({ ...block, lines: Number(event.target.value) })}
+          >
+            {[1, 2, 3, 4, 5, 6, 8].map((n) => (
+              <MenuItem key={n} value={n}>
+                {n} dòng
+              </MenuItem>
+            ))}
+          </TextField>
         </>
       )}
 
@@ -679,7 +791,7 @@ function BlockProperties({ block, onChange }: { block: ReceiptBlock; onChange: (
 
 // ── Trình soạn ───────────────────────────────────────────────────────────
 
-export function ReceiptBlockEditor({ blocks, onChange, onStarter, onFreeMode }: Props) {
+export function ReceiptBlockEditor({ blocks, onChange, onStarter, onFreeMode, kind = 'receipt' }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(blocks[0]?.id ?? null);
   const [dragging, setDragging] = useState<string | null>(null);
   // Mã ổn định cho phần mô tả trợ năng của dnd-kit (tự đánh số thì lệch giữa máy chủ và trình duyệt khi hydrate).
@@ -767,8 +879,8 @@ export function ReceiptBlockEditor({ blocks, onChange, onStarter, onFreeMode }: 
             Kéo vào bố cục, hoặc bấm để thêm sau khối đang chọn.
           </Typography>
           <Stack spacing={0.75}>
-            {BLOCK_TYPE_ORDER.map((type) => (
-              <PaletteItem key={type} type={type} onAdd={addAfterSelected} />
+            {BLOCK_TYPE_ORDERS[kind].map((type) => (
+              <PaletteItem key={type} type={type} kind={kind} onAdd={addAfterSelected} />
             ))}
           </Stack>
         </Paper>
@@ -788,7 +900,7 @@ export function ReceiptBlockEditor({ blocks, onChange, onStarter, onFreeMode }: 
               }}
               sx={{ minWidth: 200 }}
             >
-              {RECEIPT_BLOCK_STARTERS.map((starter) => (
+              {BLOCK_STARTERS[kind].map((starter) => (
                 <MenuItem key={starter.key} value={starter.key}>
                   {starter.label}
                 </MenuItem>
@@ -806,6 +918,7 @@ export function ReceiptBlockEditor({ blocks, onChange, onStarter, onFreeMode }: 
                 <BlockRow
                   key={block.id}
                   block={block}
+                  kind={kind}
                   selected={block.id === selectedId}
                   first={index === 0}
                   last={index === blocks.length - 1}
@@ -835,7 +948,7 @@ export function ReceiptBlockEditor({ blocks, onChange, onStarter, onFreeMode }: 
 
         <Paper variant="outlined" sx={{ p: 2, gridColumn: { md: '1 / -1', lg: 'auto' } }}>
           {selected ? (
-            <BlockProperties key={selected.id} block={selected} onChange={update} />
+            <BlockProperties key={selected.id} block={selected} kind={kind} onChange={update} />
           ) : (
             <Typography variant="body2" color="text.secondary">
               Chọn một khối trong bố cục để chỉnh.
@@ -847,8 +960,8 @@ export function ReceiptBlockEditor({ blocks, onChange, onStarter, onFreeMode }: 
       <DragOverlay dropAnimation={null}>
         {draggingType && (
           <Paper elevation={8} sx={{ px: 1.5, py: 1, display: 'flex', gap: 1, alignItems: 'center', width: 220 }}>
-            <Iconify icon={BLOCK_TYPES[draggingType].icon} width={18} />
-            <Typography variant="body2">{BLOCK_TYPES[draggingType].label}</Typography>
+            <Iconify icon={blockTypeInfo(draggingType, kind).icon} width={18} />
+            <Typography variant="body2">{blockTypeInfo(draggingType, kind).label}</Typography>
           </Paper>
         )}
       </DragOverlay>

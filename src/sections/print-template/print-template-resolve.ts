@@ -29,6 +29,7 @@ export const PRINT_PAYMENT_METHODS: { value: PrintPaymentMethod; label: string }
 
 export const PRINT_KIND_LABEL: Record<PrintTemplateKind, string> = {
   receipt: 'Hoá đơn',
+  purchase: 'Phiếu nhập',
   label: 'Tem mã',
 };
 

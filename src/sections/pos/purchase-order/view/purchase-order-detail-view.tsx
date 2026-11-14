@@ -42,6 +42,7 @@ import {
 import { getShareholders } from 'src/api/shareholders';
 import { FEATURE, useFeatureEnabled } from 'src/hooks/use-feature-enabled';
 
+import { PurchaseOrderPrintButton } from '../purchase-order-print';
 import { lockedByPaidBy, usePurchaseAccess } from '../purchase-access';
 import { purchaseSubTotal, receivedQuantityOf, purchaseStatusMeta } from '../purchase-status';
 
@@ -204,6 +205,7 @@ export default function PurchaseOrderDetailView({ id }: Props) {
             <Label color={statusMeta.color}>{statusMeta.label}</Label>
           </Stack>
           <Stack direction="row" spacing={1}>
+            <PurchaseOrderPrintButton orderId={id} orderNumber={order.orderNumber} />
             {access.canCreate && (
               <Button variant="outlined" color="inherit"
                 onClick={() => router.push(`${paths.dashboard.pos.purchaseOrder.new}?copy=${id}`)}

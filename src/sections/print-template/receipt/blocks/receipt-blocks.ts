@@ -69,6 +69,36 @@ export type ItemColumn = (typeof ITEM_COLUMNS)[number];
 export const TRANSFER_LINES = ['bank', 'accountNumber', 'accountName', 'content'] as const;
 export type TransferLine = (typeof TRANSFER_LINES)[number];
 
+export const PURCHASE_INFO_ROWS = [
+  'code',
+  'date',
+  'supplier',
+  'supplierCode',
+  'supplierPhone',
+  'supplierAddress',
+  'warehouse',
+  'createdBy',
+  'status',
+  'note',
+] as const;
+export type PurchaseInfoRow = (typeof PURCHASE_INFO_ROWS)[number];
+
+export const PURCHASE_TOTAL_ROWS = [
+  'subtotal',
+  'discount',
+  'vat',
+  'total',
+  'inWords',
+  'paid',
+  'debt',
+  'itemCount',
+  'totalQuantity',
+] as const;
+export type PurchaseTotalRow = (typeof PURCHASE_TOTAL_ROWS)[number];
+
+/** Loại chứng từ soạn được theo khối (tem mã có trình thiết kế riêng). */
+export type BlockDocumentKind = 'receipt' | 'purchase';
+
 export type ReceiptBlock = BlockBase &
   (
     | { type: 'logo'; widthPct: number }
@@ -85,6 +115,9 @@ export type ReceiptBlock = BlockBase &
     | { type: 'spacer'; lines: number }
     | { type: 'image'; src: string; widthPct: number }
     | { type: 'footer'; showFooter: boolean; showPrintedAt: boolean }
+    | { type: 'purchaseInfo'; rows: Record<PurchaseInfoRow, boolean> }
+    | { type: 'purchaseTotals'; rows: Record<PurchaseTotalRow, boolean>; emphasizeTotal: boolean }
+    | { type: 'signatures'; left: string; right: string; showNote: boolean; lines: number }
   );
 
 export type ReceiptBlockType = ReceiptBlock['type'];
@@ -124,6 +157,31 @@ export const TOTAL_ROW_LABELS: Record<TotalRow, string> = {
   cashTendered: 'Tiền khách đưa',
   changeDue: 'Tiền thừa trả khách',
   remaining: 'Còn phải trả',
+  itemCount: 'Số mặt hàng',
+  totalQuantity: 'Tổng số lượng',
+};
+
+export const PURCHASE_INFO_ROW_LABELS: Record<PurchaseInfoRow, string> = {
+  code: 'Mã phiếu',
+  date: 'Ngày nhập',
+  supplier: 'Nhà cung cấp',
+  supplierCode: 'Mã NCC',
+  supplierPhone: 'SĐT NCC',
+  supplierAddress: 'Địa chỉ NCC',
+  warehouse: 'Kho nhập',
+  createdBy: 'Người nhập',
+  status: 'Trạng thái',
+  note: 'Ghi chú phiếu',
+};
+
+export const PURCHASE_TOTAL_ROW_LABELS: Record<PurchaseTotalRow, string> = {
+  subtotal: 'Tổng tiền hàng',
+  discount: 'Giảm giá',
+  vat: 'Thuế VAT',
+  total: 'Cần trả NCC',
+  inWords: 'Bằng chữ',
+  paid: 'Đã trả NCC',
+  debt: 'Còn nợ NCC',
   itemCount: 'Số mặt hàng',
   totalQuantity: 'Tổng số lượng',
 };
@@ -173,9 +231,58 @@ export const BLOCK_TYPES: Record<ReceiptBlockType, BlockTypeInfo> = {
   spacer: { label: 'Khoảng trống', icon: 'mingcute:minimize-line', hint: '1–4 dòng trống' },
   image: { label: 'Ảnh', icon: 'solar:gallery-add-bold', hint: 'Ảnh tải lên (PNG, JPEG, WebP)' },
   footer: { label: 'Lời chào cuối phiếu', icon: 'solar:heart-bold', hint: 'Lời chào + thời điểm in' },
+  purchaseInfo: { label: 'Thông tin phiếu nhập', icon: 'solar:document-text-bold', hint: 'Mã, ngày, NCC, kho, người nhập' },
+  purchaseTotals: { label: 'Tổng tiền phiếu nhập', icon: 'solar:calculator-bold-duotone', hint: 'Tổng, VAT, cần trả, còn nợ NCC' },
+  signatures: { label: 'Chữ ký', icon: 'solar:pen-new-square-bold', hint: 'Người giao / người nhận' },
 };
 
-export const BLOCK_TYPE_ORDER = Object.keys(BLOCK_TYPES) as ReceiptBlockType[];
+/** Khối của từng loại chứng từ, theo thứ tự ở cột "Khối". */
+export const BLOCK_TYPE_ORDERS: Record<BlockDocumentKind, ReceiptBlockType[]> = {
+  receipt: [
+    'logo',
+    'storeHeader',
+    'title',
+    'invoiceInfo',
+    'items',
+    'totals',
+    'payments',
+    'transferQr',
+    'code',
+    'text',
+    'divider',
+    'spacer',
+    'image',
+    'footer',
+  ],
+  purchase: [
+    'logo',
+    'storeHeader',
+    'title',
+    'purchaseInfo',
+    'items',
+    'purchaseTotals',
+    'signatures',
+    'code',
+    'text',
+    'divider',
+    'spacer',
+    'image',
+  ],
+};
+
+export const BLOCK_TYPE_ORDER = BLOCK_TYPE_ORDERS.receipt;
+
+/** Nhãn / gợi ý riêng của phiếu nhập cho khối dùng chung. */
+const PURCHASE_BLOCK_INFO: Partial<Record<ReceiptBlockType, Partial<BlockTypeInfo>>> = {
+  title: { hint: 'PHIẾU NHẬP HÀNG, dấu ĐÃ HUỶ' },
+  storeHeader: { hint: 'Tên, chi nhánh nhập, địa chỉ, ĐT, MST' },
+  items: { hint: 'Tự lặp cho từng dòng hàng' },
+  code: { label: 'Mã vạch / QR mã phiếu', hint: 'Quét để tra phiếu nhập' },
+};
+
+export function blockTypeInfo(type: ReceiptBlockType, kind: BlockDocumentKind = 'receipt'): BlockTypeInfo {
+  return kind === 'purchase' ? { ...BLOCK_TYPES[type], ...PURCHASE_BLOCK_INFO[type] } : BLOCK_TYPES[type];
+}
 
 // ── Tạo khối ─────────────────────────────────────────────────────────────
 
@@ -230,8 +337,24 @@ export function createBlock<T extends ReceiptBlockType>(
     spacer: { type: 'spacer', lines: 1 },
     image: { type: 'image', src: '', widthPct: 60 },
     footer: { type: 'footer', showFooter: true, showPrintedAt: true },
+    purchaseInfo: {
+      type: 'purchaseInfo',
+      rows: all(PURCHASE_INFO_ROWS, true, ['supplierCode', 'supplierAddress', 'status']),
+    },
+    purchaseTotals: {
+      type: 'purchaseTotals',
+      rows: all(PURCHASE_TOTAL_ROWS, true, ['inWords', 'itemCount', 'totalQuantity']),
+      emphasizeTotal: true,
+    },
+    signatures: {
+      type: 'signatures',
+      left: 'Người giao hàng',
+      right: 'Người nhận hàng',
+      showNote: true,
+      lines: 4,
+    },
   };
-  const centered: ReceiptBlockType[] = ['logo', 'storeHeader', 'title', 'transferQr', 'code', 'text', 'image', 'footer'];
+  const centered: ReceiptBlockType[] = ['logo', 'storeHeader', 'title', 'transferQr', 'code', 'text', 'image', 'footer', 'signatures'];
   const sizes: Partial<Record<ReceiptBlockType, number>> = { storeHeader: 0, title: 2 };
   return {
     ...BASE,
@@ -367,8 +490,110 @@ export const RECEIPT_BLOCK_STARTERS: ReceiptBlockStarter[] = [
   },
 ];
 
-export function starterBlocks(key: string): { paper: ReceiptTemplatePaper; items: ReceiptBlock[] } {
-  const starter = RECEIPT_BLOCK_STARTERS.find((s) => s.key === key) ?? RECEIPT_BLOCK_STARTERS[0];
+export const PURCHASE_BLOCK_STARTERS: ReceiptBlockStarter[] = [
+  {
+    key: 'purchaseA4',
+    label: 'A4 có bảng hàng + chữ ký',
+    paper: 'A4',
+    build: () => [
+      createBlock('logo', { widthPct: 15, align: 'left' }),
+      createBlock('storeHeader', { align: 'left' }),
+      createBlock('title', { size: 4, align: 'center' }),
+      createBlock('purchaseInfo', {
+        rows: {
+          code: true,
+          date: true,
+          supplier: true,
+          supplierCode: false,
+          supplierPhone: true,
+          supplierAddress: true,
+          warehouse: true,
+          createdBy: true,
+          status: false,
+          note: true,
+        },
+      }),
+      createBlock('items', {
+        layout: 'table5',
+        cols: { no: true, code: true, unit: true, discount: true, note: true },
+      }),
+      createBlock('purchaseTotals', {
+        rows: {
+          subtotal: true,
+          discount: true,
+          vat: true,
+          total: true,
+          inWords: true,
+          paid: true,
+          debt: true,
+          itemCount: false,
+          totalQuantity: true,
+        },
+      }),
+      createBlock('spacer'),
+      createBlock('signatures'),
+    ],
+  },
+  {
+    key: 'purchase80',
+    label: 'Giấy cuộn 80 mm',
+    paper: '80',
+    build: () => [
+      createBlock('storeHeader', {
+        lines: { name: true, branch: true, address: false, phone: false, taxCode: false },
+      }),
+      createBlock('title', { size: 1 }),
+      createBlock('divider'),
+      createBlock('purchaseInfo', {
+        rows: {
+          code: true,
+          date: true,
+          supplier: true,
+          supplierCode: false,
+          supplierPhone: false,
+          supplierAddress: false,
+          warehouse: false,
+          createdBy: true,
+          status: false,
+          note: true,
+        },
+      }),
+      createBlock('divider'),
+      createBlock('items', {
+        cols: { no: false, code: false, unit: true, discount: true, note: false },
+      }),
+      createBlock('divider'),
+      createBlock('purchaseTotals', {
+        rows: {
+          subtotal: true,
+          discount: true,
+          vat: true,
+          total: true,
+          inWords: false,
+          paid: true,
+          debt: true,
+          itemCount: false,
+          totalQuantity: false,
+        },
+      }),
+      createBlock('signatures', { lines: 3 }),
+    ],
+  },
+];
+
+export const BLOCK_STARTERS: Record<BlockDocumentKind, ReceiptBlockStarter[]> = {
+  receipt: RECEIPT_BLOCK_STARTERS,
+  purchase: PURCHASE_BLOCK_STARTERS,
+};
+
+/** Bố cục của mẫu khởi đầu `key` (tìm ở mọi loại); không có → mẫu khởi đầu đầu tiên của `kind`. */
+export function starterBlocks(
+  key: string,
+  kind: BlockDocumentKind = 'receipt'
+): { paper: ReceiptTemplatePaper; items: ReceiptBlock[] } {
+  const starter =
+    [...RECEIPT_BLOCK_STARTERS, ...PURCHASE_BLOCK_STARTERS].find((s) => s.key === key) ??
+    BLOCK_STARTERS[kind][0];
   return { paper: starter.paper, items: starter.build() };
 }
 
@@ -484,6 +709,24 @@ export function normalizeBlock(input: unknown): ReceiptBlock | null {
         type: d.type,
         showFooter: bool(input.showFooter, d.showFooter),
         showPrintedAt: bool(input.showPrintedAt, d.showPrintedAt),
+      };
+    case 'purchaseInfo':
+      return { ...base, type: d.type, rows: flags(input.rows, PURCHASE_INFO_ROWS, d.rows) };
+    case 'purchaseTotals':
+      return {
+        ...base,
+        type: d.type,
+        rows: flags(input.rows, PURCHASE_TOTAL_ROWS, d.rows),
+        emphasizeTotal: bool(input.emphasizeTotal, d.emphasizeTotal),
+      };
+    case 'signatures':
+      return {
+        ...base,
+        type: d.type,
+        left: text(input.left, d.left).slice(0, 60),
+        right: text(input.right, d.right).slice(0, 60),
+        showNote: bool(input.showNote, d.showNote),
+        lines: num(input.lines, 1, 8, d.lines),
       };
     default:
       return null;

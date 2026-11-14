@@ -17,12 +17,10 @@ import Iconify from 'src/components/iconify';
 
 import { getAllSalesOrders, getSalesOrderReceipt } from 'src/api/sales-orders';
 
-import type { ISalesOrder, ISalesOrderReceipt } from 'src/types/corecms-api';
-
 import { renderReceiptTemplate } from './receipt-template-render';
 
-import type { RenderedReceiptTemplate } from './receipt-template-render';
 import type { ReceiptTemplateSettings } from './receipt-template-settings';
+import type { PrintSource, RenderedReceiptTemplate } from './receipt-template-render';
 
 // ----------------------------------------------------------------------
 // Xem trước mẫu hoá đơn với dữ liệu mẫu, một hoá đơn thật gần đây hoặc hoá đơn tìm theo mã: hiện ĐÚNG tài liệu sẽ gửi máy in
@@ -34,10 +32,55 @@ const PX_PER_MM = 96 / 25.4;
 const DEBOUNCE_MS = 300;
 const SAMPLE = '__sample__';
 
+/** Một chứng từ thật để chọn xem trước. */
+export type PreviewOption = { id: string; code: string; label: string };
+
+/** Nguồn dữ liệu xem trước của một loại chứng từ: chữ trên giao diện + cách tải danh sách / tìm / đọc một chứng từ. */
+export type PreviewDataSource = {
+  sampleLabel: string;
+  recentLoadingLabel: string;
+  searchLabel: string;
+  searchPlaceholder: string;
+  searchButtonLabel: string;
+  frameTitle: string;
+  notFound: (keyword: string) => string;
+  loadErrorLabel: string;
+  searchErrorLabel: string;
+  recent: () => Promise<PreviewOption[]>;
+  search: (keyword: string) => Promise<PreviewOption[]>;
+  load: (id: string) => Promise<PrintSource>;
+};
+
+const receiptOptions = (params: { keyword?: string; pageSize: number }) =>
+  getAllSalesOrders({ ...params, pageNumber: 1 }).then((page) =>
+    (page.items ?? []).map((order) => ({
+      id: order.id,
+      code: order.orderNumber ?? '',
+      label: `${order.orderNumber}${order.customerName ? ` · ${order.customerName}` : ''}`,
+    }))
+  );
+
+export const RECEIPT_PREVIEW_SOURCE: PreviewDataSource = {
+  sampleLabel: 'Hoá đơn mẫu',
+  recentLoadingLabel: 'Đang tải hoá đơn gần đây…',
+  searchLabel: 'Tìm hoá đơn theo mã',
+  searchPlaceholder: 'VD: HD081216',
+  searchButtonLabel: 'Tìm hoá đơn',
+  frameTitle: 'Xem trước mẫu hoá đơn',
+  notFound: (keyword) => `Không tìm thấy hoá đơn "${keyword}"`,
+  loadErrorLabel: 'Không tải được hoá đơn',
+  searchErrorLabel: 'Không tìm được hoá đơn',
+  recent: () => receiptOptions({ pageSize: 10 }),
+  search: (keyword) => receiptOptions({ keyword, pageSize: 5 }),
+  load: (id) => getSalesOrderReceipt(id),
+};
+
 type Props = {
   content: string;
   settings: ReceiptTemplateSettings;
-  sample: ISalesOrderReceipt;
+  sample: PrintSource;
+  /** Nguồn hoá đơn / phiếu thật để xem trước (mặc định: hoá đơn). */
+  source?: PreviewDataSource;
   /** Bề rộng tối đa của trang xem trước (px); khung hẹp hơn thì thu nhỏ theo khung. */
   maxWidthPx?: number;
   /** Gọi mỗi khi dựng xong — trang chủ dùng để "In thử" đúng bản đang xem. */
@@ -48,12 +91,13 @@ export function ReceiptTemplatePreview({
   content,
   settings,
   sample,
+  source: data = RECEIPT_PREVIEW_SOURCE,
   maxWidthPx = 420,
   onRendered,
 }: Props) {
   const [source, setSource] = useState(SAMPLE);
-  const [orders, setOrders] = useState<ISalesOrder[] | null>(null);
-  const [receipt, setReceipt] = useState<ISalesOrderReceipt>(sample);
+  const [orders, setOrders] = useState<PreviewOption[] | null>(null);
+  const [receipt, setReceipt] = useState<PrintSource>(sample);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [rendered, setRendered] = useState<RenderedReceiptTemplate | null>(null);
   const [busy, setBusy] = useState(false);
@@ -80,14 +124,13 @@ export function ReceiptTemplatePreview({
     const keyword = code.trim();
     if (!keyword || searching) return;
     setSearching(true);
-    getAllSalesOrders({ keyword, pageNumber: 1, pageSize: 5 })
-      .then((page) => {
-        const items = page.items ?? [];
+    data
+      .search(keyword)
+      .then((items) => {
         const found =
-          items.find((order) => order.orderNumber?.toLowerCase() === keyword.toLowerCase()) ??
-          items[0];
+          items.find((order) => order.code.toLowerCase() === keyword.toLowerCase()) ?? items[0];
         if (!found) {
-          setLoadError(`Không tìm thấy hoá đơn "${keyword}"`);
+          setLoadError(data.notFound(keyword));
           return;
         }
         setOrders((current) =>
@@ -95,15 +138,16 @@ export function ReceiptTemplatePreview({
         );
         setSource(found.id);
       })
-      .catch((error) => setLoadError(apiErrorMessage(error, 'Không tìm được hoá đơn')))
+      .catch((error) => setLoadError(apiErrorMessage(error, data.searchErrorLabel)))
       .finally(() => setSearching(false));
   };
 
   // Danh sách hoá đơn gần đây chỉ tải khi mở ô chọn (nhân viên không có quyền xem hết thì chỉ còn dữ liệu mẫu).
   const loadOrders = () => {
     if (orders) return;
-    getAllSalesOrders({ pageNumber: 1, pageSize: 10 })
-      .then((page) => setOrders(page.items ?? []))
+    data
+      .recent()
+      .then(setOrders)
       .catch(() => setOrders([]));
   };
 
@@ -114,7 +158,8 @@ export function ReceiptTemplatePreview({
       return undefined;
     }
     let active = true;
-    getSalesOrderReceipt(source)
+    data
+      .load(source)
       .then((value) => {
         if (active) {
           setReceipt(value);
@@ -122,12 +167,12 @@ export function ReceiptTemplatePreview({
         }
       })
       .catch((error) => {
-        if (active) setLoadError(apiErrorMessage(error, 'Không tải được hoá đơn'));
+        if (active) setLoadError(apiErrorMessage(error, data.loadErrorLabel));
       });
     return () => {
       active = false;
     };
-  }, [source, sample]);
+  }, [source, sample, data]);
 
   useEffect(() => {
     let active = true;
@@ -170,24 +215,23 @@ export function ReceiptTemplatePreview({
         helperText={loadError ?? undefined}
         error={!!loadError}
       >
-        <MenuItem value={SAMPLE}>Hoá đơn mẫu</MenuItem>
+        <MenuItem value={SAMPLE}>{data.sampleLabel}</MenuItem>
         {orders === null && source === SAMPLE && (
           <MenuItem disabled value="__loading__">
-            Đang tải hoá đơn gần đây…
+            {data.recentLoadingLabel}
           </MenuItem>
         )}
         {(orders ?? []).map((order) => (
           <MenuItem key={order.id} value={order.id}>
-            {order.orderNumber}
-            {order.customerName ? ` · ${order.customerName}` : ''}
+            {order.label}
           </MenuItem>
         ))}
       </TextField>
 
       <TextField
         size="small"
-        label="Tìm hoá đơn theo mã"
-        placeholder="VD: HD081216"
+        label={data.searchLabel}
+        placeholder={data.searchPlaceholder}
         value={code}
         onChange={(event) => setCode(event.target.value)}
         onKeyDown={(event) => {
@@ -202,7 +246,7 @@ export function ReceiptTemplatePreview({
               <IconButton
                 size="small"
                 edge="end"
-                aria-label="Tìm hoá đơn"
+                aria-label={data.searchButtonLabel}
                 onClick={findByCode}
                 disabled={!code.trim() || searching}
               >
@@ -240,7 +284,7 @@ export function ReceiptTemplatePreview({
             }}
           >
             <iframe
-              title="Xem trước mẫu hoá đơn"
+              title={data.frameTitle}
               sandbox=""
               srcDoc={rendered.html}
               style={{

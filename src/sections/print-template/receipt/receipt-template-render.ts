@@ -8,13 +8,10 @@ import type { ISalesOrderReceipt } from 'src/types/corecms-api';
 
 import { isSafeLogoSrc, isSafeImageSrc, parseImageWidth } from '../print-image';
 
-import {
-  isItemField,
-  isPaymentField,
-  receiptItemValues,
-  receiptScalarValues,
-  receiptPaymentValues,
-} from './receipt-template-fields';
+import { isPrintDocument } from '../print-document';
+import { isItemField, isPaymentField, receiptDocument } from './receipt-template-fields';
+
+import type { PrintDocument } from '../print-document';
 import {
   contentWidthMm,
   RECEIPT_FONT_STACKS,
@@ -238,17 +235,20 @@ export function invoiceBarcodeSvg(code: string, maxWidthMm: number, heightMm = 1
   );
 }
 
-function blockValues(
-  receipt: ISalesOrderReceipt,
-  settings: ReceiptTemplateSettings
-): Record<string, string> {
+/** Dữ liệu in: phiếu thanh toán (GET /sales-orders/{id}/receipt) hoặc chứng từ đã đổi sẵn (phiếu nhập…). */
+export type PrintSource = ISalesOrderReceipt | PrintDocument;
+
+export const toPrintDocument = (source: PrintSource): PrintDocument =>
+  isPrintDocument(source) ? source : receiptDocument(source);
+
+function blockValues(doc: PrintDocument, settings: ReceiptTemplateSettings): Record<string, string> {
   const width = contentWidthMm(settings);
-  const cancelled = !!receipt.invoice.isCancelled;
-  const transfer = cancelled ? null : receipt.transferQr;
-  const code = (receipt.invoice.code ?? '').trim();
+  const { cancelled } = doc;
+  const transfer = cancelled ? null : doc.transferQrPayload;
+  const code = doc.code.trim();
   return {
     cancelled_banner: cancelled ? '<span class="cx">ĐÃ HUỶ</span>' : '',
-    transfer_qr: transfer ? (buildReceiptQr(transfer.payload, Math.min(38, width))?.svg ?? '') : '',
+    transfer_qr: transfer ? (buildReceiptQr(transfer, Math.min(38, width))?.svg ?? '') : '',
     invoice_qr: code ? (buildReceiptQr(code, Math.min(26, width))?.svg ?? '') : '',
     invoice_barcode: code ? invoiceBarcodeSvg(code, width) : '',
   };
@@ -389,16 +389,17 @@ export function sanitizeReceiptTemplateHtml(html: string): string {
 /** Phần thân phiếu đã trộn dữ liệu — chỉ còn thẻ an toàn và SVG do web dựng. */
 export function mergeReceiptTemplate(
   templateHtml: string,
-  receipt: ISalesOrderReceipt,
+  source: PrintSource,
   settingsInput: ReceiptTemplateSettings | string
 ): string {
+  const doc = toPrintDocument(source);
   const settings =
     typeof settingsInput === 'string' ? normalizeReceiptSettings(settingsInput) : settingsInput;
   const body = parseBody(templateHtml ?? '');
   sanitizeElement(body);
 
-  const scalars = receiptScalarValues(receipt);
-  const blocks = blockValues(receipt, settings);
+  const { scalars } = doc;
+  const blocks = blockValues(doc, settings);
   const global: Resolver = (key) => {
     if (key in blocks) return { html: blocks[key] };
     if (key in scalars) return { text: scalars[key] };
@@ -406,9 +407,9 @@ export function mergeReceiptTemplate(
     return { text: '' };
   };
 
-  fillStoreLogo(body, receipt.store?.logoUrl);
-  expandRepeats(body, isItemField, (receipt.lines ?? []).map(receiptItemValues), global);
-  expandRepeats(body, isPaymentField, (receipt.payments ?? []).map(receiptPaymentValues), global);
+  fillStoreLogo(body, doc.logoUrl);
+  expandRepeats(body, isItemField, doc.items, global);
+  expandRepeats(body, isPaymentField, doc.payments, global);
   fill(body, global);
   removeEmptyContainers(body);
   return body.innerHTML;
@@ -613,16 +614,17 @@ export type RenderedReceiptTemplate = { html: string; page: ReceiptTemplatePage 
  */
 export async function renderReceiptTemplate(
   template: { content: string; settings: string | ReceiptTemplateSettings },
-  receipt: ISalesOrderReceipt,
+  source: PrintSource,
   options: { measure?: MeasureHeight; title?: string } = {}
 ): Promise<RenderedReceiptTemplate> {
+  const doc = toPrintDocument(source);
   const settings =
     typeof template.settings === 'string'
       ? normalizeReceiptSettings(template.settings)
       : template.settings;
   const paper = RECEIPT_TEMPLATE_PAPERS[settings.paper];
-  const body = mergeReceiptTemplate(template.content, receipt, settings);
-  const title = options.title ?? `Hoá đơn ${(receipt.invoice.code ?? '').trim()}`.trim();
+  const body = mergeReceiptTemplate(template.content, doc, settings);
+  const title = options.title ?? doc.title;
 
   if (paper.heightMm !== null) {
     return {

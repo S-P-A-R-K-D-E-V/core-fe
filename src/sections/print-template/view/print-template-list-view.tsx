@@ -59,6 +59,7 @@ import type {
 } from 'src/types/print-template';
 
 import { sampleReceipt } from '../receipt/receipt-template-default';
+import { purchaseDocument, samplePurchasePrint } from '../purchase/purchase-template-fields';
 import { renderReceiptTemplate } from '../receipt/receipt-template-render';
 import { renderDesignSheetHtml } from '../label/label-design-render';
 import { parseLabelDesign, paperSummary } from '../label/label-design';
@@ -74,9 +75,9 @@ import {
 } from '../print-template-resolve';
 
 // ----------------------------------------------------------------------
-// Mẫu in: mỗi loại (hoá đơn / tem mã) một thẻ gồm
+// Mẫu in: mỗi loại (hoá đơn / phiếu nhập / tem mã) một thẻ gồm
 //  - "Đang áp dụng": hoá đơn là bảng kênh × phương thức thanh toán, mỗi ô chọn một mẫu hoặc để trống (theo ô rộng hơn:
-//    (kênh, *) → (*, phương thức) → (*, *) → mẫu hệ thống); tem mã chỉ có một mẫu mặc định;
+//    (kênh, *) → (*, phương thức) → (*, *) → mẫu hệ thống); phiếu nhập và tem mã chỉ có một mẫu mặc định;
 //  - danh sách mẫu: sửa, nhân bản, in thử với dữ liệu mẫu, xoá (ô đang dùng mẫu bị gỡ, in theo ô rộng hơn).
 // ----------------------------------------------------------------------
 
@@ -84,6 +85,14 @@ const CHANNEL_ROWS = [{ value: PRINT_ANY, label: 'Mọi kênh' }, ...PRINT_CHANN
 const METHOD_COLUMNS = [{ value: PRINT_ANY, label: 'Mọi phương thức' }, ...PRINT_PAYMENT_METHODS];
 
 const cellKey = (channel: string, method: string) => `${channel}|${method}`;
+
+const KIND_TABS: PrintTemplateKind[] = ['receipt', 'purchase', 'label'];
+
+const CREATE_LABEL: Record<PrintTemplateKind, string> = {
+  receipt: 'Tạo mẫu hoá đơn',
+  purchase: 'Tạo mẫu phiếu nhập',
+  label: 'Tạo mẫu tem',
+};
 
 const SAMPLE_LABELS = [
   {
@@ -179,7 +188,14 @@ export function PrintTemplateListView() {
       const html =
         template.kind === 'receipt'
           ? (await renderReceiptTemplate(template, sampleReceipt(brandName, logoUrl))).html
-          : renderDesignSheetHtml(
+          : template.kind === 'purchase'
+            ? (
+                await renderReceiptTemplate(
+                  template,
+                  purchaseDocument(samplePurchasePrint(brandName, logoUrl))
+                )
+              ).html
+            : renderDesignSheetHtml(
               { items: SAMPLE_LABELS, context: { storeName: brandName, logoUrl } },
               parseLabelDesign(template.content),
               DEFAULT_CALIBRATION
@@ -217,8 +233,8 @@ export function PrintTemplateListView() {
         <Box sx={{ flexGrow: 1 }}>
           <Typography variant="h4">Mẫu in</Typography>
           <Typography variant="body2" color="text.secondary">
-            Soạn mẫu hoá đơn và tem mã của cửa hàng; chọn mẫu dùng cho từng kênh bán và phương thức
-            thanh toán. Chưa chọn mẫu nào thì in bằng mẫu hệ thống như trước.
+            Soạn mẫu hoá đơn, phiếu nhập hàng và tem mã của cửa hàng; chọn mẫu dùng cho từng kênh bán và
+            phương thức thanh toán. Chưa chọn mẫu nào thì in bằng mẫu hệ thống như trước.
           </Typography>
         </Box>
         <Button
@@ -227,12 +243,12 @@ export function PrintTemplateListView() {
           href={paths.dashboard.storeSettings.printTemplateNew(kind)}
           startIcon={<Iconify icon="mingcute:add-line" />}
         >
-          {kind === 'receipt' ? 'Tạo mẫu hoá đơn' : 'Tạo mẫu tem'}
+          {CREATE_LABEL[kind]}
         </Button>
       </Stack>
 
       <Tabs value={kind} onChange={(_, next) => setKind(next)} sx={{ mb: 3 }}>
-        {(['receipt', 'label'] as PrintTemplateKind[]).map((value) => (
+        {KIND_TABS.map((value) => (
           <Tab
             key={value}
             value={value}
@@ -259,7 +275,12 @@ export function PrintTemplateListView() {
           {kind === 'receipt' ? (
             <ReceiptAssignmentsCard key={snapshotKey(data, 'receipt')} data={data} onSaved={load} />
           ) : (
-            <LabelDefaultCard key={snapshotKey(data, 'label')} data={data} onSaved={load} />
+            <DefaultTemplateCard
+              key={`${kind}:${snapshotKey(data, kind)}`}
+              kind={kind}
+              data={data}
+              onSaved={load}
+            />
           )}
 
           <Card>
@@ -564,18 +585,46 @@ function ReceiptAssignmentsCard({
   );
 }
 
-function LabelDefaultCard({
+const DEFAULT_CARD_TEXT: Record<
+  Exclude<PrintTemplateKind, 'receipt'>,
+  { title: string; subheader: string; field: string; none: string; empty: string; saved: string }
+> = {
+  label: {
+    title: 'Mẫu tem đang áp dụng',
+    subheader:
+      'Mẫu được chọn sẵn khi bấm “In tem mã”; người in vẫn đổi được sang mẫu khác hoặc khổ giấy hệ thống.',
+    field: 'Mẫu tem mặc định',
+    none: 'Khổ giấy hệ thống (chọn khi in)',
+    empty: 'Tạo mẫu tem trước rồi chọn ở đây.',
+    saved: 'Đã lưu mẫu tem mặc định',
+  },
+  purchase: {
+    title: 'Mẫu phiếu nhập đang áp dụng',
+    subheader:
+      'Mẫu được chọn sẵn khi bấm “In phiếu” ở phiếu nhập hàng; người in vẫn đổi được sang mẫu khác hoặc mẫu hệ thống.',
+    field: 'Mẫu phiếu nhập mặc định',
+    none: 'Mẫu hệ thống (A4)',
+    empty: 'Tạo mẫu phiếu nhập trước rồi chọn ở đây.',
+    saved: 'Đã lưu mẫu phiếu nhập mặc định',
+  },
+};
+
+/** Loại chỉ có một ô áp dụng (*, *): tem mã, phiếu nhập. */
+function DefaultTemplateCard({
+  kind,
   data,
   onSaved,
 }: {
+  kind: Exclude<PrintTemplateKind, 'receipt'>;
   data: IPrintTemplateList;
   onSaved: () => Promise<void>;
 }) {
   const { enqueueSnackbar } = useSnackbar();
-  const templates = data.templates.filter((t) => t.kind === 'label');
+  const text = DEFAULT_CARD_TEXT[kind];
+  const templates = data.templates.filter((t) => t.kind === kind);
   const initial =
     data.assignments.find(
-      (a) => a.kind === 'label' && a.channel === PRINT_ANY && a.paymentMethod === PRINT_ANY
+      (a) => a.kind === kind && a.channel === PRINT_ANY && a.paymentMethod === PRINT_ANY
     )?.templateId ?? '';
   const [value, setValue] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -584,10 +633,10 @@ function LabelDefaultCard({
     setSaving(true);
     try {
       await setPrintTemplateAssignments(
-        'label',
+        kind,
         value ? [{ channel: PRINT_ANY, paymentMethod: PRINT_ANY, templateId: value }] : []
       );
-      enqueueSnackbar('Đã lưu mẫu tem mặc định');
+      enqueueSnackbar(text.saved);
       await onSaved();
     } catch (saveError) {
       enqueueSnackbar(apiErrorMessage(saveError, 'Lưu thất bại'), { variant: 'error' });
@@ -598,10 +647,7 @@ function LabelDefaultCard({
 
   return (
     <Card>
-      <CardHeader
-        title="Mẫu tem đang áp dụng"
-        subheader="Mẫu được chọn sẵn khi bấm “In tem mã”; người in vẫn đổi được sang mẫu khác hoặc khổ giấy hệ thống."
-      />
+      <CardHeader title={text.title} subheader={text.subheader} />
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         spacing={2}
@@ -611,17 +657,17 @@ function LabelDefaultCard({
         <TextField
           select
           size="small"
-          label="Mẫu tem mặc định"
+          label={text.field}
           value={value}
           onChange={(event) => setValue(event.target.value)}
           SelectProps={{ displayEmpty: true }}
           InputLabelProps={{ shrink: true }}
           sx={{ minWidth: 320 }}
           disabled={templates.length === 0}
-          helperText={templates.length === 0 ? 'Tạo mẫu tem trước rồi chọn ở đây.' : undefined}
+          helperText={templates.length === 0 ? text.empty : undefined}
         >
           <MenuItem value="">
-            <em>Khổ giấy hệ thống (chọn khi in)</em>
+            <em>{text.none}</em>
           </MenuItem>
           {templates.map((template) => (
             <MenuItem key={template.id} value={template.id}>

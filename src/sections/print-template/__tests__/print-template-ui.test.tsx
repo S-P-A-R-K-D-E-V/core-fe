@@ -55,6 +55,11 @@ vi.mock('src/api/sales-orders', () => ({
   getSalesOrderReceipt: vi.fn(),
 }));
 
+vi.mock('src/api/purchase-orders', () => ({
+  getAllPurchaseOrders: vi.fn().mockResolvedValue({ items: [] }),
+  getPurchaseOrderPrint: vi.fn(),
+}));
+
 const uploadTemplateImage = vi.fn();
 vi.mock('../print-image-upload', () => ({
   uploadTemplateImage: (...args: any[]) => uploadTemplateImage(...args),
@@ -337,7 +342,72 @@ describe('PrintTemplateListView', () => {
   });
 });
 
+describe('PrintTemplateListView — phiếu nhập', () => {
+  it('thẻ Phiếu nhập: chọn mẫu mặc định rồi lưu ô (*, *) của loại purchase', async () => {
+    api.getPrintTemplates.mockResolvedValue({
+      templates: [
+        {
+          id: 'p1',
+          kind: 'purchase',
+          name: 'Phiếu nhập A4',
+          content: '<p>{{supplier_name}}</p>',
+          settings: '{"paper":"A4"}',
+          createdAt: '2026-11-14T00:00:00Z',
+          updatedAt: null,
+        },
+      ],
+      assignments: [],
+    });
+    api.setPrintTemplateAssignments.mockResolvedValue([]);
+    const user = userEvent.setup();
+    wrap(<PrintTemplateListView />);
+
+    await user.click(await screen.findByRole('tab', { name: 'Phiếu nhập (1)' }));
+    expect(screen.getByText('Mẫu phiếu nhập đang áp dụng')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Tạo mẫu phiếu nhập/ })).toHaveAttribute(
+      'href',
+      '/dashboard/store-settings/print-templates/new?kind=purchase'
+    );
+
+    await user.click(screen.getByRole('combobox', { name: 'Mẫu phiếu nhập mặc định' }));
+    await user.click(await screen.findByRole('option', { name: 'Phiếu nhập A4' }));
+    const card = screen
+      .getByText('Mẫu phiếu nhập đang áp dụng')
+      .closest('.MuiCard-root') as HTMLElement;
+    await user.click(within(card).getByRole('button', { name: 'Lưu' }));
+
+    await waitFor(() =>
+      expect(api.setPrintTemplateAssignments).toHaveBeenCalledWith('purchase', [
+        { channel: '*', paymentMethod: '*', templateId: 'p1' },
+      ])
+    );
+  });
+});
+
 describe('PrintTemplateEditView', () => {
+  it('mẫu phiếu nhập mới: khối của phiếu nhập, bắt đầu từ A4; Tạo mẫu gửi loại purchase', async () => {
+    api.createPrintTemplate.mockResolvedValue({ id: 'pn-id', kind: 'purchase' });
+    const user = userEvent.setup();
+    wrap(<PrintTemplateEditView id="new" kind="purchase" />);
+
+    expect(await screen.findByTitle('Xem trước mẫu phiếu nhập')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Thêm khối Thông tin phiếu nhập' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Thêm khối Chữ ký' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Thêm khối Thông tin hoá đơn' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Thêm khối QR chuyển khoản' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Tạo mẫu' }));
+    await waitFor(() => expect(api.createPrintTemplate).toHaveBeenCalledTimes(1));
+    const [kind, payload] = api.createPrintTemplate.mock.calls[0];
+    expect(kind).toBe('purchase');
+    expect(payload.name).toBe('Phiếu nhập A4');
+    const settings = JSON.parse(payload.settings);
+    expect(settings.paper).toBe('A4');
+    expect(settings.blocks.items.map((b: any) => b.type)).toContain('signatures');
+    expect(payload.content).toContain('{{supplier_name}}');
+    expect(payload.content).toContain('{{item_name}}');
+  });
+
   it('mẫu hoá đơn mới bắt đầu từ mẫu chuẩn; Tạo mẫu gửi HTML + thiết lập rồi chuyển sang trang của mẫu', async () => {
     api.createPrintTemplate.mockResolvedValue({ id: 'new-id', kind: 'receipt' });
     const user = userEvent.setup();

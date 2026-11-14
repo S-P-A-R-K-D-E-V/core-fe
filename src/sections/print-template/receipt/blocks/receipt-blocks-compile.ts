@@ -4,7 +4,17 @@ import { isSafeImageSrc } from '../../print-image';
 import { KEEP_CLASS, RULE_CLASSES, STORE_LOGO_CLASS } from '../receipt-template-render';
 
 import type { ReceiptTemplateSettings } from '../receipt-template-settings';
-import type { BlockOf, InfoRow, StoreLine, TotalRow, ItemsLayout, ReceiptBlock, TransferLine } from './receipt-blocks';
+import type {
+  BlockOf,
+  InfoRow,
+  StoreLine,
+  TotalRow,
+  ItemsLayout,
+  ReceiptBlock,
+  TransferLine,
+  PurchaseInfoRow,
+  PurchaseTotalRow,
+} from './receipt-blocks';
 
 // ----------------------------------------------------------------------
 // Khối → HTML `{{ma}}` đúng dialect của mẫu soạn tự do (receipt-template-render.ts): chỉ đoạn, <strong>/<em>, bảng, <hr>,
@@ -96,6 +106,30 @@ const TOTAL_FIELDS: Record<Exclude<TotalRow, 'inWords' | 'payments'>, [string, s
   cashTendered: ['Tiền khách đưa', '{{cash_tendered}}'],
   changeDue: ['Tiền thừa trả khách', '{{change_due}}'],
   remaining: ['Còn phải trả', '{{remaining}}'],
+  itemCount: ['Số mặt hàng', '{{item_count}}'],
+  totalQuantity: ['Tổng số lượng', '{{total_quantity}}'],
+};
+
+const PURCHASE_INFO_FIELDS: Record<PurchaseInfoRow, string> = {
+  code: 'Mã phiếu: <strong>{{purchase_code}}</strong>',
+  date: 'Ngày nhập: <strong>{{purchase_date}}</strong>',
+  supplier: 'Nhà cung cấp: <strong>{{supplier_name}}</strong>',
+  supplierCode: 'Mã NCC: {{supplier_code}}',
+  supplierPhone: 'SĐT NCC: {{supplier_phone}}',
+  supplierAddress: 'Địa chỉ NCC: {{supplier_address}}',
+  warehouse: 'Kho nhập: {{warehouse_name}}',
+  createdBy: 'Người nhập: {{created_by}}',
+  status: 'Trạng thái: {{purchase_status}}',
+  note: '<em>Ghi chú: {{purchase_note}}</em>',
+};
+
+const PURCHASE_TOTAL_FIELDS: Record<Exclude<PurchaseTotalRow, 'inWords'>, [string, string]> = {
+  subtotal: ['Tổng tiền hàng', '{{subtotal}}'],
+  discount: ['Giảm giá', '{{discount_total}}'],
+  vat: ['Thuế VAT', '{{vat_total}}'],
+  total: ['Cần trả NCC', '{{total}}'],
+  paid: ['Đã trả NCC', '{{paid_to_supplier}}'],
+  debt: ['Còn nợ NCC', '{{supplier_debt}}'],
   itemCount: ['Số mặt hàng', '{{item_count}}'],
   totalQuantity: ['Tổng số lượng', '{{total_quantity}}'],
 };
@@ -199,6 +233,40 @@ function compileTotals(block: BlockOf<'totals'>, ctx: Ctx): string {
   return table(rows);
 }
 
+function compilePurchaseTotals(block: BlockOf<'purchaseTotals'>, ctx: Ctx): string {
+  const rows: string[] = [];
+  (Object.keys(block.rows) as PurchaseTotalRow[]).forEach((key) => {
+    if (!block.rows[key]) return;
+    if (key === 'inWords') {
+      rows.push(row(block, cell(block, ctx, '<em>Bằng chữ: {{total_in_words}}</em>', { colspan: 2 })));
+      return;
+    }
+    const [label, value] = PURCHASE_TOTAL_FIELDS[key];
+    const emphasis = key === 'total' && block.emphasizeTotal;
+    const bold = emphasis || key === 'debt' ? true : undefined;
+    const extraSize = emphasis ? 2 : 0;
+    rows.push(
+      row(
+        block,
+        cell(block, ctx, label, { bold, extraSize }) + cell(block, ctx, value, { align: 'right', bold, extraSize })
+      )
+    );
+  });
+  return table(rows);
+}
+
+/** Hai cột chữ ký: tên vai trò, "(Ký, ghi rõ họ tên)", rồi vài dòng trống để ký. Luôn in (không có trường). */
+function compileSignatures(block: BlockOf<'signatures'>, ctx: Ctx): string {
+  const sides = [block.left, block.right].map((value) => value.trim()).filter(Boolean);
+  if (!sides.length) return '';
+  const center = (inner: string, extraSize = 0, bold?: boolean) =>
+    cell(block, ctx, inner, { align: 'center', extraSize, bold });
+  const rows = [`<tr class="${KEEP_CLASS}">${sides.map((side) => center(blockText(side), 0, true)).join('')}</tr>`];
+  if (block.showNote)
+    rows.push(`<tr class="${KEEP_CLASS}">${sides.map(() => center('<em>(Ký, ghi rõ họ tên)</em>', -1.5, false)).join('')}</tr>`);
+  return table(rows) + '<p></p>'.repeat(Math.min(8, Math.max(1, block.lines)));
+}
+
 function compilePayments(block: BlockOf<'payments'>, ctx: Ctx): string {
   const rows = [
     `<tr>${cell(block, ctx, '{{payment_method}}')}${cell(block, ctx, '{{payment_amount}}', { align: 'right' })}</tr>`,
@@ -264,6 +332,15 @@ export function compileBlock(block: ReceiptBlock, ctx: Ctx): string {
         (block.showFooter ? para(block, ctx, '{{footer}}') : '') +
         (block.showPrintedAt ? para(block, ctx, 'In lúc {{printed_at}}', { extraSize: -1.5, bold: false }) : '')
       );
+    case 'purchaseInfo':
+      return (Object.keys(PURCHASE_INFO_FIELDS) as PurchaseInfoRow[])
+        .filter((key) => block.rows[key])
+        .map((key) => para(block, ctx, PURCHASE_INFO_FIELDS[key]))
+        .join('');
+    case 'purchaseTotals':
+      return compilePurchaseTotals(block, ctx);
+    case 'signatures':
+      return compileSignatures(block, ctx);
     default:
       return '';
   }

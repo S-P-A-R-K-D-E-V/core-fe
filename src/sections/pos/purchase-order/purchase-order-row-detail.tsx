@@ -31,6 +31,7 @@ import { ConfirmDialog } from 'src/components/custom-dialog';
 import { IShareholder, IPurchaseOrder, IPurchaseOrderCapabilities } from 'src/types/corecms-api';
 import { cancelPurchaseOrder, completePurchaseOrder } from 'src/api/purchase-orders';
 
+import { PurchaseOrderPrintButton } from './purchase-order-print';
 import { lockedByPaidBy, type PurchaseAccess } from './purchase-access';
 import { purchaseStatusMeta, purchaseSubTotal, receivedQuantityOf } from './purchase-status';
 
@@ -308,6 +309,7 @@ export default function PurchaseOrderRowDetail({ order, access, capabilities, on
             Sửa
           </Button>
         )}
+        <PurchaseOrderPrintButton orderId={order.id} orderNumber={order.orderNumber} />
         <Button
           variant={canComplete ? 'outlined' : 'contained'}
           startIcon={<Iconify icon="solar:square-top-down-outline" />}

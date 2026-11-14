@@ -5,6 +5,8 @@ import type {
 } from 'src/types/corecms-api';
 
 import { moneyInWords } from '../money-words';
+
+import type { PrintDocument } from '../print-document';
 import { formatReceiptMoney, formatReceiptQuantity } from '../../pos/receipt-print/receipt-html';
 
 // ----------------------------------------------------------------------
@@ -24,14 +26,23 @@ export type ReceiptFieldGroup =
   | 'transfer'
   | 'code';
 
-export type ReceiptFieldDef = {
+/** Một trường trộn của một loại chứng từ (hoá đơn, phiếu nhập…). */
+export type PrintFieldDef<G extends string = string> = {
   key: string;
   label: string;
-  group: ReceiptFieldGroup;
+  group: G;
   /** Ghi chú ngắn trong bảng trường. */
   hint?: string;
   /** Trường hình / khung (mã QR, mã vạch, dấu đã huỷ). */
   block?: boolean;
+};
+
+export type ReceiptFieldDef = PrintFieldDef<ReceiptFieldGroup>;
+
+/** Bộ trường của một loại chứng từ: nhóm (theo thứ tự hiện) + trường. */
+export type PrintFieldSet = {
+  groups: { key: string; label: string; hint?: string }[];
+  fields: PrintFieldDef[];
 };
 
 export const RECEIPT_FIELD_GROUPS: { key: ReceiptFieldGroup; label: string; hint?: string }[] = [
@@ -143,6 +154,8 @@ export const RECEIPT_FIELDS: ReceiptFieldDef[] = [
   },
 ];
 
+export const RECEIPT_FIELD_SET: PrintFieldSet = { groups: RECEIPT_FIELD_GROUPS, fields: RECEIPT_FIELDS };
+
 export const RECEIPT_FIELD_KEYS = new Set(RECEIPT_FIELDS.map((field) => field.key));
 
 export const BLOCK_FIELD_KEYS = new Set(
@@ -188,25 +201,35 @@ function changeOf(receipt: ISalesOrderReceipt): { tendered: number; change: numb
   return payments.length > 0 && change > 0 && !(totals.remaining > 0) ? { tendered, change } : null;
 }
 
-/** Giá trị chữ của các trường không lặp (trường khối không có ở đây — xem receipt-template-render). */
-export function receiptScalarValues(receipt: ISalesOrderReceipt): Record<string, string> {
-  const { store, branch, invoice, totals, transferQr } = receipt;
-  const lines = receipt.lines ?? [];
-  const payments = receipt.payments ?? [];
-  const cancelled = !!invoice.isCancelled;
+/** Đầu cửa hàng (chung mọi chứng từ): chi nhánh trùng tên cửa hàng thì bỏ; địa chỉ / ĐT ưu tiên của chi nhánh. */
+export function storeScalarValues(
+  store: Pick<ISalesOrderReceipt['store'], 'name' | 'address' | 'phone' | 'taxCode'> | null | undefined,
+  branch: ISalesOrderReceipt['branch'] | null | undefined
+): Record<string, string> {
   const storeName = clean(store?.name);
   const branchName = clean(branch?.name);
-  const change = changeOf(receipt);
-  const transfer = cancelled ? null : transferQr;
-  const otherCharges = totals.total > totals.subTotal ? totals.total - totals.subTotal : 0;
-  const totalQuantity = lines.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0);
-
   return {
     store_name: storeName,
     branch_name: branchName && branchName !== storeName ? branchName : '',
     store_address: clean(branch?.address) || clean(store?.address),
     store_phone: clean(branch?.phone) || clean(store?.phone),
     store_tax_code: clean(store?.taxCode),
+  };
+}
+
+/** Giá trị chữ của các trường không lặp (trường khối không có ở đây — xem receipt-template-render). */
+export function receiptScalarValues(receipt: ISalesOrderReceipt): Record<string, string> {
+  const { store, branch, invoice, totals, transferQr } = receipt;
+  const lines = receipt.lines ?? [];
+  const payments = receipt.payments ?? [];
+  const cancelled = !!invoice.isCancelled;
+  const change = changeOf(receipt);
+  const transfer = cancelled ? null : transferQr;
+  const otherCharges = totals.total > totals.subTotal ? totals.total - totals.subTotal : 0;
+  const totalQuantity = lines.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0);
+
+  return {
+    ...storeScalarValues(store, branch),
 
     invoice_title: clean(receipt.title) || 'PHIẾU THANH TOÁN',
     invoice_code: clean(invoice.code),
@@ -266,5 +289,21 @@ export function receiptPaymentValues(payment: ISalesOrderReceiptPayment): Record
     payment_amount: formatReceiptMoney(payment.amount),
     payment_reference: clean(payment.reference),
     payment_time: clean(payment.paidAtLocal),
+  };
+}
+
+/** Phiếu thanh toán → chứng từ chung để trộn vào mẫu. */
+export function receiptDocument(receipt: ISalesOrderReceipt): PrintDocument {
+  const code = clean(receipt.invoice?.code);
+  const cancelled = !!receipt.invoice?.isCancelled;
+  return {
+    title: `Hoá đơn ${code}`.trim(),
+    code,
+    cancelled,
+    logoUrl: receipt.store?.logoUrl ?? null,
+    scalars: receiptScalarValues(receipt),
+    items: (receipt.lines ?? []).map(receiptItemValues),
+    payments: (receipt.payments ?? []).map(receiptPaymentValues),
+    transferQrPayload: cancelled ? null : (receipt.transferQr?.payload ?? null),
   };
 }

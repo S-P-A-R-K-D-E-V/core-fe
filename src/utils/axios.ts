@@ -833,6 +833,7 @@ export const endpoints = {
     receive: (id: string) => `/purchase-orders/${id}/receive`,
     cancel: (id: string) => `/purchase-orders/${id}/cancel`,
     paidBy: (id: string) => `/purchase-orders/${id}/paid-by`,
+    print: (id: string) => `/purchase-orders/${id}/print`,
     draft: '/purchase-orders/draft',
     capabilities: '/purchase-orders/capabilities',
     complete: '/purchase-orders/complete',

@@ -5,7 +5,8 @@
 // Mẫu đang áp dụng: ô kênh × phương thức thanh toán ("*" = mọi), ô (*, *) là mặc định; tem chỉ có ô (*, *).
 // ----------------------------------------------------------------------
 
-export type PrintTemplateKind = 'receipt' | 'label';
+/** receipt = hoá đơn, label = tem mã, purchase = phiếu nhập hàng (HTML `{{ma}}` như hoá đơn, chỉ ô mặc định). */
+export type PrintTemplateKind = 'receipt' | 'label' | 'purchase';
 
 /** Kênh in hoá đơn — cùng bộ mã với core-be (PrintTemplateRules.ReceiptChannels). */
 export type PrintChannel = 'pos' | 'fnb' | 'online';

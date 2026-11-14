@@ -9,6 +9,7 @@ import {
   ICompletePurchaseOrderRequest,
   ICompletePurchaseOrderResponse,
 } from 'src/types/corecms-api';
+import type { IPurchaseOrderPrint } from 'src/types/purchase-print';
 
 // ----------------------------------------------------------------------
 
@@ -25,6 +26,12 @@ export async function getAllPurchaseOrders(params?: {
   keyword?: string;
 }): Promise<IPurchaseOrderPagedResponse> {
   const response = await axios.get<IPurchaseOrderPagedResponse>(endpoints.purchaseOrders.list, { params });
+  return response.data;
+}
+
+/** Phiếu nhập để in (đầu cửa hàng, NCC, dòng hàng, tổng, đã trả / còn nợ) — quyền purchase.read. */
+export async function getPurchaseOrderPrint(id: string): Promise<IPurchaseOrderPrint> {
+  const response = await axios.get<IPurchaseOrderPrint>(endpoints.purchaseOrders.print(id));
   return response.data;
 }
 

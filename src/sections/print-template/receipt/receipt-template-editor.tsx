@@ -46,13 +46,9 @@ import { TemplateImage } from './template-image-node';
 import { Column, Columns, COLUMN_LAYOUTS } from './columns-node';
 import { receiptTemplateContentCss } from './receipt-template-render';
 import { RECEIPT_TEMPLATE_PAPERS } from './receipt-template-settings';
-import {
-  RECEIPT_FIELDS,
-  isItemField,
-  isPaymentField,
-  RECEIPT_FIELD_GROUPS,
-} from './receipt-template-fields';
+import { isItemField, isPaymentField, RECEIPT_FIELD_SET } from './receipt-template-fields';
 
+import type { PrintFieldSet } from './receipt-template-fields';
 import type { ReceiptTemplateSettings } from './receipt-template-settings';
 
 // ----------------------------------------------------------------------
@@ -72,14 +68,14 @@ const IMAGE_WIDTH_PRESETS = [25, 40, 50, 75, 100];
 
 const PX_PER_MM = 96 / 25.4;
 
-const LABELS = new Map(
-  RECEIPT_FIELDS.map((field) => [
-    field.key,
-    `${isItemField(field.key) || isPaymentField(field.key) ? '⟳ ' : ''}${field.block ? '▦ ' : ''}${field.label}`,
-  ])
-);
-
-const resolveChip = (key: string) => ({ text: LABELS.get(key) ?? key, unknown: !LABELS.has(key) });
+/** Nhãn thẻ trường: ⟳ = trường lặp, ▦ = trường hình. */
+const chipLabels = (fieldSet: PrintFieldSet) =>
+  new Map(
+    fieldSet.fields.map((field) => [
+      field.key,
+      `${isItemField(field.key) || isPaymentField(field.key) ? '⟳ ' : ''}${field.block ? '▦ ' : ''}${field.label}`,
+    ])
+  );
 
 const cell = (inner: string, tag: 'td' | 'th' = 'td', attrs = '') =>
   `<${tag}${attrs}><p>${inner}</p></${tag}>`;
@@ -441,11 +437,15 @@ const PALETTE_ITEM_SX = (disabled?: boolean) => ({
 
 /** Bảng trường: tìm, kéo thả vào tờ phiếu hoặc bấm để chèn ở con trỏ. */
 function FieldPalette({
+  fieldSet,
+  labels,
   onInsert,
   onInsertLogo,
   onPickImage,
   disabled,
 }: {
+  fieldSet: PrintFieldSet;
+  labels: Map<string, string>;
   onInsert: (key: string) => void;
   onInsertLogo: () => void;
   onPickImage: () => void;
@@ -530,8 +530,8 @@ function FieldPalette({
             </Stack>
           </Box>
         )}
-        {RECEIPT_FIELD_GROUPS.map((group) => {
-          const fields = RECEIPT_FIELDS.filter(
+        {fieldSet.groups.map((group) => {
+          const fields = fieldSet.fields.filter(
             (field) =>
               field.group === group.key &&
               (!needle || field.label.toLowerCase().includes(needle) || field.key.includes(needle))
@@ -574,7 +574,7 @@ function FieldPalette({
                     />
                     <Box sx={{ minWidth: 0 }}>
                       <Typography variant="body2" sx={{ lineHeight: 1.4 }}>
-                        {LABELS.get(field.key)}
+                        {labels.get(field.key)}
                       </Typography>
                       {field.hint && (
                         <Typography variant="caption" component="div" color="text.disabled">
@@ -602,6 +602,8 @@ type Props = {
   /** Logo hiện tại của cửa hàng — hiện trên ảnh logo trong trình soạn. */
   logoUrl?: string | null;
   disabled?: boolean;
+  /** Bộ trường của loại chứng từ (mặc định: hoá đơn). Đổi bộ trường cần dựng lại trình soạn (key). */
+  fieldSet?: PrintFieldSet;
 };
 
 export function ReceiptTemplateEditor({
@@ -611,9 +613,14 @@ export function ReceiptTemplateEditor({
   zoom,
   logoUrl,
   disabled,
+  fieldSet = RECEIPT_FIELD_SET,
 }: Props) {
   const { enqueueSnackbar } = useSnackbar();
-  const resolve = useCallback((key: string) => resolveChip(key), []);
+  const labels = useMemo(() => chipLabels(fieldSet), [fieldSet]);
+  const resolve = useCallback(
+    (key: string) => ({ text: labels.get(key) ?? key, unknown: !labels.has(key) }),
+    [labels]
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(0);
   // editorProps được giữ từ lúc tạo trình soạn → gọi hàm mới nhất qua ref.
@@ -744,6 +751,8 @@ export function ReceiptTemplateEditor({
     >
       <Paper variant="outlined" sx={{ p: 1.5, position: { md: 'sticky' }, top: { md: 80 } }}>
         <FieldPalette
+          fieldSet={fieldSet}
+          labels={labels}
           onInsert={insertField}
           onInsertLogo={insertLogo}
           onPickImage={() => fileInputRef.current?.click()}

@@ -205,7 +205,7 @@ export const paths = {
       devices: `${ROOTS.DASHBOARD}/store-settings/devices`,
       // Mẫu in hoá đơn / tem mã và mẫu đang áp dụng theo kênh × phương thức thanh toán.
       printTemplates: `${ROOTS.DASHBOARD}/store-settings/print-templates`,
-      printTemplateNew: (kind: 'receipt' | 'label') => `${ROOTS.DASHBOARD}/store-settings/print-templates/new?kind=${kind}`,
+      printTemplateNew: (kind: 'receipt' | 'label' | 'purchase') => `${ROOTS.DASHBOARD}/store-settings/print-templates/new?kind=${kind}`,
       printTemplateEdit: (id: string) => `${ROOTS.DASHBOARD}/store-settings/print-templates/${id}`,
     },
     // Thanh toán (một mục quản lý): đối soát giao dịch ngân hàng / cổng với thanh toán, đơn online từ trang bán online,

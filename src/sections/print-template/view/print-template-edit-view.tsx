@@ -41,13 +41,20 @@ import { LabelDesigner } from '../label/label-designer';
 import { ReceiptTemplateEditor } from '../receipt/receipt-template-editor';
 import { ReceiptBlockEditor } from '../receipt/blocks/receipt-block-editor';
 import { compileReceiptBlocks } from '../receipt/blocks/receipt-blocks-compile';
+import { RECEIPT_FIELD_SET } from '../receipt/receipt-template-fields';
+import { ReceiptTemplatePreview } from '../receipt/receipt-template-preview';
+import { PURCHASE_PREVIEW_SOURCE } from '../purchase/purchase-preview-source';
 import {
+  BLOCK_STARTERS,
   starterBlocks,
   readReceiptBlocks,
   RECEIPT_BLOCKS_VERSION,
-  RECEIPT_BLOCK_STARTERS,
 } from '../receipt/blocks/receipt-blocks';
-import { ReceiptTemplatePreview } from '../receipt/receipt-template-preview';
+import {
+  purchaseDocument,
+  PURCHASE_FIELD_SET,
+  samplePurchasePrint,
+} from '../purchase/purchase-template-fields';
 import { renderDesignSheetHtml, snapDesignToDots } from '../label/label-design-render';
 import { sampleReceipt, defaultReceiptTemplate } from '../receipt/receipt-template-default';
 import { ReceiptTemplateSettingsPanel } from '../receipt/receipt-template-settings-panel';
@@ -58,7 +65,7 @@ import {
 } from '../receipt/receipt-template-settings';
 
 import type { LabelDesign } from '../label/label-design';
-import type { ReceiptBlock } from '../receipt/blocks/receipt-blocks';
+import type { ReceiptBlock, BlockDocumentKind } from '../receipt/blocks/receipt-blocks';
 import type { RenderedReceiptTemplate } from '../receipt/receipt-template-render';
 import type { ReceiptTemplateSettings } from '../receipt/receipt-template-settings';
 import type { DesignLabelSource, DesignPrintContext } from '../label/label-design-render';
@@ -110,13 +117,27 @@ type Draft = {
   design: LabelDesign;
 };
 
+const asKind = (value: string | undefined): PrintTemplateKind =>
+  value === 'label' || value === 'purchase' ? value : 'receipt';
+
+/** Hoá đơn / phiếu nhập soạn theo khối; tem mã có trình thiết kế riêng. */
+const blockKindOf = (kind: PrintTemplateKind): BlockDocumentKind =>
+  kind === 'purchase' ? 'purchase' : 'receipt';
+
+const NEW_NAMES: Record<PrintTemplateKind, string> = {
+  receipt: 'Hoá đơn giấy cuộn 80 mm',
+  purchase: 'Phiếu nhập A4',
+  label: 'Tem mã',
+};
+
 function initialDraft(kind: PrintTemplateKind): Draft {
   const receipt = defaultReceiptTemplate('80');
-  const starter = starterBlocks(RECEIPT_BLOCK_STARTERS[0].key);
+  const blockKind = blockKindOf(kind);
+  const starter = starterBlocks(BLOCK_STARTERS[blockKind][0].key, blockKind);
   return {
-    name: kind === 'receipt' ? 'Hoá đơn giấy cuộn 80 mm' : 'Tem mã',
+    name: NEW_NAMES[kind],
     html: receipt.content,
-    blocks: kind === 'receipt' ? starter.items : null,
+    blocks: kind === 'label' ? null : starter.items,
     receiptSettings: defaultReceiptSettings(starter.paper),
     design: defaultLabelDesign(),
   };
@@ -128,10 +149,10 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
   const { brandName, logoUrl } = useStoreBrand();
   const isNew = id === 'new';
 
-  const [kind, setKind] = useState<PrintTemplateKind>(kindParam === 'label' ? 'label' : 'receipt');
-  const [draft, setDraft] = useState<Draft>(() =>
-    initialDraft(kindParam === 'label' ? 'label' : 'receipt')
-  );
+  const [kind, setKind] = useState<PrintTemplateKind>(asKind(kindParam));
+  const [draft, setDraft] = useState<Draft>(() => initialDraft(asKind(kindParam)));
+  const blockKind = blockKindOf(kind);
+  const htmlKind = kind !== 'label';
   const [loading, setLoading] = useState(!isNew);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -147,16 +168,15 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
     getPrintTemplate(id)
       .then((template) => {
         if (!active) return;
+        const html = template.kind !== 'label';
         setKind(template.kind);
         setDraft({
           name: template.name,
-          html: template.kind === 'receipt' ? template.content : '',
-          blocks:
-            template.kind === 'receipt' ? (readReceiptBlocks(template.settings)?.items ?? null) : null,
-          receiptSettings:
-            template.kind === 'receipt'
-              ? normalizeReceiptSettings(template.settings)
-              : defaultReceiptSettings(),
+          html: html ? template.content : '',
+          blocks: html ? (readReceiptBlocks(template.settings)?.items ?? null) : null,
+          receiptSettings: html
+            ? normalizeReceiptSettings(template.settings)
+            : defaultReceiptSettings(),
           design:
             template.kind === 'label' ? parseLabelDesign(template.content) : defaultLabelDesign(),
         });
@@ -202,7 +222,13 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
     }),
     [brandName, logoUrl]
   );
-  const sample = useMemo(() => sampleReceipt(brandName, logoUrl), [brandName, logoUrl]);
+  const sample = useMemo(
+    () =>
+      kind === 'purchase'
+        ? purchaseDocument(samplePurchasePrint(brandName, logoUrl))
+        : sampleReceipt(brandName, logoUrl),
+    [kind, brandName, logoUrl]
+  );
 
   /** Nội dung sẽ lưu / in: HTML dịch từ khối, hoặc HTML soạn tự do. */
   const receiptContent = useMemo(
@@ -216,9 +242,9 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
   }, []);
 
   const applyStarter = (key: string) => {
-    const starter = RECEIPT_BLOCK_STARTERS.find((s) => s.key === key);
+    const starter = BLOCK_STARTERS[blockKind].find((s) => s.key === key);
     if (!starter) return;
-    const { paper, items } = starterBlocks(key);
+    const { paper, items } = starterBlocks(key, blockKind);
     change({ blocks: items, receiptSettings: defaultReceiptSettings(paper) });
   };
 
@@ -238,8 +264,7 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
       enqueueSnackbar('Nhập tên mẫu in', { variant: 'warning' });
       return;
     }
-    const payload =
-      kind === 'receipt'
+    const payload = htmlKind
         ? {
             name,
             content: receiptContent,
@@ -261,7 +286,7 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
         const updated = await updatePrintTemplate(id, payload);
         // Máy chủ lọc lại HTML — nạp bản đã lọc để trình soạn khớp với thứ sẽ in.
         // Soạn theo khối: nội dung luôn dịch lại từ khối nên không cần nạp.
-        if (updated.kind === 'receipt')
+        if (updated.kind !== 'label')
           setDraft((prev) => (prev.blocks ? prev : { ...prev, html: updated.content }));
         setDirty(false);
         enqueueSnackbar('Đã lưu mẫu in');
@@ -274,8 +299,7 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
   };
 
   const handleTestPrint = () => {
-    const html =
-      kind === 'receipt'
+    const html = htmlKind
         ? rendered?.html
         : renderDesignSheetHtml(
             { items: SAMPLE_LABEL_ITEMS, context: labelContext },
@@ -349,7 +373,7 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
           sx={{ flexGrow: 1, maxWidth: 420 }}
         />
         <Box sx={{ flexGrow: 1 }} />
-        {kind === 'receipt' && !draft.blocks && (
+        {htmlKind && !draft.blocks && (
           <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 180 }}>
             <Iconify icon="eva:search-fill" width={18} sx={{ color: 'text.disabled' }} />
             <Slider
@@ -384,7 +408,7 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
         </LoadingButton>
       </Stack>
 
-      {kind === 'receipt' ? (
+      {htmlKind ? (
         <Box
           display="grid"
           gap={2}
@@ -393,6 +417,7 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
         >
           {draft.blocks ? (
             <ReceiptBlockEditor
+              kind={blockKind}
               blocks={draft.blocks}
               onChange={onBlocksChange}
               onStarter={applyStarter}
@@ -400,6 +425,8 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
             />
           ) : (
             <ReceiptTemplateEditor
+              key={kind}
+              fieldSet={kind === 'purchase' ? PURCHASE_FIELD_SET : RECEIPT_FIELD_SET}
               value={draft.html}
               onChange={onHtmlChange}
               settings={draft.receiptSettings}
@@ -424,10 +451,11 @@ export function PrintTemplateEditView({ id, kind: kindParam }: Props) {
                 content={receiptContent}
                 settings={draft.receiptSettings}
                 sample={sample}
+                source={kind === 'purchase' ? PURCHASE_PREVIEW_SOURCE : undefined}
                 onRendered={setRendered}
               />
             </Box>
-            {!draft.blocks && (
+            {!draft.blocks && kind === 'receipt' && (
               <Button
                 size="small"
                 color="inherit"
