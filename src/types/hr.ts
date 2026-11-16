@@ -738,6 +738,28 @@ export interface IViolationRule {
   escalationSteps?: string | null;
   /** Đếm tái phạm trong ngần này tháng gần nhất (tính cả tháng xảy ra). */
   escalationWindowMonths?: number | null;
+  /** Số lần ghi tay 30 ngày qua. */
+  recentUseCount?: number;
+}
+
+/** Ảnh minh chứng của một lần ghi nhận; tự xoá sau 90 ngày (url = null, deleted = true). */
+export interface IViolationPhoto {
+  id: string;
+  /** Đường dẫn /media đã ký (ghép bằng getStorageUrl); null khi ảnh đã xoá. */
+  url?: string | null;
+  source: 'Camera' | 'Library';
+  expiresAt: string;
+  deleted: boolean;
+}
+
+/** Nhân viên để chọn khi ghi vi phạm (GET hr-violations/staff?date=). */
+export interface IViolationStaff {
+  userId: string;
+  fullName: string;
+  avatarUrl?: string | null;
+  onShiftNow: boolean;
+  shifts: { assignmentId: string; name?: string | null; start: string; end: string; checkedIn: boolean }[];
+  monthPoints: number;
 }
 
 export interface IViolationCatalog {
@@ -795,6 +817,8 @@ export interface IViolationEntry {
   escalationAction?: string | null;
   /** Ca để sửa chấm công; chỉ có ở lần tự ghi từ chấm công. */
   attendanceAssignmentId?: string | null;
+  /** Ảnh minh chứng (bản server cũ không có). */
+  photos?: IViolationPhoto[] | null;
 }
 
 /** Ca của một lần ghi nhận và giờ chấm hiện tại. */

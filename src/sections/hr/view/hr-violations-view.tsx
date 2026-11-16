@@ -49,8 +49,10 @@ import {
   resolveViolation,
   complainViolation,
   saveViolationRule,
+  getViolationStaff,
   getViolationCatalog,
   getViolationSummary,
+  removeViolationPhoto,
   saveViolationPolicy,
   archiveViolationRule,
 } from 'src/api/hr';
@@ -65,6 +67,7 @@ import type {
   IViolationShift,
   IViolationMonth,
   IViolationPolicy,
+  IViolationStaff,
   IViolationSummary,
   ViolationComponent,
   ViolationAutoSource,
@@ -73,6 +76,7 @@ import type {
 import { VIOLATION_STATUS_LABEL, VIOLATION_COMPONENT_LABEL, VIOLATION_AUTO_SOURCE_LABEL } from 'src/types/hr';
 
 import { MonthField, monthStart } from '../hr-common';
+import { ViolationPhotoThumbs, ViolationPhotoPicker, type DraftViolationPhoto } from '../violation-photos';
 
 // ----------------------------------------------------------------------
 // Vi phạm & điểm trừ: danh mục riêng của cửa hàng (Admin sửa), các lần ghi nhận (hệ thống tự ghi phần có dữ liệu chấm công /
@@ -378,7 +382,8 @@ function EntriesTable({
                 )}
               </TableCell>
               <TableCell sx={{ maxWidth: 320 }}>
-                <Typography variant="body2">{e.note || '—'}</Typography>
+                <Typography variant="body2">{e.note || (e.photos?.length ? '' : '—')}</Typography>
+                <ViolationPhotoThumbs photos={e.photos} />
                 <Typography variant="caption" color="text.secondary">
                   {e.isAuto ? 'Hệ thống tự ghi' : 'Quản lý ghi'}
                 </Typography>
@@ -897,6 +902,7 @@ function StoreViolations({
 
       {creating && (
         <CreateViolationDialog
+          canAddRule={canEditPolicy}
           onClose={() => setCreating(false)}
           onCreated={() => {
             setCreating(false);
@@ -938,16 +944,34 @@ function StoreViolations({
   );
 }
 
-function CreateViolationDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+type RuleOption = IViolationRule | { id: '__new__'; name: string };
+
+const NEW_RULE_GROUP = 'Khác';
+
+function CreateViolationDialog({
+  canAddRule,
+  onClose,
+  onCreated,
+}: {
+  /** hr.rule.manage: được thêm loại vi phạm mới ngay tại đây (lưu vào danh mục). */
+  canAddRule: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
   const { enqueueSnackbar } = useSnackbar();
   const [rules, setRules] = useState<IViolationRule[]>([]);
   const [policy, setPolicy] = useState<IViolationPolicy | null>(null);
   const [staff, setStaff] = useState<{ id: string; name: string }[]>([]);
   const [rule, setRule] = useState<IViolationRule | null>(null);
+  const [newRule, setNewRule] = useState<{ name: string; groupName: string; points: string; component: ViolationComponent } | null>(null);
+  const [ruleInput, setRuleInput] = useState('');
   const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
   const [date, setDate] = useState(today());
+  const [shifts, setShifts] = useState<IViolationStaff['shifts']>([]);
+  const [shiftId, setShiftId] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [note, setNote] = useState('');
+  const [photos, setPhotos] = useState<DraftViolationPhoto[]>([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -962,14 +986,65 @@ function CreateViolationDialog({ onClose, onCreated }: { onClose: () => void; on
       .catch(() => setStaff([]));
   }, []);
 
+  // Ca của người được chọn ngày đó (chỉ khi ghi một người).
+  const onePersonId = people.length === 1 ? people[0].id : null;
+  useEffect(() => {
+    setShiftId('');
+    setShifts([]);
+    if (!onePersonId || !date) return;
+    getViolationStaff(date)
+      .then((list) => {
+        const mine = list.find((s) => s.userId === onePersonId)?.shifts ?? [];
+        setShifts(mine);
+        if (mine.length === 1) setShiftId(mine[0].assignmentId);
+      })
+      .catch(() => setShifts([]));
+  }, [onePersonId, date]);
+
+  const groups = useMemo(() => [...new Set([...rules.map((r) => r.groupName), NEW_RULE_GROUP])], [rules]);
   const qty = Number(quantity);
-  const valid = !!rule && people.length > 0 && !!date && Number.isInteger(qty) && qty >= 1 && qty <= 50 && !!note.trim();
+  const newPoints = Number(newRule?.points);
+  const newRuleOk = !!newRule && !!newRule.name.trim() && Number.isInteger(newPoints) && newPoints >= 1 && newPoints <= 100;
+  const uploading = photos.filter((p) => p.status === 'uploading').length;
+  const photoKeys = photos.filter((p) => p.status === 'done' && p.objectKey).map((p) => p.objectKey!);
+  const valid =
+    (!!rule || newRuleOk) &&
+    people.length > 0 &&
+    !!date &&
+    Number.isInteger(qty) &&
+    qty >= 1 &&
+    qty <= 50 &&
+    uploading === 0 &&
+    !photos.some((p) => p.status === 'error') &&
+    (!!note.trim() || photoKeys.length > 0);
+  const effective = rule ?? (newRuleOk ? { points: newPoints, fineAmount: null } : null);
+
+  const close = () => {
+    photos.forEach((p) => {
+      if (p.photoId) removeViolationPhoto(p.photoId).catch(() => {});
+      URL.revokeObjectURL(p.previewUrl);
+    });
+    onClose();
+  };
 
   const submit = async () => {
-    if (!rule) return;
+    if (!valid) return;
     setBusy(true);
     try {
-      await createViolations({ ruleId: rule.id, userIds: people.map((p) => p.id), occurredOn: date, quantity: qty, note: note.trim() });
+      await createViolations({
+        ruleId: rule?.id ?? null,
+        newRule:
+          rule || !newRule
+            ? null
+            : { name: newRule.name.trim(), groupName: newRule.groupName, points: newPoints, component: newRule.component },
+        userIds: people.map((p) => p.id),
+        occurredOn: date,
+        quantity: qty,
+        note: note.trim(),
+        photoKeys,
+        shiftAssignmentId: onePersonId && shiftId ? shiftId : null,
+      });
+      photos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
       enqueueSnackbar('Đã ghi nhận — nhân viên được báo');
       onCreated();
     } catch (err) {
@@ -979,19 +1054,103 @@ function CreateViolationDialog({ onClose, onCreated }: { onClose: () => void; on
     }
   };
 
+  const options: RuleOption[] =
+    canAddRule && ruleInput.trim() && !rules.some((r) => r.name.trim().toLowerCase() === ruleInput.trim().toLowerCase())
+      ? [...rules, { id: '__new__', name: ruleInput.trim() }]
+      : rules;
+
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog open onClose={close} fullWidth maxWidth="sm">
       <DialogTitle>Ghi vi phạm</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <Autocomplete
-            options={rules}
-            groupBy={(r) => r.groupName}
-            getOptionLabel={(r) => `${r.name} (−${r.points})`}
+          <Autocomplete<RuleOption>
+            options={options}
+            groupBy={(r) => ('groupName' in r ? r.groupName : 'Thêm vào danh mục')}
+            getOptionLabel={(r) => ('groupName' in r ? `${r.name} (−${r.points})` : `＋ Thêm loại mới: «${r.name}»`)}
+            isOptionEqualToValue={(a, b) => a.id === b.id}
             value={rule}
-            onChange={(_, v) => setRule(v)}
-            renderInput={(params) => <TextField {...params} label="Hành vi" />}
+            inputValue={ruleInput}
+            onInputChange={(_, v, reason) => reason !== 'reset' && setRuleInput(v)}
+            onChange={(_, v) => {
+              if (v && !('groupName' in v)) {
+                setRule(null);
+                setNewRule({ name: v.name, groupName: NEW_RULE_GROUP, points: '2', component: 'Discipline' });
+                setRuleInput('');
+                return;
+              }
+              setRule(v);
+              if (v) setNewRule(null);
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Hành vi"
+                helperText={canAddRule ? 'Gõ tên lỗi chưa có để thêm loại mới vào danh mục' : undefined}
+              />
+            )}
           />
+          {newRule && !rule && (
+            <Card variant="outlined" sx={{ p: 2 }}>
+              <Stack spacing={1.5}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                  <Typography variant="subtitle2">Loại vi phạm mới (lưu vào danh mục)</Typography>
+                  <Button size="small" color="inherit" onClick={() => setNewRule(null)}>
+                    Huỷ
+                  </Button>
+                </Stack>
+                <TextField
+                  size="small"
+                  label="Tên"
+                  value={newRule.name}
+                  onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
+                  inputProps={{ maxLength: 400 }}
+                />
+                <Stack direction="row" spacing={1.5}>
+                  <TextField
+                    select
+                    size="small"
+                    label="Nhóm"
+                    value={newRule.groupName}
+                    onChange={(e) => setNewRule({ ...newRule, groupName: e.target.value })}
+                    sx={{ flex: 1 }}
+                  >
+                    {groups.map((g) => (
+                      <MenuItem key={g} value={g}>
+                        {g}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField
+                    size="small"
+                    type="number"
+                    label="Điểm trừ"
+                    value={newRule.points}
+                    onChange={(e) => setNewRule({ ...newRule, points: e.target.value })}
+                    inputProps={{ min: 1, max: 100 }}
+                    sx={{ width: 110 }}
+                  />
+                  <TextField
+                    select
+                    size="small"
+                    label="Thành phần"
+                    value={newRule.component}
+                    onChange={(e) => setNewRule({ ...newRule, component: e.target.value as ViolationComponent })}
+                    sx={{ width: 140 }}
+                  >
+                    <MenuItem value="Discipline">{VIOLATION_COMPONENT_LABEL.Discipline}</MenuItem>
+                    <MenuItem value="Reconciliation">{VIOLATION_COMPONENT_LABEL.Reconciliation}</MenuItem>
+                  </TextField>
+                </Stack>
+                <Typography variant="caption" color="text.secondary">
+                  {newRuleOk && (ruleMoney({ points: newPoints, fineAmount: null }, policy) ?? 0) > 0
+                    ? `= ${money(ruleMoney({ points: newPoints, fineAmount: null }, policy) ?? 0)} / lần, trừ vào lương. `
+                    : ''}
+                  Cờ mất thưởng, bậc tái phạm, tiền riêng: sửa sau ở tab Danh mục.
+                </Typography>
+              </Stack>
+            </Card>
+          )}
           {rule?.autoSource && rule.autoSource !== 'None' && (
             <Alert severity="info">Hành vi này hệ thống đã tự ghi theo dữ liệu — chỉ ghi tay khi hệ thống không có dữ liệu.</Alert>
           )}
@@ -1016,7 +1175,32 @@ function CreateViolationDialog({ onClose, onCreated }: { onClose: () => void; on
             renderInput={(params) => <TextField {...params} label="Nhân viên" helperText="Chọn nhiều người nếu cả ca cùng vi phạm" />}
           />
           <Stack direction="row" spacing={2}>
-            <TextField type="date" label="Ngày" value={date} onChange={(e) => setDate(e.target.value)} InputLabelProps={{ shrink: true }} />
+            <TextField
+              type="date"
+              label="Ngày"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ max: today() }}
+            />
+            {onePersonId && (
+              <TextField
+                select
+                label="Ca"
+                value={shiftId}
+                onChange={(e) => setShiftId(e.target.value)}
+                sx={{ minWidth: 180 }}
+                helperText={shifts.length === 0 ? 'Không có ca ngày này' : undefined}
+                disabled={shifts.length === 0}
+              >
+                <MenuItem value="">Không theo ca</MenuItem>
+                {shifts.map((s) => (
+                  <MenuItem key={s.assignmentId} value={s.assignmentId}>
+                    {s.name ?? 'Ca'} {s.start}–{s.end}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
             <TextField
               type="number"
               label="Số lần"
@@ -1026,27 +1210,30 @@ function CreateViolationDialog({ onClose, onCreated }: { onClose: () => void; on
               sx={{ width: 120 }}
             />
           </Stack>
+          <ViolationPhotoPicker photos={photos} onChange={setPhotos} />
           <TextField
             multiline
             minRows={2}
-            label="Căn cứ"
+            label={photoKeys.length > 0 ? 'Căn cứ (tuỳ chọn khi đã có ảnh)' : 'Căn cứ'}
             placeholder="VD: camera quầy 19:10–19:25; báo cáo ca; tin nhắn khách…"
-            helperText="Không có căn cứ thì không ghi. Nhân viên sẽ thấy nội dung này."
+            helperText="Cần ảnh hoặc căn cứ (ít nhất một). Nhân viên sẽ thấy nội dung và ảnh."
             value={note}
             onChange={(e) => setNote(e.target.value)}
+            inputProps={{ maxLength: 1000 }}
           />
-          {rule && valid && (
+          {effective && valid && (
             <Typography variant="body2">
-              Trừ {rule.points * qty} điểm cho mỗi người ({people.length} người)
-              {(ruleMoney(rule, policy, qty) ?? 0) > 0 ? ` — phạt ${money(ruleMoney(rule, policy, qty) ?? 0)}, trừ vào lương` : ''}.
+              Trừ {effective.points * qty} điểm cho mỗi người ({people.length} người)
+              {(ruleMoney(effective, policy, qty) ?? 0) > 0 ? ` — phạt ${money(ruleMoney(effective, policy, qty) ?? 0)}, trừ vào lương` : ''}
+              {photoKeys.length > 0 ? ` · kèm ${photoKeys.length} ảnh` : ''}.
             </Typography>
           )}
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Đóng</Button>
+        <Button onClick={close}>Đóng</Button>
         <LoadingButton variant="contained" loading={busy} disabled={!valid} onClick={submit}>
-          Ghi nhận
+          {uploading > 0 ? `Đang tải ${uploading} ảnh…` : 'Ghi nhận'}
         </LoadingButton>
       </DialogActions>
     </Dialog>
