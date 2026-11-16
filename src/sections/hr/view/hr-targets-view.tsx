@@ -11,6 +11,7 @@ import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
+import Checkbox from '@mui/material/Checkbox';
 import Collapse from '@mui/material/Collapse';
 import TableRow from '@mui/material/TableRow';
 import Container from '@mui/material/Container';
@@ -24,6 +25,7 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { fDate } from 'src/utils/format-time';
@@ -82,6 +84,8 @@ export default function HrTargetsView() {
   const [notes, setNotes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  // Tính lại cả tuần đã công bố mà không thu hồi, không thông báo nhân viên.
+  const [overwritePublished, setOverwritePublished] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [edit, setEdit] = useState<{ target: ISalesTarget; amount: string; note: string } | null>(null);
 
@@ -108,10 +112,12 @@ export default function HrTargetsView() {
   const generate = async () => {
     setBusy(true);
     try {
-      const result = await generateSalesTargets(from, to);
+      const result = await generateSalesTargets(from, to, overwritePublished);
       setTargets(result);
       setNotes(Array.from(new Set(result.flatMap((t) => t.notes))));
-      enqueueSnackbar('Đã tính target');
+      enqueueSnackbar(
+        overwritePublished ? 'Đã tính lại cả tuần đã công bố (không gửi thông báo)' : 'Đã tính target'
+      );
     } catch (err) {
       enqueueSnackbar(apiErrorMessage(err, 'Không tính được target'), { variant: 'error' });
     } finally {
@@ -171,6 +177,19 @@ export default function HrTargetsView() {
           canManage &&
           tab === 'targets' && (
             <Stack direction="row" spacing={1}>
+              {autoTargets && (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={overwritePublished}
+                      onChange={(e) => setOverwritePublished(e.target.checked)}
+                    />
+                  }
+                  label="Ghi đè cả tuần đã công bố"
+                  title="Tính lại cả tuần đã công bố, không cần thu hồi, không gửi thông báo cho nhân viên. Tuần sửa tay vẫn giữ số sửa tay."
+                />
+              )}
               {autoTargets && (
                 <LoadingButton variant="outlined" loading={busy} onClick={generate}>
                   Tính target

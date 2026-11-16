@@ -186,8 +186,17 @@ export async function getSalesTargets(from: string, to: string): Promise<ISalesT
   return response.data;
 }
 
-export async function generateSalesTargets(from: string, to: string): Promise<ISalesTarget[]> {
-  const response = await axios.post<ISalesTarget[]>(endpoints.hr.targetsGenerate, { from, to });
+/** overwritePublished = tính lại cả tuần đã công bố (giữ công bố, không thông báo nhân viên). */
+export async function generateSalesTargets(
+  from: string,
+  to: string,
+  overwritePublished = false
+): Promise<ISalesTarget[]> {
+  const response = await axios.post<ISalesTarget[]>(endpoints.hr.targetsGenerate, {
+    from,
+    to,
+    overwritePublished,
+  });
   return response.data;
 }
 
