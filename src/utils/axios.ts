@@ -124,6 +124,7 @@ export const endpoints = {
     details: (id: string) => `/agent-actions/${id}`,
     approve: (id: string) => `/agent-actions/${id}/approve`,
     reject: (id: string) => `/agent-actions/${id}/reject`,
+    requestRevision: (id: string) => `/agent-actions/${id}/request-revision`,
     policies: '/agent-actions/policies',
     policy: (permission: string) => `/agent-actions/policies/${encodeURIComponent(permission)}`,
     logs: '/agent-actions/logs',

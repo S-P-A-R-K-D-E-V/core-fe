@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   timeLeft,
+  appendNote,
   queryParams,
+  platformInfo,
   resultSnippet,
   permissionDomain,
   parseActionParams,
@@ -112,11 +114,26 @@ describe('quyền và trạng thái', () => {
   it('trạng thái lạ vẫn hiện được', () => {
     expect(agentActionStatus('executed').label).toBe('Đã chạy');
     expect(agentActionStatus('weird')).toEqual({ label: 'weird', color: 'default' });
+    expect(agentActionStatus('revision_requested').label).toBe('Đã yêu cầu sửa');
   });
 
   it('phản hồi JSON in đẹp, cắt ngắn', () => {
     expect(resultSnippet('{"ok":true}')).toBe('{\n  "ok": true\n}');
     expect(resultSnippet('x'.repeat(50), 10)).toHaveLength(10);
     expect(resultSnippet(null)).toBe('');
+  });
+});
+
+describe('Yêu cầu sửa', () => {
+  it('chip chèn ý vào ghi chú: xuống dòng, không trùng', () => {
+    expect(appendNote('', 'Viết ngắn lại')).toBe('Viết ngắn lại');
+    expect(appendNote('Ảnh tối', 'Viết ngắn lại')).toBe('Ảnh tối\nViết ngắn lại');
+    expect(appendNote('Ảnh tối\nViết ngắn lại', 'Viết ngắn lại')).toBe('Ảnh tối\nViết ngắn lại');
+  });
+
+  it('tên nền tảng', () => {
+    expect(platformInfo('threads').label).toBe('Threads');
+    expect(platformInfo('Threads').label).toBe('Threads');
+    expect(platformInfo('lemon8').label).toBe('lemon8');
   });
 });

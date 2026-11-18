@@ -20,6 +20,7 @@ export const AGENT_ACTION_STATUS: Record<AgentActionStatus, { label: string; col
     failed: { label: 'Lỗi', color: 'error' },
     rejected: { label: 'Từ chối', color: 'default' },
     expired: { label: 'Hết hạn', color: 'default' },
+    revision_requested: { label: 'Đã yêu cầu sửa', color: 'info' },
   };
 
 export function agentActionStatus(status: string): { label: string; color: LabelColor } {
@@ -205,4 +206,42 @@ export function resultSnippet(body: string | null | undefined, max = 600): strin
 /** Lệnh chạy thành công khi máy chủ trả 2xx. */
 export function isSuccessStatus(code: number | null | undefined): boolean {
   return typeof code === 'number' && code >= 200 && code < 300;
+}
+
+// ----------------------------------------------------------------------
+// Yêu cầu sửa + xem trước bài đăng.
+// ----------------------------------------------------------------------
+
+/** Chip chèn nhanh vào ghi chú "Yêu cầu sửa". */
+export const REVISION_QUICK_NOTES = [
+  'Ảnh đẹp / sáng hơn',
+  'Đổi nền khác',
+  'Viết ngắn lại',
+  'Giọng vui hơn',
+  'Đổi giờ đăng',
+] as const;
+
+/** Thêm một ý vào ghi chú: xuống dòng nếu đã có chữ, không thêm trùng ý đã có. */
+export function appendNote(note: string, text: string): string {
+  const current = note.trimEnd();
+  if (!current) return text;
+  if (current.split('\n').some((line) => line.trim() === text)) return note;
+  return `${current}\n${text}`;
+}
+
+const PLATFORMS: Record<string, { label: string; icon: string }> = {
+  threads: { label: 'Threads', icon: 'ri:threads-fill' },
+  facebook: { label: 'Facebook', icon: 'ri:facebook-circle-fill' },
+  instagram: { label: 'Instagram', icon: 'ri:instagram-fill' },
+  tiktok: { label: 'TikTok', icon: 'ri:tiktok-fill' },
+  zalo: { label: 'Zalo', icon: 'simple-icons:zalo' },
+};
+
+export function platformInfo(platform: string): { label: string; icon: string } {
+  return (
+    PLATFORMS[platform?.toLowerCase()] ?? {
+      label: platform || 'Mạng xã hội',
+      icon: 'solar:global-bold',
+    }
+  );
 }

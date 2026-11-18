@@ -15,7 +15,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 
-import { CodeText } from './agent-action-card';
+import { CodeText } from './agent-action-preview';
 import { resultSnippet, isSuccessStatus } from './agent-action-utils';
 
 // ----------------------------------------------------------------------
@@ -49,14 +49,12 @@ export function AgentDecisionDialog({
 
   return (
     <Dialog open={!!action} onClose={submitting ? undefined : onClose} fullWidth maxWidth="sm">
-      <DialogTitle>
-        {approve ? 'Duyệt việc agent xin làm?' : 'Từ chối việc agent xin làm?'}
-      </DialogTitle>
+      <DialogTitle>{approve ? 'Duyệt việc agent xin làm?' : 'Từ chối hẳn việc này?'}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 0.5 }}>
           {action && (
             <Stack spacing={0.5}>
-              <Typography variant="subtitle2">{action.summary}</Typography>
+              <Typography variant="subtitle2">{action.title?.trim() || action.summary}</Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                 {action.agentName}
                 {action.actsForName ? ` · làm thay ${action.actsForName}` : ''}
@@ -69,8 +67,10 @@ export function AgentDecisionDialog({
               thực hiện. Không hoàn tác tự động được.
             </Alert>
           ) : (
-            <Alert severity="info">
-              Lệnh sẽ không chạy; phiếu chuyển sang tab Đã xử lý kèm lý do bạn ghi.
+            <Alert severity="warning">
+              <strong>Agent sẽ dừng việc này, không làm lại.</strong> Lệnh không chạy; phiếu chuyển
+              sang tab Đã xử lý kèm lý do bạn ghi. Nếu chỉ muốn agent sửa rồi gửi lại, hãy đóng hộp
+              này và bấm <strong>Yêu cầu sửa</strong>.
             </Alert>
           )}
           <TextField
@@ -94,7 +94,7 @@ export function AgentDecisionDialog({
           loading={submitting}
           onClick={() => onSubmit(note)}
         >
-          {approve ? 'Duyệt và chạy ngay' : 'Từ chối'}
+          {approve ? 'Duyệt và chạy ngay' : 'Từ chối, dừng việc'}
         </LoadingButton>
       </DialogActions>
     </Dialog>
@@ -121,7 +121,7 @@ export function AgentResultDialog({
       <DialogContent>
         {action && (
           <Stack spacing={2}>
-            <Typography variant="subtitle2">{action.summary}</Typography>
+            <Typography variant="subtitle2">{action.title?.trim() || action.summary}</Typography>
             {running && (
               <Alert severity="info">
                 Lệnh đang chạy — xem kết quả ở tab Đã xử lý sau ít phút.
