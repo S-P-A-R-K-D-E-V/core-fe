@@ -203,6 +203,11 @@ export const PERMISSIONS = {
   /** Bán hàng online (/social): soạn / đăng bài (mặc định Admin, Quản lý), kết nối kênh (Admin). */
   social: { posts: 'social.posts', channels: 'social.channels' },
   /**
+   * Đội agent (K3) — mặc định chỉ chủ cửa hàng. approve: xem + duyệt / từ chối phiếu agent xin làm (lệnh chạy với người
+   * duyệt là người thực hiện); manage (kèm approve): mức tự chủ theo từng quyền ghi, cách duyệt của khoá, nhật ký.
+   */
+  agent: { approve: 'agent.approve', manage: 'agent.manage' },
+  /**
    * Nhân viên — hồ sơ của mình không cần quyền. Tài khoản Admin chỉ Admin đụng được, gán vai trò / thêm quản lý chỉ Admin
    * (luật theo vai trò).
    */

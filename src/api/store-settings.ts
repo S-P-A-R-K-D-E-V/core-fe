@@ -48,6 +48,13 @@ export interface IAgentKey {
   revokedAt: string | null;
   lastUsedAt: string | null;
   active: boolean;
+  /**
+   * Cách duyệt lệnh ghi (K3): "client_confirm" = người dùng tự xác nhận trong ứng dụng agent (mặc định, như trước);
+   * "server_approval" = agent tự chạy, lệnh ghi theo mức tự chủ của cửa hàng. Core-be cũ không trả.
+   */
+  approvalMode?: 'client_confirm' | 'server_approval' | string;
+  /** Người được làm thay — bắt buộc với "server_approval". */
+  actsForUserId?: string | null;
 }
 
 export async function getStoreBranding(): Promise<IStoreBranding> {

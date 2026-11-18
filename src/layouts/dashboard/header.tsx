@@ -21,6 +21,7 @@ import AccountPopover from '../common/account-popover';
 import UsersPopover from '../common/users-popover';
 import LanguagePopover from '../common/language-popover';
 import NotificationsPopover from '../common/notifications-popover';
+import AgentApprovalsButton from '../common/agent-approvals-button';
 import { useNavTree } from './config-navigation';
 import { useCounterSession } from '../../sections/counter/counter-scope';
 import { NavPinsButton, NavSellButton, NavSettingsButton } from './nav/nav-header-tools';
@@ -74,6 +75,9 @@ export default function Header({ onOpenNav }: Props) {
         <LanguagePopover />
 
         {lgUp && !counterSession && <NavPinsButton tree={tree} />}
+
+        {/* Việc agent chờ duyệt — chỉ hiện khi có phiếu và người này có quyền duyệt. */}
+        {!counterSession && <AgentApprovalsButton tree={tree} />}
 
         {!counterSession && <NotificationsPopover />}
 

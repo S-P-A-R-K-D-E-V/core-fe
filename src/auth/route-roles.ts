@@ -56,6 +56,9 @@ export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   // Mẫu in hoá đơn / tem mã: theo quyền sales.print-template.manage (PrintTemplatesController; mặc định Admin, Manager).
   { prefix: paths.dashboard.storeSettings.printTemplates, roles: null, permissions: [PERMISSIONS.sales.printTemplateManage] },
   { prefix: paths.dashboard.notificationConfig.root, roles: ADMIN_ROLES },
+  // Duyệt việc agent: theo quyền agent.approve (AgentActionsController; mặc định chỉ Admin). Tab Mức tự chủ / Nhật ký
+  // trong trang tự ẩn khi thiếu agent.manage.
+  { prefix: paths.dashboard.agent.root, roles: null, permissions: [PERMISSIONS.agent.approve] },
   // Thanh toán: đối soát cho chủ và quản lý; đơn online cho mọi nhân viên (OnlineOrdersController — StoreStaff: người
   // đang làm gói hàng); Cài đặt (+ hai trang cũ chuyển về đó) chỉ chủ cửa hàng (PaymentSettingsController,
   // PaymentChannelSettingsController, ShippingSettingsController — Admin).

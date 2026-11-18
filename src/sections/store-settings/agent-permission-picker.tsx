@@ -23,7 +23,7 @@ import { useAuthContext } from 'src/auth/hooks';
 // Chọn quyền cho khoá API theo nhóm: danh mục → nhóm (domain của quyền) → từng quyền. Tích ô ở
 // danh mục / nhóm để chọn tất cả bên trong. Quyền ghi (không phải .read) được đánh dấu.
 
-const DOMAIN_LABELS: Record<string, string> = {
+export const DOMAIN_LABELS: Record<string, string> = {
   analytics: 'Báo cáo & phân tích',
   orders: 'Đơn hàng',
   'pos-cart': 'Giỏ hàng POS',

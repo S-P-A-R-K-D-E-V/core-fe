@@ -117,6 +117,18 @@ export const endpoints = {
     preview: '/staff-invites/preview',
     accept: '/staff-invites/accept',
   },
+  // Đội agent — phía người (K3): phiếu agent xin làm, mức tự chủ theo quyền ghi, nhật ký; cách duyệt của khoá agent.
+  agentActions: {
+    list: '/agent-actions',
+    pendingCount: '/agent-actions/pending-count',
+    details: (id: string) => `/agent-actions/${id}`,
+    approve: (id: string) => `/agent-actions/${id}/approve`,
+    reject: (id: string) => `/agent-actions/${id}/reject`,
+    policies: '/agent-actions/policies',
+    policy: (permission: string) => `/agent-actions/policies/${encodeURIComponent(permission)}`,
+    logs: '/agent-actions/logs',
+    keySettings: (id: string) => `/agent-keys/${id}/settings`,
+  },
   users: {
     list: '/users',
     activeStaff: '/users/active-staff',
