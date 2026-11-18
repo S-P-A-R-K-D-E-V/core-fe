@@ -1080,6 +1080,15 @@ export function buildSettingsModule(isCiCi: boolean): NavModule {
             keywords: 'api key mcp tro ly ai',
           },
           {
+            // Phiếu agent tự chạy xin làm (K3) — thông báo của core-be mở thẳng trang này. Mức tự chủ / nhật ký là tab
+            // trong trang (agent.manage).
+            key: 'set.agent-approvals',
+            title: 'Duyệt việc agent',
+            path: paths.dashboard.agent.approvals,
+            permissions: [P.agent.approve],
+            keywords: 'agent duyet phieu xin lam muc tu chu nhat ky tro ly ai',
+          },
+          {
             key: 'set.platform-features',
             title: 'Tính năng web / app',
             path: `${paths.dashboard.storeSettings.root}?tab=platform-features`,

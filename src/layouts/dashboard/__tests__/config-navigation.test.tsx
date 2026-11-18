@@ -563,6 +563,30 @@ describe('Bán online', () => {
   });
 });
 
+describe('Duyệt việc agent', () => {
+  it('chủ cửa hàng thấy trong Cài đặt › Kết nối, ngay sau khoá API', () => {
+    const tree = nav('Admin', ALL_FEATURES);
+    const page = tree.pages.find((p) => p.key === 'set.agent-approvals');
+    expect(page?.path).toBe(paths.dashboard.agent.approvals);
+    expect(page?.moduleKey).toBe('settings');
+    const keys = tree.settings?.groups.find((g) => g.key === 'settings.connections')?.pages.map((p) => p.key);
+    expect(keys?.indexOf('set.agent-approvals')).toBe((keys?.indexOf('set.mcp') ?? -2) + 1);
+  });
+
+  it('chỉ hiện với quyền agent.approve — quản lý mặc định không thấy', () => {
+    expect(navKeys('Manager', ALL_FEATURES, ['social.posts'])).not.toContain('set.agent-approvals');
+    expect(navKeys('Staff', ALL_FEATURES, [])).not.toContain('set.agent-approvals');
+    const granted = nav('Manager', ALL_FEATURES, ['agent.approve']);
+    expect(granted.pages.map((p) => p.key)).toContain('set.agent-approvals');
+    expect(granted.settings?.groups.map((g) => g.key)).toContain('settings.connections');
+  });
+
+  it('mở thẳng trang khi bấm thông báo (actionUrl) — tô đậm đúng mục', () => {
+    const { pages } = nav('Admin', ALL_FEATURES);
+    expect(findActivePage(pages, paths.dashboard.agent.approvals)?.key).toBe('set.agent-approvals');
+  });
+});
+
 describe('máy quầy', () => {
   it('chỉ có module Máy quầy, ai đăng nhập cũng vậy', () => {
     counter.on = true;
@@ -647,6 +671,7 @@ describe('menu khớp luật chặn route (thấy mục thì mở được trang
     'user.update',
     'posts.manage',
     'social.posts',
+    'agent.approve',
   ];
   const users: [string, string[], string[] | undefined][] = [
     ['Admin', ['Admin'], undefined],

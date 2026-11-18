@@ -55,6 +55,8 @@ const BACKEND_API_PREFIXES = [
   'store-posts',
   // Bán hàng online (core-be SocialController, SocialImageController): kênh Threads, bài đăng, studio ảnh, Tổng quan, Cấu hình.
   'social',
+  // Đội agent — phía người (K3): phiếu agent xin làm (duyệt / từ chối), mức tự chủ, nhật ký lệnh ghi.
+  'agent-actions',
 ];
 
 const nextConfig = {

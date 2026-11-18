@@ -63,6 +63,11 @@ describe('requiredPermissionsFor', () => {
     });
   });
 
+  it('duyệt việc agent theo quyền agent.approve, không theo vai trò', () => {
+    expect(requiredPermissionsFor(paths.dashboard.agent.approvals)).toEqual([PERMISSIONS.agent.approve]);
+    expect(requiredRolesFor(paths.dashboard.agent.approvals)).toBeNull();
+  });
+
   it.each([
     [paths.dashboard.salary.configuration, [P.salaryConfigRead]],
     [paths.dashboard.salary.history, [P.salaryConfigRead]],

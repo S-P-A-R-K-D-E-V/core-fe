@@ -1,5 +1,7 @@
 'use client';
 
+import type { IUser } from 'src/types/corecms-api';
+
 import { useState, useEffect, useCallback } from 'react';
 
 import Card from '@mui/material/Card';
@@ -40,10 +42,14 @@ import {
   revokeAgentKey,
   getAgentPermissionCatalog,
 } from 'src/api/store-settings';
+import { getAllUsers } from 'src/api/users';
+
+import { approvalModeLabel } from 'src/sections/agent-approvals/agent-action-utils';
 
 import { McpSessionsCard } from './mcp-sessions-card';
 import { EndAllSessionsCard } from './end-all-sessions-card';
 import AgentPermissionPicker from './agent-permission-picker';
+import AgentKeySettingsDialog, { userDisplayName } from './agent-key-settings-dialog';
 import { CodeBlock, McpPromptCopy, McpConnectCard } from './mcp-connect-card';
 import {
   mcpUrl,
@@ -79,6 +85,9 @@ export default function AgentKeysTab() {
   const [created, setCreated] = useState<ICreatedAgentKey | null>(null);
   const [promptTarget, setPromptTarget] = useState<McpPromptTarget>('default');
   const [revokeTarget, setRevokeTarget] = useState<IAgentKey | null>(null);
+  const [settingsTarget, setSettingsTarget] = useState<IAgentKey | null>(null);
+  // Người được làm thay của khoá "Agent tự chạy" — chỉ thành viên đang hoạt động.
+  const [users, setUsers] = useState<IUser[]>([]);
 
   const load = useCallback(() => {
     listAgentKeys()
@@ -92,6 +101,9 @@ export default function AgentKeysTab() {
     load();
     getAgentPermissionCatalog()
       .then(setCatalog)
+      .catch(() => {});
+    getAllUsers()
+      .then((list) => setUsers(list.filter((u) => u.status === 'Active')))
       .catch(() => {});
   }, [load]);
 
@@ -131,6 +143,11 @@ export default function AgentKeysTab() {
 
   const url = mcpUrl(origin);
 
+  const actsForName = (id: string) => {
+    const u = users.find((x) => x.id === id);
+    return u ? userDisplayName(u) : 'người đã chọn';
+  };
+
   const copy = async (text: string, done: string) => {
     if (await copyText(text)) enqueueSnackbar(done);
     else
@@ -151,6 +168,11 @@ export default function AgentKeysTab() {
               Mỗi khoá gắn với cửa hàng này và chỉ dùng được trong phạm vi quyền đã chọn. Nên dùng
               khoá Chỉ đọc cho agent hỏi đáp.
             </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              Cách duyệt: &quot;Người dùng tự xác nhận&quot; hỏi ngay trong ứng dụng agent;
+              &quot;Agent tự chạy&quot; cần chọn người được làm thay, lệnh ghi theo Mức tự chủ ở
+              trang Duyệt việc agent.
+            </Typography>
           </Stack>
           <Button
             variant="contained"
@@ -163,12 +185,13 @@ export default function AgentKeysTab() {
 
         <TableContainer>
           <Scrollbar>
-            <Table size="small" sx={{ minWidth: 760 }}>
+            <Table size="small" sx={{ minWidth: 900 }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Tên</TableCell>
                   <TableCell>Khoá</TableCell>
                   <TableCell>Quyền</TableCell>
+                  <TableCell>Cách duyệt</TableCell>
                   <TableCell>Hết hạn</TableCell>
                   <TableCell>Dùng lần cuối</TableCell>
                   <TableCell>Trạng thái</TableCell>
@@ -185,6 +208,14 @@ export default function AgentKeysTab() {
                         <span>{k.permissions.length} quyền</span>
                       </Tooltip>
                     </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{approvalModeLabel(k.approvalMode)}</Typography>
+                      {k.actsForUserId && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          làm thay {actsForName(k.actsForUserId)}
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell>{k.expiresAt ? fDateTime(k.expiresAt) : '—'}</TableCell>
                     <TableCell>{k.lastUsedAt ? fDateTime(k.lastUsedAt) : 'Chưa dùng'}</TableCell>
                     <TableCell>
@@ -193,6 +224,13 @@ export default function AgentKeysTab() {
                       </Label>
                     </TableCell>
                     <TableCell align="right">
+                      {k.active && (
+                        <Tooltip title="Cách duyệt lệnh ghi">
+                          <IconButton onClick={() => setSettingsTarget(k)}>
+                            <Iconify icon="solar:shield-check-bold" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       {k.active && (
                         <Tooltip title="Thu hồi">
                           <IconButton color="error" onClick={() => setRevokeTarget(k)}>
@@ -205,7 +243,7 @@ export default function AgentKeysTab() {
                 ))}
                 {keys.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                    <TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                       Chưa có khoá nào
                     </TableCell>
                   </TableRow>
@@ -339,6 +377,13 @@ export default function AgentKeysTab() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <AgentKeySettingsDialog
+        agentKey={settingsTarget}
+        users={users}
+        onClose={() => setSettingsTarget(null)}
+        onSaved={load}
+      />
 
       <Dialog open={!!revokeTarget} onClose={() => setRevokeTarget(null)}>
         <DialogTitle>Thu hồi khoá &quot;{revokeTarget?.name}&quot;?</DialogTitle>

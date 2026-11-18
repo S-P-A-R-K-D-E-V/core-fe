@@ -297,6 +297,11 @@ export const paths = {
     shiftAudit: {
       root: `${ROOTS.DASHBOARD}/shift-audit`,
     },
+    // Đội agent: duyệt việc agent xin làm (thông báo của core-be mở thẳng trang này).
+    agent: {
+      root: `${ROOTS.DASHBOARD}/agent`,
+      approvals: `${ROOTS.DASHBOARD}/agent/approvals`,
+    },
     agentSessions: {
       root: `${ROOTS.DASHBOARD}/agent-sessions`,
     },
