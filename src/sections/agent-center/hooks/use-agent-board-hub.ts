@@ -68,8 +68,13 @@ export function useAgentBoardHub(handlers: Handlers, enabled = true) {
     const join = async () => {
       if (stopped) return;
       try {
-        await conn.invoke('Join');
+        // Máy chủ trả false (không ném lỗi) khi người dùng thiếu agent.approve → coi như không có trực tiếp.
+        const joined = await conn.invoke<boolean>('Join');
         if (stopped) return;
+        if (joined === false) {
+          setState('disconnected');
+          return;
+        }
         setState('connected');
         if (everJoined) handlersRef.current.onResync?.();
         everJoined = true;
