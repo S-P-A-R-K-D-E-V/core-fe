@@ -444,6 +444,8 @@ describe('đối tượng + câu hỏi nhanh', () => {
     // Quản lý cửa hàng SaaS: agent Staff nhưng hỏi số liệu cửa hàng.
     expect(resolveChatbotAudience({ agent: 'Staff', tier: 'store_manager' })).toBe('admin');
     expect(resolveChatbotAudience({ agent: 'InternalAdmin', tier: 'store_admin' })).toBe('admin');
+    // Nhân viên cửa hàng SaaS: trợ lý chỉ về dữ liệu của chính họ.
+    expect(resolveChatbotAudience({ agent: 'Staff', tier: 'store_staff' })).toBe('staff');
     // Server cũ không trả tier → theo agent; phiên thắng vai trò đăng nhập.
     expect(resolveChatbotAudience({ agent: 'Staff', role: 'Admin' })).toBe('staff');
     expect(resolveChatbotAudience({ agent: 'CustomerSupport', tier: 'none', role: 'Admin' })).toBe(

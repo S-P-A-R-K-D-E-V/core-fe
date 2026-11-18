@@ -14,6 +14,8 @@ export type ChatbotTier =
   | 'cici_customer'
   | 'store_admin'
   | 'store_manager'
+  /** Nhân viên cửa hàng SaaS: trợ lý chỉ trả lời về dữ liệu của chính họ (tool me_*) + quy chế. */
+  | 'store_staff'
   | 'none';
 
 export type ChatbotSession = {
