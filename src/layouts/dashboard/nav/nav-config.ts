@@ -1089,6 +1089,15 @@ export function buildSettingsModule(isCiCi: boolean): NavModule {
             keywords: 'agent duyet phieu xin lam muc tu chu nhat ky tro ly ai',
           },
           {
+            // Trung tâm Agent (K4): bảng việc kanban, lịch chạy, danh sách agent, chi phí. Thông báo "việc chờ người / lỗi"
+            // mở `?task={id}`. Sửa agent / lịch / Dừng tất cả / Chi phí cần thêm agent.manage (ẩn trong trang).
+            key: 'set.agent-center',
+            title: 'Trung tâm Agent',
+            path: paths.dashboard.agent.center,
+            permissions: [P.agent.approve],
+            keywords: 'agent bang viec kanban lich chay giao viec chi phi token tro ly ai',
+          },
+          {
             key: 'set.platform-features',
             title: 'Tính năng web / app',
             path: `${paths.dashboard.storeSettings.root}?tab=platform-features`,

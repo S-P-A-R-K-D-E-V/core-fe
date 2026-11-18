@@ -587,6 +587,28 @@ describe('Duyệt việc agent', () => {
   });
 });
 
+describe('Trung tâm Agent', () => {
+  it('nằm ngay sau Duyệt việc agent trong Cài đặt › Kết nối', () => {
+    const tree = nav('Admin', ALL_FEATURES);
+    const page = tree.pages.find((p) => p.key === 'set.agent-center');
+    expect(page?.path).toBe(paths.dashboard.agent.center);
+    expect(page?.moduleKey).toBe('settings');
+    const keys = tree.settings?.groups.find((g) => g.key === 'settings.connections')?.pages.map((p) => p.key);
+    expect(keys?.indexOf('set.agent-center')).toBe((keys?.indexOf('set.agent-approvals') ?? -2) + 1);
+  });
+
+  it('chỉ hiện với quyền agent.approve', () => {
+    expect(navKeys('Manager', ALL_FEATURES, ['social.posts'])).not.toContain('set.agent-center');
+    expect(navKeys('Staff', ALL_FEATURES, [])).not.toContain('set.agent-center');
+    expect(navKeys('Staff', ALL_FEATURES, ['agent.approve'])).toContain('set.agent-center');
+  });
+
+  it('thông báo mở ?task={id} — tô đậm đúng mục', () => {
+    const { pages } = nav('Admin', ALL_FEATURES);
+    expect(findActivePage(pages, paths.dashboard.agent.center, '?task=abc')?.key).toBe('set.agent-center');
+  });
+});
+
 describe('máy quầy', () => {
   it('chỉ có module Máy quầy, ai đăng nhập cũng vậy', () => {
     counter.on = true;

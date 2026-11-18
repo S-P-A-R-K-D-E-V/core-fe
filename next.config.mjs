@@ -57,6 +57,8 @@ const BACKEND_API_PREFIXES = [
   'social',
   // Đội agent — phía người (K3): phiếu agent xin làm (duyệt / từ chối), mức tự chủ, nhật ký lệnh ghi.
   'agent-actions',
+  // Trung tâm Agent (K4): agent, bảng việc, lịch chạy, chi phí. Cập nhật trực tiếp đi hub /hubs/agent-board (ingress).
+  'agent-center',
 ];
 
 const nextConfig = {

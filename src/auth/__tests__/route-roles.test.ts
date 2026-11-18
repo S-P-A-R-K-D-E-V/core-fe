@@ -68,6 +68,11 @@ describe('requiredPermissionsFor', () => {
     expect(requiredRolesFor(paths.dashboard.agent.approvals)).toBeNull();
   });
 
+  it('Trung tâm Agent theo quyền agent.approve (agent.manage kiểm trong trang)', () => {
+    expect(requiredPermissionsFor(paths.dashboard.agent.center)).toEqual([PERMISSIONS.agent.approve]);
+    expect(requiredRolesFor(paths.dashboard.agent.center)).toBeNull();
+  });
+
   it.each([
     [paths.dashboard.salary.configuration, [P.salaryConfigRead]],
     [paths.dashboard.salary.history, [P.salaryConfigRead]],
