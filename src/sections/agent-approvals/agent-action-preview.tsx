@@ -19,7 +19,7 @@ import Typography from '@mui/material/Typography';
 import Iconify from 'src/components/iconify';
 import Lightbox, { useLightBox } from 'src/components/lightbox';
 
-import { platformInfo } from './agent-action-utils';
+import { platformInfo, splitRevisionNote } from './agent-action-utils';
 
 // ----------------------------------------------------------------------
 // Bản xem trước dễ đọc của phiếu agent: bài mạng xã hội trông như bài thật (kênh, giờ đăng, caption, ảnh, sản phẩm gắn),
@@ -285,6 +285,7 @@ export function PreviousVersion({
   const prevPost = previous.preview?.kind === 'social_post' ? previous.preview.socialPost : null;
   const prevImages = prevPost?.imageUrls ?? [];
   const prevFields = previous.preview?.kind !== 'social_post' ? previous.preview : null;
+  const { text: noteText, imageUrls: redoImages } = splitRevisionNote(previous.note);
 
   return (
     <Box
@@ -304,7 +305,8 @@ export function PreviousVersion({
           <Typography variant="subtitle2">Bản trước</Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }} noWrap={!open}>
             {previous.decidedByName ?? 'Người duyệt'} yêu cầu sửa
-            {previous.note ? `: ${previous.note}` : ''}
+            {noteText ? `: ${noteText}` : ''}
+            {!noteText && redoImages.length > 0 ? `: làm lại ${redoImages.length} ảnh` : ''}
           </Typography>
         </Box>
         <Iconify
@@ -315,10 +317,13 @@ export function PreviousVersion({
 
       <Collapse in={open} unmountOnExit>
         <Stack spacing={1.5} sx={{ px: 1.5, pb: 1.5 }}>
-          {previous.note && (
-            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-              {previous.note}
-            </Typography>
+          {redoImages.length > 0 && (
+            <Box>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                Ảnh được yêu cầu làm lại
+              </Typography>
+              <PreviewImages urls={redoImages} size={72} />
+            </Box>
           )}
 
           {prevPost?.text && (

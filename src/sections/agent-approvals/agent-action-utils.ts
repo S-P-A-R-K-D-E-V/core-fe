@@ -245,3 +245,23 @@ export function platformInfo(platform: string): { label: string; icon: string } 
     }
   );
 }
+
+// ----------------------------------------------------------------------
+
+const REDO_MARKER = 'Ảnh cần làm lại:';
+
+/**
+ * Ghi chú của phiếu bị "Yêu cầu sửa" (BE ghép: ghi chú + "Ảnh cần làm lại:" + "- url" từng dòng) → phần chữ và danh
+ * sách ảnh, để hiện ảnh nhỏ thay vì in đường link.
+ */
+export function splitRevisionNote(note: string | null | undefined): { text: string; imageUrls: string[] } {
+  const raw = note ?? '';
+  const at = raw.indexOf(REDO_MARKER);
+  if (at < 0) return { text: raw.trim(), imageUrls: [] };
+  const imageUrls = raw
+    .slice(at + REDO_MARKER.length)
+    .split('\n')
+    .map((line) => line.trim().replace(/^-\s*/, '').trim())
+    .filter((line) => line.startsWith('https://') || line.startsWith('http://'));
+  return { text: raw.slice(0, at).trim(), imageUrls };
+}

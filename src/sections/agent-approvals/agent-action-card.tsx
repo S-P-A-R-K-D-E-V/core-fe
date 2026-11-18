@@ -22,7 +22,7 @@ import { fDateTime } from 'src/utils/format-time';
 import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
 
-import { CodeText, ParamList, ActionPreview, PreviousVersion } from './agent-action-preview';
+import { CodeText, ParamList, ActionPreview, PreviewImages, PreviousVersion } from './agent-action-preview';
 import {
   timeLeft,
   queryParams,
@@ -30,6 +30,7 @@ import {
   isSuccessStatus,
   agentActionStatus,
   parseActionParams,
+  splitRevisionNote,
 } from './agent-action-utils';
 
 export { CodeText, ParamList } from './agent-action-preview';
@@ -171,6 +172,7 @@ export default function AgentActionCard({
   const currentImages =
     preview?.kind === 'social_post' ? (preview.socialPost?.imageUrls ?? []) : [];
   const version = action.version ?? null;
+  const decisionNote = splitRevisionNote(action.decisionNote);
   const revisionsLeft = action.revisionsLeft ?? null;
   const revisionLocked = revisionsLeft !== null && revisionsLeft <= 0;
 
@@ -258,13 +260,21 @@ export default function AgentActionCard({
                 <strong>{action.decidedByName ?? 'không rõ'}</strong>
                 {action.decidedAt ? ` lúc ${fDateTime(action.decidedAt)}` : ''}
               </Typography>
-              {action.decisionNote && (
+              {decisionNote.text && (
                 <Typography
                   variant="body2"
                   sx={{ color: 'text.secondary', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
                 >
-                  Ghi chú: {action.decisionNote}
+                  Ghi chú: {decisionNote.text}
                 </Typography>
+              )}
+              {decisionNote.imageUrls.length > 0 && (
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Ảnh cần làm lại
+                  </Typography>
+                  <PreviewImages urls={decisionNote.imageUrls} size={72} />
+                </Box>
               )}
             </Stack>
           </>
