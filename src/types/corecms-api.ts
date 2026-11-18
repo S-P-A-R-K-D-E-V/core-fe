@@ -2803,7 +2803,7 @@ export interface ICheckinFaceResponse {
 
 // ── Notification Config ──
 
-export type NotificationType = 'telegram' | 'zalo';
+export type NotificationType = 'telegram' | 'telegram-report' | 'zalo';
 
 export interface INotificationConfig {
   id: string;
