@@ -301,6 +301,8 @@ export const paths = {
     agent: {
       root: `${ROOTS.DASHBOARD}/agent`,
       approvals: `${ROOTS.DASHBOARD}/agent/approvals`,
+      // Trung tâm Agent (K4): bảng việc, lịch chạy, agent, chi phí. Thông báo việc chờ người / lỗi mở `?task={id}`.
+      center: `${ROOTS.DASHBOARD}/agent/center`,
     },
     agentSessions: {
       root: `${ROOTS.DASHBOARD}/agent-sessions`,
