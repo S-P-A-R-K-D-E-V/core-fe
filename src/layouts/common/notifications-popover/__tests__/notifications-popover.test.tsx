@@ -86,6 +86,39 @@ describe('NotificationsPopover', () => {
     expect(push).toHaveBeenCalledWith(ACTION_URL);
   });
 
+  it('thông báo việc agent (chờ người / lỗi / đã xong) → mở Trung tâm Agent kèm ?task để mở ngăn chi tiết', async () => {
+    push.mockClear();
+    const user = userEvent.setup();
+    const url = '/dashboard/agent/center?task=0f8c2b1e-1111-4222-8333-944455556666';
+    const context: any = {
+      notifications: [],
+      totalUnRead: 1,
+      markAllAsRead: vi.fn(),
+      removeNotification: vi.fn(),
+      dbNotifications: [
+        { id: 'n3', title: 'Việc agent đã xong', message: 'Báo cáo tồn kho', category: 'System', actionUrl: url, isRead: false, createdAt: '2026-11-18T02:00:00Z' },
+      ],
+      dbUnreadCount: 1,
+      markAsRead: vi.fn(),
+      markDbAllAsRead: vi.fn(),
+      deleteDbNotification: vi.fn(),
+      loadNotifications: vi.fn(),
+    };
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <SyncNotificationContext.Provider value={context}>
+          <NotificationsPopover />
+        </SyncNotificationContext.Provider>
+      </ThemeProvider>
+    );
+
+    await user.click(screen.getAllByRole('button')[0]);
+    await user.click(await screen.findByText('Việc agent đã xong'));
+
+    expect(push).toHaveBeenCalledWith(url);
+  });
+
   it.each([
     ['không có đường dẫn', undefined],
     ['đường dẫn ra ngoài', 'https://evil.example/dashboard'],

@@ -21,6 +21,7 @@ import AccountPopover from '../common/account-popover';
 import UsersPopover from '../common/users-popover';
 import LanguagePopover from '../common/language-popover';
 import NotificationsPopover from '../common/notifications-popover';
+import AgentActivityButton from '../common/agent-activity-button';
 import AgentApprovalsButton from '../common/agent-approvals-button';
 import { useNavTree } from './config-navigation';
 import { useCounterSession } from '../../sections/counter/counter-scope';
@@ -78,6 +79,9 @@ export default function Header({ onOpenNav }: Props) {
 
         {/* Việc agent chờ duyệt — chỉ hiện khi có phiếu và người này có quyền duyệt. */}
         {!counterSession && <AgentApprovalsButton tree={tree} />}
+
+        {/* Đội agent đang làm việc (đang chạy + chờ chạy; chấm cam = có việc chờ người) — mở Trung tâm Agent. */}
+        {!counterSession && <AgentActivityButton tree={tree} />}
 
         {!counterSession && <NotificationsPopover />}
 

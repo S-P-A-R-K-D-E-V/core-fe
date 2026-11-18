@@ -211,11 +211,26 @@ export function isAgentTask(value: unknown): value is IAgentTask {
 
 const POLL_MS = 30_000;
 
-export function useAgentCenterSummary(poll: boolean) {
-  const { data, isLoading, error, mutate } = useSWR<IAgentCenterSummary>(agentSummaryKey, fetcher, {
-    refreshInterval: poll ? POLL_MS : 0,
-    keepPreviousData: true,
-  });
+export interface AgentCenterSummaryOptions {
+  /** false = không hỏi máy chủ (vd người không có quyền agent.approve). Mặc định true. */
+  enabled?: boolean;
+  /** Chu kỳ hỏi lại tính theo dữ liệu mới nhất — thay cho `poll`. SWR tự dừng khi tab bị ẩn. */
+  refreshInterval?: (latest: IAgentCenterSummary | undefined) => number;
+  /** Lỗi (vd 403) thì thôi, không thử lại dồn dập. */
+  quiet?: boolean;
+}
+
+export function useAgentCenterSummary(poll: boolean, options?: AgentCenterSummaryOptions) {
+  const enabled = options?.enabled ?? true;
+  const { data, isLoading, error, mutate } = useSWR<IAgentCenterSummary>(
+    enabled ? agentSummaryKey : null,
+    fetcher,
+    {
+      refreshInterval: options?.refreshInterval ?? (poll ? POLL_MS : 0),
+      keepPreviousData: true,
+      ...(options?.quiet && { shouldRetryOnError: false }),
+    }
+  );
   return useMemo(
     () => ({ summary: data, loading: isLoading && !data, error, refresh: mutate }),
     [data, isLoading, error, mutate]
