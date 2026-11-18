@@ -9,6 +9,7 @@ import {
   permissionDomain,
   parseActionParams,
   agentActionStatus,
+  splitRevisionNote,
   groupPoliciesByDomain,
 } from '../agent-action-utils';
 
@@ -135,5 +136,20 @@ describe('Yêu cầu sửa', () => {
     expect(platformInfo('threads').label).toBe('Threads');
     expect(platformInfo('Threads').label).toBe('Threads');
     expect(platformInfo('lemon8').label).toBe('lemon8');
+  });
+});
+
+describe('splitRevisionNote', () => {
+  it('tách ghi chú và ảnh cần làm lại', () => {
+    const note = 'Nền pastel hồng\nẢnh cần làm lại:\n- https://cdn.example.com/a.jpg\n- https://cdn.example.com/b.jpg';
+    expect(splitRevisionNote(note)).toEqual({
+      text: 'Nền pastel hồng',
+      imageUrls: ['https://cdn.example.com/a.jpg', 'https://cdn.example.com/b.jpg'],
+    });
+  });
+
+  it('ghi chú không có ảnh giữ nguyên', () => {
+    expect(splitRevisionNote('  Viết ngắn lại ')).toEqual({ text: 'Viết ngắn lại', imageUrls: [] });
+    expect(splitRevisionNote(null)).toEqual({ text: '', imageUrls: [] });
   });
 });
