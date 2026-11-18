@@ -18,9 +18,59 @@ export type AgentActionStatus =
   | 'executed'
   | 'failed'
   | 'rejected'
-  | 'expired';
+  | 'expired'
+  /** Người duyệt bấm "Yêu cầu sửa" — agent làm lại rồi gửi phiếu bản mới. */
+  | 'revision_requested';
 
 export type AgentActionStatusFilter = AgentActionStatus | 'all';
+
+export interface IAgentPreviewChannel {
+  id: string;
+  /** vd "threads". */
+  platform: string;
+  name: string;
+  username: string | null;
+  avatarUrl: string | null;
+}
+
+export interface IAgentPreviewProduct {
+  id: string;
+  code: string;
+  name: string;
+  price: number;
+  imageUrl: string | null;
+  inStock: boolean;
+}
+
+export interface IAgentSocialPostPreview {
+  /** draft | queue | schedule | now. */
+  mode: string;
+  /** Câu cho người đọc, vd "Hẹn đăng 19:30 hôm nay (18/11)". */
+  modeLabel: string;
+  scheduledAt: string | null;
+  text: string | null;
+  imageUrls: string[];
+  channels: IAgentPreviewChannel[];
+  products: IAgentPreviewProduct[];
+}
+
+export interface IAgentActionPreview {
+  kind: 'social_post' | 'generic' | (string & {});
+  /** Tên thao tác tiếng Việt, vd "Tạo bài đăng mạng xã hội". */
+  title: string;
+  /** Chỉ có khi kind = social_post. */
+  socialPost: IAgentSocialPostPreview | null;
+  /** Tham số "nhãn — giá trị" (id đã đổi thành tên); bài mạng xã hội thì trống. */
+  fields: { label: string; value: string }[];
+}
+
+/** Bản trước của cùng việc (phiếu đã bị "Yêu cầu sửa") — để so chữ / ảnh cũ và mới. */
+export interface IAgentActionPrevious {
+  actionId: string;
+  note: string | null;
+  decidedByName: string | null;
+  preview: IAgentActionPreview | null;
+}
 
 export interface IAgentAction {
   id: string;
@@ -45,6 +95,18 @@ export interface IAgentAction {
   resultStatusCode: number | null;
   /** Phản hồi của lệnh khi chạy (máy chủ đã cắt ngắn). */
   resultBody: string | null;
+  /** Tên thao tác tiếng Việt; rỗng ở máy chủ cũ → dùng `summary`. */
+  title?: string;
+  /** Bản xem trước dễ đọc (bài đăng như thật / bảng tham số); null = không dựng được. */
+  preview?: IAgentActionPreview | null;
+  /** Việc trên bảng việc đang chờ phiếu này. */
+  taskId?: string | null;
+  taskTitle?: string | null;
+  /** Bản thứ mấy (1 = lần đầu) sau các lần "Yêu cầu sửa". */
+  version?: number | null;
+  previous?: IAgentActionPrevious | null;
+  /** Còn mấy lần được "Yêu cầu sửa"; 0 = khoá nút; null = không áp dụng. */
+  revisionsLeft?: number | null;
 }
 
 export type AgentAutonomyLevel = 'auto' | 'auto_notify' | 'approve' | 'deny';
@@ -129,6 +191,21 @@ export async function approveAgentAction(id: string, note?: string): Promise<IAg
 
 export async function rejectAgentAction(id: string, note?: string): Promise<IAgentAction> {
   const res = await axios.post<IAgentAction>(EP.reject(id), { note: note?.trim() || null });
+  return res.data;
+}
+
+/**
+ * Yêu cầu sửa: lệnh không chạy, agent nhận ghi chú + ảnh cần làm lại rồi gửi phiếu bản mới. Cần ghi chú hoặc ít nhất 1 ảnh
+ * (ảnh phải thuộc phiếu) — 400; quá số lần sửa — 409 (câu tiếng Việt ở detail / title).
+ */
+export async function requestAgentActionRevision(
+  id: string,
+  data: { note?: string; imageUrls?: string[] }
+): Promise<IAgentAction> {
+  const res = await axios.post<IAgentAction>(EP.requestRevision(id), {
+    note: data.note?.trim() || null,
+    imageUrls: data.imageUrls && data.imageUrls.length > 0 ? data.imageUrls : null,
+  });
   return res.data;
 }
 

@@ -17,13 +17,14 @@ import { paths } from 'src/routes/paths';
 import { useSearchParams } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
-import { apiErrorMessage } from 'src/utils/api-error';
+import { apiErrorMessage, hasApiErrorCode } from 'src/utils/api-error';
 
 import {
   rejectAgentAction,
   useAgentActions,
   approveAgentAction,
   useAgentPendingCount,
+  requestAgentActionRevision,
 } from 'src/api/agent-actions';
 
 import Label from 'src/components/label';
@@ -40,6 +41,7 @@ import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
 import AgentLogsTab from '../agent-logs-tab';
 import AgentActionCard from '../agent-action-card';
 import AgentAutonomyTab from '../agent-autonomy-tab';
+import { AgentRevisionDialog } from '../agent-revision-dialog';
 import {
   type DecisionMode,
   AgentResultDialog,
@@ -65,6 +67,7 @@ const HISTORY_FILTERS: { value: AgentActionStatusFilter; label: string }[] = [
   { value: 'executed', label: 'Đã chạy' },
   { value: 'failed', label: 'Lỗi' },
   { value: 'rejected', label: 'Từ chối' },
+  { value: 'revision_requested', label: 'Yêu cầu sửa' },
   { value: 'expired', label: 'Hết hạn' },
   { value: 'executing', label: 'Đang chạy' },
 ];
@@ -87,6 +90,8 @@ function PendingTab({ onCountChange }: { onCountChange: VoidFunction }) {
   const [target, setTarget] = useState<{ action: IAgentAction; mode: DecisionMode } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<IAgentAction | null>(null);
+  const [revisionTarget, setRevisionTarget] = useState<IAgentAction | null>(null);
+  const [revisionError, setRevisionError] = useState<string | null>(null);
 
   // Cập nhật "còn bao lâu" mỗi 30 giây.
   useEffect(() => {
@@ -128,6 +133,41 @@ function PendingTab({ onCountChange }: { onCountChange: VoidFunction }) {
     }
   };
 
+  const openRevision = (action: IAgentAction) => {
+    setRevisionError(null);
+    setRevisionTarget(action);
+  };
+
+  const handleRevisionSubmit = async (data: { note: string; imageUrls: string[] }) => {
+    if (!revisionTarget) return;
+    setSubmitting(true);
+    setRevisionError(null);
+    try {
+      await requestAgentActionRevision(revisionTarget.id, data);
+      enqueueSnackbar('Đã gửi yêu cầu sửa — agent sẽ làm lại và gửi phiếu mới');
+      setRevisionTarget(null);
+    } catch (err: any) {
+      const notPending = err?.status === 404 || hasApiErrorCode(err, 'AgentAction.NotPending');
+      const message = apiErrorMessage(
+        err,
+        notPending
+          ? 'Phiếu này đã được người khác xử lý hoặc đã hết hạn'
+          : 'Gửi yêu cầu sửa thất bại'
+      );
+      if (notPending) {
+        enqueueSnackbar(message, { variant: 'warning' });
+        setRevisionTarget(null);
+      } else {
+        // Lỗi kiểm tra (thiếu ghi chú, ảnh không thuộc phiếu, hết lượt sửa…) — giữ hộp mở, hiện câu của máy chủ.
+        setRevisionError(message);
+      }
+    } finally {
+      setSubmitting(false);
+      refresh();
+      onCountChange();
+    }
+  };
+
   return (
     <>
       {error && (
@@ -155,6 +195,7 @@ function PendingTab({ onCountChange }: { onCountChange: VoidFunction }) {
               busy={submitting}
               onApprove={(a) => setTarget({ action: a, mode: 'approve' })}
               onReject={(a) => setTarget({ action: a, mode: 'reject' })}
+              onRequestRevision={openRevision}
             />
           ))}
         </Stack>
@@ -166,6 +207,14 @@ function PendingTab({ onCountChange }: { onCountChange: VoidFunction }) {
         submitting={submitting}
         onClose={() => setTarget(null)}
         onSubmit={handleSubmit}
+      />
+
+      <AgentRevisionDialog
+        action={revisionTarget}
+        submitting={submitting}
+        error={revisionError}
+        onClose={() => setRevisionTarget(null)}
+        onSubmit={handleRevisionSubmit}
       />
 
       <AgentResultDialog action={result} onClose={() => setResult(null)} />
