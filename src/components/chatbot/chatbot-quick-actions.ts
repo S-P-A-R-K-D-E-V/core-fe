@@ -27,6 +27,7 @@ export function resolveChatbotAudience(input: AudienceInput): ChatbotAudience {
     case 'store_manager':
       return 'admin';
     case 'cici_staff':
+    case 'store_staff':
       return 'staff';
     case 'cici_customer':
       return 'customer';
