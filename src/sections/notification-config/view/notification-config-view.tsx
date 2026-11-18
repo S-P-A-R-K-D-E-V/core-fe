@@ -209,7 +209,8 @@ export default function NotificationConfigView() {
           onChange={(e) => setFormType(e.target.value)}
           fullWidth
         >
-          <MenuItem value="telegram">Telegram</MenuItem>
+          <MenuItem value="telegram">Telegram (nhóm thông báo)</MenuItem>
+          <MenuItem value="telegram-report">Telegram – báo cáo riêng (doanh thu, báo cáo sáng)</MenuItem>
           <MenuItem value="zalo">Zalo OA</MenuItem>
         </TextField>
       )}
@@ -224,14 +225,14 @@ export default function NotificationConfigView() {
         label="Bot Token *"
         value={formToken}
         onChange={(e) => setFormToken(e.target.value)}
-        placeholder={formType === 'telegram' ? 'VD: 123456:ABC-DEF...' : 'Zalo OA Token'}
+        placeholder={formType.startsWith('telegram') ? 'VD: 123456:ABC-DEF...' : 'Zalo OA Token'}
         fullWidth
       />
       <TextField
         label="Chat ID *"
         value={formChatId}
         onChange={(e) => setFormChatId(e.target.value)}
-        placeholder={formType === 'telegram' ? 'VD: -1001234567890' : 'Zalo User ID'}
+        placeholder={formType.startsWith('telegram') ? 'VD: -1001234567890' : 'Zalo User ID'}
         fullWidth
       />
       <Stack direction="row" alignItems="center" spacing={1}>
@@ -361,8 +362,20 @@ export default function NotificationConfigView() {
                 <TableRow key={config.id} hover>
                   <TableCell>{config.name || '—'}</TableCell>
                   <TableCell>
-                    <Label color={config.type === 'telegram' ? 'info' : 'primary'}>
-                      {config.type === 'telegram' ? '🤖 Telegram' : '💬 Zalo'}
+                    <Label
+                      color={
+                        config.type === 'telegram-report'
+                          ? 'warning'
+                          : config.type === 'telegram'
+                            ? 'info'
+                            : 'primary'
+                      }
+                    >
+                      {config.type === 'telegram-report'
+                        ? '🔒 Telegram báo cáo'
+                        : config.type === 'telegram'
+                          ? '🤖 Telegram'
+                          : '💬 Zalo'}
                     </Label>
                   </TableCell>
                   <TableCell>

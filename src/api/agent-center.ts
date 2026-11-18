@@ -153,6 +153,8 @@ export interface IAgentSchedule {
   nextRunAt: string | null;
   lastRunAt: string | null;
   lastTaskId: string | null;
+  /** Xong / lỗi → hệ thống gửi kết quả vào chat Telegram báo cáo riêng (cấu hình loại telegram-report). */
+  deliverTelegram?: boolean;
 }
 
 export interface IAgentScheduleInput {
@@ -161,6 +163,7 @@ export interface IAgentScheduleInput {
   cron: string;
   instruction: string;
   enabled: boolean;
+  deliverTelegram?: boolean;
 }
 
 export interface IAgentScheduleOccurrence {

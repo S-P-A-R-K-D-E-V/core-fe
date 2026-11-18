@@ -66,6 +66,7 @@ export default function AgentScheduleDialog({
   const [cron, setCron] = useState(CRON_PRESETS[0].cron);
   const [instruction, setInstruction] = useState('');
   const [enabled, setEnabled] = useState(true);
+  const [deliverTelegram, setDeliverTelegram] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -78,6 +79,7 @@ export default function AgentScheduleDialog({
     setCron(schedule?.cron ?? CRON_PRESETS[0].cron);
     setInstruction(schedule?.instruction ?? '');
     setEnabled(schedule?.enabled ?? true);
+    setDeliverTelegram(schedule?.deliverTelegram ?? false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, schedule]);
 
@@ -92,6 +94,7 @@ export default function AgentScheduleDialog({
       cron: cron.trim(),
       instruction: instruction.trim(),
       enabled,
+      deliverTelegram,
     };
     setSaving(true);
     setError(null);
@@ -203,6 +206,25 @@ export default function AgentScheduleDialog({
                 />
               }
               label="Đang bật"
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={deliverTelegram}
+                  onChange={(e) => setDeliverTelegram(e.target.checked)}
+                  disabled={readOnly}
+                />
+              }
+              label={
+                <Stack spacing={0}>
+                  <Typography variant="body2">Gửi kết quả qua Telegram</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Gửi vào chat báo cáo riêng (Cài đặt → Thông báo, loại &quot;Telegram – báo cáo riêng&quot;), không
+                    vào nhóm nhân viên. Lỗi cũng báo một dòng.
+                  </Typography>
+                </Stack>
+              }
             />
 
             {schedule && (
