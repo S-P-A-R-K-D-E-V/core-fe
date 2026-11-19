@@ -50,12 +50,19 @@ import { useAuthContext } from 'src/auth/hooks';
 import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
 
 import AgentBoard from '../agent-board';
+import AgentTaskList from '../agent-task-list';
+import AgentTaskCalendar from '../agent-task-calendar';
+import AgentTaskToolbar, {
+  type TaskView,
+  TASK_VIEWS,
+  type TaskFilterState,
+} from '../agent-task-toolbar';
 import AgentListTab from '../agent-list-tab';
 import AgentUsageTab from '../agent-usage-tab';
 import AgentTaskDrawer from '../agent-task-drawer';
 import AgentScheduleTab from '../agent-schedule-tab';
 import AgentAssignDialog from '../agent-assign-dialog';
-import { upsertTask } from '../agent-center-utils';
+import { upsertTask, filterTasks } from '../agent-center-utils';
 import { useAgentBoardHub } from '../hooks/use-agent-board-hub';
 
 // ----------------------------------------------------------------------
@@ -94,10 +101,16 @@ export function AgentCenterView() {
   const searchParams = useSearchParams();
   const tab: TabValue = tabs.find((t) => t.value === searchParams.get('tab'))?.value ?? 'board';
   const openTaskId = searchParams.get('task') || null;
+  const taskView: TaskView =
+    TASK_VIEWS.find((v) => v.value === searchParams.get('view'))?.value ?? 'kanban';
 
   const setQuery = useCallback(
-    (patch: { tab?: TabValue; task?: string | null }) => {
+    (patch: { tab?: TabValue; task?: string | null; view?: TaskView }) => {
       const params = new URLSearchParams(searchParams.toString());
+      if (patch.view !== undefined) {
+        if (patch.view === 'kanban') params.delete('view');
+        else params.set('view', patch.view);
+      }
       if (patch.tab !== undefined) {
         if (patch.tab === 'board') params.delete('tab');
         else params.set('tab', patch.tab);
@@ -161,6 +174,19 @@ export function AgentCenterView() {
     error: agentsError,
     refresh: refreshAgents,
   } = useAgentDefinitions();
+
+  // --- Lọc bảng việc (dùng chung 3 chế độ) ----------------------------------------------
+  const [filter, setFilter] = useState<TaskFilterState>({
+    mode: 'active',
+    q: '',
+    agentId: '',
+    source: '',
+  });
+  const [listStatus, setListStatus] = useState('');
+  const boardTasks = useMemo(
+    () => filterTasks(tasks, { agentId: filter.agentId, source: filter.source, q: filter.q }),
+    [tasks, filter.agentId, filter.source, filter.q]
+  );
 
   // Nối lại hub → có thể đã lỡ sự kiện: tải lại bảng, tóm tắt và việc đang mở.
   useEffect(() => {
@@ -458,25 +484,51 @@ export function AgentCenterView() {
 
       {tab === 'board' && (
         <>
-          {!!tasksError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {apiErrorMessage(tasksError, 'Không tải được bảng việc')}
-            </Alert>
-          )}
-          <AgentBoard
-            tasks={tasks}
+          <AgentTaskToolbar
+            view={taskView}
+            onView={(v) => setQuery({ view: v })}
+            filter={filter}
+            onFilter={(patch) => setFilter((f) => ({ ...f, ...patch }))}
             agents={agents}
-            loading={tasksLoading}
-            selectedTaskId={openTaskId}
-            onOpen={(t) => openTask(t.id)}
-            onStop={(t) => setConfirm({ kind: 'stop', task: t })}
-            onRetry={handleRetry}
-            onCancel={(t) => setConfirm({ kind: 'cancel', task: t })}
             onRefresh={() => {
               refreshTasks();
               refreshSummary();
             }}
           />
+          {!!tasksError && taskView === 'kanban' && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {apiErrorMessage(tasksError, 'Không tải được bảng việc')}
+            </Alert>
+          )}
+          {taskView === 'kanban' && (
+            <AgentBoard
+              tasks={boardTasks}
+              mode={filter.mode}
+              loading={tasksLoading}
+              selectedTaskId={openTaskId}
+              onOpen={(t) => openTask(t.id)}
+              onStop={(t) => setConfirm({ kind: 'stop', task: t })}
+              onRetry={handleRetry}
+              onCancel={(t) => setConfirm({ kind: 'cancel', task: t })}
+              onShowList={(status) => {
+                setListStatus(status);
+                setQuery({ view: 'list' });
+              }}
+            />
+          )}
+          {taskView === 'list' && (
+            <AgentTaskList
+              filter={filter}
+              status={listStatus}
+              onStatus={setListStatus}
+              selectedTaskId={openTaskId}
+              onOpen={(t) => openTask(t.id)}
+              poll={poll}
+            />
+          )}
+          {taskView === 'calendar' && (
+            <AgentTaskCalendar filter={filter} onOpen={(t) => openTask(t.id)} poll={poll} />
+          )}
         </>
       )}
 

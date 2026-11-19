@@ -7,13 +7,11 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
-import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
 import { useTheme } from '@mui/material/styles';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
-
-import { fToNow } from 'src/utils/format-time';
 
 import { bgBlur } from 'src/theme/css';
 
@@ -22,9 +20,9 @@ import Iconify from 'src/components/iconify';
 
 import {
   canStop,
+  taskCode,
+  shortAgo,
   stepLabel,
-  taskTokens,
-  shortTokens,
   isDraggable,
   planProgress,
   taskElapsedMs,
@@ -35,9 +33,17 @@ import {
 } from './agent-center-utils';
 
 // ----------------------------------------------------------------------
-// Thẻ việc trên bảng (dựa trên kanban-task-item của template): agent, tên việc, nguồn, bước hiện tại, tiến độ kế hoạch,
-// thời gian chạy (đang chạy thì tự tăng theo `now`), token, nút Dừng.
+// Thẻ việc gọn (theo kanban-task-item của Minimal): mã + nguồn, tên việc tối đa 2 dòng, một dòng trạng thái (bước hiện tại /
+// chờ duyệt / lỗi), chân thẻ = agent (avatar robot) + thời gian. Token chỉ xem ở ngăn chi tiết.
 // ----------------------------------------------------------------------
+
+const STATUS_ON_CARD: string[] = [
+  'waiting_approval',
+  'waiting_human',
+  'failed',
+  'stopped',
+  'cancelled',
+];
 
 type Props = {
   task: IAgentTask;
@@ -51,13 +57,26 @@ type Props = {
 function AgentTaskCard({ task, index, now, selected, onOpen, onStop }: Props) {
   const theme = useTheme();
   const progress = planProgress(task.plan);
-  const label = stepLabel(task);
   const source = taskSourceMeta(task.source);
-  const elapsed = taskElapsedMs(task, now);
-  const tokens = taskTokens(task);
   const status = taskStatusMeta(task.status);
-  const showStatus = ['failed', 'stopped', 'cancelled'].includes(task.status);
+  const elapsed = taskElapsedMs(task, now);
   const childrenLabel = childrenWaitLabel(task);
+  const running = task.status === 'running';
+
+  // Một dòng nói việc đang ở đâu: chờ việc con / đã yêu cầu dừng / bước đang chạy.
+  const step = running ? stepLabel(task) : null;
+  let line: { text: string; color: string } | null = null;
+  if (childrenLabel) line = { text: childrenLabel, color: 'primary.main' };
+  else if (task.stopRequested && canStop(task.status))
+    line = { text: 'Đã yêu cầu dừng', color: 'warning.main' };
+  else if (step) line = { text: step, color: 'info.main' };
+  // Cột gộp nhiều trạng thái (chờ duyệt / chờ người, lỗi / dừng / huỷ) → ghi rõ trên thẻ.
+  const showStatus = STATUS_ON_CARD.includes(task.status);
+
+  const time =
+    elapsed != null && (running || task.finishedAt)
+      ? formatDuration(elapsed)
+      : shortAgo(task.finishedAt || task.createdAt, now);
 
   return (
     <Draggable draggableId={task.id} index={index} isDragDisabled={!isDraggable(task.status)}>
@@ -67,17 +86,19 @@ function AgentTaskCard({ task, index, now, selected, onOpen, onStop }: Props) {
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={() => onOpen(task)}
+          data-testid="agent-task-card"
           sx={{
             width: 1,
             borderRadius: 1.5,
             overflow: 'hidden',
             position: 'relative',
             cursor: 'pointer',
-            bgcolor: 'background.default',
+            bgcolor: 'background.paper',
             boxShadow: theme.customShadows.z1,
-            '&:hover': { boxShadow: theme.customShadows.z20 },
+            '&:hover': { boxShadow: theme.customShadows.z8 },
+            '&:hover .agent-card-stop, & .agent-card-stop:focus-visible': { opacity: 1 },
             ...(selected && {
-              boxShadow: theme.customShadows.z20,
+              boxShadow: theme.customShadows.z8,
               outline: `2px solid ${theme.palette.primary.main}`,
             }),
             ...(snapshot.isDragging && {
@@ -86,113 +107,107 @@ function AgentTaskCard({ task, index, now, selected, onOpen, onStop }: Props) {
             }),
           }}
         >
-          <Stack spacing={1.25} sx={{ px: 2, py: 1.75 }}>
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <Avatar
-                alt={task.agentName}
-                sx={{ width: 24, height: 24, fontSize: 12, bgcolor: 'primary.main' }}
-              >
-                {(task.agentName || '?').trim().charAt(0).toUpperCase()}
-              </Avatar>
-              <Typography variant="caption" noWrap sx={{ flexGrow: 1, color: 'text.secondary' }}>
-                {task.agentName}
+          <Stack spacing={0.75} sx={{ px: 1.5, pt: 1.25, pb: 1 }}>
+            <Stack direction="row" alignItems="center" spacing={0.75}>
+              <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600 }}>
+                {taskCode(task.id)}
               </Typography>
               <Tooltip title={`Nguồn: ${source.label}`}>
-                <Label variant="soft" startIcon={<Iconify icon={source.icon} width={14} />}>
-                  {source.label}
-                </Label>
+                <Box component="span" sx={{ display: 'inline-flex', color: 'text.disabled' }}>
+                  <Iconify icon={source.icon} width={14} />
+                </Box>
               </Tooltip>
+              <Box sx={{ flexGrow: 1 }} />
+              {showStatus && (
+                <Label color={status.color} variant="soft" sx={{ height: 20, fontSize: 11 }}>
+                  {status.label}
+                </Label>
+              )}
+              {canStop(task.status) && !task.stopRequested && (
+                <Tooltip title="Dừng việc">
+                  <IconButton
+                    size="small"
+                    color="error"
+                    aria-label="Dừng"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onStop(task);
+                    }}
+                    className="agent-card-stop"
+                    sx={{
+                      p: 0.25,
+                      mr: -0.5,
+                      opacity: running ? 1 : 0,
+                      transition: 'opacity 0.15s',
+                    }}
+                  >
+                    <Iconify icon="solar:stop-circle-bold" width={18} />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Stack>
 
-            <Typography variant="subtitle2" sx={{ wordBreak: 'break-word' }}>
+            <Typography
+              variant="subtitle2"
+              sx={{
+                lineHeight: 1.4,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                wordBreak: 'break-word',
+              }}
+            >
               {task.title}
             </Typography>
 
-            {showStatus && (
-              <Box>
-                <Label color={status.color} variant="soft">
-                  {status.label}
-                </Label>
-              </Box>
-            )}
-
-            {childrenLabel && (
-              <Box>
-                <Label
-                  color="primary"
-                  variant="soft"
-                  startIcon={<Iconify icon="solar:users-group-rounded-bold" width={14} />}
-                >
-                  {childrenLabel}
-                </Label>
-              </Box>
-            )}
-
-            {label && (
-              <Typography
-                variant="caption"
-                sx={{ color: task.status === 'running' ? 'info.main' : 'text.secondary' }}
-              >
-                {label}
+            {line && (
+              <Typography variant="caption" noWrap sx={{ color: line.color }}>
+                {line.text}
               </Typography>
             )}
 
-            {task.stopRequested && canStop(task.status) && (
-              <Typography variant="caption" sx={{ color: 'warning.main' }}>
-                Đã yêu cầu dừng — dừng sau bước hiện tại
-              </Typography>
-            )}
-
-            {progress.total > 0 && (
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <LinearProgress
-                  variant="determinate"
-                  value={progress.percent}
-                  color={task.status === 'failed' ? 'error' : 'primary'}
-                  sx={{ flexGrow: 1, height: 6, borderRadius: 1 }}
-                />
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {progress.done}/{progress.total}
-                </Typography>
-              </Stack>
+            {running && progress.total > 0 && (
+              <LinearProgress
+                variant="determinate"
+                value={progress.percent}
+                sx={{ height: 4, borderRadius: 1 }}
+              />
             )}
 
             <Stack
               direction="row"
               alignItems="center"
-              spacing={1.5}
+              spacing={0.75}
               sx={{ typography: 'caption', color: 'text.disabled' }}
             >
-              <Stack direction="row" alignItems="center" spacing={0.5}>
-                <Iconify icon="solar:clock-circle-outline" width={14} />
-                <span>
-                  {elapsed != null ? formatDuration(elapsed) : `tạo ${fToNow(task.createdAt)}`}
-                </span>
-              </Stack>
-              {tokens > 0 && (
-                <Tooltip title={`Vào ${task.inputTokens} · ra ${task.outputTokens} token`}>
-                  <Stack direction="row" alignItems="center" spacing={0.5}>
-                    <Iconify icon="solar:bolt-circle-outline" width={14} />
-                    <span>{shortTokens(tokens)}</span>
-                  </Stack>
-                </Tooltip>
-              )}
-              <Box sx={{ flexGrow: 1 }} />
-              {canStop(task.status) && !task.stopRequested && (
-                <Button
-                  size="small"
-                  color="error"
-                  variant="soft"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onStop(task);
-                  }}
-                  startIcon={<Iconify icon="solar:stop-circle-bold" width={16} />}
-                  sx={{ minHeight: 26, py: 0, px: 1 }}
+              <Tooltip title={task.agentName}>
+                <Avatar
+                  alt={task.agentName}
+                  sx={{ width: 20, height: 20, bgcolor: 'primary.lighter', color: 'primary.dark' }}
                 >
-                  Dừng
-                </Button>
+                  <Iconify icon="solar:cpu-bolt-bold" width={12} />
+                </Avatar>
+              </Tooltip>
+              <Box component="span" sx={{ flexGrow: 1, minWidth: 0 }}>
+                <Typography
+                  variant="caption"
+                  noWrap
+                  component="div"
+                  sx={{ color: 'text.secondary' }}
+                >
+                  {task.agentName}
+                </Typography>
+              </Box>
+              {progress.total > 0 && !running && (
+                <span>
+                  {progress.done}/{progress.total}
+                </span>
               )}
+              <Iconify icon="solar:clock-circle-outline" width={13} />
+              <Box component="span" sx={{ whiteSpace: 'nowrap' }}>
+                {time}
+              </Box>
             </Stack>
           </Stack>
         </Paper>

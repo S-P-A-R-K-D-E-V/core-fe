@@ -217,7 +217,8 @@ const EP = endpoints.agentCenter;
 
 export const AGENT_TASKS_TAKE = 200;
 export const agentSummaryKey = EP.summary;
-export const agentTasksKey = `${EP.tasks}?take=${AGENT_TASKS_TAKE}`;
+/** Bảng việc: 7 ngày + mọi việc chưa xong; việc trả lời tin khách (`conv:`) chỉ hiện khi lỗi / chờ người (xem ở Hộp thư). */
+export const agentTasksKey = `${EP.tasks}?take=${AGENT_TASKS_TAKE}&hideConversation=true`;
 export const agentTaskDetailKey = (id: string) => EP.task(id);
 export const agentListKey = EP.agents;
 export const agentSchedulesKey = EP.schedules;
@@ -271,6 +272,42 @@ export function useAgentTasks(poll: boolean) {
   });
   return useMemo(
     () => ({ tasks: data ?? [], loading: isLoading && !data, error, refresh: mutate }),
+    [data, isLoading, error, mutate]
+  );
+}
+
+export interface AgentTaskListParams {
+  /** Danh sách trạng thái, phẩy ngăn cách (vd "failed,stopped"). */
+  status?: string;
+  agentId?: string;
+  source?: string;
+  q?: string;
+  /** ISO — lọc theo lúc tạo; có khoảng ngày thì bỏ mặc định 7 ngày. */
+  from?: string;
+  to?: string;
+  hideConversation?: boolean;
+  skip?: number;
+  take?: number;
+}
+
+export function agentTaskListKey(params: AgentTaskListParams): string {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === '' || v === false) return;
+    qs.set(k, String(v));
+  });
+  return `${EP.tasks}?${qs.toString()}`;
+}
+
+/** Danh sách việc có lọc / phân trang (chế độ Danh sách, Lịch). `params` null = chưa hỏi. */
+export function useAgentTaskList(params: AgentTaskListParams | null, poll = false) {
+  const { data, isLoading, error, mutate } = useSWR<IAgentTask[]>(
+    params ? agentTaskListKey(params) : null,
+    fetcher,
+    { keepPreviousData: true, refreshInterval: poll ? POLL_MS : 0 }
+  );
+  return useMemo(
+    () => ({ tasks: data ?? [], loading: isLoading, error, refresh: mutate }),
     [data, isLoading, error, mutate]
   );
 }

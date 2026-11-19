@@ -62,7 +62,7 @@ function task(over: Partial<IAgentTask>): IAgentTask {
     pendingActionId: null,
     createdByUserId: 'u1',
     createdByName: 'Bình',
-    createdAt: '2026-11-18T00:00:00Z',
+    createdAt: new Date().toISOString(),
     startedAt: null,
     finishedAt: null,
     stopRequested: false,
@@ -104,23 +104,24 @@ describe('bảng việc', () => {
       <ThemeProvider theme={theme}>
         <AgentBoard
           tasks={tasks}
-          agents={[]}
+          mode="all"
           loading={false}
           selectedTaskId={null}
           onOpen={onOpen}
           onStop={onStop}
           onRetry={vi.fn()}
           onCancel={vi.fn()}
-          onRefresh={vi.fn()}
+          onShowList={vi.fn()}
         />
       </ThemeProvider>
     );
 
     expect(screen.getByText('Bước 2/3 — đang tra tồn kho')).toBeInTheDocument();
-    expect(screen.getByText('1/3')).toBeInTheDocument();
-    expect(screen.getByText('1,5k')).toBeInTheDocument();
-    expect(screen.getByText('Lịch')).toBeInTheDocument();
+    // Thẻ gọn: không in token, nguồn nằm trong chú thích của icon.
+    expect(screen.queryByText('1,5k')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Nguồn: Lịch')).toBeInTheDocument();
     expect(screen.getByText('Đã huỷ')).toBeInTheDocument();
+    expect(screen.getByText('Lỗi')).toBeInTheDocument();
 
     const stops = screen.getAllByRole('button', { name: 'Dừng' });
     expect(stops).toHaveLength(1);
@@ -201,15 +202,17 @@ describe('chi tiết việc', () => {
     expect(within(drawer).getByText('Đặt hàng NCC')).toBeInTheDocument();
     expect(within(drawer).getByText('1. Tra tồn')).toBeInTheDocument();
     expect(within(drawer).getByText('chờ duyệt')).toBeInTheDocument();
-    // Dòng thời gian theo seq.
+    // Link mở thẳng phiếu đang chờ.
+    expect(within(drawer).getByRole('link', { name: 'Xem phiếu duyệt' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('/dashboard/agent/approvals?id=')
+    );
+    // Dòng thời gian (tab Các bước) theo seq.
+    await userEvent.click(within(drawer).getByRole('tab', { name: /Các bước/ }));
     const s1 = within(drawer).getByText('Lập kế hoạch 2 bước');
     const s2 = within(drawer).getByText('Gọi tạo phiếu nhập');
     expect(s1.compareDocumentPosition(s2) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(drawer).getByText('Lỗi')).toBeInTheDocument();
-    expect(within(drawer).getByRole('link', { name: 'Xem phiếu duyệt' })).toHaveAttribute(
-      'href',
-      '/dashboard/agent/approvals'
-    );
 
     await userEvent.click(within(drawer).getByText('Xem chi tiết'));
     expect(within(drawer).getByText('{"supplierId":"x"}')).toBeInTheDocument();
@@ -217,6 +220,61 @@ describe('chi tiết việc', () => {
     expect(within(drawer).queryByRole('button', { name: 'Chạy lại' })).toBeNull();
     await userEvent.click(within(drawer).getByRole('button', { name: 'Dừng' }));
     expect(onStop).toHaveBeenCalledWith(expect.objectContaining({ id: 'w' }));
+  });
+});
+
+describe('bảng việc — chế độ và cột Xong', () => {
+  it('"Đang phải làm" ẩn cột Xong; "Tất cả" chỉ hiện việc xong hôm nay + link xem việc cũ', async () => {
+    const onShowList = vi.fn();
+    const yesterday = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    const tasks = [
+      task({
+        id: 'd1',
+        title: 'Xong hôm nay',
+        status: 'done',
+        finishedAt: new Date().toISOString(),
+      }),
+      task({
+        id: 'd0',
+        title: 'Xong hôm kia',
+        status: 'done',
+        finishedAt: yesterday,
+        createdAt: yesterday,
+      }),
+      task({ id: 'w', title: 'Chờ duyệt bài', status: 'waiting_approval' }),
+    ];
+    const props = {
+      tasks,
+      loading: false,
+      selectedTaskId: null,
+      onOpen: vi.fn(),
+      onStop: vi.fn(),
+      onRetry: vi.fn(),
+      onCancel: vi.fn(),
+      onShowList,
+    };
+    const { rerender } = render(
+      <ThemeProvider theme={theme}>
+        <AgentBoard {...props} mode="active" />
+      </ThemeProvider>
+    );
+    expect(screen.queryByTestId('agent-column-done')).not.toBeInTheDocument();
+    expect(screen.getByText('Chờ duyệt bài')).toBeInTheDocument();
+    // Cột gộp → thẻ ghi rõ trạng thái.
+    expect(
+      within(screen.getByTestId('agent-column-waiting')).getByText('Chờ duyệt')
+    ).toBeInTheDocument();
+
+    rerender(
+      <ThemeProvider theme={theme}>
+        <AgentBoard {...props} mode="all" />
+      </ThemeProvider>
+    );
+    const done = screen.getByTestId('agent-column-done');
+    expect(within(done).getByText('Xong hôm nay')).toBeInTheDocument();
+    expect(within(done).queryByText('Xong hôm kia')).not.toBeInTheDocument();
+    await userEvent.click(within(done).getByText(/Xem 1 việc xong trước đó/));
+    expect(onShowList).toHaveBeenCalledWith('done');
   });
 });
 
@@ -237,20 +295,20 @@ describe('A2 — việc chờ việc con', () => {
       <ThemeProvider theme={theme}>
         <AgentBoard
           tasks={[parent]}
-          agents={[]}
+          mode="all"
           loading={false}
           selectedTaskId={null}
           onOpen={vi.fn()}
           onStop={onStop}
           onRetry={vi.fn()}
           onCancel={vi.fn()}
-          onRefresh={vi.fn()}
+          onShowList={vi.fn()}
         />
       </ThemeProvider>
     );
 
     expect(screen.getByText('Chờ 1/3 việc con')).toBeInTheDocument();
-    expect(screen.getByText('Nhóm quản trị')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nguồn: Nhóm quản trị')).toBeInTheDocument();
     // Cột Đang chạy chứa thẻ.
     const runningColumn = screen
       .getByText('CEO gom báo cáo tuần')
