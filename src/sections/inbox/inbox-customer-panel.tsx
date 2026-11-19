@@ -5,6 +5,7 @@ import type { CustomerPanel, ConversationDetail, CustomerUpdateInput } from 'src
 import { useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
@@ -27,7 +28,8 @@ import { useSnackbar } from 'src/components/snackbar';
 
 // ----------------------------------------------------------------------
 // Cột thông tin khách: sửa tên / SĐT / địa chỉ / ghi chú (PUT customer — SĐT trùng đúng một khách cũ thì máy chủ gộp vào
-// khách đó), nhãn hội thoại (PUT tags), lịch sử mua + 5 hoá đơn gần nhất.
+// khách đó), nhãn hội thoại (PUT tags), lịch sử mua, thẻ "Trạng thái đơn đặt hàng" (5 hoá đơn gần nhất; nút Tạo đơn đặt
+// hàng chờ F4 — chốt đơn trong hội thoại).
 // ----------------------------------------------------------------------
 
 type Props = {
@@ -139,15 +141,20 @@ export default function InboxCustomerPanel({ detail, canEdit, tagOptions, onSave
 
       <Scrollbar sx={{ flex: 1, minHeight: 0 }}>
         <Stack spacing={2} sx={{ p: 2 }}>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <Avatar src={panel?.avatarUrl ?? detail.customer.avatarUrl ?? undefined} sx={{ width: 48, height: 48 }}>
+          <Stack alignItems="center" spacing={1} sx={{ pt: 1, textAlign: 'center' }}>
+            <Avatar src={panel?.avatarUrl ?? detail.customer.avatarUrl ?? undefined} sx={{ width: 72, height: 72 }}>
               {(panel?.name ?? detail.customer.name)?.charAt(0).toUpperCase()}
             </Avatar>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography variant="subtitle2" noWrap>
+            <Box sx={{ minWidth: 0, maxWidth: 1 }}>
+              <Typography variant="subtitle1" noWrap>
                 {panel?.name ?? detail.customer.name}
               </Typography>
-              <Stack direction="row" spacing={0.5} sx={{ mt: 0.25, flexWrap: 'wrap', rowGap: 0.5 }}>
+              <Stack
+                direction="row"
+                spacing={0.5}
+                justifyContent="center"
+                sx={{ mt: 0.5, flexWrap: 'wrap', rowGap: 0.5 }}
+              >
                 {(panel?.code ?? detail.customer.code) && (
                   <Label color="default">{panel?.code ?? detail.customer.code}</Label>
                 )}
@@ -237,36 +244,6 @@ export default function InboxCustomerPanel({ detail, canEdit, tagOptions, onSave
                     Mua gần nhất: {fDate(panel.lastPurchaseAt)}
                   </Typography>
                 )}
-
-                {panel.recentInvoices.length > 0 ? (
-                  <Stack spacing={1} sx={{ mt: 1.5 }}>
-                    {panel.recentInvoices.map((inv) => (
-                      <Stack
-                        key={inv.id}
-                        direction="row"
-                        alignItems="center"
-                        spacing={1}
-                        sx={{ p: 1, borderRadius: 1, bgcolor: 'background.neutral' }}
-                      >
-                        <Iconify icon="solar:bill-list-bold" width={18} sx={{ color: 'text.secondary' }} />
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="subtitle2" noWrap>
-                            {inv.code}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            {fDate(inv.createdAt)}
-                            {inv.channel ? ` · ${inv.channel}` : ''}
-                          </Typography>
-                        </Box>
-                        <Typography variant="subtitle2">{fVnd(inv.total)}</Typography>
-                      </Stack>
-                    ))}
-                  </Stack>
-                ) : (
-                  <Typography variant="body2" sx={{ color: 'text.disabled', mt: 1 }}>
-                    Chưa có hoá đơn.
-                  </Typography>
-                )}
               </>
             ) : (
               <Typography variant="body2" sx={{ color: 'text.disabled', mt: 1 }}>
@@ -274,6 +251,58 @@ export default function InboxCustomerPanel({ detail, canEdit, tagOptions, onSave
               </Typography>
             )}
           </Box>
+
+          <Card variant="outlined" sx={{ p: 1.5 }}>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Iconify icon="solar:cart-large-2-bold" width={18} sx={{ color: 'text.secondary' }} />
+              <Typography variant="subtitle2" sx={{ flex: 1 }}>
+                Trạng thái đơn đặt hàng
+              </Typography>
+            </Stack>
+
+            {panel && panel.recentInvoices.length > 0 ? (
+              <Stack spacing={1} sx={{ mt: 1.5 }}>
+                {panel.recentInvoices.map((inv) => (
+                  <Stack
+                    key={inv.id}
+                    direction="row"
+                    alignItems="center"
+                    spacing={1}
+                    sx={{ p: 1, borderRadius: 1, bgcolor: 'background.neutral' }}
+                  >
+                    <Iconify icon="solar:bill-list-bold" width={18} sx={{ color: 'text.secondary' }} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="subtitle2" noWrap>
+                        {inv.code}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        {fDate(inv.createdAt)}
+                        {inv.channel ? ` · ${inv.channel}` : ''}
+                      </Typography>
+                    </Box>
+                    <Typography variant="subtitle2">{fVnd(inv.total)}</Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            ) : (
+              <Typography variant="body2" sx={{ color: 'text.disabled', mt: 1 }}>
+                Chưa có đơn / hoá đơn.
+              </Typography>
+            )}
+
+            <Button
+              fullWidth
+              variant="outlined"
+              disabled
+              startIcon={<Iconify icon="mingcute:add-line" />}
+              sx={{ mt: 1.5 }}
+            >
+              Tạo đơn đặt hàng
+            </Button>
+            <Typography variant="caption" component="div" sx={{ color: 'text.disabled', mt: 0.5, textAlign: 'center' }}>
+              Sắp có (chốt đơn trong hội thoại — F4)
+            </Typography>
+          </Card>
         </Stack>
       </Scrollbar>
     </Stack>

@@ -4,6 +4,7 @@ import type {
   SocialPostInput,
   SocialChannelList,
   SocialAppSettings,
+  SocialChannelInbox,
   SocialDashboard,
   SocialQueue,
   SocialCalendar,
@@ -11,6 +12,7 @@ import type {
   SocialCaptionResult,
   SocialImageCatalog,
   SocialImageAnalysis,
+  SocialChannelSubscription,
 } from 'src/lib/social';
 
 import { socialCalendarKey } from 'src/lib/social';
@@ -156,6 +158,16 @@ export async function saveThreadsApp(input: { clientId: string; clientSecret: st
 
 export async function deleteThreadsApp() {
   await deleteSocialApp('threads');
+}
+
+/** Bật / tắt nhận tin + bình luận vào hộp thư và agent CSKH cho một kênh (agent tự tắt khi hộp thư tắt). */
+export async function setSocialChannelInbox(id: string, input: { inboxEnabled: boolean; agentEnabled: boolean }) {
+  return (await axios.put<SocialChannelInbox>(`${ROOT}/channels/${id}/inbox`, input)).data;
+}
+
+/** Đăng ký lại nhận tin nhắn + bình luận của fanpage → trường page đang gửi. */
+export async function resubscribeSocialChannel(id: string) {
+  return (await axios.post<SocialChannelSubscription>(`${ROOT}/channels/${id}/resubscribe`)).data;
 }
 
 export async function disconnectSocialChannel(id: string) {

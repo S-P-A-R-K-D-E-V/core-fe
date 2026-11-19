@@ -1,14 +1,16 @@
 'use client';
 
-import type { QuickReply, SendMessageInput } from 'src/lib/inbox';
+import type { QuickReply, SendMessageInput, ConversationKind } from 'src/lib/inbox';
 
 import { useRef, useMemo, useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import List from '@mui/material/List';
 import Paper from '@mui/material/Paper';
+import Popover from '@mui/material/Popover';
 import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
 import Switch from '@mui/material/Switch';
 import Tooltip from '@mui/material/Tooltip';
 import InputBase from '@mui/material/InputBase';
@@ -23,10 +25,13 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import { uploadConversationImage } from 'src/api/inbox';
 import {
+  appendSlash,
   windowState,
+  QUICK_EMOJIS,
+  maxImagesFor,
+  insertAtCursor,
   applyQuickReply,
   parseSlashQuery,
-  MESSAGE_MAX_IMAGES,
   MESSAGE_MAX_LENGTH,
   filterQuickReplies,
 } from 'src/lib/inbox';
@@ -34,10 +39,16 @@ import {
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 
+import InboxPrivateReplyDialog from './inbox-private-reply-dialog';
+
 // ----------------------------------------------------------------------
 // Ô gõ: Enter gửi, Shift+Enter xuống dòng; gõ "/" gọi mẫu trả lời nhanh (↑ ↓ chọn, Enter / Tab chèn, Esc đóng); đính ảnh
 // (JPEG / PNG, ≤ 10); công tắc Ghi chú nội bộ. Không trả lời được (canReply false) → vẫn ghi chú nội bộ được.
 // Cửa sổ 24 giờ của Meta còn dưới 3 giờ → cảnh báo.
+// Thanh công cụ kiểu Meta Business Suite: đính ảnh, mẫu trả lời nhanh (mở ô chọn "/"), biểu tượng cảm xúc, ô trống thì có
+// nút 👍 gửi nhanh.
+// Hội thoại bình luận: Gửi = "Trả lời công khai" dưới bình luận gần nhất của khách (tối đa 1 ảnh, không có cửa sổ 24 giờ);
+// thêm nút "Nhắn riêng" (Messenger, 1 lần / bình luận).
 // ----------------------------------------------------------------------
 
 type Props = {
@@ -52,7 +63,13 @@ type Props = {
   /** Đổi hội thoại → xoá nháp. */
   conversationId: string;
   /** Đổ sẵn nội dung (gợi ý của agent) — mỗi lần đổi `key` là một lần đổ. */
-  prefill?: { key: number; text: string; images: string[] } | null;
+  prefill?: { key: number; text: string; images: string[]; onlyIfEmpty?: boolean } | null;
+  /** Loại hội thoại — comment: trả lời công khai, 1 ảnh, có Nhắn riêng. */
+  kind?: ConversationKind;
+  /** Tên khách (tiêu đề dialog Nhắn riêng). */
+  customerName?: string;
+  /** Nhắn riêng cho người bình luận (chỉ hội thoại bình luận). Ném lỗi = giữ dialog. */
+  onPrivateReply?: (text: string) => Promise<void>;
 };
 
 const PICKER_LIMIT = 8;
@@ -66,6 +83,9 @@ export default function InboxComposer({
   allowed,
   conversationId,
   prefill,
+  kind = 'dm',
+  customerName = '',
+  onPrivateReply,
 }: Props) {
   const { enqueueSnackbar } = useSnackbar();
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -79,6 +99,14 @@ export default function InboxComposer({
   const [pickerIndex, setPickerIndex] = useState(0);
   const [pickerClosed, setPickerClosed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [privateOpen, setPrivateOpen] = useState(false);
+  const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
+
+  const comment = kind === 'comment';
+  const maxImages = maxImagesFor(kind);
+  const imageLimitText = comment
+    ? 'Trả lời bình luận chỉ kèm được 1 ảnh'
+    : `Tối đa ${maxImages} ảnh mỗi tin`;
 
   useEffect(() => {
     setText('');
@@ -88,23 +116,27 @@ export default function InboxComposer({
 
   // Dùng gợi ý của agent: đổ chữ + ảnh vào ô soạn để nhân viên sửa rồi gửi.
   const prefillKey = prefill?.key;
+  const draftRef = useRef({ text: '', images: 0 });
+  draftRef.current = { text, images: images.length };
   useEffect(() => {
     if (!prefill) return;
+    // Gợi ý tự đến: không đè lên nội dung nhân viên đang gõ.
+    if (prefill.onlyIfEmpty && (draftRef.current.text.trim() || draftRef.current.images > 0)) return;
     setText(prefill.text);
-    setImages(prefill.images);
+    setImages(prefill.images.slice(0, maxImages));
     setNote(false);
     inputRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillKey]);
 
-  // Cửa sổ 24 giờ: tính lại mỗi phút.
+  // Cửa sổ 24 giờ: tính lại mỗi phút (bình luận không có cửa sổ).
   useEffect(() => {
-    if (!windowEndsAt) return undefined;
+    if (!windowEndsAt || comment) return undefined;
     const timer = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(timer);
-  }, [windowEndsAt]);
+  }, [windowEndsAt, comment]);
 
-  const win = windowState(windowEndsAt, now);
+  const win = windowState(comment ? null : windowEndsAt, now);
   const slash = parseSlashQuery(text);
   const slashQuery = slash?.query ?? null;
   const slashStart = slash?.start ?? null;
@@ -127,7 +159,9 @@ export default function InboxComposer({
     if (!slash) return;
     setText(applyQuickReply(text, slash, reply));
     if (reply.imageUrls.length) {
-      setImages((prev) => Array.from(new Set([...prev, ...reply.imageUrls])).slice(0, MESSAGE_MAX_IMAGES));
+      const merged = Array.from(new Set([...images, ...reply.imageUrls]));
+      if (merged.length > maxImages) enqueueSnackbar(imageLimitText, { variant: 'warning' });
+      setImages(merged.slice(0, maxImages));
     }
     setPickerClosed(true);
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -135,6 +169,10 @@ export default function InboxComposer({
 
   const handleSend = async () => {
     if (blocked || empty || tooLong || sending || uploading) return;
+    if (images.length > maxImages) {
+      enqueueSnackbar(imageLimitText, { variant: 'warning' });
+      return;
+    }
     setSending(true);
     try {
       await onSend({
@@ -150,6 +188,43 @@ export default function InboxComposer({
       setSending(false);
       requestAnimationFrame(() => inputRef.current?.focus());
     }
+  };
+
+  /** Gửi nhanh 👍 (ô gõ trống). */
+  const handleLike = async () => {
+    if (blocked || note || sending || uploading) return;
+    setSending(true);
+    try {
+      await onSend({ text: '👍' });
+    } catch {
+      // Lỗi đã báo ở nơi gọi.
+    } finally {
+      setSending(false);
+    }
+  };
+
+  /** Chèn biểu tượng cảm xúc vào chỗ con trỏ. */
+  const handleEmoji = (emoji: string) => {
+    const el = inputRef.current;
+    const next = insertAtCursor(text, emoji, el?.selectionStart, el?.selectionEnd);
+    setText(next.text);
+    setEmojiAnchor(null);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(next.caret, next.caret);
+    });
+  };
+
+  /** Nút Mẫu trả lời nhanh: thêm "/" để mở ô chọn mẫu. */
+  const handleQuickReplies = () => {
+    setText((t) => appendSlash(t));
+    setPickerClosed(false);
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -185,11 +260,12 @@ export default function InboxComposer({
     if (!files?.length) return;
     const list = Array.from(files).filter((f) => f.type === 'image/jpeg' || f.type === 'image/png');
     if (list.length < files.length) enqueueSnackbar('Chỉ gửi được ảnh JPEG / PNG', { variant: 'warning' });
-    const room = MESSAGE_MAX_IMAGES - images.length;
+    const room = maxImages - images.length;
     if (room <= 0) {
-      enqueueSnackbar(`Tối đa ${MESSAGE_MAX_IMAGES} ảnh mỗi tin`, { variant: 'warning' });
+      enqueueSnackbar(imageLimitText, { variant: 'warning' });
       return;
     }
+    if (list.length > room) enqueueSnackbar(imageLimitText, { variant: 'warning' });
     setUploading(true);
     try {
       const urls: string[] = [];
@@ -317,7 +393,9 @@ export default function InboxComposer({
           placeholder={
             note
               ? 'Ghi chú nội bộ — khách không thấy…'
-              : 'Nhập tin trả lời… (gõ / để chọn mẫu trả lời nhanh)'
+              : comment
+                ? 'Trả lời công khai dưới bình luận của khách…'
+                : 'Trả lời trong Messenger…'
           }
           sx={{ typography: 'body2', ...(note && { color: 'grey.800' }) }}
         />
@@ -326,36 +404,72 @@ export default function InboxComposer({
       <Stack
         direction="row"
         alignItems="center"
-        spacing={1}
+        spacing={0.5}
         sx={{ px: 1, py: 1, ...(note && { bgcolor: 'warning.lighter' }) }}
       >
         <input
           ref={fileRef}
           type="file"
           accept="image/jpeg,image/png"
-          multiple
+          multiple={!comment}
           hidden
           onChange={(e) => handleFiles(e.target.files)}
         />
-        <Tooltip title="Đính ảnh (JPEG / PNG)">
+        <Tooltip
+          title={
+            images.length >= maxImages
+              ? imageLimitText
+              : comment
+                ? 'Đính 1 ảnh (JPEG / PNG) — bình luận chỉ kèm được 1 ảnh'
+                : 'Đính ảnh (JPEG / PNG)'
+          }
+        >
           <span>
             <IconButton
               onClick={() => fileRef.current?.click()}
-              disabled={!allowed || uploading || images.length >= MESSAGE_MAX_IMAGES}
+              disabled={!allowed || uploading || images.length >= maxImages}
             >
               <Iconify icon={uploading ? 'svg-spinners:8-dots-rotate' : 'solar:gallery-add-bold'} />
             </IconButton>
           </span>
         </Tooltip>
 
-        <FormControlLabel
-          control={<Switch size="small" color="warning" checked={note} onChange={(_, v) => setNote(v)} />}
-          label={<Typography variant="body2">Ghi chú nội bộ</Typography>}
-          disabled={!allowed}
-          sx={{ mx: 0 }}
-        />
+        <Tooltip title={quickReplies.length ? 'Mẫu trả lời nhanh (hoặc gõ /)' : 'Chưa có mẫu trả lời nhanh'}>
+          <span>
+            <IconButton onClick={handleQuickReplies} disabled={!allowed || quickReplies.length === 0}>
+              <Iconify icon="solar:bolt-circle-bold" />
+            </IconButton>
+          </span>
+        </Tooltip>
+
+        <Tooltip title="Biểu tượng cảm xúc">
+          <span>
+            <IconButton onClick={(e) => setEmojiAnchor(e.currentTarget)} disabled={!allowed}>
+              <Iconify icon="solar:smile-circle-bold" />
+            </IconButton>
+          </span>
+        </Tooltip>
+
+        <Tooltip title="Ghi chú nội bộ — khách không thấy">
+          <FormControlLabel
+            control={<Switch size="small" color="warning" checked={note} onChange={(_, v) => setNote(v)} />}
+            label={
+              <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                Ghi chú nội bộ
+              </Typography>
+            }
+            disabled={!allowed}
+            sx={{ mx: 0, ml: 0.5 }}
+          />
+        </Tooltip>
 
         <Box sx={{ flex: 1 }} />
+
+        {comment && images.length >= maxImages && (
+          <Typography variant="caption" sx={{ color: 'text.disabled', display: { xs: 'none', sm: 'block' } }}>
+            Tối đa 1 ảnh
+          </Typography>
+        )}
 
         {text.length > MESSAGE_MAX_LENGTH * 0.8 && (
           <Typography variant="caption" sx={{ color: tooLong ? 'error.main' : 'text.disabled' }}>
@@ -363,17 +477,80 @@ export default function InboxComposer({
           </Typography>
         )}
 
-        <LoadingButton
-          variant="contained"
-          color={note ? 'warning' : 'primary'}
-          loading={sending}
-          disabled={blocked || empty || tooLong || uploading}
-          onClick={handleSend}
-          endIcon={<Iconify icon={note ? 'solar:notes-bold' : 'solar:plain-2-bold'} />}
-        >
-          {note ? 'Ghi chú' : 'Gửi'}
-        </LoadingButton>
+        {comment && onPrivateReply && (
+          <Tooltip title="Nhắn Messenger riêng cho người bình luận (1 lần / bình luận, trong 7 ngày)">
+            <span>
+              <Button
+                variant="outlined"
+                color="inherit"
+                disabled={!allowed || !canReply || sending}
+                onClick={() => setPrivateOpen(true)}
+                startIcon={<Iconify icon="solar:letter-bold" />}
+              >
+                Nhắn riêng
+              </Button>
+            </span>
+          </Tooltip>
+        )}
+
+        {empty && !note ? (
+          <Tooltip title="Gửi 👍">
+            <span>
+              <IconButton
+                color="primary"
+                aria-label="Gửi biểu tượng thích"
+                disabled={blocked || sending || uploading}
+                onClick={handleLike}
+                sx={{ fontSize: 22, width: 40, height: 40 }}
+              >
+                {sending ? <Iconify icon="svg-spinners:8-dots-rotate" /> : <span aria-hidden>👍</span>}
+              </IconButton>
+            </span>
+          </Tooltip>
+        ) : (
+          <LoadingButton
+            variant="contained"
+            color={note ? 'warning' : 'primary'}
+            loading={sending}
+            disabled={blocked || empty || tooLong || uploading}
+            onClick={handleSend}
+            endIcon={<Iconify icon={note ? 'solar:notes-bold' : 'solar:plain-2-bold'} />}
+          >
+            {note ? 'Ghi chú' : comment ? 'Trả lời công khai' : 'Gửi'}
+          </LoadingButton>
+        )}
       </Stack>
+
+      <Popover
+        open={!!emojiAnchor}
+        anchorEl={emojiAnchor}
+        onClose={() => setEmojiAnchor(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        slotProps={{ paper: { sx: { p: 1 } } }}
+      >
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, 36px)', gap: 0.25 }}>
+          {QUICK_EMOJIS.map((emoji) => (
+            <IconButton
+              key={emoji}
+              onClick={() => handleEmoji(emoji)}
+              aria-label={`Chèn ${emoji}`}
+              sx={{ width: 36, height: 36, fontSize: 20, borderRadius: 1 }}
+            >
+              {emoji}
+            </IconButton>
+          ))}
+        </Box>
+      </Popover>
+
+      {comment && onPrivateReply && (
+        <InboxPrivateReplyDialog
+          open={privateOpen}
+          customerName={customerName}
+          onClose={() => setPrivateOpen(false)}
+          onSend={onPrivateReply}
+        />
+      )}
     </Box>
   );
 }

@@ -17,7 +17,40 @@ export type SocialChannel = {
   tokenExpiresAt: string | null;
   lastError: string | null;
   connectedAt: string;
+  /** Nhận tin nhắn + bình luận vào Hộp thư khách (tắt = page chỉ để đăng bài). */
+  inboxEnabled: boolean;
+  /** Agent CSKH trả lời trên kênh này (chỉ bật được khi inboxEnabled). */
+  agentEnabled: boolean;
+  /** Lần đăng ký nhận tin (webhook) gần nhất của page. */
+  webhookSubscribedAt: string | null;
+  /** Lần cuối nhận sự kiện webhook từ page. */
+  lastWebhookAt: string | null;
 };
+
+/** Kết quả PUT social/channels/{id}/inbox. */
+export type SocialChannelInbox = { id: string; inboxEnabled: boolean; agentEnabled: boolean };
+
+/** Kết quả POST social/channels/{id}/resubscribe: trường page đang gửi (messages, feed…). */
+export type SocialChannelSubscription = {
+  fields: string[];
+  appWebhookError: string | null;
+  subscribedAt: string | null;
+  lastError: string | null;
+};
+
+/** "Đang nhận: messages, feed" / lỗi đăng ký → câu báo cho chủ cửa hàng. */
+export function subscriptionSummary(result: SocialChannelSubscription): {
+  severity: 'success' | 'warning' | 'error';
+  message: string;
+} {
+  const error = result.appWebhookError?.trim() || result.lastError?.trim();
+  const fields = result.fields.filter(Boolean);
+  if (fields.length === 0) {
+    return { severity: 'error', message: error || 'Page chưa gửi tin / bình luận nào về hộp thư.' };
+  }
+  const listening = `Đang nhận: ${fields.join(', ')}`;
+  return error ? { severity: 'warning', message: `${listening}. Lưu ý: ${error}` } : { severity: 'success', message: listening };
+}
 
 export type SocialChannelList = { threadsConfigured: boolean; facebookConfigured?: boolean; items: SocialChannel[] };
 

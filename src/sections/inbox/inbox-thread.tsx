@@ -14,15 +14,13 @@ import { useSWRConfig } from 'swr';
 import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
-import Menu from '@mui/material/Menu';
+import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import Drawer from '@mui/material/Drawer';
-import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
-import MenuItem from '@mui/material/MenuItem';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
@@ -32,22 +30,28 @@ import { hasApiErrorCode, apiErrorMessage } from 'src/utils/api-error';
 
 import {
   toSummary,
+  isPriority,
   holderColor,
   holderLabel,
   platformIcon,
   isHeldByMe,
+  facebookPostUrl,
   flattenMessages,
   addMessageToPages,
   imageAttachments,
+  togglePriorityTag,
   updateMessageInPages,
 } from 'src/lib/inbox';
 import {
+  sendPrivateReply,
   takeConversation,
+  setCommentHidden,
   assignConversation,
   releaseConversation,
   setConversationTags,
   markConversationRead,
   conversationDetailKey,
+  markConversationUnread,
   setConversationStatus,
   useConversationDetail,
   sendConversationMessage,
@@ -67,9 +71,12 @@ import InboxAssignDialog from './inbox-assign-dialog';
 import InboxCustomerPanel from './inbox-customer-panel';
 
 // ----------------------------------------------------------------------
-// Khung một hội thoại: thanh đầu (khách, kênh, người giữ, Tôi trả lời / Trả về hàng chờ / Giao lại cho agent, menu Giao
-// cho… / Đóng / Mở lại / Spam), bong bóng tin, ô gõ; cột thông tin khách (cạnh bên hoặc ngăn kéo).
+// Khung một hội thoại (kiểu Meta Business Suite): thanh đầu (khách, kênh, "Đã chỉ định cho …" mở hộp Giao cho, nút biểu
+// tượng Spam / Ưu tiên / Đánh dấu chưa đọc / Hoàn tất – Mở lại), thanh người giữ (Tôi trả lời / Trả về hàng chờ / Giao lại
+// cho agent), bong bóng tin, ô gõ; cột thông tin khách (cạnh bên hoặc ngăn kéo).
 // Mở hội thoại / có tin mới khi đang mở → đánh dấu đã đọc.
+// Hội thoại bình luận: thanh đầu ghi "Bình luận trên bài" + link "Xem bài"; bình luận khách ẩn / hiện lại được; ô gõ trả
+// lời công khai + Nhắn riêng.
 // ----------------------------------------------------------------------
 
 export type InboxPermissions = { reply: boolean; manage: boolean };
@@ -87,9 +94,11 @@ type Props = {
   onBack?: VoidFunction;
   /** Hub mất kết nối → hỏi lại định kỳ. */
   poll: boolean;
+  /** Đã đánh dấu chưa đọc → rời hội thoại (không thì mở ra là tự đánh dấu đã đọc lại). */
+  onMarkedUnread?: VoidFunction;
 };
 
-type Busy = 'take' | 'release-none' | 'release-agent' | 'status' | null;
+type Busy = 'take' | 'release-none' | 'release-agent' | 'status' | 'priority' | 'unread' | null;
 
 export default function InboxThread({
   conversationId,
@@ -101,6 +110,7 @@ export default function InboxThread({
   panelMode,
   onBack,
   poll,
+  onMarkedUnread,
 }: Props) {
   const { enqueueSnackbar } = useSnackbar();
   const { mutate } = useSWRConfig();
@@ -111,12 +121,37 @@ export default function InboxThread({
   const messages = useMemo(() => flattenMessages(msgs.pages), [msgs.pages]);
 
   const [busy, setBusy] = useState<Busy>(null);
-  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [forceConfirm, setForceConfirm] = useState<{ name: string } | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
-  const [prefill, setPrefill] = useState<{ key: number; text: string; images: string[] } | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [prefill, setPrefill] = useState<{
+    key: number;
+    text: string;
+    images: string[];
+    onlyIfEmpty?: boolean;
+  } | null>(null);
+
+  // Gợi ý MỚI của agent (vd sau khi nhân viên ghi chú hướng dẫn) → tự đổ vào ô trả lời khi ô đang trống; người sửa rồi tự gửi.
+  const lastSuggestionRef = useRef<{ conversationId: string; id: string | null } | null>(null);
+  useEffect(() => {
+    if (msgs.loading) return;
+    const latest = [...messages].reverse().find((m) => m.status === 'suggested') ?? null;
+    const seen = lastSuggestionRef.current;
+    lastSuggestionRef.current = { conversationId, id: latest?.id ?? null };
+    // Lần đầu mở hội thoại: chỉ ghi nhận, không đổ gợi ý cũ.
+    if (!seen || seen.conversationId !== conversationId || !latest || latest.id === seen.id) return;
+    if (!permissions.reply) return;
+    setPrefill({
+      key: Date.now(),
+      text: latest.text ?? '',
+      images: latest.attachments.filter((a) => a.type === 'image').map((a) => a.url),
+      onlyIfEmpty: true,
+    });
+    enqueueSnackbar('Agent đã soạn gợi ý vào ô trả lời — sửa rồi bấm Gửi', { variant: 'info' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, conversationId, msgs.loading]);
 
   // --- Sự kiện trực tiếp cho hội thoại đang mở -------------------------------------------------
   const prevRef = useRef<{ status?: string; windowEndsAt?: string | null }>({});
@@ -145,8 +180,11 @@ export default function InboxThread({
 
   // --- Đánh dấu đã đọc --------------------------------------------------------------------------
   const readInFlight = useRef(false);
+  /** Vừa bấm "Đánh dấu chưa đọc" → không tự đánh dấu đã đọc lại trước khi rời hội thoại. */
+  const keepUnread = useRef(false);
   useEffect(() => {
     if (!detail || detail.id !== conversationId || detail.unreadCount <= 0 || readInFlight.current) return;
+    if (keepUnread.current) return;
     readInFlight.current = true;
     const summary = { ...toSummary(detail), unreadCount: 0 };
     markConversationRead(conversationId)
@@ -204,15 +242,44 @@ export default function InboxThread({
   };
 
   const doStatus = async (status: ConversationStatus) => {
-    setMenuAnchor(null);
     setBusy('status');
     try {
       applySummary(await setConversationStatus(conversationId, status));
       enqueueSnackbar(
-        status === 'closed' ? 'Đã đóng hội thoại' : status === 'spam' ? 'Đã đánh dấu spam' : 'Đã mở lại hội thoại'
+        status === 'closed' ? 'Đã hoàn tất hội thoại' : status === 'spam' ? 'Đã đánh dấu spam' : 'Đã mở lại hội thoại'
       );
     } catch (err) {
       enqueueSnackbar(apiErrorMessage(err, 'Không đổi được trạng thái'), { variant: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const doTogglePriority = async () => {
+    if (!detail) return;
+    const on = !isPriority(detail);
+    setBusy('priority');
+    try {
+      applySummary(await setConversationTags(conversationId, togglePriorityTag(detail.tags)));
+      enqueueSnackbar(on ? 'Đã gắn Ưu tiên' : 'Đã bỏ Ưu tiên');
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không đổi được Ưu tiên'), { variant: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const doMarkUnread = async () => {
+    keepUnread.current = true;
+    setBusy('unread');
+    try {
+      const summary = await markConversationUnread(conversationId);
+      onMarkedUnread?.();
+      applySummary(summary);
+      enqueueSnackbar('Đã đánh dấu chưa đọc');
+    } catch (err) {
+      keepUnread.current = false;
+      enqueueSnackbar(apiErrorMessage(err, 'Không đánh dấu chưa đọc được'), { variant: 'error' });
     } finally {
       setBusy(null);
     }
@@ -267,6 +334,32 @@ export default function InboxThread({
     }
   };
 
+  const doToggleHidden = async (m: ConversationMessage) => {
+    const hide = m.status !== 'hidden';
+    setTogglingId(m.id);
+    try {
+      const updated = await setCommentHidden(conversationId, m.id, hide);
+      msgs.mutate((pages) => updateMessageInPages(pages, updated), { revalidate: false });
+      enqueueSnackbar(hide ? 'Đã ẩn bình luận trên Facebook' : 'Đã hiện lại bình luận');
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, hide ? 'Không ẩn được bình luận' : 'Không hiện lại được bình luận'), {
+        variant: 'error',
+      });
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const doPrivateReply = async (text: string) => {
+    try {
+      applyMessage(await sendPrivateReply(conversationId, text));
+      enqueueSnackbar('Đã nhắn riêng cho khách qua Messenger');
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Facebook không gửi được tin nhắn riêng'), { variant: 'error' });
+      throw err;
+    }
+  };
+
   const doSaveCustomer = async (input: CustomerUpdateInput) => {
     const panel = await updateConversationCustomer(conversationId, input);
     mutate(
@@ -308,6 +401,9 @@ export default function InboxThread({
   }
 
   const mine = isHeldByMe(detail.holder, myUserId);
+  const isComment = detail.kind === 'comment';
+  const priority = isPriority(detail);
+  const postUrl = isComment ? facebookPostUrl(detail.postId) : null;
   const agentOff = !agentMode || agentMode === 'off';
   const showPanelButton = panelMode === 'drawer';
 
@@ -343,8 +439,8 @@ export default function InboxThread({
         <Stack
           direction="row"
           alignItems="center"
-          spacing={1.5}
-          sx={{ px: { xs: 1, md: 2 }, py: 1, minHeight: 64, flexWrap: 'wrap', rowGap: 1 }}
+          spacing={1}
+          sx={{ px: { xs: 1, md: 2 }, py: 1, minHeight: 64, flexWrap: 'wrap', rowGap: 0.5 }}
         >
           {onBack && (
             <IconButton onClick={onBack} aria-label="Quay lại danh sách">
@@ -355,62 +451,102 @@ export default function InboxThread({
             {detail.customer.name?.charAt(0).toUpperCase()}
           </Avatar>
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="subtitle1" noWrap>
-              {detail.customer.name || 'Khách'}
-            </Typography>
-            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ color: 'text.secondary' }}>
-              <Iconify icon={platformIcon(detail.platform)} width={14} />
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+              <Typography variant="subtitle1" noWrap>
+                {detail.customer.name || 'Khách'}
+              </Typography>
+              {priority && <Iconify icon="solar:star-bold" width={16} sx={{ color: 'warning.main', flexShrink: 0 }} />}
+            </Stack>
+            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ color: 'text.secondary', minWidth: 0 }}>
+              <Iconify icon={platformIcon(detail.platform)} width={14} sx={{ flexShrink: 0 }} />
               <Typography variant="caption" noWrap>
                 {detail.channelName}
-                {detail.kind === 'comment' ? ' · Bình luận' : ''}
-                {detail.assignedName ? ` · Giao cho ${detail.assignedName}` : ''}
+                {isComment ? ' · Bình luận trên bài' : ''}
               </Typography>
+              {postUrl && (
+                <Link
+                  href={postUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="caption"
+                  underline="hover"
+                  sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25, flexShrink: 0, fontWeight: 600 }}
+                >
+                  Xem bài
+                  <Iconify icon="eva:external-link-fill" width={12} />
+                </Link>
+              )}
             </Stack>
           </Box>
 
-          <Label color={holderColor(detail.holder, myUserId)} variant="soft" sx={{ flexShrink: 0 }}>
-            {holderLabel(detail.holder, myUserId)}
-          </Label>
-          {detail.status !== 'open' && (
-            <Label color={detail.status === 'spam' ? 'error' : 'default'}>
-              {detail.status === 'spam' ? 'Spam' : 'Đã đóng'}
-            </Label>
-          )}
-
-          <Stack direction="row" spacing={1} alignItems="center">
-            {!mine && (
-              <LoadingButton
+          <Tooltip title={permissions.manage ? 'Giao hội thoại cho nhân viên' : 'Cần quyền quản lý hộp thư để giao'}>
+            <span>
+              <Button
                 size="small"
-                variant="contained"
-                loading={busy === 'take'}
-                disabled={!permissions.reply || !!busy}
-                onClick={() => doTake(false)}
-                startIcon={<Iconify icon="solar:chat-round-dots-bold" />}
+                color="inherit"
+                disabled={!permissions.manage}
+                onClick={() => setAssignOpen(true)}
+                startIcon={<Iconify icon="solar:user-hand-up-bold" width={16} />}
+                endIcon={<Iconify icon="eva:arrow-ios-downward-fill" width={14} />}
+                sx={{ fontWeight: 500, color: 'text.secondary', maxWidth: 220 }}
               >
-                Tôi trả lời
-              </LoadingButton>
-            )}
-            {detail.holder.type !== 'none' && (mine || permissions.manage) && (
-              <LoadingButton
+                <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {detail.assignedName ? `Đã chỉ định cho ${detail.assignedName}` : 'Chưa chỉ định'}
+                </Box>
+              </Button>
+            </span>
+          </Tooltip>
+
+          <Stack direction="row" spacing={0.25} alignItems="center">
+            <Tooltip title={detail.status === 'spam' ? 'Bỏ đánh dấu spam' : 'Đánh dấu spam'}>
+              <span>
+                <IconButton
+                  disabled={!permissions.reply || !!busy}
+                  onClick={() => doStatus(detail.status === 'spam' ? 'open' : 'spam')}
+                  sx={{ color: detail.status === 'spam' ? 'error.main' : undefined }}
+                >
+                  <Iconify icon="solar:shield-warning-bold" />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title={priority ? 'Bỏ Ưu tiên' : 'Ưu tiên'}>
+              <span>
+                <IconButton
+                  disabled={!permissions.reply || !!busy}
+                  onClick={doTogglePriority}
+                  sx={{ color: priority ? 'warning.main' : undefined }}
+                >
+                  <Iconify icon={priority ? 'solar:star-bold' : 'solar:star-linear'} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="Đánh dấu chưa đọc">
+              <span>
+                <IconButton disabled={!!busy} onClick={doMarkUnread}>
+                  <Iconify icon="solar:letter-unread-bold" />
+                </IconButton>
+              </span>
+            </Tooltip>
+            {detail.status === 'open' ? (
+              <Tooltip title="Hoàn tất (đóng hội thoại)">
+                <span>
+                  <IconButton disabled={!permissions.reply || !!busy} onClick={() => doStatus('closed')}>
+                    <Iconify icon="solar:check-circle-bold" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            ) : (
+              <Button
                 size="small"
                 variant="outlined"
                 color="inherit"
-                loading={busy === 'release-none'}
                 disabled={!permissions.reply || !!busy}
-                onClick={() => doRelease('none')}
+                onClick={() => doStatus('open')}
+                startIcon={<Iconify icon="solar:restart-bold" width={16} />}
               >
-                Trả về hàng chờ
-              </LoadingButton>
+                Mở lại
+              </Button>
             )}
-            {detail.holder.type !== 'agent' &&
-              (agentOff ? (
-                <Tooltip title="Bật agent ở bước sau">
-                  <span>{agentButton}</span>
-                </Tooltip>
-              ) : (
-                agentButton
-              ))}
-
             {showPanelButton && (
               <Tooltip title="Thông tin khách">
                 <IconButton onClick={() => setPanelOpen(true)}>
@@ -418,13 +554,66 @@ export default function InboxThread({
                 </IconButton>
               </Tooltip>
             )}
-            <IconButton onClick={(e) => setMenuAnchor(e.currentTarget)} aria-label="Thêm thao tác">
-              <Iconify icon="eva:more-vertical-fill" />
-            </IconButton>
           </Stack>
         </Stack>
 
-        <Divider />
+        {/* Thanh người giữ: ai đang trả lời + giành / trả / giao agent */}
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1}
+          sx={{
+            px: { xs: 1, md: 2 },
+            py: 0.75,
+            bgcolor: 'background.neutral',
+            borderTop: (theme) => `solid 1px ${theme.palette.divider}`,
+            borderBottom: (theme) => `solid 1px ${theme.palette.divider}`,
+            flexWrap: 'wrap',
+            rowGap: 0.75,
+          }}
+        >
+          <Label color={holderColor(detail.holder, myUserId)} variant="soft" sx={{ flexShrink: 0 }}>
+            {holderLabel(detail.holder, myUserId)}
+          </Label>
+          {detail.status !== 'open' && (
+            <Label color={detail.status === 'spam' ? 'error' : 'default'}>
+              {detail.status === 'spam' ? 'Spam' : 'Đã hoàn tất'}
+            </Label>
+          )}
+          <Box sx={{ flex: 1 }} />
+          {!mine && (
+            <LoadingButton
+              size="small"
+              variant="contained"
+              loading={busy === 'take'}
+              disabled={!permissions.reply || !!busy}
+              onClick={() => doTake(false)}
+              startIcon={<Iconify icon="solar:chat-round-dots-bold" />}
+            >
+              Tôi trả lời
+            </LoadingButton>
+          )}
+          {detail.holder.type !== 'none' && (mine || permissions.manage) && (
+            <LoadingButton
+              size="small"
+              variant="outlined"
+              color="inherit"
+              loading={busy === 'release-none'}
+              disabled={!permissions.reply || !!busy}
+              onClick={() => doRelease('none')}
+            >
+              Trả về hàng chờ
+            </LoadingButton>
+          )}
+          {detail.holder.type !== 'agent' &&
+            (agentOff ? (
+              <Tooltip title="Bật agent ở bước sau">
+                <span>{agentButton}</span>
+              </Tooltip>
+            ) : (
+              agentButton
+            ))}
+        </Stack>
 
         <InboxMessageList
           conversationId={conversationId}
@@ -446,6 +635,9 @@ export default function InboxThread({
           }
           resendingId={resendingId}
           customerAvatarUrl={detail.customer.avatarUrl}
+          conversationKind={detail.kind}
+          onToggleHidden={permissions.reply && isComment ? doToggleHidden : undefined}
+          togglingId={togglingId}
         />
 
         <InboxComposer
@@ -453,10 +645,13 @@ export default function InboxThread({
           allowed={permissions.reply}
           canReply={detail.canReply}
           reason={detail.reason}
-          windowEndsAt={detail.windowEndsAt}
+          windowEndsAt={isComment ? null : detail.windowEndsAt}
           quickReplies={quickReplies}
           onSend={doSend}
           prefill={prefill}
+          kind={detail.kind}
+          customerName={detail.customer.name}
+          onPrivateReply={isComment ? doPrivateReply : undefined}
         />
       </Stack>
 
@@ -483,37 +678,6 @@ export default function InboxThread({
           {panel}
         </Drawer>
       )}
-
-      <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={() => setMenuAnchor(null)}>
-        {permissions.manage && (
-          <MenuItem
-            onClick={() => {
-              setMenuAnchor(null);
-              setAssignOpen(true);
-            }}
-          >
-            <Iconify icon="solar:user-hand-up-bold" sx={{ mr: 1 }} />
-            Giao cho…
-          </MenuItem>
-        )}
-        {detail.status === 'open' ? (
-          <MenuItem disabled={!permissions.reply} onClick={() => doStatus('closed')}>
-            <Iconify icon="solar:check-circle-bold" sx={{ mr: 1 }} />
-            Đóng hội thoại
-          </MenuItem>
-        ) : (
-          <MenuItem disabled={!permissions.reply} onClick={() => doStatus('open')}>
-            <Iconify icon="solar:restart-bold" sx={{ mr: 1 }} />
-            Mở lại
-          </MenuItem>
-        )}
-        {detail.status !== 'spam' && (
-          <MenuItem disabled={!permissions.reply} onClick={() => doStatus('spam')} sx={{ color: 'error.main' }}>
-            <Iconify icon="solar:shield-warning-bold" sx={{ mr: 1 }} />
-            Đánh dấu spam
-          </MenuItem>
-        )}
-      </Menu>
 
       <InboxAssignDialog
         open={assignOpen}

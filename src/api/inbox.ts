@@ -183,6 +183,19 @@ export async function sendConversationMessage(id: string, input: SendMessageInpu
   return (await axios.post<ConversationMessage>(`${ROOT}/${id}/messages`, input)).data;
 }
 
+/** Hội thoại bình luận: ẩn / hiện lại một bình luận của khách trên Facebook. */
+export async function setCommentHidden(id: string, messageId: string, hidden: boolean) {
+  return (await axios.post<ConversationMessage>(`${ROOT}/${id}/messages/${messageId}/hide`, { hidden })).data;
+}
+
+/**
+ * Hội thoại bình luận: nhắn riêng Messenger cho người bình luận (1 tin / bình luận, trong 7 ngày).
+ * Facebook từ chối → 409 `Conversation.PrivateReplyFailed` (detail tiếng Việt).
+ */
+export async function sendPrivateReply(id: string, text: string) {
+  return (await axios.post<ConversationMessage>(`${ROOT}/${id}/private-reply`, { text })).data;
+}
+
 /** Giành quyền trả lời; `force` (quyền manage) để giành từ nhân viên khác. */
 export async function takeConversation(id: string, force = false) {
   return (await axios.post<ConversationSummary>(`${ROOT}/${id}/take`, force ? { force: true } : {})).data;
@@ -198,6 +211,11 @@ export async function assignConversation(id: string, userId: string | null) {
 
 export async function markConversationRead(id: string) {
   await axios.post(`${ROOT}/${id}/read`);
+}
+
+/** Đánh dấu chưa đọc (unread = 1 nếu đang 0) → ConversationSummary. */
+export async function markConversationUnread(id: string) {
+  return (await axios.post<ConversationSummary>(`${ROOT}/${id}/unread`)).data;
 }
 
 export async function setConversationTags(id: string, tags: string[]) {

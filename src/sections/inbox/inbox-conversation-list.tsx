@@ -5,14 +5,15 @@ import type { InboxBox, InboxSummary, ConversationStatus, ConversationSummary } 
 import { useMemo, useState } from 'react';
 
 import Box from '@mui/material/Box';
-import Tab from '@mui/material/Tab';
+import Chip from '@mui/material/Chip';
 import Menu from '@mui/material/Menu';
-import Tabs from '@mui/material/Tabs';
 import Badge from '@mui/material/Badge';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
+import Select from '@mui/material/Select';
 import Divider from '@mui/material/Divider';
+import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
@@ -25,12 +26,16 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { fTimeShort } from 'src/utils/format-time';
 
 import {
+  isPriority,
   INBOX_BOXES,
+  PRIORITY_TAG,
   STATUS_LABEL,
   holderColor,
   platformIcon,
   holderShortLabel,
   lastMessagePreview,
+  conversationKindLabel,
+  conversationBadgeIcon,
 } from 'src/lib/inbox';
 
 import Label from 'src/components/label';
@@ -39,14 +44,21 @@ import Scrollbar from 'src/components/scrollbar';
 import EmptyContent from 'src/components/empty-content';
 
 // ----------------------------------------------------------------------
-// Cột danh sách hội thoại: tab theo nhóm (đếm từ conversations/summary), tìm, lọc kênh / nhãn / trạng thái, "Tải thêm".
+// Cột danh sách hội thoại (kiểu Meta Business Suite): ô tìm, chọn nhóm người giữ (Chưa ai nhận / Của tôi / Agent / Trên
+// Facebook / Tất cả — đếm từ conversations/summary), chip lọc nhanh Chưa đọc / Ưu tiên / AI, menu lọc trạng thái / kênh /
+// nhãn; dòng: ảnh đại diện có dấu kênh, tên đậm khi chưa đọc, tin cuối ("Bạn: …"), giờ, chip Ưu tiên + "Giao: …".
+// Loại hội thoại (tin nhắn / bình luận) là tab trên cùng của trang.
 // ----------------------------------------------------------------------
 
 export type ListExtraFilter = {
   channelId: string | null;
   tag: string | null;
   status: ConversationStatus;
+  /** Chỉ hội thoại còn tin chưa đọc. */
+  unread: boolean;
 };
+
+export const DEFAULT_LIST_EXTRA: ListExtraFilter = { channelId: null, tag: null, status: 'open', unread: false };
 
 type Props = {
   box: InboxBox;
@@ -97,65 +109,110 @@ export default function InboxConversationList({
     const set = new Set<string>();
     items.forEach((c) => c.tags.forEach((t) => set.add(t)));
     if (extra.tag) set.add(extra.tag);
+    set.delete(PRIORITY_TAG);
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'vi'));
   }, [items, extra.tag]);
 
-  const activeFilters = (extra.channelId ? 1 : 0) + (extra.tag ? 1 : 0) + (extra.status !== 'open' ? 1 : 0);
+  const priorityOn = extra.tag === PRIORITY_TAG;
+  const aiOn = box === 'agent';
+  const menuFilters =
+    (extra.channelId ? 1 : 0) + (extra.tag && !priorityOn ? 1 : 0) + (extra.status !== 'open' ? 1 : 0);
+
+  const boxCount = (value: InboxBox) => {
+    const key = INBOX_BOXES.find((b) => b.value === value)?.countKey;
+    return key && summary ? summary[key] : 0;
+  };
+
+  const quickChip = (label: string, icon: string, active: boolean, onClick: VoidFunction) => (
+    <Chip
+      size="small"
+      label={label}
+      icon={<Iconify icon={icon} width={14} />}
+      color={active ? 'primary' : 'default'}
+      variant={active ? 'filled' : 'outlined'}
+      onClick={onClick}
+      sx={{ fontWeight: 600 }}
+    />
+  );
 
   return (
     <Stack sx={{ height: 1, minHeight: 0 }}>
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ p: 1.5, pb: 1 }}>
-        <TextField
-          fullWidth
-          size="small"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Tìm tên, SĐT, nội dung…"
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
-              </InputAdornment>
-            ),
-          }}
-        />
-        <IconButton onClick={(e) => setFilterAnchor(e.currentTarget)} aria-label="Lọc hội thoại">
-          <Badge color="error" badgeContent={activeFilters} invisible={!activeFilters}>
-            <Iconify icon="solar:filter-bold" />
-          </Badge>
-        </IconButton>
-      </Stack>
+      <Stack spacing={1} sx={{ p: 1.5, pb: 1 }}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <TextField
+            fullWidth
+            size="small"
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Tìm tên, SĐT, nội dung…"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+                </InputAdornment>
+              ),
+              sx: { borderRadius: 5 },
+            }}
+          />
+          <Tooltip title="Lọc theo trạng thái / kênh / nhãn">
+            <IconButton onClick={(e) => setFilterAnchor(e.currentTarget)} aria-label="Lọc hội thoại">
+              <Badge color="error" badgeContent={menuFilters} invisible={!menuFilters}>
+                <Iconify icon="solar:filter-bold" />
+              </Badge>
+            </IconButton>
+          </Tooltip>
+        </Stack>
 
-      <Tabs
-        value={box}
-        onChange={(_, value) => onBoxChange(value)}
-        variant="scrollable"
-        scrollButtons={false}
-        sx={{ px: 1.5, minHeight: 40, '& .MuiTab-root': { minHeight: 40, mr: 2 } }}
-      >
-        {INBOX_BOXES.map((b) => {
-          const count = b.countKey && summary ? summary[b.countKey] : 0;
-          return (
-            <Tab
-              key={b.value}
-              value={b.value}
-              iconPosition="end"
-              label={b.label}
-              icon={
-                count ? (
-                  <Label
-                    variant={b.value === box ? 'filled' : 'soft'}
-                    color={b.value === 'unassigned' ? 'error' : 'default'}
-                    sx={{ ml: 0.5 }}
-                  >
-                    {count}
-                  </Label>
-                ) : undefined
-              }
-            />
-          );
-        })}
-      </Tabs>
+        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 0.75 }}>
+          <Select
+            size="small"
+            value={box}
+            onChange={(e) => onBoxChange(e.target.value as InboxBox)}
+            variant="standard"
+            disableUnderline
+            renderValue={(value) => {
+              const b = INBOX_BOXES.find((x) => x.value === value);
+              const count = boxCount(value as InboxBox);
+              return (
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <Typography variant="subtitle2">{b?.label ?? 'Tất cả'}</Typography>
+                  {!!count && (
+                    <Label color={value === 'unassigned' ? 'error' : 'default'} sx={{ height: 18 }}>
+                      {count}
+                    </Label>
+                  )}
+                </Stack>
+              );
+            }}
+            sx={{ mr: 0.5, '& .MuiSelect-select': { py: 0.25 } }}
+            inputProps={{ 'aria-label': 'Nhóm người giữ' }}
+          >
+            {INBOX_BOXES.map((b) => {
+              const count = boxCount(b.value);
+              return (
+                <MenuItem key={b.value} value={b.value}>
+                  <Typography variant="body2" sx={{ flex: 1 }}>
+                    {b.label}
+                  </Typography>
+                  {!!count && (
+                    <Label color={b.value === 'unassigned' ? 'error' : 'default'} sx={{ ml: 1.5 }}>
+                      {count}
+                    </Label>
+                  )}
+                </MenuItem>
+              );
+            })}
+          </Select>
+
+          {quickChip('Chưa đọc', 'solar:letter-unread-bold', extra.unread, () =>
+            onExtraChange({ ...extra, unread: !extra.unread })
+          )}
+          {quickChip('Ưu tiên', 'solar:star-bold', priorityOn, () =>
+            onExtraChange({ ...extra, tag: priorityOn ? null : PRIORITY_TAG })
+          )}
+          {quickChip('AI', 'solar:cpu-bolt-bold', aiOn, () => onBoxChange(aiOn ? 'all' : 'agent'))}
+        </Stack>
+      </Stack>
 
       <Divider />
 
@@ -168,7 +225,7 @@ export default function InboxConversationList({
 
         {!loading && items.length === 0 && (
           <EmptyContent
-            title={search.trim() ? 'Không tìm thấy hội thoại' : 'Chưa có hội thoại'}
+            title={search.trim() ? 'Không tìm thấy hội thoại' : extra.unread ? 'Đã đọc hết' : 'Chưa có hội thoại'}
             description={box === 'unassigned' ? 'Không có khách nào đang chờ người nhận.' : undefined}
             sx={{ py: 6 }}
           />
@@ -229,11 +286,11 @@ export default function InboxConversationList({
           </MenuItem>
         ))}
 
-        {activeFilters > 0 && <Divider />}
-        {activeFilters > 0 && (
+        {menuFilters > 0 && <Divider />}
+        {menuFilters > 0 && (
           <MenuItem
             onClick={() => {
-              onExtraChange({ channelId: null, tag: null, status: 'open' });
+              onExtraChange({ ...DEFAULT_LIST_EXTRA, unread: extra.unread, tag: priorityOn ? PRIORITY_TAG : null });
               setFilterAnchor(null);
             }}
             sx={{ color: 'error.main' }}
@@ -257,42 +314,62 @@ type RowProps = {
 
 function ConversationRow({ conversation: c, selected, onClick, myUserId }: RowProps) {
   const unread = c.unreadCount > 0;
+  const priority = isPriority(c);
   return (
     <ListItemButton
       selected={selected}
       onClick={onClick}
-      sx={{ px: 1.5, py: 1.25, gap: 1.5, alignItems: 'flex-start' }}
+      sx={{
+        px: 1.5,
+        py: 1.25,
+        gap: 1.5,
+        alignItems: 'flex-start',
+        borderRadius: 1,
+        mx: 0.5,
+        my: 0.25,
+        '&.Mui-selected': { bgcolor: 'action.selected' },
+      }}
     >
       <Badge
         overlap="circular"
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         badgeContent={
-          <Box
-            sx={{
-              width: 18,
-              height: 18,
-              borderRadius: '50%',
-              bgcolor: 'background.paper',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Iconify icon={platformIcon(c.platform)} width={14} />
-          </Box>
+          <Tooltip title={c.platform === 'test' ? 'Kênh thử' : conversationKindLabel(c.kind)}>
+            <Box
+              sx={{
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                bgcolor: 'background.paper',
+                boxShadow: (theme) => `0 0 0 1px ${theme.palette.divider}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Iconify icon={conversationBadgeIcon(c)} width={14} />
+            </Box>
+          </Tooltip>
         }
       >
-        <Avatar src={c.customer.avatarUrl ?? undefined} alt={c.customer.name} sx={{ width: 44, height: 44 }}>
+        <Avatar src={c.customer.avatarUrl ?? undefined} alt={c.customer.name} sx={{ width: 48, height: 48 }}>
           {c.customer.name?.charAt(0).toUpperCase()}
         </Avatar>
       </Badge>
 
-      <Stack sx={{ minWidth: 0, flex: 1 }} spacing={0.5}>
+      <Stack sx={{ minWidth: 0, flex: 1 }} spacing={0.25}>
         <Stack direction="row" alignItems="center" spacing={1}>
-          <Typography noWrap variant="subtitle2" sx={{ flex: 1, fontWeight: unread ? 700 : 600 }}>
+          <Typography
+            noWrap
+            variant="subtitle2"
+            sx={{ flex: 1, fontWeight: unread ? 700 : 500, color: unread ? 'text.primary' : 'text.secondary' }}
+          >
             {c.customer.name || 'Khách'}
           </Typography>
-          <Typography variant="caption" sx={{ color: unread ? 'error.main' : 'text.disabled', flexShrink: 0 }}>
+          <Typography
+            variant="caption"
+            sx={{ color: unread ? 'primary.main' : 'text.disabled', fontWeight: unread ? 700 : 400, flexShrink: 0 }}
+          >
             {fTimeShort(c.lastMessageAt)}
           </Typography>
         </Stack>
@@ -312,7 +389,7 @@ function ConversationRow({ conversation: c, selected, onClick, myUserId }: RowPr
                 height: 20,
                 px: 0.5,
                 borderRadius: 10,
-                bgcolor: 'error.main',
+                bgcolor: 'primary.main',
                 color: 'common.white',
                 typography: 'caption',
                 fontWeight: 700,
@@ -327,27 +404,22 @@ function ConversationRow({ conversation: c, selected, onClick, myUserId }: RowPr
           )}
         </Stack>
 
-        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 0.5, pt: 0.25 }}>
+          {priority && (
+            <Label color="warning" variant="soft" startIcon={<Iconify icon="solar:star-bold" width={12} />}>
+              Ưu tiên
+            </Label>
+          )}
           <Label color={holderColor(c.holder, myUserId)} variant="soft">
             {holderShortLabel(c.holder, myUserId)}
           </Label>
+          {c.assignedName && (
+            <Label color="default" startIcon={<Iconify icon="solar:user-hand-up-bold" width={12} />}>
+              Giao: {c.assignedName}
+            </Label>
+          )}
           {c.status !== 'open' && (
             <Label color={c.status === 'spam' ? 'error' : 'default'}>{STATUS_LABEL[c.status]}</Label>
-          )}
-          {c.assignedName && c.assignedUserId !== c.holder.userId && (
-            <Label color="default" startIcon={<Iconify icon="solar:user-hand-up-bold" width={12} />}>
-              {c.assignedName}
-            </Label>
-          )}
-          {c.tags.slice(0, 2).map((t) => (
-            <Label key={t} color="default" variant="outlined">
-              {t}
-            </Label>
-          ))}
-          {c.tags.length > 2 && (
-            <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-              +{c.tags.length - 2}
-            </Typography>
           )}
         </Stack>
       </Stack>
