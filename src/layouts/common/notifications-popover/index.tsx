@@ -48,6 +48,7 @@ const CATEGORY_CONFIG: Record<NotificationCategory, { icon: string; color: strin
   Payroll: { icon: 'mdi:cash-multiple', color: 'warning.main', label: 'Bảng lương' },
   Salary: { icon: 'mdi:currency-usd', color: 'error.main', label: 'Lương' },
   Agent: { icon: 'mdi:robot-outline', color: 'secondary.main', label: 'Agent' },
+  Conversation: { icon: 'mdi:message-text-outline', color: 'info.main', label: 'Hộp thư khách' },
 };
 
 const TABS = [
@@ -56,6 +57,7 @@ const TABS = [
   { value: 'Shift', label: 'Ca làm' },
   { value: 'Payroll', label: 'Lương' },
   { value: 'Agent', label: 'Agent' },
+  { value: 'Conversation', label: 'Khách' },
   { value: 'System', label: 'Hệ thống' },
 ];
 

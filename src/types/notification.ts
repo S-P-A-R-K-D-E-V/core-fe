@@ -10,7 +10,9 @@ export type NotificationCategory =
   | 'Payroll'
   | 'Salary'
   /** Đội agent (core-be NotificationCategory.Agent): chỉ chuông + realtime, không push. */
-  | 'Agent';
+  | 'Agent'
+  /** Hộp thư khách (core-be NotificationCategory.Conversation): tin khách chờ người — có push; actionUrl /dashboard/inbox?c={id}. */
+  | 'Conversation';
 
 export interface INotification {
   id: string;

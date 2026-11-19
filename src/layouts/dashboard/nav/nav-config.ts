@@ -938,6 +938,14 @@ export function buildBusinessModules(): NavModule[] {
               actions: [{ title: 'Soạn bài đăng', path: paths.dashboard.social.new }],
             },
             {
+              key: 'online.inbox',
+              title: 'Hộp thư khách',
+              path: paths.dashboard.inbox.root,
+              permissions: [P.conversation.read],
+              keywords: 'hop thu khach tin nhan messenger fanpage facebook inbox cskh',
+              actions: [{ title: 'Kênh thử hộp thư', path: paths.dashboard.inbox.test, permissions: [P.conversation.reply] }],
+            },
+            {
               key: 'online.calendar',
               title: 'Lịch đăng',
               path: paths.dashboard.social.calendar,
@@ -978,6 +986,13 @@ export function buildBusinessModules(): NavModule[] {
               path: paths.dashboard.social.channels,
               permissions: [P.social.channels],
               keywords: 'ket noi threads',
+            },
+            {
+              key: 'online.inbox-settings',
+              title: 'Mẫu trả lời & hộp thư',
+              path: paths.dashboard.inbox.settings,
+              permissions: [P.conversation.read],
+              keywords: 'mau tra loi nhanh hop thu cau hinh',
             },
             {
               key: 'online.settings',

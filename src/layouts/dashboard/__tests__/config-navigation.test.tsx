@@ -563,6 +563,27 @@ describe('Bán online', () => {
   });
 });
 
+describe('Hộp thư khách', () => {
+  it('theo conversation.read, trong Bán online (cần social.selling)', () => {
+    expect(navPaths('Admin')).not.toContain(paths.dashboard.inbox.root);
+    const admin = navPaths('Admin', ['social.selling']);
+    expect(admin).toContain(paths.dashboard.inbox.root);
+    expect(admin).toContain(paths.dashboard.inbox.settings);
+    expect(admin).toContain(paths.dashboard.inbox.test);
+
+    expect(navPaths('Manager', ['social.selling'], ['social.posts'])).not.toContain(paths.dashboard.inbox.root);
+    const staff = navPaths('Staff', ['social.selling'], ['conversation.read']);
+    expect(staff).toContain(paths.dashboard.inbox.root);
+    expect(staff).not.toContain(paths.dashboard.inbox.test);
+  });
+
+  it('thông báo mở ?c={id} — tô đậm đúng mục', () => {
+    const { pages } = nav('Admin', ['social.selling']);
+    expect(findActivePage(pages, paths.dashboard.inbox.root, '?c=abc')?.key).toBe('online.inbox');
+    expect(findActivePage(pages, paths.dashboard.inbox.settings)?.key).toBe('online.inbox-settings');
+  });
+});
+
 describe('Duyệt việc agent', () => {
   it('chủ cửa hàng thấy trong Cài đặt › Kết nối, ngay sau khoá API', () => {
     const tree = nav('Admin', ALL_FEATURES);
