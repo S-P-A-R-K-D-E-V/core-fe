@@ -943,6 +943,13 @@ export function buildBusinessModules(): NavModule[] {
               path: paths.dashboard.social.calendar,
               permissions: [P.social.posts],
             },
+            {
+              key: 'online.market',
+              title: 'Đối thủ & thị trường',
+              path: paths.dashboard.social.market,
+              permissions: [P.social.posts],
+              keywords: 'doi thu thi truong xu huong gia',
+            },
           ],
         },
         {

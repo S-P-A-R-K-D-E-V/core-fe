@@ -196,6 +196,8 @@ export const paths = {
       channels: `${ROOTS.DASHBOARD}/ban-hang-online/kenh`,
       // Lịch đăng tuần / tháng + hàng đợi tự rải bài.
       calendar: `${ROOTS.DASHBOARD}/ban-hang-online/lich`,
+      // Đối thủ & thị trường (K11): kho đối thủ, ghi chú giá, báo cáo thị trường tuần của agent.
+      market: `${ROOTS.DASHBOARD}/ban-hang-online/thi-truong`,
       // Meta app (Threads app ID / secret) của cửa hàng — mỗi cửa hàng dùng app riêng.
       settings: `${ROOTS.DASHBOARD}/ban-hang-online/cau-hinh`,
     },
