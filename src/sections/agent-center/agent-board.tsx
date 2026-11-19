@@ -51,6 +51,8 @@ type Props = {
   onCancel: (task: IAgentTask) => void;
   /** Mở chế độ Danh sách lọc sẵn trạng thái (vd "done", "failed,stopped,cancelled"). */
   onShowList: (status: string) => void;
+  /** Mở Danh sách vệ sinh (ca cũ chưa chấm). */
+  onShowCleaning: VoidFunction;
 };
 
 const COLUMN_MIN_WIDTH = 264;
@@ -78,6 +80,7 @@ export default function AgentBoard({
   onRetry,
   onCancel,
   onShowList,
+  onShowCleaning,
 }: Props) {
   const { enqueueSnackbar } = useSnackbar();
 
@@ -295,6 +298,19 @@ export default function AgentBoard({
                     </Stack>
                   )}
                 </Droppable>
+
+                {col.id === 'waiting' && board.olderCleaning > 0 && (
+                  <Box sx={{ px: 1.5, py: 1, borderTop: (t) => `dashed 1px ${t.palette.divider}` }}>
+                    <Link
+                      component="button"
+                      variant="caption"
+                      color="text.secondary"
+                      onClick={onShowCleaning}
+                    >
+                      Xem {board.olderCleaning} ca vệ sinh cũ chưa chấm →
+                    </Link>
+                  </Box>
+                )}
 
                 {older > 0 && (
                   <Box sx={{ px: 1.5, py: 1, borderTop: (t) => `dashed 1px ${t.palette.divider}` }}>

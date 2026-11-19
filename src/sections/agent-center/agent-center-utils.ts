@@ -312,6 +312,8 @@ export interface BoardData {
   olderDone: number;
   /** Mục lỗi / dừng / huỷ đã đóng trước hôm qua. */
   olderEnded: number;
+  /** Ca vệ sinh trước hôm qua còn chờ làm / chờ chấm — không lên bảng (xem ở Danh sách vệ sinh). */
+  olderCleaning: number;
 }
 
 /**
@@ -330,7 +332,18 @@ export function buildBoard(
     done: [],
     ended: [],
   };
-  entries.forEach((e) => columns[e.column].push(e));
+  // Ca vệ sinh cũ hơn hôm qua chưa chấm / chưa làm: một ngày có 3 ca, để lâu thì dồn kín cột — chỉ đếm.
+  const yesterdayKey = localDateKey(startOfLocalDay(now, 1));
+  let olderCleaning = 0;
+  entries.forEach((e) => {
+    const staleCleaning =
+      e.kind === 'cleaning' &&
+      (e.column === 'queued' || e.column === 'waiting') &&
+      !!e.item.date &&
+      e.item.date < yesterdayKey;
+    if (staleCleaning) olderCleaning += 1;
+    else columns[e.column].push(e);
+  });
   (Object.keys(columns) as BoardColumnId[]).forEach((col) => {
     columns[col].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
   });
@@ -345,7 +358,13 @@ export function buildBoard(
     columns: { ...columns, done, ended },
     olderDone: columns.done.length - done.length,
     olderEnded: endedAll.length - ended.length,
+    olderCleaning,
   };
+}
+
+function localDateKey(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function sortTime(t: IAgentTask): string {
