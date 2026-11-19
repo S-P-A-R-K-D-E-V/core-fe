@@ -24,12 +24,17 @@ import { useSettingsContext } from 'src/components/settings';
 import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
 
-import { sendMessage as apiSendMessage, sendAttachment } from 'src/api/messenger';
+import { sendMessage as apiSendMessage, sendAttachment, fetchConversations } from 'src/api/messenger';
 import { useMessengerStore } from 'src/store/messenger-store';
 import { useMessengerCtx } from 'src/components/messenger/messenger-provider';
 import MessageBubble from 'src/components/messenger/message-bubble';
 import { SystemChannelAvatar } from 'src/components/messenger/system-avatar';
-import { isSystemUserId, isSystemConversation, resolveMessengerUser } from 'src/utils/messenger-system';
+import {
+  isSystemConversation,
+  resolveMessengerUser,
+  systemConversationName,
+  systemConversationSubtitle,
+} from 'src/utils/messenger-system';
 
 import NewConversationDialog from '../new-conversation-dialog';
 
@@ -79,9 +84,9 @@ export default function MessengerView() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages.length, activeId]);
 
-  // Open conv from ?conv= query param (from UsersPopover)
+  // Open conv from ?conv= (UsersPopover) hoặc ?c= (nút "Nhóm quản trị" ở Trung tâm Agent, link trong thông báo)
   useEffect(() => {
-    const convId = searchParams.get('conv');
+    const convId = searchParams.get('conv') || searchParams.get('c');
     if (convId && convId !== activeId) {
       handleSelectConv(convId);
       router.replace('/dashboard/messenger', { scroll: false });
@@ -92,6 +97,12 @@ export default function MessengerView() {
   const handleSelectConv = useCallback(async (convId: string) => {
     setActiveId(convId);
     openConversation(convId).catch(() => {});
+    // Nhóm vừa được tạo (vd nhóm quản trị mở từ Trung tâm Agent) có thể chưa có trong danh sách → tải lại danh sách.
+    if (!useMessengerStore.getState().conversations.some((c) => c.id === convId)) {
+      fetchConversations()
+        .then((list) => useMessengerStore.getState().setConversations(list))
+        .catch(() => {});
+    }
   }, [openConversation]);
 
   const activeConv = conversations.find((c) => c.id === activeId);
@@ -99,6 +110,10 @@ export default function MessengerView() {
   const convTitle = (convId: string) => {
     const c = conversations.find((x) => x.id === convId);
     if (!c) return '';
+    if (isSystemConversation(c)) {
+      const name = systemConversationName(c);
+      if (name) return name;
+    }
     if (c.type === 'Group') return c.name ?? `Nhóm ${c.participantIds.length} thành viên`;
     const otherId = c.participantIds.find((id) => id !== currentUserId);
     return otherId ? resolveMessengerUser(otherId, userCache[otherId]).name : 'Chat';
@@ -194,8 +209,12 @@ export default function MessengerView() {
                 sx={{ py: 1.5, px: { xs: 1, sm: 1.5 } }}
               >
                 {isSystemConversation(c) ? (
-                  // Kênh cảnh báo của hệ thống: avatar chuông, không có chấm online
-                  <SystemChannelAvatar size={40} sx={{ mr: { xs: 0, sm: 1.5 } }} />
+                  // Nhóm hệ thống (kênh cảnh báo: chuông; nhóm quản trị: robot), không có chấm online
+                  <SystemChannelAvatar
+                    size={40}
+                    systemKey={c.systemKey}
+                    sx={{ mr: { xs: 0, sm: 1.5 } }}
+                  />
                 ) : (
                   <Badge
                     overlap="circular"
@@ -249,7 +268,7 @@ export default function MessengerView() {
               {/* Chat header */}
               <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
                 {isSystemConversation(activeConv) ? (
-                  <SystemChannelAvatar size={40} />
+                  <SystemChannelAvatar size={40} systemKey={activeConv.systemKey} />
                 ) : (
                   <Badge
                     overlap="circular"
@@ -266,9 +285,8 @@ export default function MessengerView() {
                 <Stack sx={{ flex: 1, minWidth: 0 }}>
                   <Typography fontWeight={600} noWrap>{convTitle(activeId!)}</Typography>
                   <Typography variant="caption" color={convOnline(activeId!) ? 'success.main' : 'text.secondary'}>
-                    {/* Kênh cảnh báo: "Trợ lý hệ thống" chỉ là người gửi, không tính là người nhận */}
-                    {isSystemConversation(activeConv) &&
-                      `Cảnh báo tự động · ${activeConv.participantIds.filter((id) => !isSystemUserId(id)).length} người nhận`}
+                    {/* Nhóm hệ thống: "Trợ lý hệ thống" chỉ là người gửi, không tính là người nhận */}
+                    {isSystemConversation(activeConv) && systemConversationSubtitle(activeConv)}
                     {!isSystemConversation(activeConv) &&
                       (activeConv.type === 'Group'
                         ? `${activeConv.participantIds.length} thành viên`

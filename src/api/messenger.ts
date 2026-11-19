@@ -41,6 +41,38 @@ export type MessageAttachment = {
   kind: 'image' | 'file';
 };
 
+// ----------------------------------------------------------------------
+// Thẻ hành động trong tin (A1 — nhóm "Quản trị – Đội agent"). Hợp đồng: docs/cici/plans/a1-nhom-quan-tri-api-contract.md.
+// Tin có thẻ vẫn có `content` chữ đầy đủ (bản cũ chỉ thấy chữ).
+
+export type MessageCardKind = 'approval' | 'task_question' | 'task_failed' | 'task_result';
+
+export type MessageCardActionKey = 'approve' | 'revise' | 'reject' | 'reply' | 'open';
+
+export type MessageCardAction = {
+  key: MessageCardActionKey | (string & {});
+  label: string;
+  style?: 'primary' | 'default' | 'danger' | null;
+};
+
+export type MessageCard = {
+  kind: MessageCardKind | (string & {});
+  /** approval → id phiếu (PendingAgentAction); task_* → id việc (AgentTask). */
+  refId: string;
+  title: string;
+  /** 0–6 dòng chữ thuần. */
+  lines?: string[] | null;
+  /** Đường dẫn web, vd "/dashboard/agent/approvals?id=…". */
+  link?: string | null;
+  status: 'open' | 'done' | (string & {});
+  /** Khi done, vd "Đã duyệt bởi Xuân Bình · 10:42". */
+  statusText?: string | null;
+  /** approval: quá hạn mà còn open → "Hết hạn", ẩn nút. */
+  expiresAt?: string | null;
+  actions?: MessageCardAction[] | null;
+  updatedAt?: string | null;
+};
+
 export type DirectMessage = {
   id: string;
   conversationId: string;
@@ -51,6 +83,15 @@ export type DirectMessage = {
   isDeleted?: boolean;
   attachments?: MessageAttachment[];
   readBy?: { userId: string; readAt: string }[];
+  /** Khác null = tin là thẻ hành động (thay bong bóng chữ). */
+  card?: MessageCard | null;
+};
+
+/** Sự kiện SignalR `messageUpdated` — thẻ của một tin đổi trạng thái. */
+export type MessageUpdatedEvent = {
+  id: string;
+  conversationId: string;
+  card: MessageCard | null;
 };
 
 export type InternalUser = {

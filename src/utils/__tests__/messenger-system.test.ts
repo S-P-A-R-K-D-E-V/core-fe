@@ -12,6 +12,11 @@ import {
   resolveMessengerUser,
   incomingMessageNotice,
   messengerErrorMessage,
+  systemConversationName,
+  AGENT_ADMIN_GROUP_NAME,
+  AGENT_ADMIN_SYSTEM_KEY,
+  isAgentAdminConversation,
+  systemConversationSubtitle,
 } from '../messenger-system';
 
 // ----------------------------------------------------------------------
@@ -172,5 +177,37 @@ describe('messengerErrorMessage', () => {
     expect(messengerErrorMessage('Something went wrong', 'dự phòng')).toBe('dự phòng');
     expect(messengerErrorMessage({ error: '' }, 'dự phòng')).toBe('dự phòng');
     expect(messengerErrorMessage(undefined, 'dự phòng')).toBe('dự phòng');
+  });
+});
+
+describe('nhóm "Quản trị – Đội agent" (systemKey agent-admin)', () => {
+  const group = {
+    systemKey: AGENT_ADMIN_SYSTEM_KEY,
+    name: null as string | null,
+    participantIds: [SYSTEM_USER_ID, lan.id, '22222222-2222-2222-2222-222222222222'],
+  };
+
+  it('nhận diện theo systemKey', () => {
+    expect(AGENT_ADMIN_SYSTEM_KEY).toBe('agent-admin');
+    expect(isAgentAdminConversation(group)).toBe(true);
+    expect(isAgentAdminConversation({ systemKey: 'admin-alerts' })).toBe(false);
+    expect(isAgentAdminConversation(null)).toBe(false);
+  });
+
+  it('tên: máy chủ chưa đặt → "Quản trị – Đội agent"; kênh khác theo name', () => {
+    expect(systemConversationName(group)).toBe(AGENT_ADMIN_GROUP_NAME);
+    expect(AGENT_ADMIN_GROUP_NAME).toBe('Quản trị – Đội agent');
+    expect(systemConversationName({ ...group, name: 'Đội agent CiCi' })).toBe('Đội agent CiCi');
+    expect(systemConversationName({ systemKey: 'admin-alerts', name: 'Cảnh báo hệ thống' })).toBe(
+      'Cảnh báo hệ thống'
+    );
+    expect(systemConversationName({ systemKey: 'admin-alerts', name: null })).toBeNull();
+  });
+
+  it('dòng phụ không tính Trợ lý hệ thống', () => {
+    expect(systemConversationSubtitle(group)).toBe('Đội agent · 2 thành viên');
+    expect(systemConversationSubtitle({ ...group, systemKey: 'admin-alerts' })).toBe(
+      'Cảnh báo tự động · 2 người nhận'
+    );
   });
 });

@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
-import type { ConversationSummary, DirectMessage, InternalUser } from 'src/api/messenger';
+import type {
+  MessageCard,
+  InternalUser,
+  DirectMessage,
+  ConversationSummary,
+} from 'src/api/messenger';
 
 // ----------------------------------------------------------------------
 
@@ -43,6 +48,8 @@ type Actions = {
   setMessages: (convId: string, msgs: DirectMessage[]) => void;
   prependMessages: (convId: string, msgs: DirectMessage[]) => void;
   addMessage: (msg: DirectMessage) => void;
+  /** Sự kiện `messageUpdated` / sau khi bấm nút thẻ: thay thẻ của tin tại chỗ (tin chưa tải thì bỏ qua). */
+  updateMessageCard: (convId: string, messageId: string, card: MessageCard | null) => void;
   applyReadReceipt: (convId: string, userId: string, readAt: string) => void;
   clearUnread: (convId: string) => void;
 
@@ -111,6 +118,12 @@ export const useMessengerStore = create<State & Actions>()(
         if (!list.find((m) => m.id === msg.id)) {
           s.messagesByConv[msg.conversationId] = [...list, msg];
         }
+      }),
+
+    updateMessageCard: (convId, messageId, card) =>
+      set((s) => {
+        const msg = s.messagesByConv[convId]?.find((m) => m.id === messageId);
+        if (msg) msg.card = card;
       }),
 
     applyReadReceipt: (convId, userId, readAt) =>

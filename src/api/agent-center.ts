@@ -155,6 +155,8 @@ export interface IAgentSchedule {
   lastTaskId: string | null;
   /** Xong / lỗi → hệ thống gửi kết quả vào chat Telegram báo cáo riêng (cấu hình loại telegram-report). */
   deliverTelegram?: boolean;
+  /** Xong → hệ thống đăng thẻ kết quả (task_result) vào nhóm Messenger "Quản trị – Đội agent" (A1). */
+  deliverAdminGroup?: boolean;
 }
 
 export interface IAgentScheduleInput {
@@ -164,6 +166,19 @@ export interface IAgentScheduleInput {
   instruction: string;
   enabled: boolean;
   deliverTelegram?: boolean;
+  deliverAdminGroup?: boolean;
+}
+
+/** Nhóm Messenger hệ thống "Quản trị – Đội agent" (A1): conversationId null = chưa tạo; enabled false = tính năng tắt. */
+export interface IAgentAdminGroupInfo {
+  conversationId: string | null;
+  enabled: boolean;
+}
+
+export interface IAgentAdminGroupCreated {
+  conversationId: string;
+  name: string;
+  created: boolean;
 }
 
 export interface IAgentScheduleOccurrence {
@@ -302,6 +317,33 @@ export function useAgentScheduleOccurrences(range: { from: string; to: string } 
     () => ({ occurrences: data ?? [], loading: isLoading, error, refresh: mutate }),
     [data, isLoading, error, mutate]
   );
+}
+
+/**
+ * Nhóm quản trị (A1) — quyền agent.approve. Tính năng tắt (AgentAdminGroup__Enabled=false) thì máy chủ trả 404 hoặc
+ * `enabled: false` → coi như tắt, không thử lại.
+ */
+export function useAgentAdminGroup(enabled: boolean) {
+  const { data, isLoading, error, mutate } = useSWR<IAgentAdminGroupInfo>(
+    enabled ? EP.adminGroup : null,
+    fetcher,
+    { revalidateOnFocus: false, shouldRetryOnError: false }
+  );
+  return useMemo(
+    () => ({
+      info: error ? undefined : data,
+      loading: isLoading && !data,
+      error,
+      refresh: mutate,
+    }),
+    [data, isLoading, error, mutate]
+  );
+}
+
+/** Tạo (hoặc lấy lại) nhóm quản trị — quyền agent.manage. Lần đầu thêm sẵn các Admin của cửa hàng. */
+export async function createAgentAdminGroup(): Promise<IAgentAdminGroupCreated> {
+  const res = await axios.post<IAgentAdminGroupCreated>(EP.adminGroup);
+  return res.data;
 }
 
 /** Token theo ngày theo agent — chỉ agent.manage. */

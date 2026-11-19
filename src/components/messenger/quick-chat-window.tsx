@@ -20,7 +20,11 @@ import Scrollbar from 'src/components/scrollbar';
 
 import { sendMessage as apiSendMessage, sendAttachment } from 'src/api/messenger';
 import { useMessengerStore } from 'src/store/messenger-store';
-import { isSystemConversation, resolveMessengerUser } from 'src/utils/messenger-system';
+import {
+  isSystemConversation,
+  resolveMessengerUser,
+  systemConversationName,
+} from 'src/utils/messenger-system';
 import { useMessengerCtx } from './messenger-provider';
 import MessageBubble from './message-bubble';
 import { SystemChannelAvatar } from './system-avatar';
@@ -62,9 +66,10 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
   const isOnline = otherUserId ? onlineIds.includes(otherUserId) : false;
 
   const title =
-    conv?.type === 'Group'
+    (isSystemConversation(conv) ? systemConversationName(conv) : null) ??
+    (conv?.type === 'Group'
       ? conv?.name ?? `Nhóm ${conv.participantIds.length} thành viên`
-      : (otherUserId ? resolveMessengerUser(otherUserId, userCache[otherUserId]).name : 'Chat');
+      : (otherUserId ? resolveMessengerUser(otherUserId, userCache[otherUserId]).name : 'Chat'));
 
   useEffect(() => {
     openConversation(convId).catch(() => {});
@@ -179,7 +184,7 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
               }
             >
               {isSystemConversation(conv) ? (
-                <SystemChannelAvatar size={28} />
+                <SystemChannelAvatar size={28} systemKey={conv?.systemKey} />
               ) : (
                 <Avatar sx={{ width: 28, height: 28, fontSize: 13, bgcolor: 'primary.dark' }}>
                   {title.charAt(0).toUpperCase()}
