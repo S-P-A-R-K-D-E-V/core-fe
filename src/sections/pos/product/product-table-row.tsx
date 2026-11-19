@@ -13,6 +13,7 @@ import Checkbox from '@mui/material/Checkbox';
 import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
 import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
@@ -97,6 +98,7 @@ function getAverageCost(product: IProductListItem): number {
 }
 
 type SubRowItem = {
+  id: string;
   code: string;
   displayName: string;
   barCode?: string;
@@ -147,6 +149,9 @@ export default function ProductTableRow({
   const [expandedChildId, setExpandedChildId] = useState<string | null>(null);
   const [childDetail, setChildDetail] = useState<IProduct | null>(null);
   const [loadingChildDetail, setLoadingChildDetail] = useState(false);
+  // Ảnh của từng mẫu (mỗi mã / mỗi giá một bộ ảnh) — mở thẳng từ ô ảnh của dòng mẫu, không phải mở khung chi tiết.
+  const access = useProductAccess();
+  const [imagesFor, setImagesFor] = useState<string | null>(null);
 
   const childProducts = row.childProducts || [];
   const hasChildren = childProducts.length > 0;
@@ -302,7 +307,21 @@ export default function ProductTableRow({
   const renderSubRowCell = (colKey: ColumnKey, item: SubRowItem) => {
     switch (colKey) {
       case 'image':
-        return (
+        return access.canUpdate ? (
+          <Tooltip title="Ảnh của mẫu này">
+            <IconButton
+              size="small"
+              aria-label={`Ảnh ${item.displayName}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setImagesFor(item.id);
+              }}
+              sx={{ width: 28, height: 28, borderRadius: 1, bgcolor: 'grey.200', color: 'grey.600' }}
+            >
+              <Iconify icon="solar:camera-add-bold" width={14} />
+            </IconButton>
+          </Tooltip>
+        ) : (
           <Avatar
             variant="rounded"
             sx={{ width: 28, height: 28, bgcolor: 'grey.200', color: 'grey.500' }}
@@ -454,6 +473,10 @@ export default function ProductTableRow({
             />
           ))}
         </>
+      )}
+
+      {imagesFor && (
+        <ProductImagesDialog productId={imagesFor} onClose={() => setImagesFor(null)} />
       )}
 
       <ConfirmDialog
