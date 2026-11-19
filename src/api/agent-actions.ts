@@ -54,14 +54,27 @@ export interface IAgentSocialPostPreview {
   products: IAgentPreviewProduct[];
 }
 
+/** Một dòng của lịch đăng bài (phiếu social_batch). */
+export interface IAgentSocialBatchItem {
+  postId: string;
+  scheduledAt: string | null;
+  /** Bài đã bị sửa sau khi gửi duyệt — dòng này sẽ không được hẹn. */
+  changed: boolean;
+  /** Bài không còn (đã xoá). */
+  missing: boolean;
+  post: IAgentSocialPostPreview;
+}
+
 export interface IAgentActionPreview {
-  kind: 'social_post' | 'generic' | (string & {});
+  kind: 'social_post' | 'social_batch' | 'generic' | (string & {});
   /** Tên thao tác tiếng Việt, vd "Tạo bài đăng mạng xã hội". */
   title: string;
   /** Chỉ có khi kind = social_post. */
   socialPost: IAgentSocialPostPreview | null;
   /** Tham số "nhãn — giá trị" (id đã đổi thành tên); bài mạng xã hội thì trống. */
   fields: { label: string; value: string }[];
+  /** Chỉ có khi kind = social_batch: các bài theo giờ đăng. */
+  socialBatch?: { items: IAgentSocialBatchItem[] } | null;
 }
 
 /** Bản trước của cùng việc (phiếu đã bị "Yêu cầu sửa") — để so chữ / ảnh cũ và mới. */

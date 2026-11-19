@@ -22,7 +22,15 @@ import { fDateTime } from 'src/utils/format-time';
 import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
 
-import { CodeText, ParamList, ActionPreview, PreviewImages, PreviousVersion } from './agent-action-preview';
+import {
+  CodeText,
+  ParamList,
+  ActionPreview,
+  PreviewImages,
+  previewImages,
+  PreviousVersion,
+  hasActionPreview,
+} from './agent-action-preview';
 import {
   timeLeft,
   queryParams,
@@ -166,11 +174,8 @@ export default function AgentActionCard({
 
   const title = action.title?.trim() || action.summary;
   const { preview } = action;
-  const hasPreview =
-    !!preview &&
-    ((preview.kind === 'social_post' && !!preview.socialPost) || (preview.fields?.length ?? 0) > 0);
-  const currentImages =
-    preview?.kind === 'social_post' ? (preview.socialPost?.imageUrls ?? []) : [];
+  const hasPreview = hasActionPreview(preview);
+  const currentImages = previewImages(preview);
   const version = action.version ?? null;
   const decisionNote = splitRevisionNote(action.decisionNote);
   const revisionsLeft = action.revisionsLeft ?? null;

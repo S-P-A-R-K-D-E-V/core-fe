@@ -3,6 +3,7 @@
 import type {
   IAgentActionPreview,
   IAgentActionPrevious,
+  IAgentSocialBatchItem,
   IAgentSocialPostPreview,
 } from 'src/api/agent-actions';
 
@@ -260,11 +261,63 @@ export function SocialPostPreview({ post }: { post: IAgentSocialPostPreview }) {
 
 // ----------------------------------------------------------------------
 
-/** Xem trước theo loại: bài mạng xã hội hoặc bảng "nhãn — giá trị". Không có gì để hiện → null. */
+/** Lịch đăng bài: mỗi bài một khối (giờ đăng, bài như thật); bài đã sửa / không còn được đánh dấu. */
+export function SocialBatchPreview({ items }: { items: IAgentSocialBatchItem[] }) {
+  return (
+    <Stack spacing={1.5}>
+      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+        {items.length} bài — duyệt một lần là cả lịch tự đăng đúng giờ.
+      </Typography>
+      {items.map((item, i) => (
+        <Box
+          key={item.postId}
+          sx={{
+            p: 1.5,
+            borderRadius: 1.5,
+            border: (theme) => `1px solid ${theme.palette.divider}`,
+            opacity: item.missing ? 0.6 : 1,
+          }}
+        >
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
+            <Typography variant="subtitle2">Bài {i + 1}</Typography>
+            {item.changed && (
+              <Chip size="small" color="warning" variant="soft" label="Đã sửa sau khi gửi — sẽ không hẹn" />
+            )}
+            {item.missing && <Chip size="small" color="error" variant="soft" label="Bài không còn" />}
+          </Stack>
+          {!item.missing && <SocialPostPreview post={item.post} />}
+        </Box>
+      ))}
+    </Stack>
+  );
+}
+
+/** Ảnh của mọi bài trong phiếu (bài lẻ hoặc cả lịch) — để chọn ảnh cần làm lại / so bản trước. */
+export function previewImages(preview: IAgentActionPreview | null | undefined): string[] {
+  if (!preview) return [];
+  if (preview.kind === 'social_post') return preview.socialPost?.imageUrls ?? [];
+  if (preview.kind === 'social_batch') {
+    return (preview.socialBatch?.items ?? []).flatMap((i) => i.post.imageUrls ?? []);
+  }
+  return [];
+}
+
+/** Phiếu có gì để xem trước không. */
+export function hasActionPreview(preview: IAgentActionPreview | null | undefined): boolean {
+  if (!preview) return false;
+  if (preview.kind === 'social_post') return !!preview.socialPost;
+  if (preview.kind === 'social_batch') return (preview.socialBatch?.items?.length ?? 0) > 0;
+  return (preview.fields?.length ?? 0) > 0;
+}
+
+/** Xem trước theo loại: bài mạng xã hội, lịch nhiều bài hoặc bảng "nhãn — giá trị". Không có gì để hiện → null. */
 export function ActionPreview({ preview }: { preview: IAgentActionPreview | null | undefined }) {
   if (!preview) return null;
   if (preview.kind === 'social_post' && preview.socialPost) {
     return <SocialPostPreview post={preview.socialPost} />;
+  }
+  if (preview.kind === 'social_batch' && preview.socialBatch) {
+    return <SocialBatchPreview items={preview.socialBatch.items} />;
   }
   const fields = preview.fields ?? [];
   if (fields.length === 0) return null;
