@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   timeLeft,
   appendNote,
+  focusState,
   queryParams,
   platformInfo,
   resultSnippet,
@@ -151,5 +152,20 @@ describe('splitRevisionNote', () => {
   it('ghi chú không có ảnh giữ nguyên', () => {
     expect(splitRevisionNote('  Viết ngắn lại ')).toEqual({ text: 'Viết ngắn lại', imageUrls: [] });
     expect(splitRevisionNote(null)).toEqual({ text: '', imageUrls: [] });
+  });
+});
+
+describe('focusState', () => {
+  const list = [{ id: 'a' }, { id: 'b' }];
+
+  it('không có id hoặc đang tải → none', () => {
+    expect(focusState(list, null, false)).toBe('none');
+    expect(focusState(list, 'a', true)).toBe('none');
+  });
+
+  it('có trong danh sách → found, không có → missing', () => {
+    expect(focusState(list, 'b', false)).toBe('found');
+    expect(focusState(list, 'zzz', false)).toBe('missing');
+    expect(focusState([], 'a', false)).toBe('missing');
   });
 });
