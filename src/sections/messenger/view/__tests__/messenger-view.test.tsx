@@ -53,6 +53,10 @@ vi.mock('src/sections/messenger/new-conversation-dialog', () => ({
   default: () => null,
 }));
 
+vi.mock('src/sections/messenger/conversation-members-drawer', () => ({
+  default: ({ open }: any) => (open ? <div data-testid="members-drawer" /> : null),
+}));
+
 // Imported after the mocks above so the view picks up the mocked modules.
 import MessengerView from '../messenger-view';
 
@@ -214,5 +218,46 @@ describe('MessengerView — kênh "Cảnh báo hệ thống"', () => {
     // Chỉ còn avatar chuông của kênh cảnh báo ở danh sách
     expect(screen.getAllByRole('img', CHANNEL_AVATAR)).toHaveLength(1);
     expect(screen.queryByText(/người nhận/)).not.toBeInTheDocument();
+  });
+});
+
+describe('MessengerView — Thành viên + CEO đang soạn (A4)', () => {
+  it('nút Thành viên: có ở nhóm thường, không có ở kênh cảnh báo; bấm mở ngăn', async () => {
+    const user = userEvent.setup();
+    renderView();
+
+    await user.click(screen.getByText('Cảnh báo hệ thống'));
+    expect(screen.queryByRole('button', { name: 'Thành viên' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByText('Ca sáng'));
+    await user.click(screen.getByRole('button', { name: 'Thành viên' }));
+    expect(screen.getByTestId('members-drawer')).toBeInTheDocument();
+  });
+
+  it('nhóm Quản trị: nút Thành viên + Trợ lý hệ thống gõ hiện "CEO đang soạn…"', async () => {
+    const user = userEvent.setup();
+    useMessengerStore.setState((s) => ({
+      conversations: [
+        ...s.conversations,
+        {
+          id: 'agent-admin-1',
+          type: 'Group',
+          name: null,
+          participantIds: [SYSTEM_USER_ID, ME],
+          lastMessagePreview: null,
+          lastMessageSenderId: null,
+          lastMessageAt: null,
+          unreadCount: 0,
+          systemKey: 'agent-admin',
+        },
+      ],
+      typingByConv: { 'agent-admin-1': [SYSTEM_USER_ID] },
+    }));
+    renderView();
+
+    await user.click(screen.getByText('Quản trị – Đội agent'));
+    expect(screen.getByRole('button', { name: 'Thành viên' })).toBeInTheDocument();
+    expect(screen.getByText('CEO đang soạn…')).toBeInTheDocument();
+    expect(screen.queryByText(/Trợ lý hệ thống đang nhập/)).not.toBeInTheDocument();
   });
 });

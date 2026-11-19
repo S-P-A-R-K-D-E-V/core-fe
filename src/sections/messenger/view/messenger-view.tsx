@@ -35,8 +35,10 @@ import {
   systemConversationName,
   systemConversationSubtitle,
 } from 'src/utils/messenger-system';
+import { hasMembersPanel, messengerTypingLabel } from 'src/utils/messenger-members';
 
 import NewConversationDialog from '../new-conversation-dialog';
+import ConversationMembersDrawer from '../conversation-members-drawer';
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB — đồng bộ giới hạn BE
 
@@ -69,6 +71,7 @@ export default function MessengerView() {
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -96,6 +99,7 @@ export default function MessengerView() {
 
   const handleSelectConv = useCallback(async (convId: string) => {
     setActiveId(convId);
+    setMembersOpen(false);
     openConversation(convId).catch(() => {});
     // Nhóm vừa được tạo (vd nhóm quản trị mở từ Trung tâm Agent) có thể chưa có trong danh sách → tải lại danh sách.
     if (!useMessengerStore.getState().conversations.some((c) => c.id === convId)) {
@@ -136,10 +140,12 @@ export default function MessengerView() {
     return otherId ? onlineIds.includes(otherId) : false;
   };
 
-  const typingLabel = typingUsers
-    .filter((id) => id !== currentUserId)
-    .map((id) => userCache[id]?.fullName?.split(' ').at(-1) ?? '...')
-    .join(', ');
+  // Nhóm Quản trị: Trợ lý hệ thống gõ = "CEO đang soạn…".
+  const typingLabel = messengerTypingLabel(typingUsers, {
+    currentUserId,
+    conversation: activeConv,
+    userCache,
+  });
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -293,6 +299,17 @@ export default function MessengerView() {
                         : convOnline(activeId!) ? 'Đang online' : 'Offline')}
                   </Typography>
                 </Stack>
+                {hasMembersPanel(activeConv) && (
+                  <Button
+                    size="small"
+                    color="inherit"
+                    variant="outlined"
+                    onClick={() => setMembersOpen(true)}
+                    startIcon={<Iconify icon="solar:users-group-rounded-bold" />}
+                  >
+                    Thành viên
+                  </Button>
+                )}
               </Stack>
 
               {/* Messages */}
@@ -329,7 +346,7 @@ export default function MessengerView() {
                     ))}
                   </Box>
                   <Typography variant="caption" color="text.secondary">
-                    {typingLabel} đang nhập...
+                    {typingLabel}
                   </Typography>
                 </Stack>
               )}
@@ -386,6 +403,19 @@ export default function MessengerView() {
           )}
         </Stack>
       </Paper>
+
+      {activeConv && hasMembersPanel(activeConv) && (
+        <ConversationMembersDrawer
+          open={membersOpen}
+          onClose={() => setMembersOpen(false)}
+          conversation={activeConv}
+          user={user}
+          onLeft={() => {
+            setMembersOpen(false);
+            setActiveId(null);
+          }}
+        />
+      )}
 
       <NewConversationDialog
         open={newOpen}

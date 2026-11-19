@@ -31,6 +31,8 @@ export type ConversationSummary = {
   unreadCount: number;
   /** Khác null = hội thoại do hệ thống quản lý, vd "admin-alerts" (kênh "Cảnh báo hệ thống"). */
   systemKey?: string | null;
+  /** Người tạo nhóm — core-be chưa trả ở danh sách; có sau khi thêm / gỡ thành viên (Conversation). */
+  createdById?: string | null;
 };
 
 export type MessageAttachment = {
