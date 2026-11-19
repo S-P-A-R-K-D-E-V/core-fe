@@ -7,6 +7,7 @@ import type {
   AgentTaskSource,
   AgentTaskStatus,
 } from 'src/api/agent-center';
+import type { WorkHubKind, IWorkHubItem } from 'src/api/work-hub';
 
 // ----------------------------------------------------------------------
 // Trung tâm Agent: cột kanban theo trạng thái, luật kéo thả, kế hoạch / tiến độ, nhãn bước, cron.
@@ -23,15 +24,15 @@ export const BOARD_COLUMNS: {
   /** Chế độ "Đang phải làm" ẩn cột này. */
   allOnly?: boolean;
 }[] = [
-  { id: 'queued', label: 'Chờ chạy', color: 'default', icon: 'solar:hourglass-line-bold' },
-  { id: 'running', label: 'Đang chạy', color: 'info', icon: 'solar:play-circle-bold' },
+  { id: 'queued', label: 'Chờ làm', color: 'default', icon: 'solar:hourglass-line-bold' },
+  { id: 'running', label: 'Đang làm', color: 'info', icon: 'solar:play-circle-bold' },
   {
     id: 'waiting',
     label: 'Chờ duyệt / chờ người',
     color: 'warning',
     icon: 'solar:shield-check-bold',
   },
-  { id: 'ended', label: 'Lỗi / Đã dừng', color: 'error', icon: 'solar:danger-triangle-bold' },
+  { id: 'ended', label: 'Lỗi / trả lại', color: 'error', icon: 'solar:danger-triangle-bold' },
   {
     id: 'done',
     label: 'Xong',
@@ -130,7 +131,7 @@ export type DropDecision =
   | { kind: 'reject'; message: string };
 
 export const DROP_REJECT_MESSAGE =
-  'Máy chủ tự chuyển cột. Chỉ kéo Lỗi / Đã dừng → Chờ chạy (chạy lại) hoặc Chờ chạy → Lỗi / Đã dừng (huỷ).';
+  'Máy chủ tự chuyển cột. Chỉ kéo việc agent: Lỗi → Chờ làm (chạy lại) hoặc Chờ làm → Lỗi (huỷ). Việc giao / vệ sinh: bấm thẻ để duyệt.';
 
 export function decideDrop(
   from: BoardColumnId,
@@ -238,27 +239,108 @@ function startOfLocalDay(now: number, daysBack = 0): number {
   return d.getTime();
 }
 
+// ----------------------------------------------------------------------
+// Trung tâm việc (T2): một "mục" trên bảng = việc agent, việc giao một người hoặc vệ sinh gộp theo ca.
+
+export type BoardEntryKind = 'agent' | WorkHubKind;
+
+export type BoardEntry =
+  | (BoardEntryBase & { kind: 'agent'; task: IAgentTask })
+  | (BoardEntryBase & { kind: WorkHubKind; item: IWorkHubItem });
+
+type BoardEntryBase = {
+  id: string;
+  column: BoardColumnId;
+  /** Mốc xếp thứ tự + lọc "hôm nay" (ISO). */
+  at: string;
+  /** Đã huỷ — chế độ "Đang phải làm" ẩn. */
+  cancelled: boolean;
+  /** Còn việc phải làm dù nằm cột Lỗi (việc giao bị trả lại / quá hạn) — không bị ẩn theo ngày. */
+  open: boolean;
+};
+
+export function agentEntry(task: IAgentTask): BoardEntry {
+  return {
+    kind: 'agent',
+    id: task.id,
+    column: columnOfStatus(task.status),
+    at: sortTime(task),
+    cancelled: task.status === 'cancelled',
+    open: false,
+    task,
+  };
+}
+
+export function hubEntry(item: IWorkHubItem): BoardEntry {
+  return {
+    kind: item.kind,
+    id: `${item.kind}:${item.id}`,
+    column: item.column,
+    at: item.sortAt,
+    cancelled: item.kind === 'work' && item.status === 'Cancelled',
+    open: item.kind === 'work' && (item.status === 'Rejected' || item.status === 'Assigned'),
+    item,
+  };
+}
+
+/** Loại trên thanh lọc: '' = tất cả. */
+export type EntryKindFilter = '' | BoardEntryKind;
+
+export const ENTRY_KINDS: { value: BoardEntryKind; label: string; icon: string }[] = [
+  { value: 'agent', label: 'Việc agent', icon: 'solar:cpu-bolt-bold' },
+  { value: 'work', label: 'Việc giao nhân viên', icon: 'solar:clipboard-check-bold' },
+  { value: 'cleaning', label: 'Vệ sinh theo ca', icon: 'mdi:broom' },
+];
+
+/** Lọc việc giao / vệ sinh: lọc agent hoặc nguồn (chỉ có ở việc agent) → ẩn; từ khoá theo tên, mã, người làm. */
+export function filterHubItems(
+  items: readonly IWorkHubItem[],
+  filter: BoardFilter & { kind?: EntryKindFilter }
+): IWorkHubItem[] {
+  if (filter.agentId || filter.source) return [];
+  const term = foldText((filter.q ?? '').trim());
+  return items.filter((i) => {
+    if (filter.kind && filter.kind !== i.kind) return false;
+    if (!term) return true;
+    return [i.title, i.code, i.assigneeName ?? ''].some((v) => foldText(v).includes(term));
+  });
+}
+
 export interface BoardData {
-  columns: Record<BoardColumnId, IAgentTask[]>;
-  /** Việc xong trước hôm nay (không hiện trên bảng — xem ở Danh sách). */
+  columns: Record<BoardColumnId, BoardEntry[]>;
+  /** Mục xong trước hôm nay (không hiện trên bảng — xem ở Danh sách). */
   olderDone: number;
-  /** Việc lỗi / dừng / huỷ trước hôm qua. */
+  /** Mục lỗi / dừng / huỷ đã đóng trước hôm qua. */
   olderEnded: number;
 }
 
 /**
- * Dữ liệu bảng: cột Xong chỉ giữ việc xong hôm nay, cột Lỗi / Đã dừng chỉ giữ từ đầu hôm qua (việc cũ hơn đếm để hiện
- * "Xem thêm"); chế độ "Đang phải làm" bỏ hẳn việc đã huỷ.
+ * Dữ liệu bảng: cột Xong chỉ giữ mục xong hôm nay, cột Lỗi chỉ giữ mục đã đóng từ đầu hôm qua (mục còn phải làm — việc giao
+ * bị trả lại / quá hạn — luôn giữ); việc cũ hơn đếm để hiện "Xem thêm"; chế độ "Đang phải làm" bỏ hẳn mục đã huỷ.
  */
-export function buildBoard(tasks: readonly IAgentTask[], mode: BoardMode, now: number): BoardData {
-  const columns = groupTasksByColumn(tasks);
+export function buildBoard(
+  entries: readonly BoardEntry[],
+  mode: BoardMode,
+  now: number
+): BoardData {
+  const columns: Record<BoardColumnId, BoardEntry[]> = {
+    queued: [],
+    running: [],
+    waiting: [],
+    done: [],
+    ended: [],
+  };
+  entries.forEach((e) => columns[e.column].push(e));
+  (Object.keys(columns) as BoardColumnId[]).forEach((col) => {
+    columns[col].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+  });
   const today = startOfLocalDay(now);
   const yesterday = startOfLocalDay(now, 1);
-  const at = (t: IAgentTask) => new Date(sortTime(t)).getTime();
+  const at = (e: BoardEntry) => new Date(e.at).getTime();
 
-  const done = columns.done.filter((t) => at(t) >= today);
-  const endedAll = columns.ended.filter((t) => mode === 'all' || t.status !== 'cancelled');
-  const ended = endedAll.filter((t) => at(t) >= yesterday);
+  const done = columns.done.filter((e) => at(e) >= today);
+  const endedAll = columns.ended.filter((e) => mode === 'all' || !e.cancelled);
+  const ended = endedAll.filter((e) => e.open || at(e) >= yesterday);
   return {
     columns: { ...columns, done, ended },
     olderDone: columns.done.length - done.length,

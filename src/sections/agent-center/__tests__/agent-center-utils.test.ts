@@ -1,3 +1,4 @@
+import type { IWorkHubItem } from 'src/api/work-hub';
 import type { IAgentTask, IAgentUsageRow } from 'src/api/agent-center';
 
 import { it, expect, describe } from 'vitest';
@@ -16,6 +17,9 @@ import {
   formatDuration,
   columnOfStatus,
   buildBoard,
+  agentEntry,
+  hubEntry,
+  filterHubItems,
   filterTasks,
   taskCode,
   foldText,
@@ -224,14 +228,74 @@ describe('bảng việc', () => {
       task({ id: 'x', status: 'cancelled', finishedAt: at(19, 10) }),
       task({ id: 'w', status: 'waiting_human' }),
     ];
-    const active = buildBoard(tasks, 'active', now);
+    const active = buildBoard(tasks.map(agentEntry), 'active', now);
     expect(active.columns.done.map((t) => t.id)).toEqual(['d1']);
     expect(active.olderDone).toBe(1);
     expect(active.columns.ended.map((t) => t.id)).toEqual(['f1']);
     expect(active.olderEnded).toBe(1);
     expect(active.columns.waiting.map((t) => t.id)).toEqual(['w']);
-    const all = buildBoard(tasks, 'all', now);
+    const all = buildBoard(tasks.map(agentEntry), 'all', now);
     expect(all.columns.ended.map((t) => t.id)).toEqual(['x', 'f1']);
+  });
+
+  it('T2: việc giao trả lại / quá hạn luôn ở cột Lỗi; vệ sinh đóng cũ ẩn; việc giao huỷ ẩn ở "Đang phải làm"', () => {
+    const now = new Date(2026, 10, 19, 15, 0).getTime();
+    const old = new Date(2026, 10, 10, 9, 0).toISOString();
+    const hub = (over: Partial<IWorkHubItem>): IWorkHubItem => ({
+      kind: 'work',
+      id: 'w',
+      code: 'CV-ABCDEF',
+      title: 'Chụp ảnh 7 món',
+      subtitle: null,
+      column: 'ended',
+      status: 'Rejected',
+      statusLabel: 'Trả lại',
+      assigneeId: 'u',
+      assigneeName: 'An Xing',
+      createdAt: old,
+      dueAt: null,
+      finishedAt: old,
+      sortAt: old,
+      overdue: false,
+      photoCount: 0,
+      date: null,
+      block: null,
+      total: 0,
+      pending: 0,
+      done: 0,
+      passed: 0,
+      failed: 0,
+      ...over,
+    });
+    const items = [
+      hub({ id: 'rej' }),
+      hub({
+        id: 'cxl',
+        status: 'Cancelled',
+        statusLabel: 'Đã huỷ',
+        sortAt: new Date(now).toISOString(),
+      }),
+      hub({
+        id: '2026-11-10|Morning',
+        kind: 'cleaning',
+        code: 'VS-1011-S',
+        status: 'missed',
+        title: 'Vệ sinh ca Sáng 10/11',
+      }),
+    ];
+    const board = buildBoard(items.map(hubEntry), 'active', now);
+    expect(board.columns.ended.map((e) => e.id)).toEqual(['work:rej']);
+    expect(board.olderEnded).toBe(1);
+    expect(buildBoard(items.map(hubEntry), 'all', now).columns.ended.map((e) => e.id)).toEqual([
+      'work:cxl',
+      'work:rej',
+    ]);
+    // Lọc: loại, từ khoá theo người làm; lọc agent / nguồn → ẩn việc giao + vệ sinh.
+    expect(filterHubItems(items, { kind: 'cleaning' }).map((i) => i.id)).toEqual([
+      '2026-11-10|Morning',
+    ]);
+    expect(filterHubItems(items, { q: 'an xing', kind: 'work' })).toHaveLength(2);
+    expect(filterHubItems(items, { agentId: 'a1' })).toEqual([]);
   });
 
   it('upsertTask: thay đúng việc, việc mới lên đầu', () => {
