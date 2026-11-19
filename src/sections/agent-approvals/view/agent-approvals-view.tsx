@@ -2,8 +2,11 @@
 
 import type { IAgentAction, AgentActionStatusFilter } from 'src/api/agent-actions';
 
-import { useState, useEffect, useCallback } from 'react';
+import type { ReactNode } from 'react';
 
+import { useRef, useState, useEffect, useCallback } from 'react';
+
+import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Chip from '@mui/material/Chip';
 import Tabs from '@mui/material/Tabs';
@@ -41,6 +44,7 @@ import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
 import AgentLogsTab from '../agent-logs-tab';
 import AgentActionCard from '../agent-action-card';
 import AgentAutonomyTab from '../agent-autonomy-tab';
+import { focusState } from '../agent-action-utils';
 import { AgentRevisionDialog } from '../agent-revision-dialog';
 import {
   type DecisionMode,
@@ -83,7 +87,36 @@ function ListSkeleton() {
 
 // ----------------------------------------------------------------------
 
-function PendingTab({ onCountChange }: { onCountChange: VoidFunction }) {
+/** Khung quanh phiếu được mở từ link `?id=`: cuộn tới một lần + viền nổi bật. */
+function FocusFrame({ focused, children }: { focused: boolean; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const scrolled = useRef(false);
+
+  useEffect(() => {
+    if (!focused || scrolled.current) return;
+    scrolled.current = true;
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focused]);
+
+  if (!focused) return <>{children}</>;
+  return (
+    <Box
+      ref={ref}
+      data-testid="agent-action-focused"
+      sx={{ borderRadius: 2, outline: (theme) => `2px solid ${theme.palette.primary.main}`, outlineOffset: 4 }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+type PendingTabProps = {
+  onCountChange: VoidFunction;
+  focusId?: string | null;
+  onShowHistory?: VoidFunction;
+};
+
+function PendingTab({ onCountChange, focusId, onShowHistory }: PendingTabProps) {
   const { enqueueSnackbar } = useSnackbar();
   const { actions, loading, error, refresh } = useAgentActions('pending');
   const [now, setNow] = useState(() => Date.now());
@@ -92,6 +125,7 @@ function PendingTab({ onCountChange }: { onCountChange: VoidFunction }) {
   const [result, setResult] = useState<IAgentAction | null>(null);
   const [revisionTarget, setRevisionTarget] = useState<IAgentAction | null>(null);
   const [revisionError, setRevisionError] = useState<string | null>(null);
+  const focus = focusState(actions, focusId, loading || !!error);
 
   // Cập nhật "còn bao lâu" mỗi 30 giây.
   useEffect(() => {
@@ -174,6 +208,22 @@ function PendingTab({ onCountChange }: { onCountChange: VoidFunction }) {
         <Alert severity="error">{apiErrorMessage(error, 'Không tải được phiếu chờ duyệt')}</Alert>
       )}
 
+      {focus === 'missing' && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          action={
+            onShowHistory && (
+              <Button color="inherit" size="small" onClick={onShowHistory}>
+                Xem ở Đã xử lý
+              </Button>
+            )
+          }
+        >
+          Phiếu bạn mở không còn chờ duyệt — đã có người xử lý hoặc đã hết hạn.
+        </Alert>
+      )}
+
       {loading && <ListSkeleton />}
 
       {!loading && !error && actions.length === 0 && (
@@ -188,15 +238,16 @@ function PendingTab({ onCountChange }: { onCountChange: VoidFunction }) {
       {!loading && actions.length > 0 && (
         <Stack spacing={2}>
           {actions.map((action) => (
-            <AgentActionCard
-              key={action.id}
-              action={action}
-              now={now}
-              busy={submitting}
-              onApprove={(a) => setTarget({ action: a, mode: 'approve' })}
-              onReject={(a) => setTarget({ action: a, mode: 'reject' })}
-              onRequestRevision={openRevision}
-            />
+            <FocusFrame key={action.id} focused={focus === 'found' && action.id === focusId}>
+              <AgentActionCard
+                action={action}
+                now={now}
+                busy={submitting}
+                onApprove={(a) => setTarget({ action: a, mode: 'approve' })}
+                onReject={(a) => setTarget({ action: a, mode: 'reject' })}
+                onRequestRevision={openRevision}
+              />
+            </FocusFrame>
           ))}
         </Stack>
       )}
@@ -224,7 +275,7 @@ function PendingTab({ onCountChange }: { onCountChange: VoidFunction }) {
 
 // ----------------------------------------------------------------------
 
-function HistoryTab() {
+function HistoryTab({ focusId }: { focusId?: string | null }) {
   const [filter, setFilter] = useState<AgentActionStatusFilter>('all');
   const { actions, loading, error, refresh } = useAgentActions(filter, true, 100);
   // "Tất cả" của máy chủ gồm cả phiếu đang chờ — tab này chỉ hiện phiếu đã xử lý.
@@ -269,7 +320,9 @@ function HistoryTab() {
       {!loading && rows.length > 0 && (
         <Stack spacing={2}>
           {rows.map((action) => (
-            <AgentActionCard key={action.id} action={action} />
+            <FocusFrame key={action.id} focused={!!focusId && action.id === focusId}>
+              <AgentActionCard action={action} />
+            </FocusFrame>
           ))}
         </Stack>
       )}
@@ -289,6 +342,8 @@ export function AgentApprovalsView() {
 
   const searchParams = useSearchParams();
   const urlTab = tabs.find((t) => t.value === searchParams.get('tab'))?.value;
+  // Link từ thẻ trong nhóm quản trị / thông báo: /dashboard/agent/approvals?id=<phiếu>.
+  const focusId = searchParams.get('id');
   const [tab, setTab] = useState<TabValue>(urlTab ?? 'pending');
 
   useEffect(() => {
@@ -353,8 +408,14 @@ export function AgentApprovalsView() {
         ))}
       </Tabs>
 
-      {current === 'pending' && <PendingTab onCountChange={onCountChange} />}
-      {current === 'history' && <HistoryTab />}
+      {current === 'pending' && (
+        <PendingTab
+          onCountChange={onCountChange}
+          focusId={focusId}
+          onShowHistory={() => setTab('history')}
+        />
+      )}
+      {current === 'history' && <HistoryTab focusId={focusId} />}
       {current === 'autonomy' && <AgentAutonomyTab />}
       {current === 'logs' && <AgentLogsTab />}
     </Container>

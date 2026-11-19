@@ -265,3 +265,18 @@ export function splitRevisionNote(note: string | null | undefined): { text: stri
     .filter((line) => line.startsWith('https://') || line.startsWith('http://'));
   return { text: raw.slice(0, at).trim(), imageUrls };
 }
+
+// ----------------------------------------------------------------------
+
+/**
+ * Phiếu được mở từ link `?id=` (thẻ trong nhóm "Quản trị – Đội agent", thông báo): còn trong danh sách → `found`; danh
+ * sách đã tải xong mà không có → `missing` (đã có người xử lý / hết hạn); chưa có id hoặc đang tải → `none`.
+ */
+export function focusState(
+  actions: readonly { id: string }[],
+  focusId: string | null | undefined,
+  loading: boolean
+): 'none' | 'found' | 'missing' {
+  if (!focusId || loading) return 'none';
+  return actions.some((a) => a.id === focusId) ? 'found' : 'missing';
+}
