@@ -35,6 +35,8 @@ type Props = {
   /** Gửi lại tin lỗi (chỉ phía shop). */
   onResend?: (message: ConversationMessage) => void;
   resendingId?: string | null;
+  /** Gợi ý của agent → đổ vào ô soạn (chỉ phía shop, người có quyền trả lời). */
+  onUseSuggestion?: (message: ConversationMessage) => void;
   perspective?: 'shop' | 'customer';
   customerAvatarUrl?: string | null;
   /** Đổi khi mở hội thoại khác → cuộn xuống cuối. */
@@ -56,6 +58,7 @@ export default function InboxMessageList({
   onLoadOlder,
   onResend,
   resendingId,
+  onUseSuggestion,
   perspective = 'shop',
   customerAvatarUrl,
   conversationId,
@@ -154,6 +157,7 @@ export default function InboxMessageList({
               customerAvatarUrl={customerAvatarUrl}
               onOpenImage={lightbox.onOpen}
               onResend={onResend}
+              onUseSuggestion={onUseSuggestion}
               resending={resendingId === m.id}
             />
           </Box>
@@ -173,18 +177,30 @@ type BubbleProps = {
   customerAvatarUrl?: string | null;
   onOpenImage: (url: string) => void;
   onResend?: (message: ConversationMessage) => void;
+  onUseSuggestion?: (message: ConversationMessage) => void;
   resending: boolean;
 };
 
-function MessageBubble({ message: m, perspective, customerAvatarUrl, onOpenImage, onResend, resending }: BubbleProps) {
+function MessageBubble({
+  message: m,
+  perspective,
+  customerAvatarUrl,
+  onOpenImage,
+  onResend,
+  onUseSuggestion,
+  resending,
+}: BubbleProps) {
   const fromCustomer = m.direction === 'in';
   const right = perspective === 'customer' ? fromCustomer : !fromCustomer;
   const images = imageAttachments(m);
   const others = m.attachments.filter((a) => a.type !== 'image');
-  const note = m.isInternalNote;
+  const suggestion = m.status === 'suggested';
+  const note = m.isInternalNote && !suggestion;
   const failed = m.status === 'failed';
 
-  const caption = note
+  const caption = suggestion
+    ? `Gợi ý của ${senderLabel(m)} · chưa gửi khách`
+    : note
     ? `Ghi chú nội bộ · ${senderLabel(m)}`
     : perspective === 'shop' && !fromCustomer
       ? senderLabel(m)
@@ -205,7 +221,10 @@ function MessageBubble({ message: m, perspective, customerAvatarUrl, onOpenImage
             {m.senderType === 'agent' && !note && (
               <Iconify icon="solar:cpu-bolt-bold" width={14} sx={{ color: 'info.main' }} />
             )}
-            <Typography variant="caption" sx={{ color: note ? 'warning.dark' : 'text.disabled' }}>
+            <Typography
+              variant="caption"
+              sx={{ color: note ? 'warning.dark' : suggestion ? 'info.dark' : 'text.disabled' }}
+            >
               {caption}
             </Typography>
           </Stack>
@@ -226,6 +245,11 @@ function MessageBubble({ message: m, perspective, customerAvatarUrl, onOpenImage
                 bgcolor: 'warning.lighter',
                 color: 'grey.800',
                 border: (theme) => `dashed 1px ${theme.palette.warning.main}`,
+              }),
+              ...(suggestion && {
+                bgcolor: 'info.lighter',
+                color: 'grey.800',
+                border: (theme) => `dashed 1px ${theme.palette.info.main}`,
               }),
               ...(failed && { border: (theme) => `solid 1px ${theme.palette.error.main}` }),
             }}
@@ -283,6 +307,17 @@ function MessageBubble({ message: m, perspective, customerAvatarUrl, onOpenImage
             <Typography variant="caption" sx={{ color: 'text.disabled' }}>
               Đang gửi…
             </Typography>
+          )}
+          {suggestion && perspective === 'shop' && onUseSuggestion && (
+            <Button
+              size="small"
+              color="info"
+              startIcon={<Iconify icon="solar:pen-new-square-bold" width={16} />}
+              onClick={() => onUseSuggestion(m)}
+              sx={{ minWidth: 0, px: 1, py: 0 }}
+            >
+              Dùng gợi ý
+            </Button>
           )}
         </Stack>
 

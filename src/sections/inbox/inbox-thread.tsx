@@ -116,6 +116,7 @@ export default function InboxThread({
   const [forceConfirm, setForceConfirm] = useState<{ name: string } | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [prefill, setPrefill] = useState<{ key: number; text: string; images: string[] } | null>(null);
 
   // --- Sự kiện trực tiếp cho hội thoại đang mở -------------------------------------------------
   const prevRef = useRef<{ status?: string; windowEndsAt?: string | null }>({});
@@ -433,6 +434,16 @@ export default function InboxThread({
           loadingOlder={msgs.loadingOlder}
           onLoadOlder={msgs.loadOlder}
           onResend={permissions.reply ? doResend : undefined}
+          onUseSuggestion={
+            permissions.reply
+              ? (m) =>
+                  setPrefill({
+                    key: Date.now(),
+                    text: m.text ?? '',
+                    images: m.attachments.filter((a) => a.type === 'image').map((a) => a.url),
+                  })
+              : undefined
+          }
           resendingId={resendingId}
           customerAvatarUrl={detail.customer.avatarUrl}
         />
@@ -445,6 +456,7 @@ export default function InboxThread({
           windowEndsAt={detail.windowEndsAt}
           quickReplies={quickReplies}
           onSend={doSend}
+          prefill={prefill}
         />
       </Stack>
 
