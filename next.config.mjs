@@ -17,6 +17,8 @@ const BACKEND_API_PREFIXES = [
   'payroll', 'payroll-cycles', 'payroll-complaints', 'bonus-programs', 'quarter-bonuses',
   'holiday-policies', 'penalty-policies',
   'kiotviet', 'notification', 'notifications', 'user-tours',
+  // Zalo Bot báo việc agent (A3): kiểm tra token, lấy chat id, gửi thử — màn Cấu hình thông báo.
+  'zalo-bot',
   'categories', 'unit-of-measures', 'units', 'variant-attributes', 'products',
   'warehouses', 'inventory', 'suppliers', 'purchase-orders', 'shift-stock-checks',
   'customers', 'sales-orders', 'print-templates', 'bank-accounts', 'payment', 'reports',
@@ -59,6 +61,8 @@ const BACKEND_API_PREFIXES = [
   'agent-actions',
   // Trung tâm Agent (K4): agent, bảng việc, lịch chạy, chi phí. Cập nhật trực tiếp đi hub /hubs/agent-board (ingress).
   'agent-center',
+  // Trung tâm việc (T2): gộp việc giao một người + vệ sinh theo ca.
+  'work-hub',
   // Hộp thư khách (F2): hội thoại, mẫu trả lời nhanh, cấu hình hộp thư. Cập nhật trực tiếp đi hub /hubs/inbox (ingress).
   'conversations', 'conversation-quick-replies', 'conversation-settings',
 ];

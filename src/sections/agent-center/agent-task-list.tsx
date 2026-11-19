@@ -1,4 +1,5 @@
 import type { IAgentTask } from 'src/api/agent-center';
+import type { IWorkHubItem } from 'src/api/work-hub';
 
 import { useMemo, useState, useEffect } from 'react';
 
@@ -42,6 +43,8 @@ import {
   taskStatusMeta,
 } from './agent-center-utils';
 
+import WorkHubTable from './work-hub-table';
+
 import type { TaskFilterState } from './agent-task-toolbar';
 
 // ----------------------------------------------------------------------
@@ -78,14 +81,18 @@ type Props = {
   poll: boolean;
 };
 
+/** Danh sách: Loại = việc giao / vệ sinh → bảng các mục đó (đã tải ở trang); còn lại → việc agent phân trang ở máy chủ. */
 export default function AgentTaskList({
-  filter,
-  status,
-  onStatus,
-  selectedTaskId,
-  onOpen,
-  poll,
-}: Props) {
+  hubItems,
+  onOpenItem,
+  ...props
+}: Props & { hubItems: IWorkHubItem[]; onOpenItem: (item: IWorkHubItem) => void }) {
+  if (props.filter.kind === 'work' || props.filter.kind === 'cleaning')
+    return <WorkHubTable items={hubItems} filter={props.filter} onOpen={onOpenItem} />;
+  return <AgentOnlyList {...props} />;
+}
+
+function AgentOnlyList({ filter, status, onStatus, selectedTaskId, onOpen, poll }: Props) {
   const [days, setDays] = useState(7);
   const [withConversation, setWithConversation] = useState(false);
   const [page, setPage] = useState(0);

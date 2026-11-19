@@ -12,7 +12,12 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import Iconify from 'src/components/iconify';
 
-import { TASK_SOURCE, type BoardMode } from './agent-center-utils';
+import {
+  TASK_SOURCE,
+  ENTRY_KINDS,
+  type BoardMode,
+  type EntryKindFilter,
+} from './agent-center-utils';
 
 // ----------------------------------------------------------------------
 // Thanh trên bảng việc: Đang phải làm / Tất cả, tìm, lọc agent + nguồn, đổi chế độ Kanban / Danh sách / Lịch.
@@ -31,6 +36,8 @@ export type TaskFilterState = {
   q: string;
   agentId: string;
   source: string;
+  /** '' = mọi loại; agent / work / cleaning. */
+  kind: EntryKindFilter;
 };
 
 type Props = {
@@ -50,7 +57,7 @@ export default function AgentTaskToolbar({
   agents,
   onRefresh,
 }: Props) {
-  const filtered = !!(filter.q || filter.agentId || filter.source);
+  const filtered = !!(filter.q || filter.agentId || filter.source || filter.kind);
 
   return (
     <Stack
@@ -87,7 +94,7 @@ export default function AgentTaskToolbar({
           size="small"
           value={filter.q}
           onChange={(e) => onFilter({ q: e.target.value })}
-          placeholder="Tìm tên việc, mã AG-…"
+          placeholder="Tìm tên việc, mã, người làm…"
           sx={{ width: { xs: 1, sm: 240 } }}
           InputProps={{
             startAdornment: (
@@ -97,6 +104,24 @@ export default function AgentTaskToolbar({
             ),
           }}
         />
+
+        <TextField
+          select
+          size="small"
+          label="Loại"
+          value={filter.kind}
+          onChange={(e) => onFilter({ kind: e.target.value as EntryKindFilter })}
+          SelectProps={{ displayEmpty: true }}
+          InputLabelProps={{ shrink: true }}
+          sx={{ minWidth: 170 }}
+        >
+          <MenuItem value="">Mọi loại việc</MenuItem>
+          {ENTRY_KINDS.map((k) => (
+            <MenuItem key={k.value} value={k.value}>
+              {k.label}
+            </MenuItem>
+          ))}
+        </TextField>
 
         <TextField
           select
@@ -138,7 +163,7 @@ export default function AgentTaskToolbar({
           <Button
             size="small"
             color="error"
-            onClick={() => onFilter({ q: '', agentId: '', source: '' })}
+            onClick={() => onFilter({ q: '', agentId: '', source: '', kind: '' })}
             startIcon={<Iconify icon="solar:trash-bin-trash-bold" width={16} />}
           >
             Bỏ lọc

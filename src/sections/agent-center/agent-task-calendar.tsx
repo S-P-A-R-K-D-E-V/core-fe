@@ -1,5 +1,6 @@
 import type { IAgentTask } from 'src/api/agent-center';
-import type { DatesSetArg, EventClickArg } from '@fullcalendar/core';
+import type { IWorkHubItem } from 'src/api/work-hub';
+import type { EventInput, DatesSetArg, EventClickArg } from '@fullcalendar/core';
 
 import Calendar from '@fullcalendar/react'; // => request placed at the top
 import listPlugin from '@fullcalendar/list';
@@ -30,7 +31,7 @@ import Iconify from 'src/components/iconify';
 
 import { StyledCalendar } from 'src/sections/calendar/styles';
 
-import { filterTasks, columnOfStatus } from './agent-center-utils';
+import { filterTasks, columnOfStatus, filterHubItems } from './agent-center-utils';
 
 import type { TaskFilterState } from './agent-task-toolbar';
 
@@ -53,10 +54,13 @@ const MIN_MINUTES = 30;
 type Props = {
   filter: TaskFilterState;
   onOpen: (task: IAgentTask) => void;
+  /** Việc giao + vệ sinh (T2) — đã tải sẵn 31 ngày ở trang. */
+  hubItems: IWorkHubItem[];
+  onOpenItem: (item: IWorkHubItem) => void;
   poll: boolean;
 };
 
-export default function AgentTaskCalendar({ filter, onOpen, poll }: Props) {
+export default function AgentTaskCalendar({ filter, onOpen, hubItems, onOpenItem, poll }: Props) {
   const theme = useTheme();
   const smUp = useResponsive('up', 'sm');
   const calendarRef = useRef<Calendar>(null);
@@ -64,16 +68,23 @@ export default function AgentTaskCalendar({ filter, onOpen, poll }: Props) {
   const [title, setTitle] = useState('');
   const [range, setRange] = useState<{ from: string; to: string } | null>(null);
 
+  const showAgent = filter.kind === '' || filter.kind === 'agent';
   const list = useAgentTaskList(
-    range ? { from: range.from, to: range.to, hideConversation: true, take: 500 } : null,
+    range && showAgent
+      ? { from: range.from, to: range.to, hideConversation: true, take: 500 }
+      : null,
     poll
   );
   const occ = useAgentScheduleOccurrences(range);
 
   const tasks = useMemo(
-    () => filterTasks(list.tasks, { agentId: filter.agentId, source: filter.source, q: filter.q }),
-    [list.tasks, filter.agentId, filter.source, filter.q]
+    () =>
+      showAgent
+        ? filterTasks(list.tasks, { agentId: filter.agentId, source: filter.source, q: filter.q })
+        : [],
+    [showAgent, list.tasks, filter.agentId, filter.source, filter.q]
   );
+  const items = useMemo(() => filterHubItems(hubItems, filter), [hubItems, filter]);
 
   const events = useMemo(() => {
     const color = (status: string) => {
@@ -121,8 +132,43 @@ export default function AgentTaskCalendar({ filter, onOpen, poll }: Props) {
         textColor: theme.palette.primary.main,
         classNames: ['agent-occurrence'],
       }));
-    return [...taskEvents, ...upcoming];
-  }, [tasks, occ.occurrences, filter.agentId, filter.source, theme]);
+    // Việc giao có hạn → đặt ở giờ hạn; vệ sinh → cả ngày, một sự kiện / ca.
+    const hubColor = (item: IWorkHubItem) =>
+      item.column === 'done'
+        ? theme.palette.success.main
+        : item.column === 'waiting'
+          ? theme.palette.warning.main
+          : item.column === 'ended'
+            ? theme.palette.error.main
+            : theme.palette.grey[600];
+    const hubEvents = items.flatMap((item): EventInput[] => {
+      if (item.kind === 'cleaning' && item.date) {
+        return [
+          {
+            id: `hub|${item.kind}|${item.id}`,
+            title: `${item.title} · ${item.statusLabel}`,
+            start: item.date,
+            allDay: true,
+            textColor: hubColor(item),
+            extendedProps: { hubId: item.id, hubKind: item.kind },
+          },
+        ];
+      }
+      if (item.kind === 'work' && item.dueAt) {
+        return [
+          {
+            id: `hub|${item.kind}|${item.id}`,
+            title: `Việc giao · ${item.assigneeName ?? ''}: ${item.title}`,
+            start: item.dueAt,
+            textColor: hubColor(item),
+            extendedProps: { hubId: item.id, hubKind: item.kind },
+          },
+        ];
+      }
+      return [];
+    });
+    return [...taskEvents, ...(showAgent ? upcoming : []), ...hubEvents];
+  }, [tasks, items, showAgent, occ.occurrences, filter.agentId, filter.source, theme]);
 
   const api = () => calendarRef.current?.getApi();
 
@@ -135,11 +181,19 @@ export default function AgentTaskCalendar({ filter, onOpen, poll }: Props) {
 
   const handleEventClick = useCallback(
     (arg: EventClickArg) => {
+      const hubId = arg.event.extendedProps.hubId as string | undefined;
+      if (hubId) {
+        const item = items.find(
+          (i) => i.id === hubId && i.kind === arg.event.extendedProps.hubKind
+        );
+        if (item) onOpenItem(item);
+        return;
+      }
       const id = arg.event.extendedProps.taskId as string | undefined;
       const task = id ? tasks.find((t) => t.id === id) : undefined;
       if (task) onOpen(task);
     },
-    [tasks, onOpen]
+    [tasks, items, onOpen, onOpenItem]
   );
 
   const loading = list.loading || occ.loading;

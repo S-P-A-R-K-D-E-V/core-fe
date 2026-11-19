@@ -695,6 +695,12 @@ export const endpoints = {
     create: '/notification/config',
     update: (id: string) => `/notification/config/${id}`,
   },
+  // Zalo Bot chỉ để báo việc agent cần quyết (A3) — trợ giúp ở màn Cấu hình thông báo, quyền Admin.
+  zaloBot: {
+    check: '/zalo-bot/check',
+    updates: '/zalo-bot/updates',
+    testSend: '/zalo-bot/test-send',
+  },
   notifications: {
     list: '/notifications',
     detail: (id: string) => `/notifications/${id}`,
