@@ -170,8 +170,50 @@ function CompetitorDialog({
   );
 }
 
-function CompetitorsTab() {
+function CompetitorNotesPreview({ notes, onShowAll }: { notes: CompetitorNote[]; onShowAll: () => void }) {
+  if (notes.length === 0) return null;
+  return (
+    <Stack spacing={1} sx={{ mt: 1.5, pt: 1.5, borderTop: (theme) => `1px dashed ${theme.palette.divider}` }}>
+      {notes.slice(0, 4).map((n) => (
+        <Box key={n.id}>
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {n.title || 'Ghi chú'}
+            </Typography>
+            {n.price !== null && <Label color="warning">{fVnd(n.price)}</Label>}
+            <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+              {n.source === 'agent' ? 'Agent' : (n.createdByName ?? 'Người dán')} · {fDateTime(n.createdAt)}
+            </Typography>
+          </Stack>
+          {n.note && (
+            <Typography
+              variant="body2"
+              sx={{
+                color: 'text.secondary',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {n.note}
+            </Typography>
+          )}
+          {n.url && <LinkChips urls={[n.url]} />}
+        </Box>
+      ))}
+      <Box>
+        <Button size="small" onClick={onShowAll} endIcon={<Iconify icon="eva:arrow-ios-forward-fill" />}>
+          {notes.length > 4 ? `Xem tất cả ${notes.length} ghi chú` : 'Xem / thêm ghi chú'}
+        </Button>
+      </Box>
+    </Stack>
+  );
+}
+
+function CompetitorsTab({ onShowNotes }: { onShowNotes: (competitorId: string) => void }) {
   const { items, loading } = useCompetitors();
+  const { items: allNotes } = useMarketNotes(60);
   const { enqueueSnackbar } = useSnackbar();
   const [confirm, confirmDialog] = useConfirmDialog();
   const [editing, setEditing] = useState<Competitor | null | undefined>(undefined);
@@ -237,6 +279,10 @@ function CompetitorsTab() {
               <Box sx={{ mt: 1 }}>
                 <LinkChips urls={c.links} />
               </Box>
+              <CompetitorNotesPreview
+                notes={allNotes.filter((n) => n.competitorId === c.id)}
+                onShowAll={() => onShowNotes(c.id)}
+              />
             </Box>
             <IconButton onClick={() => setEditing(c)} aria-label="Sửa">
               <Iconify icon="solar:pen-bold" />
@@ -260,12 +306,14 @@ function CompetitorsTab() {
 
 // ---------------------------------------------------------------------- Ghi chú
 
-function NotesTab() {
-  const { items, loading } = useMarketNotes(60);
+function NotesTab({ initialCompetitorId = '' }: { initialCompetitorId?: string }) {
+  const { items: allItems, loading } = useMarketNotes(60);
   const { items: competitors } = useCompetitors();
   const { enqueueSnackbar } = useSnackbar();
   const [confirm, confirmDialog] = useConfirmDialog();
-  const [competitorId, setCompetitorId] = useState('');
+  const [competitorId, setCompetitorId] = useState(initialCompetitorId);
+  const [filter, setFilter] = useState(initialCompetitorId);
+  const items = filter ? allItems.filter((n) => n.competitorId === filter) : allItems;
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
@@ -364,6 +412,21 @@ function NotesTab() {
         </Stack>
       </Card>
 
+      <TextField
+        select
+        size="small"
+        label="Lọc theo đối thủ"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+        sx={{ maxWidth: 320 }}
+      >
+        <MenuItem value="">Tất cả</MenuItem>
+        {competitors.map((c) => (
+          <MenuItem key={c.id} value={c.id}>
+            {c.name}
+          </MenuItem>
+        ))}
+      </TextField>
       {loading && <Skeleton variant="rounded" height={120} />}
       {!loading && items.length === 0 && (
         <EmptyContent filled title="Chưa có ghi chú trong 60 ngày" sx={{ py: 6 }} />
@@ -563,6 +626,7 @@ function ReportsTab() {
 export function MarketIntelView() {
   const settings = useSettingsContext();
   const [tab, setTab] = useState<'reports' | 'competitors' | 'notes'>('reports');
+  const [notesFor, setNotesFor] = useState('');
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'lg'}>
@@ -575,14 +639,28 @@ export function MarketIntelView() {
         ]}
         sx={{ mb: { xs: 2, md: 3 } }}
       />
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3 }}>
+      <Tabs
+        value={tab}
+        onChange={(_, v) => {
+          setNotesFor('');
+          setTab(v);
+        }}
+        sx={{ mb: 3 }}
+      >
         <Tab value="reports" label="Báo cáo tuần" />
         <Tab value="competitors" label="Đối thủ" />
         <Tab value="notes" label="Ghi chú" />
       </Tabs>
       {tab === 'reports' && <ReportsTab />}
-      {tab === 'competitors' && <CompetitorsTab />}
-      {tab === 'notes' && <NotesTab />}
+      {tab === 'competitors' && (
+        <CompetitorsTab
+          onShowNotes={(id) => {
+            setNotesFor(id);
+            setTab('notes');
+          }}
+        />
+      )}
+      {tab === 'notes' && <NotesTab key={notesFor} initialCompetitorId={notesFor} />}
     </Container>
   );
 }
