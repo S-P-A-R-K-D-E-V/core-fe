@@ -1,3 +1,4 @@
+import type { IWorkHubItem } from 'src/api/work-hub';
 import type { IAgentTask, IAgentTaskDetail } from 'src/api/agent-center';
 
 import userEvent from '@testing-library/user-event';
@@ -37,6 +38,7 @@ vi.mock('src/api/agent-center', async (orig) => ({
 // Imported after the mocks above.
 import AgentBoard from '../agent-board';
 import AgentTaskDrawer from '../agent-task-drawer';
+import { hubEntry, agentEntry } from '../agent-center-utils';
 
 const theme = createTheme({
   palette: { background: { neutral: '#f4f6f8' } as any },
@@ -103,7 +105,8 @@ describe('bảng việc', () => {
     render(
       <ThemeProvider theme={theme}>
         <AgentBoard
-          tasks={tasks}
+          entries={tasks.map(agentEntry)}
+          onOpenItem={vi.fn()}
           mode="all"
           loading={false}
           selectedTaskId={null}
@@ -244,7 +247,8 @@ describe('bảng việc — chế độ và cột Xong', () => {
       task({ id: 'w', title: 'Chờ duyệt bài', status: 'waiting_approval' }),
     ];
     const props = {
-      tasks,
+      entries: tasks.map(agentEntry),
+      onOpenItem: vi.fn(),
       loading: false,
       selectedTaskId: null,
       onOpen: vi.fn(),
@@ -278,6 +282,89 @@ describe('bảng việc — chế độ và cột Xong', () => {
   });
 });
 
+describe('T2 — việc giao nhân viên + vệ sinh theo ca trên bảng', () => {
+  it('thẻ CV / VS nằm đúng cột, ghi trạng thái, bấm thẻ gọi onOpenItem', async () => {
+    const onOpenItem = vi.fn();
+    const base = {
+      subtitle: null,
+      assigneeId: null,
+      createdAt: new Date().toISOString(),
+      dueAt: null,
+      finishedAt: null,
+      sortAt: new Date().toISOString(),
+      overdue: false,
+      photoCount: 0,
+      date: null,
+      block: null,
+      total: 0,
+      pending: 0,
+      done: 0,
+      passed: 0,
+      failed: 0,
+    };
+    const items: IWorkHubItem[] = [
+      {
+        ...base,
+        kind: 'work',
+        id: 'w1',
+        code: 'CV-ABC123',
+        title: 'Chụp ảnh 7 món',
+        column: 'waiting',
+        status: 'Submitted',
+        statusLabel: 'Chờ duyệt',
+        assigneeName: 'An Xing',
+        photoCount: 3,
+      },
+      {
+        ...base,
+        kind: 'cleaning',
+        id: '2026-11-19|Morning',
+        code: 'VS-1911-S',
+        title: 'Vệ sinh ca Sáng 19/11',
+        subtitle: '3/5 đạt',
+        column: 'queued',
+        status: 'pending',
+        statusLabel: 'Chưa làm 2',
+        assigneeName: 'Trà My',
+        date: '2026-11-19',
+        block: 'Morning',
+        total: 5,
+        pending: 2,
+        passed: 3,
+      },
+    ];
+    render(
+      <ThemeProvider theme={theme}>
+        <AgentBoard
+          entries={items.map(hubEntry)}
+          mode="active"
+          loading={false}
+          selectedTaskId={null}
+          onOpen={vi.fn()}
+          onOpenItem={onOpenItem}
+          onStop={vi.fn()}
+          onRetry={vi.fn()}
+          onCancel={vi.fn()}
+          onShowList={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+    const waiting = screen.getByTestId('agent-column-waiting');
+    expect(within(waiting).getByText('Chụp ảnh 7 món')).toBeInTheDocument();
+    expect(within(waiting).getByText('Chờ duyệt')).toBeInTheDocument();
+    expect(within(waiting).getByText('An Xing')).toBeInTheDocument();
+    const queued = screen.getByTestId('agent-column-queued');
+    expect(within(queued).getByText('VS-1911-S')).toBeInTheDocument();
+    expect(within(queued).getByText('3/5 đạt')).toBeInTheDocument();
+    // Không có nút Dừng trên thẻ việc giao / vệ sinh.
+    expect(screen.queryByRole('button', { name: 'Dừng' })).toBeNull();
+    await userEvent.click(screen.getByText('Vệ sinh ca Sáng 19/11'));
+    expect(onOpenItem).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'cleaning', block: 'Morning' })
+    );
+  });
+});
+
 describe('A2 — việc chờ việc con', () => {
   const parent = task({
     id: 'p',
@@ -294,7 +381,8 @@ describe('A2 — việc chờ việc con', () => {
     render(
       <ThemeProvider theme={theme}>
         <AgentBoard
-          tasks={[parent]}
+          entries={[agentEntry(parent)]}
+          onOpenItem={vi.fn()}
           mode="all"
           loading={false}
           selectedTaskId={null}

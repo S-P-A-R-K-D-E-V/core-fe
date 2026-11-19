@@ -279,6 +279,12 @@ export async function submitWorkTask(
   return response.data;
 }
 
+/** Một việc giao (người được giao hoặc người có hr.task.manage). */
+export async function getWorkTask(id: string): Promise<IWorkTask> {
+  const response = await axios.get<IWorkTask>(endpoints.hr.task(id));
+  return response.data;
+}
+
 export async function reviewWorkTask(id: string, approve: boolean, note: string | null): Promise<IWorkTask> {
   const response = await axios.put<IWorkTask>(endpoints.hr.taskReview(id), { approve, note });
   return response.data;

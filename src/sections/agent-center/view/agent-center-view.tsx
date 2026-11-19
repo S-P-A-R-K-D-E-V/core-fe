@@ -1,6 +1,9 @@
 'use client';
 
+import type { IWorkTask } from 'src/types/hr';
 import type { IAgentTask, IAgentTaskDetail, IAgentCenterSummary } from 'src/api/agent-center';
+import { useWorkHubItems, type IWorkHubItem } from 'src/api/work-hub';
+import { getWorkTask, cancelWorkTask } from 'src/api/hr';
 
 import { useSWRConfig } from 'swr';
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -50,6 +53,8 @@ import { useAuthContext } from 'src/auth/hooks';
 import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
 
 import AgentBoard from '../agent-board';
+import CleaningReviewDialog from 'src/sections/cleaning/cleaning-review-dialog';
+import { ReviewTaskDialog } from 'src/sections/cleaning/assigned-tasks';
 import AgentTaskList from '../agent-task-list';
 import AgentTaskCalendar from '../agent-task-calendar';
 import AgentTaskToolbar, {
@@ -62,7 +67,13 @@ import AgentUsageTab from '../agent-usage-tab';
 import AgentTaskDrawer from '../agent-task-drawer';
 import AgentScheduleTab from '../agent-schedule-tab';
 import AgentAssignDialog from '../agent-assign-dialog';
-import { upsertTask, filterTasks } from '../agent-center-utils';
+import {
+  hubEntry,
+  upsertTask,
+  agentEntry,
+  filterTasks,
+  filterHubItems,
+} from '../agent-center-utils';
 import { useAgentBoardHub } from '../hooks/use-agent-board-hub';
 
 // ----------------------------------------------------------------------
@@ -181,12 +192,59 @@ export function AgentCenterView() {
     q: '',
     agentId: '',
     source: '',
+    kind: '',
   });
   const [listStatus, setListStatus] = useState('');
   const boardTasks = useMemo(
     () => filterTasks(tasks, { agentId: filter.agentId, source: filter.source, q: filter.q }),
     [tasks, filter.agentId, filter.source, filter.q]
   );
+
+  // --- Việc giao nhân viên + vệ sinh theo ca (T2) -------------------------------------------
+  // 31 ngày: đủ cho chế độ Lịch tháng; bảng chỉ hiện việc còn mở + xong hôm nay.
+  const workHub = useWorkHubItems(31);
+  const boardEntries = useMemo(
+    () => [
+      ...(filter.kind === '' || filter.kind === 'agent' ? boardTasks.map(agentEntry) : []),
+      ...filterHubItems(workHub.items, filter).map(hubEntry),
+    ],
+    [boardTasks, workHub.items, filter]
+  );
+  const [reviewWork, setReviewWork] = useState<IWorkTask | null>(null);
+  const [cancelWork, setCancelWork] = useState<IWorkTask | null>(null);
+  const [cleaningShift, setCleaningShift] = useState<{ date: Date; block: string } | null>(null);
+
+  const handleOpenItem = useCallback(
+    async (item: IWorkHubItem) => {
+      if (item.kind === 'cleaning' && item.date && item.block) {
+        const [y, m, d] = item.date.split('-').map(Number);
+        setCleaningShift({ date: new Date(y, m - 1, d), block: item.block });
+        return;
+      }
+      try {
+        setReviewWork(await getWorkTask(item.id));
+      } catch (err) {
+        enqueueSnackbar(apiErrorMessage(err, 'Không mở được việc này'), { variant: 'error' });
+      }
+    },
+    [enqueueSnackbar]
+  );
+
+  const handleCancelWork = async () => {
+    if (!cancelWork) return;
+    setBusy(true);
+    try {
+      await cancelWorkTask(cancelWork.id);
+      enqueueSnackbar('Đã huỷ việc');
+      setCancelWork(null);
+      setReviewWork(null);
+      workHub.refresh();
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Huỷ việc thất bại'), { variant: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // Nối lại hub → có thể đã lỡ sự kiện: tải lại bảng, tóm tắt và việc đang mở.
   useEffect(() => {
@@ -328,11 +386,11 @@ export function AgentCenterView() {
   return (
     <Container maxWidth={false}>
       <CustomBreadcrumbs
-        heading="Trung tâm Agent"
+        heading="Trung tâm việc"
         links={[
           { name: 'Dashboard', href: paths.dashboard.root },
           { name: 'Cài đặt' },
-          { name: 'Trung tâm Agent' },
+          { name: 'Trung tâm việc' },
         ]}
         action={
           <Stack direction="row" spacing={1} alignItems="center">
@@ -493,6 +551,7 @@ export function AgentCenterView() {
             onRefresh={() => {
               refreshTasks();
               refreshSummary();
+              workHub.refresh();
             }}
           />
           {!!tasksError && taskView === 'kanban' && (
@@ -502,11 +561,12 @@ export function AgentCenterView() {
           )}
           {taskView === 'kanban' && (
             <AgentBoard
-              tasks={boardTasks}
+              entries={boardEntries}
               mode={filter.mode}
-              loading={tasksLoading}
+              loading={tasksLoading || workHub.loading}
               selectedTaskId={openTaskId}
               onOpen={(t) => openTask(t.id)}
+              onOpenItem={handleOpenItem}
               onStop={(t) => setConfirm({ kind: 'stop', task: t })}
               onRetry={handleRetry}
               onCancel={(t) => setConfirm({ kind: 'cancel', task: t })}
@@ -523,11 +583,19 @@ export function AgentCenterView() {
               onStatus={setListStatus}
               selectedTaskId={openTaskId}
               onOpen={(t) => openTask(t.id)}
+              hubItems={workHub.items}
+              onOpenItem={handleOpenItem}
               poll={poll}
             />
           )}
           {taskView === 'calendar' && (
-            <AgentTaskCalendar filter={filter} onOpen={(t) => openTask(t.id)} poll={poll} />
+            <AgentTaskCalendar
+              filter={filter}
+              onOpen={(t) => openTask(t.id)}
+              hubItems={workHub.items}
+              onOpenItem={handleOpenItem}
+              poll={poll}
+            />
           )}
         </>
       )}
@@ -616,6 +684,49 @@ export function AgentCenterView() {
           </LoadingButton>
         }
       />
+
+      <ReviewTaskDialog
+        task={reviewWork}
+        onClose={() => setReviewWork(null)}
+        onDone={() => {
+          setReviewWork(null);
+          workHub.refresh();
+        }}
+        onCancel={(t) => setCancelWork(t)}
+      />
+
+      <ConfirmDialog
+        open={!!cancelWork}
+        onClose={() => (busy ? undefined : setCancelWork(null))}
+        cancelText="Không"
+        title="Huỷ việc giao này?"
+        content={
+          cancelWork ? `"${cancelWork.title}" sẽ bị huỷ, người được giao không cần làm nữa.` : ''
+        }
+        action={
+          <LoadingButton
+            variant="contained"
+            color="error"
+            loading={busy}
+            onClick={handleCancelWork}
+          >
+            Huỷ việc
+          </LoadingButton>
+        }
+      />
+
+      {cleaningShift && (
+        <CleaningReviewDialog
+          open
+          date={cleaningShift.date}
+          block={cleaningShift.block}
+          onClose={() => {
+            setCleaningShift(null);
+            workHub.refresh();
+          }}
+          onChanged={() => workHub.refresh()}
+        />
+      )}
     </Container>
   );
 }

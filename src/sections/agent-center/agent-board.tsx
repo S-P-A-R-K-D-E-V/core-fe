@@ -1,5 +1,6 @@
 import type { DropResult } from '@hello-pangea/dnd';
 import type { IAgentTask } from 'src/api/agent-center';
+import type { IWorkHubItem } from 'src/api/work-hub';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Droppable, DragDropContext } from '@hello-pangea/dnd';
@@ -17,12 +18,14 @@ import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 
+import WorkHubCard from './work-hub-card';
 import AgentTaskCard from './agent-task-card';
 import {
   buildBoard,
   decideDrop,
   BOARD_COLUMNS,
   type BoardMode,
+  type BoardEntry,
   type BoardColumnId,
 } from './agent-center-utils';
 
@@ -36,11 +39,13 @@ import {
 
 type Props = {
   /** Việc đã lọc (agent / nguồn / từ khoá) — bảng chỉ chia cột. */
-  tasks: IAgentTask[];
+  entries: BoardEntry[];
   mode: BoardMode;
   loading: boolean;
   selectedTaskId: string | null;
   onOpen: (task: IAgentTask) => void;
+  /** Bấm thẻ việc giao / vệ sinh. */
+  onOpenItem: (item: IWorkHubItem) => void;
   onStop: (task: IAgentTask) => void;
   onRetry: (task: IAgentTask) => void;
   onCancel: (task: IAgentTask) => void;
@@ -63,11 +68,12 @@ function readCollapsed(): BoardColumnId[] {
 }
 
 export default function AgentBoard({
-  tasks,
+  entries,
   mode,
   loading,
   selectedTaskId,
   onOpen,
+  onOpenItem,
   onStop,
   onRetry,
   onCancel,
@@ -75,8 +81,8 @@ export default function AgentBoard({
 }: Props) {
   const { enqueueSnackbar } = useSnackbar();
 
-  const hasRunning = tasks.some((t) => t.status === 'running');
-  const hasWaiting = tasks.some((t) => t.status.startsWith('waiting'));
+  const hasRunning = entries.some((e) => e.kind === 'agent' && e.task.status === 'running');
+  const hasWaiting = entries.some((e) => e.kind === 'agent' && e.task.status.startsWith('waiting'));
 
   // Đồng hồ cho thời gian chạy: mỗi giây khi có việc đang chạy, mỗi 30 giây khi chỉ có việc đang chờ, còn lại mỗi phút
   // (để cột Xong "hôm nay" tự sang ngày).
@@ -89,7 +95,7 @@ export default function AgentBoard({
   }, [tickMs]);
 
   // ≤ 200 việc — dựng lại theo đồng hồ cũng rẻ, và cột Xong "hôm nay" tự sang ngày.
-  const board = useMemo(() => buildBoard(tasks, mode, now), [tasks, mode, now]);
+  const board = useMemo(() => buildBoard(entries, mode, now), [entries, mode, now]);
 
   const [collapsed, setCollapsed] = useState<BoardColumnId[]>([]);
   useEffect(() => setCollapsed(readCollapsed()), []);
@@ -107,8 +113,9 @@ export default function AgentBoard({
   const onDragEnd = useCallback(
     ({ source, destination, draggableId }: DropResult) => {
       if (!destination) return;
-      const task = tasks.find((t) => t.id === draggableId);
-      if (!task) return;
+      const entry = entries.find((e) => e.id === draggableId);
+      if (!entry || entry.kind !== 'agent') return;
+      const { task } = entry;
       const decision = decideDrop(
         source.droppableId as BoardColumnId,
         destination.droppableId as BoardColumnId,
@@ -118,7 +125,7 @@ export default function AgentBoard({
       else if (decision.kind === 'cancel') onCancel(task);
       else if (decision.kind === 'reject') enqueueSnackbar(decision.message, { variant: 'info' });
     },
-    [tasks, onRetry, onCancel, enqueueSnackbar]
+    [entries, onRetry, onCancel, enqueueSnackbar]
   );
 
   const columns = BOARD_COLUMNS.filter((c) => mode === 'all' || !c.allOnly);
@@ -262,17 +269,28 @@ export default function AgentBoard({
                           {col.id === 'done' ? 'Chưa có việc xong hôm nay' : 'Trống'}
                         </Box>
                       )}
-                      {list.map((task, index) => (
-                        <AgentTaskCard
-                          key={task.id}
-                          task={task}
-                          index={index}
-                          now={now}
-                          selected={task.id === selectedTaskId}
-                          onOpen={onOpen}
-                          onStop={onStop}
-                        />
-                      ))}
+                      {list.map((entry, index) =>
+                        entry.kind === 'agent' ? (
+                          <AgentTaskCard
+                            key={entry.id}
+                            task={entry.task}
+                            index={index}
+                            now={now}
+                            selected={entry.task.id === selectedTaskId}
+                            onOpen={onOpen}
+                            onStop={onStop}
+                          />
+                        ) : (
+                          <WorkHubCard
+                            key={entry.id}
+                            draggableId={entry.id}
+                            item={entry.item}
+                            index={index}
+                            now={now}
+                            onOpen={onOpenItem}
+                          />
+                        )
+                      )}
                       {dropProvided.placeholder}
                     </Stack>
                   )}
