@@ -219,3 +219,69 @@ describe('chi tiết việc', () => {
     expect(onStop).toHaveBeenCalledWith(expect.objectContaining({ id: 'w' }));
   });
 });
+
+describe('A2 — việc chờ việc con', () => {
+  const parent = task({
+    id: 'p',
+    title: 'CEO gom báo cáo tuần',
+    status: 'waiting_children',
+    source: 'chat',
+    startedAt: '2026-11-18T00:00:00Z',
+    childrenTotal: 3,
+    childrenDone: 1,
+  });
+
+  it('thẻ nằm cột Đang chạy, nhãn "Chờ 1/3 việc con", nguồn "Nhóm quản trị", có nút Dừng', async () => {
+    const onStop = vi.fn();
+    render(
+      <ThemeProvider theme={theme}>
+        <AgentBoard
+          tasks={[parent]}
+          agents={[]}
+          loading={false}
+          selectedTaskId={null}
+          onOpen={vi.fn()}
+          onStop={onStop}
+          onRetry={vi.fn()}
+          onCancel={vi.fn()}
+          onRefresh={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+
+    expect(screen.getByText('Chờ 1/3 việc con')).toBeInTheDocument();
+    expect(screen.getByText('Nhóm quản trị')).toBeInTheDocument();
+    // Cột Đang chạy chứa thẻ.
+    const runningColumn = screen
+      .getByText('CEO gom báo cáo tuần')
+      .closest('[data-rfd-droppable-id]');
+    expect(runningColumn?.getAttribute('data-rfd-droppable-id')).toBe('running');
+    await userEvent.click(screen.getByRole('button', { name: 'Dừng' }));
+    expect(onStop).toHaveBeenCalledWith(expect.objectContaining({ id: 'p' }));
+  });
+
+  it('chi tiết: trạng thái "Chờ việc con", có Dừng, không Chạy lại / Huỷ', () => {
+    detail.value = { task: parent, steps: [] };
+    render(
+      <ThemeProvider theme={theme}>
+        <AgentTaskDrawer
+          taskId="p"
+          fallbackTask={null}
+          poll={false}
+          onClose={vi.fn()}
+          onStop={vi.fn()}
+          onRetry={vi.fn()}
+          onCancel={vi.fn()}
+          onNoteSent={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+
+    const drawer = screen.getByRole('presentation');
+    expect(within(drawer).getByText('Chờ việc con')).toBeInTheDocument();
+    expect(within(drawer).getByText(/Chờ 1\/3 việc con/)).toBeInTheDocument();
+    expect(within(drawer).getByRole('button', { name: 'Dừng' })).toBeInTheDocument();
+    expect(within(drawer).queryByRole('button', { name: 'Chạy lại' })).toBeNull();
+    expect(within(drawer).queryByRole('button', { name: /Huỷ/ })).toBeNull();
+  });
+});

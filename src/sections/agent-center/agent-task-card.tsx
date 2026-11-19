@@ -31,6 +31,7 @@ import {
   formatDuration,
   taskSourceMeta,
   taskStatusMeta,
+  childrenWaitLabel,
 } from './agent-center-utils';
 
 // ----------------------------------------------------------------------
@@ -56,6 +57,7 @@ function AgentTaskCard({ task, index, now, selected, onOpen, onStop }: Props) {
   const tokens = taskTokens(task);
   const status = taskStatusMeta(task.status);
   const showStatus = ['failed', 'stopped', 'cancelled'].includes(task.status);
+  const childrenLabel = childrenWaitLabel(task);
 
   return (
     <Draggable draggableId={task.id} index={index} isDragDisabled={!isDraggable(task.status)}>
@@ -110,6 +112,18 @@ function AgentTaskCard({ task, index, now, selected, onOpen, onStop }: Props) {
               <Box>
                 <Label color={status.color} variant="soft">
                   {status.label}
+                </Label>
+              </Box>
+            )}
+
+            {childrenLabel && (
+              <Box>
+                <Label
+                  color="primary"
+                  variant="soft"
+                  startIcon={<Iconify icon="solar:users-group-rounded-bold" width={14} />}
+                >
+                  {childrenLabel}
                 </Label>
               </Box>
             )}

@@ -30,7 +30,8 @@ export const AGENT_ACTIVITY_SLOW_MS = 60_000;
 
 export function agentActivityCounts(summary: IAgentCenterSummary | undefined) {
   const c = summary?.counts;
-  const running = c?.running ?? 0;
+  // Việc chờ việc con (A2) tính là đang chạy — cùng cột Đang chạy trên bảng.
+  const running = (c?.running ?? 0) + (c?.waiting_children ?? 0);
   const queued = c?.queued ?? 0;
   const waitingHuman = c?.waiting_human ?? 0;
   return { running, queued, waitingHuman, active: running + queued };

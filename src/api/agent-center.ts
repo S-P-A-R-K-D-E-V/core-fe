@@ -14,12 +14,15 @@ export type AgentTaskStatus =
   | 'running'
   | 'waiting_approval'
   | 'waiting_human'
+  /** A2: việc cha chờ các việc con (task_delegate wait) — chưa kết thúc, nằm cột Đang chạy. */
+  | 'waiting_children'
   | 'done'
   | 'failed'
   | 'stopped'
   | 'cancelled';
 
-export type AgentTaskSource = 'manual' | 'schedule' | 'agent' | 'event';
+/** `chat` (A2): tin @CEO trong nhóm quản trị. */
+export type AgentTaskSource = 'manual' | 'schedule' | 'agent' | 'event' | 'chat';
 
 export type AgentPlanItemStatus = 'pending' | 'in_progress' | 'done' | 'skipped';
 
@@ -56,6 +59,10 @@ export interface IAgentTask {
   inputTokens: number;
   outputTokens: number;
   toolCalls: number;
+  /** A2: số việc con đang được chờ (0 khi không chờ). Máy chủ cũ không gửi. */
+  childrenTotal?: number;
+  /** A2: số con trong đó đã xong / lỗi / dừng / chờ người. */
+  childrenDone?: number;
 }
 
 export type AgentStepKind = 'model' | 'tool' | 'plan' | 'note' | 'approval' | 'system';
@@ -92,6 +99,8 @@ export interface IAgentCenterSummary {
     running: number;
     waiting_approval: number;
     waiting_human: number;
+    /** A2 — máy chủ cũ không gửi. */
+    waiting_children?: number;
     done_today: number;
     failed_today: number;
   };
@@ -343,6 +352,34 @@ export function useAgentAdminGroup(enabled: boolean) {
 /** Tạo (hoặc lấy lại) nhóm quản trị — quyền agent.manage. Lần đầu thêm sẵn các Admin của cửa hàng. */
 export async function createAgentAdminGroup(): Promise<IAgentAdminGroupCreated> {
   const res = await axios.post<IAgentAdminGroupCreated>(EP.adminGroup);
+  return res.data;
+}
+
+export interface IAgentConfirmOpResult {
+  label: string;
+  ok: boolean;
+  message: string | null;
+}
+
+export interface IAgentConfirmResult {
+  status: 'done' | (string & {});
+  statusText: string | null;
+  /** Chỉ có khi Xác nhận. */
+  results?: IAgentConfirmOpResult[] | null;
+}
+
+/**
+ * Thẻ `confirm` của CEO (A2): Xác nhận → máy chủ chạy các thao tác bằng quyền + tên người bấm. 409 thẻ đã xử lý, 404 không
+ * có, 400 không phải thẻ confirm.
+ */
+export async function confirmAdminGroupProposal(refId: string): Promise<IAgentConfirmResult> {
+  const res = await axios.post<IAgentConfirmResult>(EP.adminGroupConfirm(refId), {});
+  return res.data;
+}
+
+/** Thẻ `confirm` của CEO (A2): Huỷ đề xuất, không chạy gì. */
+export async function cancelAdminGroupProposal(refId: string): Promise<IAgentConfirmResult> {
+  const res = await axios.post<IAgentConfirmResult>(EP.adminGroupConfirmCancel(refId), {});
   return res.data;
 }
 
