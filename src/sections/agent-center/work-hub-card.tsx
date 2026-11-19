@@ -69,6 +69,7 @@ function WorkHubCard({ item, index, now, draggableId, onOpen }: Props) {
           sx={{
             width: 1,
             borderRadius: 1.5,
+            flexShrink: 0,
             cursor: 'pointer',
             bgcolor: 'background.paper',
             boxShadow: theme.customShadows.z1,

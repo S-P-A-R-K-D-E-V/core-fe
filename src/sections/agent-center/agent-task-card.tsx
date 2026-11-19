@@ -90,6 +90,8 @@ function AgentTaskCard({ task, index, now, selected, onOpen, onStop }: Props) {
           sx={{
             width: 1,
             borderRadius: 1.5,
+            // Cột nhiều thẻ cuộn trong khung — thẻ không được co lại.
+            flexShrink: 0,
             overflow: 'hidden',
             position: 'relative',
             cursor: 'pointer',
