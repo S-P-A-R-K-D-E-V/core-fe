@@ -45,6 +45,10 @@ import {
 import { getAllUsers } from 'src/api/users';
 import { getAllRoles } from 'src/api/roles';
 import { sendManualNotification } from 'src/api/notifications';
+import type { IZaloBotChat } from 'src/api/zalo-bot';
+
+import ZaloBotHelper from '../zalo-bot-helper';
+import { NOTIFICATION_TYPES, applyZaloChat, getNotificationTypeMeta } from '../notification-types';
 
 // ----------------------------------------------------------------------
 
@@ -199,48 +203,66 @@ export default function NotificationConfigView() {
     }
   };
 
-  const renderForm = (isEdit: boolean) => (
-    <Stack spacing={2.5} sx={{ pt: 1 }}>
-      {!isEdit && (
+  const handlePickZaloChat = (chat: IZaloBotChat) => {
+    const next = applyZaloChat(chat, formName);
+    setFormChatId(next.chatId);
+    setFormName(next.name);
+  };
+
+  const renderForm = (isEdit: boolean) => {
+    const typeMeta = getNotificationTypeMeta(formType);
+    return (
+      <Stack spacing={2.5} sx={{ pt: 1 }}>
+        {isEdit ? (
+          <Typography variant="body2" color="text.secondary">
+            Loại: {typeMeta.label}
+          </Typography>
+        ) : (
+          <TextField
+            select
+            label="Loại"
+            value={formType}
+            onChange={(e) => setFormType(e.target.value)}
+            fullWidth
+          >
+            {NOTIFICATION_TYPES.map((t) => (
+              <MenuItem key={t.value} value={t.value}>
+                {t.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
         <TextField
-          select
-          label="Loại"
-          value={formType}
-          onChange={(e) => setFormType(e.target.value)}
+          label="Tên gợi nhớ"
+          value={formName}
+          onChange={(e) => setFormName(e.target.value)}
+          placeholder={formType === 'zalo-bot' ? 'VD: Anh Bình' : 'VD: Bot thông báo quầy'}
           fullWidth
-        >
-          <MenuItem value="telegram">Telegram (nhóm thông báo)</MenuItem>
-          <MenuItem value="telegram-report">Telegram – báo cáo riêng (doanh thu, báo cáo sáng)</MenuItem>
-          <MenuItem value="zalo">Zalo OA</MenuItem>
-        </TextField>
-      )}
-      <TextField
-        label="Tên gợi nhớ"
-        value={formName}
-        onChange={(e) => setFormName(e.target.value)}
-        placeholder="VD: Bot thông báo quầy"
-        fullWidth
-      />
-      <TextField
-        label="Bot Token *"
-        value={formToken}
-        onChange={(e) => setFormToken(e.target.value)}
-        placeholder={formType.startsWith('telegram') ? 'VD: 123456:ABC-DEF...' : 'Zalo OA Token'}
-        fullWidth
-      />
-      <TextField
-        label="Chat ID *"
-        value={formChatId}
-        onChange={(e) => setFormChatId(e.target.value)}
-        placeholder={formType.startsWith('telegram') ? 'VD: -1001234567890' : 'Zalo User ID'}
-        fullWidth
-      />
-      <Stack direction="row" alignItems="center" spacing={1}>
-        <Switch checked={formIsActive} onChange={(e) => setFormIsActive(e.target.checked)} />
-        <Typography variant="body2">Kích hoạt</Typography>
+        />
+        <TextField
+          label="Bot Token *"
+          value={formToken}
+          onChange={(e) => setFormToken(e.target.value)}
+          placeholder={typeMeta.tokenPlaceholder}
+          fullWidth
+        />
+        <TextField
+          label="Chat ID *"
+          value={formChatId}
+          onChange={(e) => setFormChatId(e.target.value)}
+          placeholder={typeMeta.chatIdPlaceholder}
+          fullWidth
+        />
+        {formType === 'zalo-bot' && (
+          <ZaloBotHelper token={formToken} chatId={formChatId} onPickChat={handlePickZaloChat} />
+        )}
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Switch checked={formIsActive} onChange={(e) => setFormIsActive(e.target.checked)} />
+          <Typography variant="body2">Kích hoạt</Typography>
+        </Stack>
       </Stack>
-    </Stack>
-  );
+    );
+  };
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'lg'}>
@@ -362,20 +384,8 @@ export default function NotificationConfigView() {
                 <TableRow key={config.id} hover>
                   <TableCell>{config.name || '—'}</TableCell>
                   <TableCell>
-                    <Label
-                      color={
-                        config.type === 'telegram-report'
-                          ? 'warning'
-                          : config.type === 'telegram'
-                            ? 'info'
-                            : 'primary'
-                      }
-                    >
-                      {config.type === 'telegram-report'
-                        ? '🔒 Telegram báo cáo'
-                        : config.type === 'telegram'
-                          ? '🤖 Telegram'
-                          : '💬 Zalo'}
+                    <Label color={getNotificationTypeMeta(config.type).color}>
+                      {getNotificationTypeMeta(config.type).listLabel}
                     </Label>
                   </TableCell>
                   <TableCell>
@@ -384,7 +394,11 @@ export default function NotificationConfigView() {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontFamily: 'monospace', maxWidth: 200 }} noWrap>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontFamily: 'monospace', maxWidth: 200 }}
+                      noWrap
+                    >
                       {config.token.slice(0, 15)}...
                     </Typography>
                   </TableCell>

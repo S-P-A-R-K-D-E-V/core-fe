@@ -17,6 +17,8 @@ const BACKEND_API_PREFIXES = [
   'payroll', 'payroll-cycles', 'payroll-complaints', 'bonus-programs', 'quarter-bonuses',
   'holiday-policies', 'penalty-policies',
   'kiotviet', 'notification', 'notifications', 'user-tours',
+  // Zalo Bot báo việc agent (A3): kiểm tra token, lấy chat id, gửi thử — màn Cấu hình thông báo.
+  'zalo-bot',
   'categories', 'unit-of-measures', 'units', 'variant-attributes', 'products',
   'warehouses', 'inventory', 'suppliers', 'purchase-orders', 'shift-stock-checks',
   'customers', 'sales-orders', 'print-templates', 'bank-accounts', 'payment', 'reports',

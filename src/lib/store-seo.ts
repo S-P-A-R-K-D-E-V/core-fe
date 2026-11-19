@@ -353,6 +353,8 @@ export const ROBOTS_DISALLOW = [
   '/agent-chat',
   '/kiosk-checkin',
   '/counter',
+  // Trang trung gian của link Zalo Bot (A3) — cần đăng nhập.
+  '/m/',
   '/customer-display',
   '/payment',
   '/product/checkout',
