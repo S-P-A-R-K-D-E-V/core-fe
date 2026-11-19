@@ -18,6 +18,9 @@ import {
   usageChartData,
   groupTasksByColumn,
   usageTotalsByAgent,
+  taskSourceMeta,
+  taskStatusMeta,
+  childrenWaitLabel,
 } from '../agent-center-utils';
 
 // ----------------------------------------------------------------------
@@ -61,6 +64,7 @@ describe('columnOfStatus', () => {
     ['waiting_approval', 'waiting_approval'],
     ['waiting_human', 'waiting_human'],
     ['done', 'done'],
+    ['waiting_children', 'running'],
     ['failed', 'ended'],
     ['stopped', 'ended'],
     ['cancelled', 'ended'],
@@ -96,6 +100,7 @@ describe('decideDrop — chỉ cho kéo có nghĩa', () => {
     ['running', 'ended'],
     ['done', 'queued'],
     ['waiting_human', 'queued'],
+    ['running', 'queued'],
   ] as const)('%s → %s bị từ chối', (from, to) => {
     const d = decideDrop(from, to, from === 'ended' ? 'failed' : 'queued');
     expect(d.kind).toBe('reject');
@@ -114,6 +119,43 @@ describe('decideDrop — chỉ cho kéo có nghĩa', () => {
   it('nút Dừng cho việc chưa kết thúc', () => {
     expect(['queued', 'running', 'waiting_approval', 'waiting_human'].every(canStop)).toBe(true);
     expect(['done', 'failed', 'stopped', 'cancelled'].some(canStop)).toBe(false);
+  });
+});
+
+describe('A2 — việc chờ việc con, nguồn nhóm quản trị', () => {
+  it('waiting_children: nhãn "Chờ việc con", nằm cột Đang chạy, dừng được, không huỷ / chạy lại / kéo', () => {
+    expect(taskStatusMeta('waiting_children').label).toBe('Chờ việc con');
+    expect(columnOfStatus('waiting_children')).toBe('running');
+    expect(canStop('waiting_children')).toBe(true);
+    expect(isDraggable('waiting_children')).toBe(false);
+    expect(decideDrop('running', 'ended', 'waiting_children').kind).toBe('reject');
+    expect(decideDrop('running', 'queued', 'waiting_children').kind).toBe('reject');
+  });
+
+  it('bảng: việc chờ việc con xếp chung cột Đang chạy với việc đang chạy', () => {
+    const cols = groupTasksByColumn([
+      task({ id: 'p', status: 'waiting_children', childrenTotal: 3, childrenDone: 1 }),
+      task({ id: 'c', status: 'running', parentTaskId: 'p' }),
+    ]);
+    expect(cols.running.map((t) => t.id).sort()).toEqual(['c', 'p']);
+    expect(cols.queued).toEqual([]);
+  });
+
+  it('nhãn "Chờ {done}/{total} việc con"', () => {
+    expect(
+      childrenWaitLabel({ status: 'waiting_children', childrenTotal: 3, childrenDone: 1 })
+    ).toBe('Chờ 1/3 việc con');
+    // máy chủ chưa gửi số → nhãn chung; số lệch → kẹp trong 0..total
+    expect(childrenWaitLabel({ status: 'waiting_children' })).toBe('Chờ việc con');
+    expect(
+      childrenWaitLabel({ status: 'waiting_children', childrenTotal: 2, childrenDone: 5 })
+    ).toBe('Chờ 2/2 việc con');
+    expect(childrenWaitLabel({ status: 'running', childrenTotal: 2, childrenDone: 1 })).toBeNull();
+  });
+
+  it('nguồn chat → "Nhóm quản trị"', () => {
+    expect(taskSourceMeta('chat').label).toBe('Nhóm quản trị');
+    expect(taskSourceMeta('la-lam').label).toBe('la-lam');
   });
 });
 

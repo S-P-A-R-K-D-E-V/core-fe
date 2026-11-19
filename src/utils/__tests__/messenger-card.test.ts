@@ -3,12 +3,16 @@ import { describe, expect, it } from 'vitest';
 import type { MessageCard } from 'src/api/messenger';
 
 import {
+  confirmPrompt,
+  confirmOpCount,
   cardActionError,
+  cardActionIntent,
   messageCardState,
   optimisticDoneCard,
   visibleCardActions,
   CARD_CONFLICT_MESSAGE,
   cardActionButtonProps,
+  confirmResultMessage,
   CARD_FORBIDDEN_MESSAGE,
 } from '../messenger-card';
 
@@ -162,5 +166,116 @@ describe('optimisticDoneCard', () => {
     expect(visibleCardActions(next, { canApprove: true, now: NOW }).map((a) => a.key)).toEqual([
       'open',
     ]);
+  });
+});
+
+// ----------------------------------------------------------------------
+// A2 — thẻ `confirm` (CEO đề xuất thao tác), docs/cici/plans/a2-agent-ceo-api-contract.md mục 3.
+
+function confirmCard(overrides: Partial<MessageCard> = {}): MessageCard {
+  return {
+    kind: 'confirm',
+    refId: 'p1',
+    title: 'CEO đề xuất: duyệt 2 phiếu Marketing',
+    lines: [
+      '1. Duyệt phiếu 702eb2ee — Tạo bài đăng mạng xã hội',
+      '2. Duyệt phiếu 9a1b2c3d — Hẹn giờ bài đăng',
+      'Lý do: đúng lịch nội dung tuần',
+    ],
+    link: '/dashboard/agent/approvals',
+    status: 'open',
+    statusText: null,
+    actions: [
+      { key: 'confirm', label: 'Xác nhận', style: 'primary' },
+      { key: 'cancel', label: 'Huỷ', style: 'default' },
+      { key: 'open', label: 'Xem phiếu', style: 'default' },
+    ],
+    ops: [
+      { type: 'approve_action', refId: 'a1', label: 'Duyệt phiếu 702eb2ee' },
+      { type: 'approve_action', refId: 'a2', label: 'Duyệt phiếu 9a1b2c3d' },
+    ],
+    ...overrides,
+  };
+}
+
+describe('thẻ confirm (A2)', () => {
+  it('cardActionIntent: confirm hỏi lại, cancel gọi thẳng, open điều hướng; nút lạ → null', () => {
+    expect(cardActionIntent('confirm')).toBe('confirm');
+    expect(cardActionIntent('cancel')).toBe('cancel');
+    expect(cardActionIntent('open')).toBe('open');
+    expect(cardActionIntent('approve')).toBe('approve');
+    expect(cardActionIntent('reply')).toBe('input');
+    expect(cardActionIntent('revise')).toBe('input');
+    expect(cardActionIntent('reject')).toBe('input');
+    expect(cardActionIntent('snooze')).toBeNull();
+  });
+
+  it('nút Xác nhận / Huỷ cần agent.approve; thẻ done chỉ còn Xem phiếu', () => {
+    expect(keys(confirmCard(), true)).toEqual(['confirm', 'cancel', 'open']);
+    expect(keys(confirmCard(), false)).toEqual(['open']);
+    expect(keys(confirmCard({ status: 'done', statusText: 'Đã huỷ bởi Xuân Bình' }), true)).toEqual(
+      ['open']
+    );
+  });
+
+  it('thẻ confirm không có hạn — không tự "Hết hạn"', () => {
+    const state = messageCardState(confirmCard({ expiresAt: '2026-11-18T00:00:00Z' }), NOW);
+    expect(state.actionable).toBe(true);
+  });
+
+  it('đếm thao tác: theo ops, không có thì đếm dòng đánh số', () => {
+    expect(confirmOpCount(confirmCard())).toBe(2);
+    expect(confirmOpCount(confirmCard({ ops: null }))).toBe(2);
+    expect(confirmOpCount(confirmCard({ ops: [], lines: ['1) Dừng việc', 'Lý do: lặp'] }))).toBe(1);
+    expect(confirmOpCount(confirmCard({ ops: undefined, lines: null }))).toBe(0);
+  });
+
+  it('câu hỏi lại "Chạy {n} thao tác này?", không đếm được → câu chung', () => {
+    expect(confirmPrompt(confirmCard())).toBe('Chạy 2 thao tác này?');
+    expect(confirmPrompt(confirmCard({ ops: null, lines: ['Lý do: …'] }))).toBe(
+      'Chạy các thao tác CEO đề xuất?'
+    );
+  });
+
+  it('snackbar: statusText của máy chủ; có thao tác lỗi → vàng kèm thao tác lỗi đầu', () => {
+    expect(
+      confirmResultMessage(
+        { statusText: 'Đã xác nhận bởi Xuân Bình · 10:42 19/11 — 2/2 thao tác chạy', results: [] },
+        'Đã xác nhận'
+      )
+    ).toEqual({
+      message: 'Đã xác nhận bởi Xuân Bình · 10:42 19/11 — 2/2 thao tác chạy',
+      variant: 'success',
+    });
+    expect(confirmResultMessage(null, 'Đã huỷ')).toEqual({ message: 'Đã huỷ', variant: 'success' });
+    const partial = confirmResultMessage(
+      {
+        statusText: '1/3 thao tác chạy',
+        results: [
+          { label: 'Duyệt phiếu 1', ok: true, message: null },
+          { label: 'Bật lịch Báo cáo sáng', ok: false, message: 'Cần quyền agent.manage' },
+          { label: 'Dừng việc 2', ok: false, message: null },
+        ],
+      },
+      'Đã xác nhận'
+    );
+    expect(partial.variant).toBe('warning');
+    expect(partial.message).toBe(
+      '1/3 thao tác chạy — lỗi: Bật lịch Báo cáo sáng: Cần quyền agent.manage (+1 thao tác lỗi khác)'
+    );
+  });
+
+  it('409 / 404 / 400 → câu { message } của máy chủ', () => {
+    expect(cardActionError({ status: 409, message: 'Đề xuất đã được xử lý' }, 'x')).toEqual({
+      message: 'Đề xuất đã được xử lý',
+      variant: 'warning',
+      reload: true,
+    });
+    expect(cardActionError({ status: 404, message: 'Không có đề xuất' }, 'x').message).toBe(
+      'Không có đề xuất'
+    );
+    expect(cardActionError({ status: 400, message: 'Không phải thẻ xác nhận' }, 'x').message).toBe(
+      'Không phải thẻ xác nhận'
+    );
   });
 });

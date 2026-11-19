@@ -45,6 +45,7 @@ import {
   planStatusMeta,
   taskSourceMeta,
   taskStatusMeta,
+  childrenWaitLabel,
 } from './agent-center-utils';
 
 // ----------------------------------------------------------------------
@@ -216,6 +217,7 @@ function TaskInfo({ task }: { task: IAgentTask }) {
   const source = taskSourceMeta(task.source);
   const elapsed = taskElapsedMs(task);
   const label = stepLabel(task);
+  const childrenLabel = childrenWaitLabel(task);
 
   const rows: { label: string; value: React.ReactNode }[] = [
     { label: 'Agent', value: task.agentName },
@@ -246,6 +248,11 @@ function TaskInfo({ task }: { task: IAgentTask }) {
         <Typography variant="body2" sx={{ color: 'info.main' }}>
           {label}
         </Typography>
+      )}
+      {childrenLabel && (
+        <Alert severity="info" icon={<Iconify icon="solar:users-group-rounded-bold" />}>
+          {childrenLabel} — agent chạy tiếp khi các việc con xong (tối đa 30 phút).
+        </Alert>
       )}
       {task.stopRequested && canStop(task.status) && (
         <Alert severity="warning">Đã yêu cầu dừng — agent dừng sau bước đang chạy.</Alert>
@@ -539,7 +546,9 @@ function NoteInput({
     ? 'Agent đang chờ bạn: gửi chỉ dẫn xong, việc chuyển về Chờ chạy và agent đọc rồi chạy tiếp.'
     : ended
       ? 'Việc đã kết thúc — ghi chú được lưu lại; với việc Lỗi / Đã dừng, bấm Chạy lại để agent đọc.'
-      : 'Agent đọc chỉ dẫn này ở lượt tiếp theo.';
+      : task.status === 'waiting_children'
+        ? 'Agent đang chờ việc con — đọc chỉ dẫn này khi chạy tiếp.'
+        : 'Agent đọc chỉ dẫn này ở lượt tiếp theo.';
 
   const handleSend = async () => {
     const value = text.trim();

@@ -35,7 +35,10 @@ export const BOARD_COLUMNS: {
   { id: 'ended', label: 'Lỗi / Đã dừng', color: 'error', icon: 'solar:danger-triangle-bold' },
 ];
 
-/** Cột của một trạng thái; failed / stopped / cancelled chung cột "Lỗi / Đã dừng". Trạng thái lạ → Chờ chạy. */
+/**
+ * Cột của một trạng thái; failed / stopped / cancelled chung cột "Lỗi / Đã dừng"; waiting_children (A2 — việc cha chờ
+ * việc con) nằm cột Đang chạy. Trạng thái lạ → Chờ chạy.
+ */
 export function columnOfStatus(status: AgentTaskStatus | string): BoardColumnId {
   switch (status) {
     case 'running':
@@ -43,6 +46,8 @@ export function columnOfStatus(status: AgentTaskStatus | string): BoardColumnId 
     case 'waiting_human':
     case 'done':
       return status;
+    case 'waiting_children':
+      return 'running';
     case 'failed':
     case 'stopped':
     case 'cancelled':
@@ -57,6 +62,7 @@ export const TASK_STATUS: Record<AgentTaskStatus, { label: string; color: LabelC
   running: { label: 'Đang chạy', color: 'info' },
   waiting_approval: { label: 'Chờ duyệt', color: 'warning' },
   waiting_human: { label: 'Chờ người', color: 'secondary' },
+  waiting_children: { label: 'Chờ việc con', color: 'primary' },
   done: { label: 'Xong', color: 'success' },
   failed: { label: 'Lỗi', color: 'error' },
   stopped: { label: 'Đã dừng', color: 'default' },
@@ -72,6 +78,7 @@ export const TASK_SOURCE: Record<AgentTaskSource, { label: string; icon: string 
   manual: { label: 'Người giao', icon: 'solar:user-bold' },
   agent: { label: 'Agent', icon: 'solar:cpu-bolt-bold' },
   event: { label: 'Sự kiện', icon: 'solar:bolt-bold' },
+  chat: { label: 'Nhóm quản trị', icon: 'solar:chat-round-dots-bold' },
 };
 
 export function taskSourceMeta(source: string): { label: string; icon: string } {
@@ -82,7 +89,20 @@ export function taskSourceMeta(source: string): { label: string; icon: string } 
 
 /** Việc chưa kết thúc — còn dừng được. */
 export function canStop(status: string): boolean {
-  return ['queued', 'running', 'waiting_approval', 'waiting_human'].includes(status);
+  return ['queued', 'running', 'waiting_approval', 'waiting_human', 'waiting_children'].includes(
+    status
+  );
+}
+
+/** Nhãn "Chờ 1/3 việc con" của việc waiting_children (A2); trạng thái khác → null. */
+export function childrenWaitLabel(
+  task: Pick<IAgentTask, 'status' | 'childrenTotal' | 'childrenDone'>
+): string | null {
+  if (task.status !== 'waiting_children') return null;
+  const total = task.childrenTotal ?? 0;
+  if (total <= 0) return 'Chờ việc con';
+  const done = Math.min(Math.max(task.childrenDone ?? 0, 0), total);
+  return `Chờ ${done}/${total} việc con`;
 }
 
 export function canRetry(status: string): boolean {

@@ -38,6 +38,7 @@ vi.mock('src/components/iconify', () => ({
 import AgentActivityButton, {
   AGENT_ACTIVITY_FAST_MS,
   AGENT_ACTIVITY_SLOW_MS,
+  agentActivityCounts,
   agentActivityRefreshMs,
 } from '../agent-activity-button';
 
@@ -45,7 +46,14 @@ const owner = { id: 'u1', roles: ['Admin'] };
 const approver = { id: 'u2', roles: ['Staff'], permissions: ['agent.approve'] };
 const staff = { id: 'u3', roles: ['Staff'], permissions: ['orders.read'] };
 
-const summary = (counts: Partial<{ running: number; queued: number; waiting_human: number }>) => ({
+const summary = (
+  counts: Partial<{
+    running: number;
+    queued: number;
+    waiting_human: number;
+    waiting_children: number;
+  }>
+) => ({
   paused: false,
   runnerEnabled: true,
   agents: 3,
@@ -165,5 +173,10 @@ describe('AgentActivityButton', () => {
       AGENT_ACTIVITY_SLOW_MS
     );
     expect(agentActivityRefreshMs(undefined)).toBe(AGENT_ACTIVITY_SLOW_MS);
+    // A2: việc chờ việc con tính là đang chạy.
+    expect(agentActivityRefreshMs(summary({ waiting_children: 1 }) as any)).toBe(
+      AGENT_ACTIVITY_FAST_MS
+    );
+    expect(agentActivityCounts(summary({ running: 1, waiting_children: 2 }) as any).active).toBe(3);
   });
 });

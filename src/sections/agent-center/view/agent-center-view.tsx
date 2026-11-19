@@ -287,7 +287,12 @@ export function AgentCenterView() {
   const counts = summary?.counts;
   const chips: { label: string; value: number | undefined; color: any }[] = [
     { label: 'Chờ chạy', value: counts?.queued, color: 'default' },
-    { label: 'Đang chạy', value: counts?.running, color: 'info' },
+    // Việc chờ việc con (A2) nằm cột Đang chạy → đếm chung cho khớp bảng.
+    {
+      label: 'Đang chạy',
+      value: counts ? counts.running + (counts.waiting_children ?? 0) : undefined,
+      color: 'info',
+    },
     { label: 'Chờ duyệt', value: counts?.waiting_approval, color: 'warning' },
     { label: 'Chờ người', value: counts?.waiting_human, color: 'secondary' },
     { label: 'Xong hôm nay', value: counts?.done_today, color: 'success' },

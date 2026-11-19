@@ -149,6 +149,10 @@ export const endpoints = {
     usage: '/agent-center/usage',
     // Nhóm Messenger "Quản trị – Đội agent" (A1): GET (agent.approve) xem đã có chưa, POST (agent.manage) tạo / lấy lại.
     adminGroup: '/agent-center/admin-group',
+    // Thẻ `confirm` của CEO (A2) — agent.approve.
+    adminGroupConfirm: (refId: string) => `/agent-center/admin-group/confirm/${refId}`,
+    adminGroupConfirmCancel: (refId: string) =>
+      `/agent-center/admin-group/confirm/${refId}/cancel`,
   },
   users: {
     list: '/users',
