@@ -8,7 +8,9 @@ export type NotificationCategory =
   | 'Attendance'
   | 'Shift'
   | 'Payroll'
-  | 'Salary';
+  | 'Salary'
+  /** Đội agent (core-be NotificationCategory.Agent): chỉ chuông + realtime, không push. */
+  | 'Agent';
 
 export interface INotification {
   id: string;
