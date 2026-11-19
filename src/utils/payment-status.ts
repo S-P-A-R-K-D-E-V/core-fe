@@ -134,6 +134,7 @@ export const ONLINE_ORDER_STATUS: Record<OnlineOrderStatus, { label: string; col
   paid: { label: 'Đã thanh toán', color: 'success' },
   cancelled: { label: 'Đã huỷ', color: 'default' },
   expired: { label: 'Hết hạn', color: 'default' },
+  draft: { label: 'Đơn nháp', color: 'default' },
 };
 
 /** Khâu gói / giao của đơn online đã thanh toán. */

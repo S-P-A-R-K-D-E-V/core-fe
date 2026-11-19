@@ -38,6 +38,8 @@ type Props = {
   disabled?: boolean;
   /** Danh sách gợi ý nổi trên khung có zIndex cao (khung chat 1400 > popper mặc định 1300). */
   popperZIndex?: number;
+  /** Chữ gợi ý trong ô tìm (mặc định "Chọn mã khác…"). */
+  placeholder?: string;
   onPick: (product: PickedProduct) => void;
 };
 
@@ -45,6 +47,7 @@ export default function PurchaseImportProductPicker({
   defaultKeyword,
   disabled,
   popperZIndex,
+  placeholder = 'Chọn mã khác…',
   onPick,
 }: Props) {
   const [input, setInput] = useState('');
@@ -118,7 +121,7 @@ export default function PurchaseImportProductPicker({
       renderInput={(params) => (
         <TextField
           {...params}
-          placeholder="Chọn mã khác…"
+          placeholder={placeholder}
           InputProps={{
             ...params.InputProps,
             endAdornment: (

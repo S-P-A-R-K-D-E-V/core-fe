@@ -207,7 +207,13 @@ export const PERMISSIONS = {
    * ghi chú, đóng; manage: giành từ người khác, giao hội thoại, sửa mẫu trả lời nhanh + cấu hình hộp thư.
    * Mặc định read + reply cho Admin, Quản lý; manage cho Admin.
    */
-  conversation: { read: 'conversation.read', reply: 'conversation.reply', manage: 'conversation.manage' },
+  conversation: {
+    read: 'conversation.read',
+    reply: 'conversation.reply',
+    manage: 'conversation.manage',
+    /** F4: lên / chốt đơn trong hội thoại, đánh dấu đơn đã nhận tiền (mặc định Admin, Quản lý). */
+    order: 'conversation.order',
+  },
   /**
    * Đội agent (K3) — mặc định chỉ chủ cửa hàng. approve: xem + duyệt / từ chối phiếu agent xin làm (lệnh chạy với người
    * duyệt là người thực hiện); manage (kèm approve): mức tự chủ theo từng quyền ghi, cách duyệt của khoá, nhật ký.

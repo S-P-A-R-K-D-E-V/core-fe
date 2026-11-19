@@ -44,6 +44,7 @@ import {
 
 import { useAuthContext } from 'src/auth/hooks';
 import { hasAnyRole, getUserRoles, MANAGER_ROLES } from 'src/auth/roles';
+import { PERMISSIONS, hasPermission } from 'src/auth/permissions';
 import {
   packOnlineOrder,
   shipOnlineOrder,
@@ -51,6 +52,7 @@ import {
   cancelOnlineOrder,
   completeOnlineOrder,
   cancelOnlineOrderShipment,
+  markOnlineOrderPaid,
 } from 'src/api/online-orders';
 
 import Iconify from 'src/components/iconify';
@@ -88,6 +90,7 @@ export default function OnlineOrderDetailDialog({ order, onClose, onChanged }: P
   const { enqueueSnackbar } = useSnackbar();
   const { user } = useAuthContext();
   const manager = hasAnyRole(getUserRoles(user), MANAGER_ROLES);
+  const canMarkPaid = hasPermission(user, PERMISSIONS.conversation.order);
   const [confirm, confirmDialog] = useConfirmDialog();
   const [detail, setDetail] = useState<IOnlineOrder | null>(null);
   const [loading, setLoading] = useState(false);
@@ -158,6 +161,18 @@ export default function OnlineOrderDetailDialog({ order, onClose, onChanged }: P
     if (ok) await run('cancel', () => cancelOnlineOrder(detail.id), 'Đã huỷ đơn', 'Huỷ đơn thất bại');
   };
 
+  const handleMarkPaid = async () => {
+    if (!detail) return;
+    const cash = detail.paymentMethod === 'pay_at_store';
+    const ok = await confirm({
+      title: 'Xác nhận đã nhận tiền?',
+      content: `Chỉ bấm khi đã thấy ${fCurrency(detail.total)} ${cash ? 'trong két (khách trả tiền mặt tại quầy)' : 'về tài khoản'} — ảnh chuyển khoản khách gửi không phải căn cứ. Đơn ${detail.code} chuyển sang Đã thanh toán, sinh hoá đơn và báo gói hàng.`,
+      confirmText: 'Đã nhận tiền',
+    });
+    if (ok)
+      await run('paid', () => markOnlineOrderPaid(detail.id, cash ? 'cash' : 'transfer'), 'Đã ghi nhận tiền — đã tạo hoá đơn', 'Không ghi nhận được');
+  };
+
   const handleCancelShipment = async () => {
     if (!detail) return;
     const ok = await confirm({
@@ -176,6 +191,9 @@ export default function OnlineOrderDetailDialog({ order, onClose, onChanged }: P
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
           Đơn {detail?.code}
           {detail && <Chip size="small" color={chip.color} label={chip.label} />}
+          {detail?.origin === 'conversation' && (
+            <Chip size="small" variant="outlined" color="info" icon={<Iconify icon="logos:messenger" width={14} />} label="Tin nhắn" />
+          )}
           {shipChip && <Chip size="small" variant="outlined" color={shipChip.color} label={shipChip.label} />}
           <IconButton onClick={onClose} size="small" sx={{ ml: 'auto' }}>
             <Iconify icon="mingcute:close-line" />
@@ -328,6 +346,12 @@ export default function OnlineOrderDetailDialog({ order, onClose, onChanged }: P
                 </InfoRow>
               </Stack>
 
+              {detail.conversationId && (
+                <Link component={RouterLink} href={paths.dashboard.inbox.conversation(detail.conversationId)} variant="body2">
+                  Mở hội thoại với khách
+                </Link>
+              )}
+
               {detail.status === 'pending_payment' && (
                 <Alert severity="info">
                   Đơn chưa thanh toán không giữ hàng trong kho. Khách chuyển khoản đúng mã thanh toán thì đơn tự chuyển
@@ -347,6 +371,11 @@ export default function OnlineOrderDetailDialog({ order, onClose, onChanged }: P
           {actions?.cancelShipment && (
             <LoadingButton color="error" loading={busy === 'cancel-shipment'} onClick={handleCancelShipment} sx={{ mr: 'auto' }}>
               Huỷ vận đơn
+            </LoadingButton>
+          )}
+          {detail?.status === 'pending_payment' && canMarkPaid && (
+            <LoadingButton variant="outlined" loading={busy === 'paid'} onClick={handleMarkPaid}>
+              Đã nhận tiền
             </LoadingButton>
           )}
           {actions?.pack && detail && (

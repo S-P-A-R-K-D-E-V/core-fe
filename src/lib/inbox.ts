@@ -701,3 +701,76 @@ export function appendSlash(text: string): string {
   if (!text || /\s$/.test(text)) return `${text}/`;
   return `${text} /`;
 }
+
+// ----------------------------------------------------------------------
+// Đơn trong hội thoại (F4) — GET/PUT/DELETE /conversations/{id}/order, POST …/order/confirm.
+
+export type ConversationOrderStatus = 'draft' | 'pending_payment' | 'paid' | 'cancelled' | 'expired';
+
+export type ConversationOrderLine = {
+  productId: string;
+  code: string | null;
+  name: string;
+  imageUrl: string | null;
+  quantity: number;
+  price: number;
+  amount: number;
+};
+
+export type ConversationOrder = {
+  id: string;
+  code: string;
+  status: ConversationOrderStatus;
+  conversationId: string | null;
+  customerName: string;
+  phone: string;
+  delivery: 'ship' | 'pickup' | null;
+  payment: 'transfer' | 'pay_at_store';
+  address: string | null;
+  street: string | null;
+  wardName: string | null;
+  provinceName: string | null;
+  lines: ConversationOrderLine[];
+  subtotal: number;
+  shippingFee: number;
+  /** Nhân viên đã tự đặt phí ship (0 = miễn ship) — chốt không tính lại phí. */
+  shippingFeeOverridden: boolean;
+  total: number;
+  carrier: string | null;
+  note: string | null;
+  qrImageUrl: string | null;
+  paymentCode: string | null;
+  bankName: string | null;
+  accountNumber: string | null;
+  accountName: string | null;
+  paymentExpiresAt: string | null;
+  /** Trả tại quầy: giữ hàng tới. */
+  holdUntil: string | null;
+  trackingCode: string | null;
+  salesOrderCode: string | null;
+  /** Phiếu "Chốt đơn" của agent đang chờ duyệt. */
+  pendingActionId: string | null;
+  draftedByAgent: boolean;
+  createdAt: string;
+  updatedAt: string;
+  paidAt: string | null;
+};
+
+export type ConversationOrderInput = {
+  items: { productId: string; quantity: number }[];
+  delivery: 'ship' | 'pickup';
+  payment: 'transfer' | 'pay_at_store';
+  /** Tỉnh / phường: mã trong danh mục (web chọn) hoặc tên. */
+  address?: { province?: string | null; ward?: string | null; street?: string | null } | null;
+  note?: string | null;
+  /** Phí ship khách trả (0 = miễn ship); null / bỏ trống = theo báo giá hãng. */
+  shippingFee?: number | null;
+};
+
+export const CONVERSATION_ORDER_STATUS: Record<ConversationOrderStatus, { label: string; color: 'default' | 'info' | 'warning' | 'success' | 'error' }> = {
+  draft: { label: 'Đơn nháp', color: 'default' },
+  pending_payment: { label: 'Chờ thanh toán', color: 'warning' },
+  paid: { label: 'Đã thanh toán', color: 'success' },
+  cancelled: { label: 'Đã huỷ', color: 'error' },
+  expired: { label: 'Quá hạn', color: 'error' },
+};

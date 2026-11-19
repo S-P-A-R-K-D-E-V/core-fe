@@ -44,3 +44,9 @@ export async function cancelOnlineOrderShipment(id: string): Promise<IOnlineOrde
   const res = await axios.post<IOnlineOrder>(endpoints.onlineOrders.cancelShipment(id));
   return res.data;
 }
+
+/** Nhân viên xác nhận đã nhận tiền (chuyển khoản đã về / khách trả tiền mặt tại quầy) — F4. */
+export async function markOnlineOrderPaid(id: string, method: 'transfer' | 'cash'): Promise<IOnlineOrder> {
+  const res = await axios.post<IOnlineOrder>(`/online-orders/${id}/mark-paid`, { method });
+  return res.data;
+}

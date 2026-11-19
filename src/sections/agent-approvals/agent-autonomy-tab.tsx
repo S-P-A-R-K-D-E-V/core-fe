@@ -220,13 +220,22 @@ export default function AgentAutonomyTab() {
                               inputProps={{ 'aria-label': `Mức tự chủ cho ${item.permission}` }}
                             >
                               {levels.map((level) => (
-                                <MenuItem key={level} value={level}>
+                                <MenuItem
+                                  key={level}
+                                  value={level}
+                                  disabled={!!item.locked && level !== 'approve' && level !== 'deny'}
+                                >
                                   {AUTONOMY_LEVELS[level].label}
                                 </MenuItem>
                               ))}
                             </Select>
                             {saving === item.permission && <CircularProgress size={18} />}
                           </Stack>
+                          {item.locked && (
+                            <Typography variant="caption" component="div" sx={{ color: 'warning.main' }}>
+                              Luôn chờ người duyệt (chốt đơn) — không hạ được
+                            </Typography>
+                          )}
                           {item.isDefault && (
                             <Typography variant="caption" sx={{ color: 'text.disabled' }}>
                               mặc định
