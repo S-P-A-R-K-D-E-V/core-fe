@@ -50,6 +50,7 @@ import { SystemSenderAvatar } from 'src/components/messenger/system-avatar';
 import { useMessengerStore } from 'src/store/messenger-store';
 import { addGroupMembers, removeGroupMember } from 'src/api/messenger';
 import type { InternalUser, Conversation, ConversationSummary } from 'src/api/messenger';
+import { useAgentAdminGroup } from 'src/api/agent-center';
 import { getCustomRoles, getPermissionCatalog, getUserRoleAssignment } from 'src/api/custom-roles';
 
 // ----------------------------------------------------------------------
@@ -114,7 +115,11 @@ export default function ConversationMembersDrawer({
     }
   }, [open]);
 
-  // Quyền giao việc cho CEO của người khác: chỉ chủ cửa hàng đọc được phân vai (xem messenger-members.ts).
+  // Ai giao việc được cho CEO: máy chủ trả sẵn (GET agent-center/admin-group → approverIds), ai trong nhóm cũng thấy.
+  const { info: adminGroupInfo } = useAgentAdminGroup(open && agentAdmin);
+  const approverIds = adminGroupInfo?.approverIds ?? null;
+
+  // Tên vai trò của người khác (chỉ hiện thêm cho chủ cửa hàng) + dự phòng khi máy chủ cũ chưa trả approverIds.
   const memberKey = conversation.participantIds.join(',');
   useEffect(() => {
     if (!open || !agentAdmin || !isOwner) return undefined;
@@ -158,6 +163,7 @@ export default function ConversationMembersDrawer({
     if (memberId === currentUserId) {
       return hasPermission(user, PERMISSIONS.agent.approve) ? 'approve' : 'view';
     }
+    if (approverIds) return approverIds.includes(memberId) ? 'approve' : 'view';
     return roleInfo.access[memberId] ?? 'unknown';
   };
 

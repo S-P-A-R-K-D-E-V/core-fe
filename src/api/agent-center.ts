@@ -182,6 +182,8 @@ export interface IAgentScheduleInput {
 export interface IAgentAdminGroupInfo {
   conversationId: string | null;
   enabled: boolean;
+  /** A4: thành viên có quyền duyệt agent (giao việc được cho CEO) — máy chủ tính, người khác chỉ xem. */
+  approverIds?: string[] | null;
 }
 
 export interface IAgentAdminGroupCreated {
