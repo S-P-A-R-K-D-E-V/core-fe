@@ -63,7 +63,7 @@ type Props = {
   /** Đổi hội thoại → xoá nháp. */
   conversationId: string;
   /** Đổ sẵn nội dung (gợi ý của agent) — mỗi lần đổi `key` là một lần đổ. */
-  prefill?: { key: number; text: string; images: string[] } | null;
+  prefill?: { key: number; text: string; images: string[]; onlyIfEmpty?: boolean } | null;
   /** Loại hội thoại — comment: trả lời công khai, 1 ảnh, có Nhắn riêng. */
   kind?: ConversationKind;
   /** Tên khách (tiêu đề dialog Nhắn riêng). */
@@ -116,8 +116,12 @@ export default function InboxComposer({
 
   // Dùng gợi ý của agent: đổ chữ + ảnh vào ô soạn để nhân viên sửa rồi gửi.
   const prefillKey = prefill?.key;
+  const draftRef = useRef({ text: '', images: 0 });
+  draftRef.current = { text, images: images.length };
   useEffect(() => {
     if (!prefill) return;
+    // Gợi ý tự đến: không đè lên nội dung nhân viên đang gõ.
+    if (prefill.onlyIfEmpty && (draftRef.current.text.trim() || draftRef.current.images > 0)) return;
     setText(prefill.text);
     setImages(prefill.images.slice(0, maxImages));
     setNote(false);

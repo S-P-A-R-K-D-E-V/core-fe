@@ -126,7 +126,32 @@ export default function InboxThread({
   const [panelOpen, setPanelOpen] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [prefill, setPrefill] = useState<{ key: number; text: string; images: string[] } | null>(null);
+  const [prefill, setPrefill] = useState<{
+    key: number;
+    text: string;
+    images: string[];
+    onlyIfEmpty?: boolean;
+  } | null>(null);
+
+  // Gợi ý MỚI của agent (vd sau khi nhân viên ghi chú hướng dẫn) → tự đổ vào ô trả lời khi ô đang trống; người sửa rồi tự gửi.
+  const lastSuggestionRef = useRef<{ conversationId: string; id: string | null } | null>(null);
+  useEffect(() => {
+    if (msgs.loading) return;
+    const latest = [...messages].reverse().find((m) => m.status === 'suggested') ?? null;
+    const seen = lastSuggestionRef.current;
+    lastSuggestionRef.current = { conversationId, id: latest?.id ?? null };
+    // Lần đầu mở hội thoại: chỉ ghi nhận, không đổ gợi ý cũ.
+    if (!seen || seen.conversationId !== conversationId || !latest || latest.id === seen.id) return;
+    if (!permissions.reply) return;
+    setPrefill({
+      key: Date.now(),
+      text: latest.text ?? '',
+      images: latest.attachments.filter((a) => a.type === 'image').map((a) => a.url),
+      onlyIfEmpty: true,
+    });
+    enqueueSnackbar('Agent đã soạn gợi ý vào ô trả lời — sửa rồi bấm Gửi', { variant: 'info' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, conversationId, msgs.loading]);
 
   // --- Sự kiện trực tiếp cho hội thoại đang mở -------------------------------------------------
   const prevRef = useRef<{ status?: string; windowEndsAt?: string | null }>({});
