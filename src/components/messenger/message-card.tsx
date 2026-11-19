@@ -23,18 +23,25 @@ import { useRouter } from 'src/routes/hooks';
 
 import { apiErrorMessage } from 'src/utils/api-error';
 import {
+  confirmPrompt,
   CARD_DONE_TEXT,
   CARD_REPLY_MAX,
   cardActionError,
+  cardActionIntent,
   messageCardState,
   optimisticDoneCard,
   visibleCardActions,
+  confirmResultMessage,
   cardActionButtonProps,
 } from 'src/utils/messenger-card';
 
 import { fetchMessages } from 'src/api/messenger';
-import { addAgentTaskNote } from 'src/api/agent-center';
 import { useMessengerStore } from 'src/store/messenger-store';
+import {
+  addAgentTaskNote,
+  cancelAdminGroupProposal,
+  confirmAdminGroupProposal,
+} from 'src/api/agent-center';
 import {
   getAgentAction,
   rejectAgentAction,
@@ -68,6 +75,7 @@ const KIND_ICON: Record<string, { icon: string; color: string }> = {
   task_question: { icon: 'solar:question-circle-bold', color: 'info.main' },
   task_failed: { icon: 'solar:danger-triangle-bold', color: 'error.main' },
   task_result: { icon: 'solar:check-circle-bold', color: 'success.main' },
+  confirm: { icon: 'solar:lightbulb-bolt-bold', color: 'primary.main' },
 };
 
 // Lớp chat nhanh (quick-chat-layer) nằm ở zIndex 1400 — hộp thoại phải nổi trên nó.
@@ -247,6 +255,7 @@ export default function MessageCardView({ message, compact }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const [confirmApprove, setConfirmApprove] = useState(false);
+  const [confirmProposal, setConfirmProposal] = useState(false);
   const [inputMode, setInputMode] = useState<InputMode | null>(null);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -323,14 +332,43 @@ export default function MessageCardView({ message, compact }: Props) {
     }
   };
 
+  // Thẻ confirm (A2): Xác nhận / Huỷ đề xuất của CEO. Máy chủ trả statusText → chữ trạng thái + snackbar.
+  const runProposal = async (key: 'confirm' | 'cancel') => {
+    setBusy(true);
+    try {
+      const res =
+        key === 'confirm'
+          ? await confirmAdminGroupProposal(card.refId)
+          : await cancelAdminGroupProposal(card.refId);
+      const doneText = res?.statusText?.trim() || CARD_DONE_TEXT[key];
+      setCard(optimisticDoneCard(card, doneText));
+      const msg = confirmResultMessage(res, CARD_DONE_TEXT[key]);
+      enqueueSnackbar(msg.message, { variant: msg.variant });
+      setConfirmProposal(false);
+    } catch (err) {
+      const e = cardActionError(err, 'Thao tác thất bại');
+      enqueueSnackbar(e.message, { variant: e.variant });
+      if (e.reload) {
+        setConfirmProposal(false);
+        reloadCards();
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleAction = (action: MessageCardAction) => {
-    switch (action.key) {
+    switch (cardActionIntent(action.key)) {
       case 'approve':
         setConfirmApprove(true);
         break;
-      case 'revise':
-      case 'reject':
-      case 'reply':
+      case 'confirm':
+        setConfirmProposal(true);
+        break;
+      case 'cancel':
+        runProposal('cancel');
+        break;
+      case 'input':
         setInputMode(action.key as InputMode);
         break;
       case 'open':
@@ -464,6 +502,33 @@ export default function MessageCardView({ message, compact }: Props) {
           </Button>
           <LoadingButton variant="contained" loading={busy} onClick={handleApprove}>
             Duyệt và chạy ngay
+          </LoadingButton>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={confirmProposal}
+        onClose={busy ? undefined : () => setConfirmProposal(false)}
+        fullWidth
+        maxWidth="xs"
+        sx={{ zIndex: DIALOG_Z }}
+      >
+        <DialogTitle>{confirmPrompt(card)}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            <Typography variant="subtitle2">{card.title}</Typography>
+            <Alert severity="warning">
+              Máy chủ chạy ngay các thao tác trên bằng quyền và tên của bạn. Thao tác cần quyền cao
+              hơn quyền bạn có sẽ báo lỗi, thao tác khác vẫn chạy.
+            </Alert>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" onClick={() => setConfirmProposal(false)} disabled={busy}>
+            Thôi
+          </Button>
+          <LoadingButton variant="contained" loading={busy} onClick={() => runProposal('confirm')}>
+            Xác nhận và chạy
           </LoadingButton>
         </DialogActions>
       </Dialog>

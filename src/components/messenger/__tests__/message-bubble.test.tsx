@@ -1,11 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { render, screen, waitFor } from '@testing-library/react';
 
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 import { SYSTEM_USER_ID } from 'src/utils/messenger-system';
 
-import type { DirectMessage, InternalUser } from 'src/api/messenger';
+import type { MessageCard, DirectMessage, InternalUser } from 'src/api/messenger';
 
 // ----------------------------------------------------------------------
 // Bong bóng tin nhắn (dùng chung cho trang Tin nhắn nội bộ và cửa sổ chat nhanh — compact):
@@ -20,11 +21,23 @@ vi.mock('src/components/iconify', () => ({
 }));
 
 // Thẻ hành động (message-card) dùng snackbar + phiên đăng nhập — tin trong file này không có thẻ.
-vi.mock('src/components/snackbar', () => ({ useSnackbar: () => ({ enqueueSnackbar: vi.fn() }) }));
+const enqueueSnackbar = vi.fn();
+vi.mock('src/components/snackbar', () => ({ useSnackbar: () => ({ enqueueSnackbar }) }));
 const authUser: { current: any } = { current: null };
 vi.mock('src/auth/hooks', () => ({ useAuthContext: () => ({ user: authUser.current }) }));
 const routerPush = vi.fn();
 vi.mock('src/routes/hooks', () => ({ useRouter: () => ({ push: routerPush }) }));
+// Thẻ confirm (A2) gọi API nhóm quản trị; 409 thì tải lại tin.
+const confirmApi = { confirm: vi.fn(), cancel: vi.fn() };
+vi.mock('src/api/agent-center', async (orig) => ({
+  ...(await orig<typeof import('src/api/agent-center')>()),
+  confirmAdminGroupProposal: (id: string) => confirmApi.confirm(id),
+  cancelAdminGroupProposal: (id: string) => confirmApi.cancel(id),
+}));
+vi.mock('src/api/messenger', async (orig) => ({
+  ...(await orig<typeof import('src/api/messenger')>()),
+  fetchMessages: vi.fn().mockResolvedValue([]),
+}));
 
 // Imported after the mock above so the component picks up the mocked module.
 import MessageBubble from '../message-bubble';
@@ -156,7 +169,7 @@ describe('MessageBubble — thẻ hành động (nhóm "Quản trị – Đội 
   it('thẻ thay bong bóng chữ; người có agent.approve thấy nút duyệt + xem trước', () => {
     authUser.current = { id: 'me', roles: ['Manager'], permissions: ['agent.approve'] };
     const { container } = renderBubble({
-      message: message({ card: { ...card, actions: [...card.actions] } }),
+      message: message({ card: { ...card, lines: [...card.lines], actions: [...card.actions] } }),
     });
 
     expect(container.querySelector('.messenger-bubble')).toBeNull();
@@ -169,7 +182,9 @@ describe('MessageBubble — thẻ hành động (nhóm "Quản trị – Đội 
 
   it('không có agent.approve → chỉ còn nút Mở phiếu', () => {
     authUser.current = { id: 'me', roles: ['Staff'], permissions: [] };
-    renderBubble({ message: message({ card: { ...card, actions: [...card.actions] } }) });
+    renderBubble({
+      message: message({ card: { ...card, lines: [...card.lines], actions: [...card.actions] } }),
+    });
 
     expect(screen.queryByRole('button', { name: 'Duyệt' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Xem trước' })).not.toBeInTheDocument();
@@ -182,6 +197,7 @@ describe('MessageBubble — thẻ hành động (nhóm "Quản trị – Đội 
       message: message({
         card: {
           ...card,
+          lines: [...card.lines],
           actions: [...card.actions],
           status: 'done',
           statusText: 'Đã duyệt bởi Xuân Bình · 10:42',
@@ -191,5 +207,101 @@ describe('MessageBubble — thẻ hành động (nhóm "Quản trị – Đội 
 
     expect(screen.getByText('Đã duyệt bởi Xuân Bình · 10:42')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Duyệt' })).not.toBeInTheDocument();
+  });
+});
+
+describe('MessageBubble — thẻ confirm của CEO (A2)', () => {
+  const confirmCard: MessageCard = {
+    kind: 'confirm',
+    refId: 'p1',
+    title: 'CEO đề xuất: duyệt 2 phiếu Marketing',
+    lines: [
+      '1. Duyệt phiếu 702eb2ee — Tạo bài đăng',
+      '2. Duyệt phiếu 9a1b2c3d — Hẹn giờ',
+      'Lý do: đúng lịch',
+    ],
+    link: '/dashboard/agent/approvals',
+    status: 'open',
+    statusText: null,
+    actions: [
+      { key: 'confirm', label: 'Xác nhận', style: 'primary' },
+      { key: 'cancel', label: 'Huỷ', style: 'default' },
+      { key: 'open', label: 'Xem phiếu', style: 'default' },
+    ],
+    ops: [
+      { type: 'approve_action', refId: 'a1', label: 'Duyệt phiếu 702eb2ee' },
+      { type: 'approve_action', refId: 'a2', label: 'Duyệt phiếu 9a1b2c3d' },
+    ],
+  };
+  const cardMessage = () =>
+    message({
+      id: 'm-confirm',
+      conversationId: 'admin-group',
+      card: { ...confirmCard },
+    });
+
+  beforeEach(() => {
+    authUser.current = { id: 'me', roles: ['Manager'], permissions: ['agent.approve'] };
+    enqueueSnackbar.mockClear();
+    confirmApi.confirm.mockReset();
+    confirmApi.cancel.mockReset();
+    routerPush.mockClear();
+  });
+
+  it('Xác nhận → hỏi lại "Chạy 2 thao tác này?" rồi gọi API, snackbar theo statusText', async () => {
+    confirmApi.confirm.mockResolvedValue({
+      status: 'done',
+      statusText: 'Đã xác nhận bởi Xuân Bình · 10:42 19/11 — 2/2 thao tác chạy',
+      results: [
+        { label: 'Duyệt phiếu 702eb2ee', ok: true, message: null },
+        { label: 'Duyệt phiếu 9a1b2c3d', ok: true, message: null },
+      ],
+    });
+    renderBubble({ message: cardMessage() });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Xác nhận' }));
+    expect(confirmApi.confirm).not.toHaveBeenCalled();
+    expect(screen.getByText('Chạy 2 thao tác này?')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Xác nhận và chạy' }));
+    expect(confirmApi.confirm).toHaveBeenCalledWith('p1');
+    await waitFor(() =>
+      expect(enqueueSnackbar).toHaveBeenCalledWith(
+        'Đã xác nhận bởi Xuân Bình · 10:42 19/11 — 2/2 thao tác chạy',
+        { variant: 'success' }
+      )
+    );
+  });
+
+  it('Huỷ → gọi thẳng API huỷ, không hỏi lại', async () => {
+    confirmApi.cancel.mockResolvedValue({ status: 'done', statusText: 'Đã huỷ bởi Xuân Bình' });
+    renderBubble({ message: cardMessage() });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Huỷ' }));
+    expect(confirmApi.cancel).toHaveBeenCalledWith('p1');
+    expect(confirmApi.confirm).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(enqueueSnackbar).toHaveBeenCalledWith('Đã huỷ bởi Xuân Bình', { variant: 'success' })
+    );
+  });
+
+  it('409 → snackbar câu { message } của máy chủ', async () => {
+    confirmApi.cancel.mockRejectedValue({ status: 409, message: 'Đề xuất đã được xử lý' });
+    renderBubble({ message: cardMessage() });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Huỷ' }));
+    await waitFor(() =>
+      expect(enqueueSnackbar).toHaveBeenCalledWith('Đề xuất đã được xử lý', { variant: 'warning' })
+    );
+  });
+
+  it('Xem phiếu → điều hướng tới link; không có agent.approve → chỉ còn Xem phiếu', async () => {
+    authUser.current = { id: 'me', roles: ['Staff'], permissions: [] };
+    renderBubble({ message: cardMessage() });
+
+    expect(screen.queryByRole('button', { name: 'Xác nhận' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Huỷ' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Xem phiếu' }));
+    expect(routerPush).toHaveBeenCalledWith('/dashboard/agent/approvals');
   });
 });

@@ -90,6 +90,25 @@ export async function getStorefrontProducts(page = 1, pageSize = 24): Promise<St
 }
 
 /**
+ * Hàng bán chạy 14 ngày (đang bán, còn hàng; thiếu thì core-be bù hàng mới) cho khối đầu trang chủ — đã xếp hạng, không kèm
+ * số bán. Ảnh chỉ là ảnh hệ thống (ảnh KiotViet không ra trang công khai). core-be cũ chưa có API / lỗi → null (trang chủ dùng
+ * danh sách thường như trước).
+ */
+export async function getStorefrontBestSellers(take = 12): Promise<StorefrontProductPage | null> {
+  const data = await fetchPublic<StorefrontProductPage>(
+    `/public/storefront/products/best-sellers?take=${take}`
+  );
+  if (!data?.items) return null;
+  return {
+    items: data.items.map((p) => ({
+      ...p,
+      imageUrl: p.imageUrl ? getStorageUrl(p.imageUrl) : null,
+    })),
+    total: data.total ?? 0,
+  };
+}
+
+/**
  * Trang đầu danh sách /product (GET /public/storefront/products — cùng khoá SWR với useGetStorefrontProducts) để trang
  * render sẵn phía server: công cụ tìm kiếm thấy tên, giá, link từng sản phẩm.
  */

@@ -7,8 +7,18 @@ import { apiErrorMessage } from './api-error';
 // màu nút, câu báo lỗi. Hợp đồng: docs/cici/plans/a1-nhom-quan-tri-api-contract.md mục 2.
 // ----------------------------------------------------------------------
 
-/** Nút cần quyền agent.approve (duyệt / yêu cầu sửa / từ chối / trả lời agent). "open" chỉ là điều hướng. */
-export const CARD_DECISION_KEYS = ['approve', 'revise', 'reject', 'reply'] as const;
+/**
+ * Nút cần quyền agent.approve (duyệt / yêu cầu sửa / từ chối / trả lời agent; A2: xác nhận / huỷ đề xuất của CEO). "open"
+ * chỉ là điều hướng.
+ */
+export const CARD_DECISION_KEYS = [
+  'approve',
+  'revise',
+  'reject',
+  'reply',
+  'confirm',
+  'cancel',
+] as const;
 
 export const CARD_FORBIDDEN_MESSAGE = 'Bạn không có quyền duyệt agent';
 export const CARD_CONFLICT_MESSAGE = 'Phiếu đã được xử lý hoặc đã hết hạn';
@@ -99,4 +109,63 @@ export const CARD_DONE_TEXT: Record<string, string> = {
   revise: 'Đã yêu cầu sửa',
   reject: 'Đã từ chối',
   reply: 'Đã trả lời',
+  confirm: 'Đã xác nhận',
+  cancel: 'Đã huỷ',
 };
+
+// ----------------------------------------------------------------------
+// Bấm nút thẻ → làm gì. approve / confirm hỏi lại một lần; revise / reject / reply mở ô nhập; cancel gọi thẳng; open điều
+// hướng. Nút lạ → null.
+
+export type CardActionIntent = 'approve' | 'input' | 'confirm' | 'cancel' | 'open';
+
+export function cardActionIntent(key: string): CardActionIntent | null {
+  switch (key) {
+    case 'approve':
+    case 'confirm':
+    case 'cancel':
+    case 'open':
+      return key;
+    case 'revise':
+    case 'reject':
+    case 'reply':
+      return 'input';
+    default:
+      return null;
+  }
+}
+
+// ----------------------------------------------------------------------
+// Thẻ `confirm` (A2 — CEO đề xuất thao tác). Hợp đồng: docs/cici/plans/a2-agent-ceo-api-contract.md mục 3.
+
+/** Số thao tác của đề xuất: theo `ops` nếu máy chủ gửi, không thì đếm dòng đánh số "1. …"; không đếm được → 0. */
+export function confirmOpCount(card: Pick<MessageCard, 'ops' | 'lines'>): number {
+  if (Array.isArray(card.ops) && card.ops.length > 0) return card.ops.length;
+  return (card.lines ?? []).filter((l) => typeof l === 'string' && /^\s*\d+[.)]\s/.test(l)).length;
+}
+
+/** Câu hỏi lại trước khi Xác nhận. */
+export function confirmPrompt(card: Pick<MessageCard, 'ops' | 'lines'>): string {
+  const n = confirmOpCount(card);
+  return n > 0 ? `Chạy ${n} thao tác này?` : 'Chạy các thao tác CEO đề xuất?';
+}
+
+/**
+ * Snackbar sau khi Xác nhận / Huỷ: chữ `statusText` của máy chủ; có thao tác lỗi (vd thiếu quyền agent.manage) → vàng,
+ * kèm thao tác lỗi đầu tiên.
+ */
+export function confirmResultMessage(
+  res: {
+    statusText?: string | null;
+    results?: { label: string; ok: boolean; message?: string | null }[] | null;
+  } | null,
+  fallback: string
+): { message: string; variant: 'success' | 'warning' } {
+  const base = res?.statusText?.trim() || fallback;
+  const failed = (res?.results ?? []).filter((r) => !r.ok);
+  if (!failed.length) return { message: base, variant: 'success' };
+  const first = failed[0];
+  const detail = first.message?.trim() ? `${first.label}: ${first.message.trim()}` : first.label;
+  const more = failed.length > 1 ? ` (+${failed.length - 1} thao tác lỗi khác)` : '';
+  return { message: `${base} — lỗi: ${detail}${more}`, variant: 'warning' };
+}

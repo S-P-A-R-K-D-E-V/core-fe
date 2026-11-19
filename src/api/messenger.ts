@@ -45,9 +45,22 @@ export type MessageAttachment = {
 // Thẻ hành động trong tin (A1 — nhóm "Quản trị – Đội agent"). Hợp đồng: docs/cici/plans/a1-nhom-quan-tri-api-contract.md.
 // Tin có thẻ vẫn có `content` chữ đầy đủ (bản cũ chỉ thấy chữ).
 
-export type MessageCardKind = 'approval' | 'task_question' | 'task_failed' | 'task_result';
+/** `confirm` (A2): CEO đề xuất thao tác — người bấm Xác nhận / Huỷ. Hợp đồng a2-agent-ceo-api-contract.md mục 3. */
+export type MessageCardKind =
+  | 'approval'
+  | 'task_question'
+  | 'task_failed'
+  | 'task_result'
+  | 'confirm';
 
-export type MessageCardActionKey = 'approve' | 'revise' | 'reject' | 'reply' | 'open';
+export type MessageCardActionKey =
+  | 'approve'
+  | 'revise'
+  | 'reject'
+  | 'reply'
+  | 'confirm'
+  | 'cancel'
+  | 'open';
 
 export type MessageCardAction = {
   key: MessageCardActionKey | (string & {});
@@ -70,7 +83,15 @@ export type MessageCard = {
   /** approval: quá hạn mà còn open → "Hết hạn", ẩn nút. */
   expiresAt?: string | null;
   actions?: MessageCardAction[] | null;
+  /** confirm (A2): các thao tác sẽ chạy khi Xác nhận — client chỉ dùng để đếm, không bắt buộc có. */
+  ops?: MessageCardOp[] | null;
   updatedAt?: string | null;
+};
+
+export type MessageCardOp = {
+  type: string;
+  refId: string;
+  label: string;
 };
 
 export type DirectMessage = {
