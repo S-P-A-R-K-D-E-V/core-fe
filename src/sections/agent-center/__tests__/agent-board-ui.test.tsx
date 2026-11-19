@@ -115,6 +115,7 @@ describe('bảng việc', () => {
           onRetry={vi.fn()}
           onCancel={vi.fn()}
           onShowList={vi.fn()}
+          onShowCleaning={vi.fn()}
         />
       </ThemeProvider>
     );
@@ -256,6 +257,7 @@ describe('bảng việc — chế độ và cột Xong', () => {
       onRetry: vi.fn(),
       onCancel: vi.fn(),
       onShowList,
+      onShowCleaning: vi.fn(),
     };
     const { rerender } = render(
       <ThemeProvider theme={theme}>
@@ -346,6 +348,7 @@ describe('T2 — việc giao nhân viên + vệ sinh theo ca trên bảng', () =
           onRetry={vi.fn()}
           onCancel={vi.fn()}
           onShowList={vi.fn()}
+          onShowCleaning={vi.fn()}
         />
       </ThemeProvider>
     );
@@ -391,6 +394,7 @@ describe('A2 — việc chờ việc con', () => {
           onRetry={vi.fn()}
           onCancel={vi.fn()}
           onShowList={vi.fn()}
+          onShowCleaning={vi.fn()}
         />
       </ThemeProvider>
     );

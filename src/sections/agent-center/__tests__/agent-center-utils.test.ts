@@ -284,6 +284,29 @@ describe('bảng việc', () => {
       }),
     ];
     const board = buildBoard(items.map(hubEntry), 'active', now);
+    // Ca vệ sinh cũ hơn hôm qua còn chờ chấm: không lên bảng, chỉ đếm.
+    const stale = buildBoard(
+      [
+        hubEntry({
+          ...items[2],
+          id: '2026-11-15|Morning',
+          column: 'waiting',
+          status: 'review',
+          date: '2026-11-15',
+        }),
+        hubEntry({
+          ...items[2],
+          id: '2026-11-18|Morning',
+          column: 'waiting',
+          status: 'review',
+          date: '2026-11-18',
+        }),
+      ],
+      'active',
+      now
+    );
+    expect(stale.columns.waiting.map((e) => e.id)).toEqual(['cleaning:2026-11-18|Morning']);
+    expect(stale.olderCleaning).toBe(1);
     expect(board.columns.ended.map((e) => e.id)).toEqual(['work:rej']);
     expect(board.olderEnded).toBe(1);
     expect(buildBoard(items.map(hubEntry), 'all', now).columns.ended.map((e) => e.id)).toEqual([

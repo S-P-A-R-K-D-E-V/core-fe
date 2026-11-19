@@ -570,6 +570,10 @@ export function AgentCenterView() {
               onStop={(t) => setConfirm({ kind: 'stop', task: t })}
               onRetry={handleRetry}
               onCancel={(t) => setConfirm({ kind: 'cancel', task: t })}
+              onShowCleaning={() => {
+                setFilter((f) => ({ ...f, kind: 'cleaning' }));
+                setQuery({ view: 'list' });
+              }}
               onShowList={(status) => {
                 setListStatus(status);
                 setQuery({ view: 'list' });
