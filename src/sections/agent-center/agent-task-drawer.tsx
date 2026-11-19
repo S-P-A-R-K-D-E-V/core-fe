@@ -3,12 +3,13 @@ import type { IAgentTask, IAgentRunStep } from 'src/api/agent-center';
 import { useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 import Link from '@mui/material/Link';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Drawer from '@mui/material/Drawer';
-import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import Collapse from '@mui/material/Collapse';
 import Skeleton from '@mui/material/Skeleton';
@@ -34,6 +35,7 @@ import { useSnackbar } from 'src/components/snackbar';
 
 import {
   canStop,
+  taskCode,
   canRetry,
   canCancel,
   stepLabel,
@@ -62,6 +64,8 @@ const StyledLabel = styled('span')(({ theme }) => ({
   fontWeight: theme.typography.fontWeightSemiBold,
 }));
 
+type DrawerTab = 'overview' | 'steps' | 'chat';
+
 type Props = {
   taskId: string | null;
   /** Bản trên bảng — hiện ngay khi chi tiết còn đang tải. */
@@ -89,6 +93,16 @@ export default function AgentTaskDrawer({
   const { detail, loading, error, refresh } = useAgentTaskDetail(taskId, poll);
   const task = detail?.task ?? fallbackTask;
   const steps = [...(detail?.steps ?? [])].sort((a, b) => a.seq - b.seq);
+  const notes = steps.filter((st) => st.kind === 'note');
+
+  // Mở việc khác → về tab Tổng quan; việc đang chờ người → mở thẳng tab Trao đổi.
+  const [tab, setTab] = useState<DrawerTab>('overview');
+  const waitingHuman = task?.status === 'waiting_human';
+  useEffect(() => {
+    setTab(waitingHuman ? 'chat' : 'overview');
+    // Chỉ khi đổi việc.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskId]);
 
   return (
     <Drawer
@@ -96,31 +110,52 @@ export default function AgentTaskDrawer({
       onClose={onClose}
       anchor="right"
       slotProps={{ backdrop: { invisible: true } }}
-      PaperProps={{ sx: { width: { xs: 1, sm: 520 } } }}
+      PaperProps={{ sx: { width: { xs: 1, sm: 560 } } }}
     >
-      <Stack
-        direction="row"
-        alignItems="center"
-        spacing={1}
-        sx={{ px: 2.5, py: 2, borderBottom: (t) => `1px solid ${t.palette.divider}` }}
-      >
-        {task && (
-          <Label color={taskStatusMeta(task.status).color} variant="soft">
-            {taskStatusMeta(task.status).label}
-          </Label>
-        )}
-        <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>
+      <Box sx={{ px: 2.5, pt: 2, borderBottom: (t) => `1px solid ${t.palette.divider}` }}>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          {task && (
+            <>
+              <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600 }}>
+                {taskCode(task.id)}
+              </Typography>
+              <Label color={taskStatusMeta(task.status).color} variant="soft">
+                {taskStatusMeta(task.status).label}
+              </Label>
+            </>
+          )}
+          <Box sx={{ flexGrow: 1 }} />
+          {task && (
+            <TaskActions task={task} onStop={onStop} onRetry={onRetry} onCancel={onCancel} />
+          )}
+          <Tooltip title="Tải lại">
+            <IconButton onClick={() => refresh()}>
+              <Iconify icon="solar:restart-bold" />
+            </IconButton>
+          </Tooltip>
+          <IconButton onClick={onClose}>
+            <Iconify icon="mingcute:close-line" />
+          </IconButton>
+        </Stack>
+        <Typography variant="h6" sx={{ mt: 1, wordBreak: 'break-word' }}>
           {task?.title ?? 'Việc của agent'}
         </Typography>
-        <Tooltip title="Tải lại">
-          <IconButton onClick={() => refresh()}>
-            <Iconify icon="solar:restart-bold" />
-          </IconButton>
-        </Tooltip>
-        <IconButton onClick={onClose}>
-          <Iconify icon="mingcute:close-line" />
-        </IconButton>
-      </Stack>
+        <Tabs value={tab} onChange={(_, v: DrawerTab) => setTab(v)} sx={{ mt: 0.5 }}>
+          <Tab value="overview" label="Tổng quan" />
+          <Tab value="steps" label={`Các bước${detail ? ` (${steps.length})` : ''}`} />
+          <Tab
+            value="chat"
+            label={
+              <Stack direction="row" alignItems="center" spacing={0.75}>
+                <span>Trao đổi</span>
+                {waitingHuman && (
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'warning.main' }} />
+                )}
+              </Stack>
+            }
+          />
+        </Tabs>
+      </Box>
 
       {error && !task && (
         <Alert severity="error" sx={{ m: 2.5 }}>
@@ -141,69 +176,84 @@ export default function AgentTaskDrawer({
       {task && (
         <Scrollbar sx={{ height: 1 }}>
           <Stack spacing={3} sx={{ px: 2.5, pt: 2.5, pb: 5 }}>
-            <TaskInfo task={task} />
-            <TaskActions task={task} onStop={onStop} onRetry={onRetry} onCancel={onCancel} />
-
-            {task.pendingActionId && (
-              <Alert
-                severity="warning"
-                action={
-                  <Button
-                    component={RouterLink}
-                    href={paths.dashboard.agent.approvals}
-                    color="inherit"
-                    size="small"
+            {tab === 'overview' && (
+              <>
+                {task.pendingActionId && (
+                  <Alert
+                    severity="warning"
+                    action={
+                      <Button
+                        component={RouterLink}
+                        href={`${paths.dashboard.agent.approvals}?id=${task.pendingActionId}`}
+                        color="inherit"
+                        size="small"
+                      >
+                        Xem phiếu duyệt
+                      </Button>
+                    }
                   >
-                    Xem phiếu duyệt
-                  </Button>
-                }
-              >
-                Agent đang chờ duyệt một lệnh ghi.
-              </Alert>
+                    Agent đang chờ duyệt một lệnh ghi.
+                  </Alert>
+                )}
+
+                {task.error && (
+                  <Alert severity="error" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {task.error}
+                  </Alert>
+                )}
+
+                {task.result && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      Kết quả
+                    </Typography>
+                    <TextBox text={task.result} />
+                  </Box>
+                )}
+
+                <TaskInfo task={task} />
+                <TaskPlan task={task} />
+              </>
             )}
 
-            {task.result && (
+            {tab === 'steps' && (
               <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Kết quả
-                </Typography>
-                <TextBox text={task.result} />
+                {loading && !detail && <Skeleton variant="rounded" height={160} />}
+                {detail && steps.length === 0 && (
+                  <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                    Chưa có bước nào.
+                  </Typography>
+                )}
+                <Stack spacing={0}>
+                  {steps.map((step, i) => (
+                    <StepItem key={step.id} step={step} last={i === steps.length - 1} />
+                  ))}
+                </Stack>
               </Box>
             )}
 
-            {task.error && (
-              <Alert severity="error" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                {task.error}
-              </Alert>
+            {tab === 'chat' && (
+              <>
+                {notes.length > 0 && (
+                  <Stack spacing={0}>
+                    {notes.map((step, i) => (
+                      <StepItem key={step.id} step={step} last={i === notes.length - 1} />
+                    ))}
+                  </Stack>
+                )}
+                {detail && notes.length === 0 && (
+                  <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                    Chưa có trao đổi nào với agent trong việc này.
+                  </Typography>
+                )}
+                <NoteInput
+                  task={task}
+                  onSent={onNoteSent}
+                  onSentRefresh={() => refresh()}
+                  poll={poll}
+                />
+              </>
             )}
-
-            <TaskPlan task={task} />
-
-            <Divider />
-
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
-                Dòng thời gian
-              </Typography>
-              {loading && !detail && <Skeleton variant="rounded" height={160} />}
-              {detail && steps.length === 0 && (
-                <Typography variant="body2" sx={{ color: 'text.disabled' }}>
-                  Chưa có bước nào.
-                </Typography>
-              )}
-              <Stack spacing={0}>
-                {steps.map((step, i) => (
-                  <StepItem key={step.id} step={step} last={i === steps.length - 1} />
-                ))}
-              </Stack>
-            </Box>
-
-            <NoteInput
-              task={task}
-              onSent={onNoteSent}
-              onSentRefresh={() => refresh()}
-              poll={poll}
-            />
           </Stack>
         </Scrollbar>
       )}
@@ -292,6 +342,7 @@ function TaskActions({
     <Stack direction="row" spacing={1}>
       {stop && (
         <Button
+          size="small"
           variant="soft"
           color="error"
           startIcon={<Iconify icon="solar:stop-circle-bold" />}
@@ -302,6 +353,7 @@ function TaskActions({
       )}
       {cancel && (
         <Button
+          size="small"
           variant="outlined"
           color="inherit"
           startIcon={<Iconify icon="solar:close-circle-bold" />}
@@ -312,6 +364,7 @@ function TaskActions({
       )}
       {retry && (
         <Button
+          size="small"
           variant="contained"
           startIcon={<Iconify icon="solar:restart-bold" />}
           onClick={() => onRetry(task)}

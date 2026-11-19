@@ -15,6 +15,10 @@ import {
   taskElapsedMs,
   formatDuration,
   columnOfStatus,
+  buildBoard,
+  filterTasks,
+  taskCode,
+  foldText,
   usageChartData,
   groupTasksByColumn,
   usageTotalsByAgent,
@@ -61,8 +65,8 @@ describe('columnOfStatus', () => {
   it.each([
     ['queued', 'queued'],
     ['running', 'running'],
-    ['waiting_approval', 'waiting_approval'],
-    ['waiting_human', 'waiting_human'],
+    ['waiting_approval', 'waiting'],
+    ['waiting_human', 'waiting'],
     ['done', 'done'],
     ['waiting_children', 'running'],
     ['failed', 'ended'],
@@ -99,7 +103,7 @@ describe('decideDrop — chỉ cho kéo có nghĩa', () => {
     ['ended', 'running'],
     ['running', 'ended'],
     ['done', 'queued'],
-    ['waiting_human', 'queued'],
+    ['waiting', 'queued'],
     ['running', 'queued'],
   ] as const)('%s → %s bị từ chối', (from, to) => {
     const d = decideDrop(from, to, from === 'ended' ? 'failed' : 'queued');
@@ -173,6 +177,61 @@ describe('bảng việc', () => {
     const onlyA1 = groupTasksByColumn(tasks, 'a1');
     expect(onlyA1.running).toEqual([]);
     expect(onlyA1.queued.map((t) => t.id)).toEqual(['d']);
+  });
+
+  it('mã việc AG- + 6 ký tự, tìm không dấu theo tên / mã / agent; việc tin khách chỉ hiện khi lỗi / chờ người', () => {
+    expect(taskCode('3f2a9c1e-0000-0000-0000-000000000000')).toBe('AG-3F2A9C');
+    expect(foldText('Trả lời ĐƠN')).toBe('tra loi don');
+    const tasks = [
+      task({ id: '3f2a9c1e-1', title: 'Báo cáo sáng' }),
+      task({
+        id: 'aa',
+        title: 'Trả lời Lan',
+        source: 'event',
+        sourceRef: 'conv:x:1',
+        status: 'done',
+      }),
+      task({
+        id: 'bb',
+        title: 'Trả lời Mai',
+        source: 'event',
+        sourceRef: 'conv:x:2',
+        status: 'failed',
+      }),
+      task({
+        id: 'cc',
+        title: 'Thẩm định',
+        source: 'event',
+        sourceRef: 'assess:1',
+        agentName: 'CEO',
+      }),
+    ];
+    expect(filterTasks(tasks, {}).map((t) => t.id)).toEqual(['3f2a9c1e-1', 'bb', 'cc']);
+    expect(filterTasks(tasks, { q: 'bao cao' }).map((t) => t.id)).toEqual(['3f2a9c1e-1']);
+    expect(filterTasks(tasks, { q: 'ag-3f2a' }).map((t) => t.id)).toEqual(['3f2a9c1e-1']);
+    expect(filterTasks(tasks, { q: 'ceo' }).map((t) => t.id)).toEqual(['cc']);
+    expect(filterTasks(tasks, { source: 'schedule' }).map((t) => t.id)).toEqual(['3f2a9c1e-1']);
+  });
+
+  it('buildBoard: cột Xong chỉ hôm nay, Lỗi từ đầu hôm qua; "Đang phải làm" bỏ việc huỷ', () => {
+    const now = new Date(2026, 10, 19, 15, 0).getTime();
+    const at = (d: number, h: number) => new Date(2026, 10, d, h, 0).toISOString();
+    const tasks = [
+      task({ id: 'd1', status: 'done', finishedAt: at(19, 9) }),
+      task({ id: 'd0', status: 'done', finishedAt: at(18, 23) }),
+      task({ id: 'f1', status: 'failed', finishedAt: at(18, 8) }),
+      task({ id: 'f0', status: 'failed', finishedAt: at(17, 23) }),
+      task({ id: 'x', status: 'cancelled', finishedAt: at(19, 10) }),
+      task({ id: 'w', status: 'waiting_human' }),
+    ];
+    const active = buildBoard(tasks, 'active', now);
+    expect(active.columns.done.map((t) => t.id)).toEqual(['d1']);
+    expect(active.olderDone).toBe(1);
+    expect(active.columns.ended.map((t) => t.id)).toEqual(['f1']);
+    expect(active.olderEnded).toBe(1);
+    expect(active.columns.waiting.map((t) => t.id)).toEqual(['w']);
+    const all = buildBoard(tasks, 'all', now);
+    expect(all.columns.ended.map((t) => t.id)).toEqual(['x', 'f1']);
   });
 
   it('upsertTask: thay đúng việc, việc mới lên đầu', () => {

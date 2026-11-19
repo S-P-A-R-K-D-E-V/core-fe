@@ -13,41 +13,48 @@ import type {
 // Máy chủ quyết trạng thái — ở đây chỉ hiển thị và chặn kéo thả vô nghĩa.
 // ----------------------------------------------------------------------
 
-export type BoardColumnId =
-  | 'queued'
-  | 'running'
-  | 'waiting_approval'
-  | 'waiting_human'
-  | 'done'
-  | 'ended';
+export type BoardColumnId = 'queued' | 'running' | 'waiting' | 'done' | 'ended';
 
 export const BOARD_COLUMNS: {
   id: BoardColumnId;
   label: string;
   color: LabelColor;
   icon: string;
+  /** Chế độ "Đang phải làm" ẩn cột này. */
+  allOnly?: boolean;
 }[] = [
   { id: 'queued', label: 'Chờ chạy', color: 'default', icon: 'solar:hourglass-line-bold' },
   { id: 'running', label: 'Đang chạy', color: 'info', icon: 'solar:play-circle-bold' },
-  { id: 'waiting_approval', label: 'Chờ duyệt', color: 'warning', icon: 'solar:shield-check-bold' },
-  { id: 'waiting_human', label: 'Chờ người', color: 'secondary', icon: 'solar:user-speak-bold' },
-  { id: 'done', label: 'Xong', color: 'success', icon: 'solar:check-circle-bold' },
+  {
+    id: 'waiting',
+    label: 'Chờ duyệt / chờ người',
+    color: 'warning',
+    icon: 'solar:shield-check-bold',
+  },
   { id: 'ended', label: 'Lỗi / Đã dừng', color: 'error', icon: 'solar:danger-triangle-bold' },
+  {
+    id: 'done',
+    label: 'Xong',
+    color: 'success',
+    icon: 'solar:check-circle-bold',
+    allOnly: true,
+  },
 ];
 
 /**
- * Cột của một trạng thái; failed / stopped / cancelled chung cột "Lỗi / Đã dừng"; waiting_children (A2 — việc cha chờ
- * việc con) nằm cột Đang chạy. Trạng thái lạ → Chờ chạy.
+ * Cột của một trạng thái: chờ duyệt + chờ người chung cột "Chờ duyệt / chờ người"; failed / stopped / cancelled chung cột
+ * "Lỗi / Đã dừng"; waiting_children (A2 — việc cha chờ việc con) nằm cột Đang chạy. Trạng thái lạ → Chờ chạy.
  */
 export function columnOfStatus(status: AgentTaskStatus | string): BoardColumnId {
   switch (status) {
     case 'running':
-    case 'waiting_approval':
-    case 'waiting_human':
-    case 'done':
-      return status;
     case 'waiting_children':
       return 'running';
+    case 'waiting_approval':
+    case 'waiting_human':
+      return 'waiting';
+    case 'done':
+      return 'done';
     case 'failed':
     case 'stopped':
     case 'cancelled':
@@ -148,7 +155,61 @@ export function isDraggable(status: AgentTaskStatus | string): boolean {
 }
 
 // ----------------------------------------------------------------------
-// Bảng: nhóm việc theo cột (mới trước), lọc theo agent, chèn / cập nhật một việc.
+// Bảng: lọc, nhóm việc theo cột (mới trước), chèn / cập nhật một việc.
+
+/** Mã ngắn hiển thị trên thẻ: AG- + 6 ký tự đầu của id. */
+export function taskCode(id: string): string {
+  return `AG-${id.replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+}
+
+/** Thời gian tương đối ngắn cho thẻ: "vừa xong", "18 phút", "3 giờ", "2 ngày". */
+export function shortAgo(iso: string | null | undefined, now: number): string {
+  if (!iso) return '';
+  const min = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60_000));
+  if (min < 1) return 'vừa xong';
+  if (min < 60) return `${min} phút`;
+  const hours = Math.floor(min / 60);
+  if (hours < 24) return `${hours} giờ`;
+  return `${Math.floor(hours / 24)} ngày`;
+}
+
+/** Việc trả lời / gợi ý trả lời tin khách (F3) — mỗi tin một việc, xem ở Hộp thư. */
+export function isConversationTask(task: Pick<IAgentTask, 'source' | 'sourceRef'>): boolean {
+  return task.source === 'event' && !!task.sourceRef && task.sourceRef.startsWith('conv:');
+}
+
+const COMBINING_MARKS = new RegExp('[\\u0300-\\u036f]', 'g');
+
+/** Bỏ dấu tiếng Việt + chữ thường để tìm "tra loi" ra "Trả lời". */
+export function foldText(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(COMBINING_MARKS, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase();
+}
+
+export type BoardMode = 'active' | 'all';
+
+export interface BoardFilter {
+  agentId?: string | null;
+  source?: string | null;
+  q?: string;
+}
+
+/** Lọc agent / nguồn / từ khoá (tên việc, mã, tên agent); việc tin khách chỉ giữ khi lỗi / chờ người. */
+export function filterTasks(tasks: readonly IAgentTask[], filter: BoardFilter): IAgentTask[] {
+  const term = foldText((filter.q ?? '').trim());
+  return tasks.filter((t) => {
+    if (filter.agentId && t.agentId !== filter.agentId) return false;
+    if (filter.source && t.source !== filter.source) return false;
+    if (isConversationTask(t) && t.status !== 'failed' && t.status !== 'waiting_human')
+      return false;
+    if (!term) return true;
+    return [t.title, taskCode(t.id), t.agentName].some((v) => foldText(v ?? '').includes(term));
+  });
+}
 
 export function groupTasksByColumn(
   tasks: readonly IAgentTask[],
@@ -157,8 +218,7 @@ export function groupTasksByColumn(
   const out: Record<BoardColumnId, IAgentTask[]> = {
     queued: [],
     running: [],
-    waiting_approval: [],
-    waiting_human: [],
+    waiting: [],
     done: [],
     ended: [],
   };
@@ -169,6 +229,41 @@ export function groupTasksByColumn(
     out[col].sort((a, b) => sortTime(b).localeCompare(sortTime(a)));
   });
   return out;
+}
+
+function startOfLocalDay(now: number, daysBack = 0): number {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - daysBack);
+  return d.getTime();
+}
+
+export interface BoardData {
+  columns: Record<BoardColumnId, IAgentTask[]>;
+  /** Việc xong trước hôm nay (không hiện trên bảng — xem ở Danh sách). */
+  olderDone: number;
+  /** Việc lỗi / dừng / huỷ trước hôm qua. */
+  olderEnded: number;
+}
+
+/**
+ * Dữ liệu bảng: cột Xong chỉ giữ việc xong hôm nay, cột Lỗi / Đã dừng chỉ giữ từ đầu hôm qua (việc cũ hơn đếm để hiện
+ * "Xem thêm"); chế độ "Đang phải làm" bỏ hẳn việc đã huỷ.
+ */
+export function buildBoard(tasks: readonly IAgentTask[], mode: BoardMode, now: number): BoardData {
+  const columns = groupTasksByColumn(tasks);
+  const today = startOfLocalDay(now);
+  const yesterday = startOfLocalDay(now, 1);
+  const at = (t: IAgentTask) => new Date(sortTime(t)).getTime();
+
+  const done = columns.done.filter((t) => at(t) >= today);
+  const endedAll = columns.ended.filter((t) => mode === 'all' || t.status !== 'cancelled');
+  const ended = endedAll.filter((t) => at(t) >= yesterday);
+  return {
+    columns: { ...columns, done, ended },
+    olderDone: columns.done.length - done.length,
+    olderEnded: endedAll.length - ended.length,
+  };
 }
 
 function sortTime(t: IAgentTask): string {
