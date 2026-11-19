@@ -51,6 +51,8 @@ type Props = {
   allowed: boolean;
   /** Đổi hội thoại → xoá nháp. */
   conversationId: string;
+  /** Đổ sẵn nội dung (gợi ý của agent) — mỗi lần đổi `key` là một lần đổ. */
+  prefill?: { key: number; text: string; images: string[] } | null;
 };
 
 const PICKER_LIMIT = 8;
@@ -63,6 +65,7 @@ export default function InboxComposer({
   onSend,
   allowed,
   conversationId,
+  prefill,
 }: Props) {
   const { enqueueSnackbar } = useSnackbar();
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -82,6 +85,17 @@ export default function InboxComposer({
     setImages([]);
     setNote(false);
   }, [conversationId]);
+
+  // Dùng gợi ý của agent: đổ chữ + ảnh vào ô soạn để nhân viên sửa rồi gửi.
+  const prefillKey = prefill?.key;
+  useEffect(() => {
+    if (!prefill) return;
+    setText(prefill.text);
+    setImages(prefill.images);
+    setNote(false);
+    inputRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillKey]);
 
   // Cửa sổ 24 giờ: tính lại mỗi phút.
   useEffect(() => {

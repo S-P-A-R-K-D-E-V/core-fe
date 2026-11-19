@@ -50,7 +50,8 @@ export type MessageAttachment = {
   name: string | null;
 };
 
-export type MessageStatus = 'sending' | 'sent' | 'failed' | 'received';
+/** suggested = gợi ý agent CSKH soạn cho nhân viên (ghi chú nội bộ, chưa gửi khách — bấm "Dùng gợi ý" để sửa rồi gửi). */
+export type MessageStatus = 'sending' | 'sent' | 'failed' | 'received' | 'suggested';
 
 export type ConversationMessage = {
   id: string;
