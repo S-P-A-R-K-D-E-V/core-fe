@@ -25,6 +25,7 @@ import {
   resolveMessengerUser,
   systemConversationName,
 } from 'src/utils/messenger-system';
+import { messengerTypingLabel } from 'src/utils/messenger-members';
 import { useMessengerCtx } from './messenger-provider';
 import MessageBubble from './message-bubble';
 import { SystemChannelAvatar } from './system-avatar';
@@ -123,10 +124,8 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
     }
   };
 
-  const typingNames = typing
-    .filter((id) => id !== currentUserId)
-    .map((id) => userCache[id]?.fullName?.split(' ').at(-1) ?? '...')
-    .join(', ');
+  // Nhóm Quản trị: Trợ lý hệ thống gõ = "CEO đang soạn…".
+  const typingNames = messengerTypingLabel(typing, { currentUserId, conversation: conv, userCache });
 
   return (
     <m.div
@@ -245,7 +244,7 @@ export default function QuickChatWindow({ convId, currentUserId, onClose }: Prop
           {/* Typing indicator */}
           {typingNames && (
             <Typography variant="caption" sx={{ px: 1.5, pb: 0.5, color: 'text.secondary', display: 'block' }}>
-              {typingNames} đang nhập...
+              {typingNames}
             </Typography>
           )}
 
