@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { move, append, remove, sameOrder, makePrimary, MAX_PRODUCT_IMAGES } from '../gallery';
+import {
+  move,
+  append,
+  remove,
+  sameOrder,
+  makePrimary,
+  nextVariant,
+  MAX_PRODUCT_IMAGES,
+} from '../gallery';
 
 describe('bộ ảnh sản phẩm', () => {
   const urls = ['a', 'b', 'c'];
@@ -27,5 +35,20 @@ describe('bộ ảnh sản phẩm', () => {
   it('so thứ tự', () => {
     expect(sameOrder(['a', 'b'], ['a', 'b'])).toBe(true);
     expect(sameOrder(['a', 'b'], ['b', 'a'])).toBe(false);
+  });
+});
+
+describe('nextVariant (Lưu & sang mẫu tiếp)', () => {
+  const v = (id: string, coverUrl: string | null = null) => ({ id, coverUrl });
+
+  it('nhảy tới mẫu chưa có ảnh đứng sau, vòng lại từ đầu', () => {
+    const list = [v('18k'), v('25k', 'a.jpg'), v('50k'), v('70k', 'b.jpg')];
+    expect(nextVariant(list, '25k')?.id).toBe('50k');
+    expect(nextVariant(list, '50k')?.id).toBe('18k');
+  });
+
+  it('mọi mẫu đã có ảnh thì sang mẫu ngay sau; một mẫu thì không có', () => {
+    expect(nextVariant([v('a', 'x'), v('b', 'y')], 'a')?.id).toBe('b');
+    expect(nextVariant([v('a')], 'a')).toBeNull();
   });
 });

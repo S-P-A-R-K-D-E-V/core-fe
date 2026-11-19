@@ -18,7 +18,26 @@ export type ProductImages = {
   images: string[];
   description: string | null;
   onlineDescription: string | null;
+  /** Giá bán của mẫu đang mở (core-be cũ không trả). */
+  price?: number;
+  /** Mã cha + các mẫu con cùng nhóm, theo giá — mỗi mẫu một bộ ảnh; rỗng / thiếu = hàng không có mẫu. */
+  variants?: ProductImageVariant[] | null;
 };
+
+/** coverUrl = ảnh đầu của bộ ẢNH HỆ THỐNG (null = chưa có; ảnh KiotViet không tính). */
+export type ProductImageVariant = {
+  id: string;
+  code: string;
+  label: string;
+  price: number;
+  isMaster: boolean;
+  coverUrl: string | null;
+};
+
+/** Dùng bộ ảnh hệ thống của mẫu này cho các mẫu cùng nhóm (thay bộ ảnh cũ của các mẫu đó). */
+export async function copyProductImages(id: string, targetIds: string[]) {
+  return (await axios.post<{ copied: number }>(`/products/${id}/images/copy`, { targetIds })).data;
+}
 
 const root = (id: string) => `/products/${id}/images`;
 

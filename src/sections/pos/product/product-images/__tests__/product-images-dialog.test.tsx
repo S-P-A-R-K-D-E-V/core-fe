@@ -25,24 +25,34 @@ const api = vi.hoisted(() => ({
   analyzeProductImage: vi.fn(),
   generateProductImage: vi.fn(),
   frameProductImage: vi.fn(),
+  copyProductImages: vi.fn(),
   mutate: vi.fn(),
+  // Mẫu cùng nhóm + id đã nạp (chuyển mẫu trong hộp thoại).
+  variants: null as any,
+  customized: false,
+  loadedIds: [] as string[],
 }));
 
 vi.mock('src/api/product-images', () => ({
-  useProductImages: () => ({
-    data: {
-      productId: 'p1',
-      code: 'K25',
-      name: 'Kẹp tóc - k25',
-      kiotVietLinked: true,
-      imagesCustomized: false,
-      images: [KV, SECOND],
-      description: null,
-      onlineDescription: null,
-    },
-    error: undefined,
-    mutate: api.mutate,
-  }),
+  useProductImages: (id: string) => {
+    api.loadedIds.push(id);
+    return {
+      data: {
+        productId: id,
+        code: 'K25',
+        name: 'Kẹp tóc - k25',
+        kiotVietLinked: true,
+        imagesCustomized: api.customized,
+        price: 25000,
+        variants: api.variants,
+        images: [KV, SECOND],
+        description: null,
+        onlineDescription: null,
+      },
+      error: undefined,
+      mutate: api.mutate,
+    };
+  },
   useProductImageCatalog: () => ({
     items: [],
     tags: [],
@@ -54,6 +64,7 @@ vi.mock('src/api/product-images', () => ({
   analyzeProductImage: (...a: any[]) => api.analyzeProductImage(...a),
   generateProductImage: (...a: any[]) => api.generateProductImage(...a),
   frameProductImage: (...a: any[]) => api.frameProductImage(...a),
+  copyProductImages: (...a: any[]) => api.copyProductImages(...a),
 }));
 
 // eslint-disable-next-line import/first
@@ -70,6 +81,50 @@ const renderDialog = (onSaved = vi.fn(), onClose = vi.fn()) => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  api.variants = null;
+  api.customized = false;
+  api.loadedIds = [];
+});
+
+const SQUISHY = [
+  { id: 'p1', code: 'SP014956', label: '25', price: 25000, isMaster: true, coverUrl: null },
+  { id: 'p50', code: 'SP015853', label: '50', price: 50000, isMaster: false, coverUrl: SECOND },
+  { id: 'p70', code: 'SP015912', label: 'Squishy', price: 70000, isMaster: false, coverUrl: null },
+];
+
+describe('ProductImagesDialog — mẫu cùng nhóm', () => {
+  it('hiện các mẫu, bấm một mẫu thì nạp ảnh của đúng mẫu đó; "Sang mẫu tiếp" tới mẫu chưa có ảnh', async () => {
+    api.variants = SQUISHY;
+    renderDialog();
+
+    expect(screen.getByText('Các mẫu cùng nhóm (3)')).toBeInTheDocument();
+    expect(screen.getAllByText('Chưa có ảnh')).toHaveLength(2);
+
+    await userEvent.click(screen.getByRole('button', { name: /^50 / }));
+    expect(api.loadedIds.at(-1)).toBe('p50');
+
+    await userEvent.click(screen.getByRole('button', { name: /Sang mẫu tiếp/ }));
+    expect(api.loadedIds.at(-1)).toBe('p70');
+  });
+
+  it('chưa có bộ ảnh hệ thống (chỉ ảnh KiotViet) thì không dùng ảnh cho mẫu khác được', async () => {
+    api.variants = SQUISHY;
+    renderDialog();
+    expect(screen.getByRole('button', { name: /Dùng ảnh này cho mẫu khác/ })).toBeDisabled(); // ảnh KiotViet
+  });
+
+  it('dùng ảnh cho các mẫu chưa có ảnh', async () => {
+    api.variants = SQUISHY;
+    api.customized = true;
+    api.copyProductImages.mockResolvedValue({ copied: 1 });
+    renderDialog();
+
+    await userEvent.click(screen.getByRole('button', { name: /Dùng ảnh này cho mẫu khác/ }));
+    await userEvent.click(screen.getByText('Chọn mẫu chưa có ảnh'));
+    await userEvent.click(screen.getByRole('button', { name: 'Dùng ảnh cho 1 mẫu' }));
+
+    expect(api.copyProductImages).toHaveBeenCalledWith('p1', ['p70']);
+  });
 });
 
 describe('ProductImagesDialog', () => {

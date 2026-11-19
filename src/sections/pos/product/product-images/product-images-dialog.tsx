@@ -1,6 +1,7 @@
 'use client';
 
 import type { ImageResult, ImageAnalysis } from 'src/lib/image-ai';
+import type { ProductImageVariant } from 'src/api/product-images';
 
 import { useRef, useState, useEffect } from 'react';
 
@@ -26,11 +27,13 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { useResponsive } from 'src/hooks/use-responsive';
 
 import { getStorageUrl } from 'src/utils/storage';
+import { fCurrency } from 'src/utils/format-number';
 import { apiErrorMessage } from 'src/utils/api-error';
 
 import { defaultPreset } from 'src/lib/image-ai';
 import {
   useProductImages,
+  copyProductImages,
   saveProductImages,
   frameProductImage,
   uploadProductImage,
@@ -44,7 +47,15 @@ import { useSnackbar } from 'src/components/snackbar';
 import { ImageFigure } from 'src/components/image-ai/image-figure';
 import { AiPresetPicker } from 'src/components/image-ai/ai-preset-picker';
 
-import { move, append, remove, sameOrder, makePrimary, MAX_PRODUCT_IMAGES } from './gallery';
+import {
+  move,
+  append,
+  remove,
+  sameOrder,
+  makePrimary,
+  nextVariant,
+  MAX_PRODUCT_IMAGES,
+} from './gallery';
 
 // ----------------------------------------------------------------------
 // Ảnh sản phẩm (phục vụ bán online, storefront /product/[id]):
@@ -65,6 +76,27 @@ type Props = {
 };
 
 export function ProductImagesDialog({ productId, aiEnabled = true, onClose, onSaved }: Props) {
+  // Chuyển mẫu cùng nhóm ngay trong hộp thoại (mỗi mẫu một bộ ảnh) — dựng lại phần thân theo mẫu đang mở.
+  const [currentId, setCurrentId] = useState(productId);
+  return (
+    <ProductImagesDialogBody
+      key={currentId}
+      productId={currentId}
+      aiEnabled={aiEnabled}
+      onClose={onClose}
+      onSaved={currentId === productId ? onSaved : undefined}
+      onSwitch={setCurrentId}
+    />
+  );
+}
+
+function ProductImagesDialogBody({
+  productId,
+  aiEnabled = true,
+  onClose,
+  onSaved,
+  onSwitch,
+}: Props & { onSwitch: (id: string) => void }) {
   const { enqueueSnackbar } = useSnackbar();
   const smUp = useResponsive('up', 'sm');
   const { data, error: loadError, mutate } = useProductImages(productId);
@@ -89,6 +121,10 @@ export function ProductImagesDialog({ productId, aiEnabled = true, onClose, onSa
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // "Dùng ảnh này cho mẫu khác…"
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyTargets, setCopyTargets] = useState<string[]>([]);
+  const [copying, setCopying] = useState(false);
   const uploadRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
@@ -213,7 +249,8 @@ export function ProductImagesDialog({ productId, aiEnabled = true, onClose, onSa
     else enqueueSnackbar(`Đã thêm ${toAdd.length} ảnh vào bộ ảnh — bấm Lưu để cập nhật sản phẩm`);
   };
 
-  const handleSave = async () => {
+  /** Lưu rồi đóng, hoặc sang mẫu {@link next} ("Lưu & sang mẫu tiếp"). */
+  const handleSave = async (next?: ProductImageVariant | null) => {
     if (!data) return;
     setSaving(true);
     setError(null);
@@ -225,7 +262,8 @@ export function ProductImagesDialog({ productId, aiEnabled = true, onClose, onSa
       await mutate(saved, { revalidate: false });
       enqueueSnackbar('Đã lưu ảnh sản phẩm');
       onSaved?.(saved.images);
-      onClose();
+      if (next) onSwitch(next.id);
+      else onClose();
     } catch (err) {
       setError(apiErrorMessage(err, 'Chưa lưu được ảnh sản phẩm'));
     } finally {
@@ -240,8 +278,31 @@ export function ProductImagesDialog({ productId, aiEnabled = true, onClose, onSa
     onClose();
   };
 
+  const handleCopy = async () => {
+    if (copyTargets.length === 0) return;
+    setCopying(true);
+    setError(null);
+    try {
+      const { copied } = await copyProductImages(productId, copyTargets);
+      enqueueSnackbar(`Đã dùng ảnh cho ${copied} mẫu`);
+      setCopyOpen(false);
+      setCopyTargets([]);
+      await mutate();
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Chưa dùng được ảnh cho mẫu khác'));
+    } finally {
+      setCopying(false);
+    }
+  };
+
   const busy = running > 0 || uploading || saving;
   const pickedNew = picked.filter((u) => !gallery.includes(u));
+  const variants = data?.variants ?? [];
+  const next = nextVariant(variants, productId);
+  const others = variants.filter((v) => v.id !== productId);
+  // Chỉ bộ ẢNH HỆ THỐNG đã lưu mới dùng cho mẫu khác được (ảnh KiotViet thì không).
+  const canCopy =
+    !!data && data.images.length > 0 && (data.imagesCustomized || !data.kiotVietLinked) && !dirty;
 
   return (
     <Dialog open fullWidth maxWidth="lg" fullScreen={!smUp} onClose={handleClose}>
@@ -249,6 +310,7 @@ export function ProductImagesDialog({ productId, aiEnabled = true, onClose, onSa
         Ảnh sản phẩm{data ? ` — ${data.name}` : ''}
         {data && (
           <Typography variant="caption" component="div" sx={{ color: 'text.secondary' }}>
+            {data.price ? `${fCurrency(data.price)} · ` : ''}
             {data.code}
             {data.kiotVietLinked &&
               (data.imagesCustomized
@@ -272,6 +334,107 @@ export function ProductImagesDialog({ productId, aiEnabled = true, onClose, onSa
 
         {data && (
           <Stack spacing={3}>
+            {/* ---------- Các mẫu cùng nhóm (KiotViet: mỗi giá một mã, một bộ ảnh — vd Squishy 18k…140k) ---------- */}
+            {variants.length > 1 && (
+              <Box>
+                <Typography variant="subtitle1" sx={{ mb: 0.5 }}>
+                  Các mẫu cùng nhóm ({variants.length})
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{ color: 'text.secondary', display: 'block', mb: 1.5 }}
+                >
+                  Mỗi mẫu (mỗi mã, mỗi giá) có bộ ảnh riêng. Bấm một mẫu để sửa ảnh của mẫu đó
+                  {dirty ? ' — lưu thay đổi của mẫu này trước khi chuyển.' : '.'}
+                </Typography>
+                <Stack direction="row" spacing={1.5} sx={{ overflowX: 'auto', pb: 1 }}>
+                  {variants.map((v) => (
+                    <VariantTile
+                      key={v.id}
+                      variant={v}
+                      current={v.id === productId}
+                      disabled={busy || dirty}
+                      onClick={() => onSwitch(v.id)}
+                    />
+                  ))}
+                </Stack>
+                <Tooltip
+                  title={canCopy ? '' : 'Lưu bộ ảnh của mẫu này trước rồi mới dùng cho mẫu khác'}
+                >
+                  <span>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      sx={{ mt: 1 }}
+                      startIcon={<Iconify icon="solar:copy-bold-duotone" />}
+                      disabled={!canCopy || busy || copying}
+                      onClick={() => setCopyOpen((o) => !o)}
+                    >
+                      Dùng ảnh này cho mẫu khác…
+                    </Button>
+                  </span>
+                </Tooltip>
+                {copyOpen && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: 'text.secondary', display: 'block' }}
+                    >
+                      Chọn các mẫu trông giống mẫu này. Bộ ảnh cũ của các mẫu đó sẽ được thay.{' '}
+                      <ButtonBase
+                        sx={{
+                          color: 'primary.main',
+                          typography: 'caption',
+                          verticalAlign: 'baseline',
+                        }}
+                        onClick={() =>
+                          setCopyTargets(others.filter((v) => !v.coverUrl).map((v) => v.id))
+                        }
+                      >
+                        Chọn mẫu chưa có ảnh
+                      </ButtonBase>
+                    </Typography>
+                    <Stack direction="row" flexWrap="wrap" useFlexGap sx={{ my: 1 }}>
+                      {others.map((v) => (
+                        <Box
+                          key={v.id}
+                          component="label"
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            pr: 1.5,
+                            typography: 'body2',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <Checkbox
+                            size="small"
+                            checked={copyTargets.includes(v.id)}
+                            onChange={() =>
+                              setCopyTargets((cur) =>
+                                cur.includes(v.id) ? cur.filter((x) => x !== v.id) : [...cur, v.id]
+                              )
+                            }
+                          />
+                          {fCurrency(v.price)} · {v.code}
+                          {v.coverUrl ? ' · đã có ảnh' : ''}
+                        </Box>
+                      ))}
+                    </Stack>
+                    <LoadingButton
+                      size="small"
+                      variant="contained"
+                      loading={copying}
+                      disabled={copyTargets.length === 0}
+                      onClick={handleCopy}
+                    >
+                      Dùng ảnh cho {copyTargets.length} mẫu
+                    </LoadingButton>
+                  </Box>
+                )}
+              </Box>
+            )}
+
             {/* ---------- Bộ ảnh ---------- */}
             <Box>
               <Typography variant="subtitle1" sx={{ mb: 0.5 }}>
@@ -569,10 +732,20 @@ export function ProductImagesDialog({ productId, aiEnabled = true, onClose, onSa
           variant="contained"
           loading={saving}
           disabled={!dirty || running > 0 || uploading}
-          onClick={handleSave}
+          onClick={() => handleSave()}
         >
           Lưu
         </LoadingButton>
+        {next && (
+          <LoadingButton
+            variant="outlined"
+            loading={saving}
+            disabled={running > 0 || uploading}
+            onClick={() => (dirty ? handleSave(next) : onSwitch(next.id))}
+          >
+            {dirty ? 'Lưu & sang mẫu tiếp' : 'Sang mẫu tiếp'} ({fCurrency(next.price)})
+          </LoadingButton>
+        )}
       </DialogActions>
     </Dialog>
   );
@@ -715,6 +888,75 @@ function AddTile({
     >
       {loading ? <CircularProgress size={24} /> : <Iconify icon={icon} width={28} />}
       <Typography variant="caption">{label}</Typography>
+    </ButtonBase>
+  );
+}
+
+// ----------------------------------------------------------------------
+
+function VariantTile({
+  variant,
+  current,
+  disabled,
+  onClick,
+}: {
+  variant: ProductImageVariant;
+  current: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <ButtonBase
+      onClick={onClick}
+      disabled={disabled && !current}
+      aria-label={`${variant.label} ${fCurrency(variant.price)}`}
+      sx={{
+        flexShrink: 0,
+        width: 96,
+        p: 0.5,
+        borderRadius: 1.5,
+        display: 'block',
+        textAlign: 'left',
+        border: (theme) =>
+          current
+            ? `3px solid ${theme.palette.primary.main}`
+            : `1px solid ${theme.palette.divider}`,
+        opacity: disabled && !current ? 0.5 : 1,
+      }}
+    >
+      <Box
+        sx={{
+          width: '100%',
+          aspectRatio: '1',
+          borderRadius: 1,
+          overflow: 'hidden',
+          bgcolor: 'background.neutral',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {variant.coverUrl ? (
+          <Box
+            component="img"
+            src={getStorageUrl(variant.coverUrl)}
+            alt={variant.label}
+            sx={{ width: 1, height: 1, objectFit: 'cover' }}
+          />
+        ) : (
+          <Iconify
+            icon="solar:camera-add-bold-duotone"
+            width={24}
+            sx={{ color: 'text.disabled' }}
+          />
+        )}
+      </Box>
+      <Typography variant="caption" component="div" noWrap sx={{ fontWeight: 600, mt: 0.5 }}>
+        {fCurrency(variant.price)}
+      </Typography>
+      <Typography variant="caption" component="div" noWrap sx={{ color: 'text.secondary' }}>
+        {variant.coverUrl ? variant.label : 'Chưa có ảnh'}
+      </Typography>
     </ButtonBase>
   );
 }
