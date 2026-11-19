@@ -46,6 +46,7 @@ vi.mock('src/components/messenger/messenger-provider', () => ({
 vi.mock('src/api/messenger', () => ({
   sendMessage: vi.fn(),
   sendAttachment: vi.fn(),
+  fetchConversations: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('src/sections/messenger/new-conversation-dialog', () => ({

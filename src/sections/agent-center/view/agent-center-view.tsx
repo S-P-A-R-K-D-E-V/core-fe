@@ -33,7 +33,9 @@ import {
   agentSummaryKey,
   agentTaskDetailKey,
   useAgentDefinitions,
+  useAgentAdminGroup,
   setAgentCenterPaused,
+  createAgentAdminGroup,
   useAgentCenterSummary,
 } from 'src/api/agent-center';
 
@@ -249,6 +251,32 @@ export function AgentCenterView() {
     setConfirm(null);
   };
 
+  // --- Nhóm quản trị (A1) ------------------------------------------------------------------
+  // Tính năng tắt (enabled false / 404) → ẩn nút. Chưa có nhóm thì chỉ người có agent.manage tạo được.
+  const { info: adminGroup, refresh: refreshAdminGroup } = useAgentAdminGroup(true);
+  const [openingGroup, setOpeningGroup] = useState(false);
+  const showAdminGroup = !!adminGroup?.enabled && (!!adminGroup.conversationId || canManage);
+
+  const handleOpenAdminGroup = async () => {
+    if (!adminGroup) return;
+    let conversationId = adminGroup.conversationId;
+    if (!conversationId) {
+      setOpeningGroup(true);
+      try {
+        const res = await createAgentAdminGroup();
+        conversationId = res.conversationId;
+        refreshAdminGroup();
+        if (res.created) enqueueSnackbar(`Đã tạo nhóm "${res.name}"`);
+      } catch (err) {
+        enqueueSnackbar(apiErrorMessage(err, 'Không mở được nhóm quản trị'), { variant: 'error' });
+        return;
+      } finally {
+        setOpeningGroup(false);
+      }
+    }
+    router.push(`${paths.dashboard.messenger}?c=${encodeURIComponent(conversationId)}`);
+  };
+
   const openTask = useCallback((id: string) => setQuery({ task: id }), [setQuery]);
   const fallbackTask = useMemo(
     () => (openTaskId ? (tasks.find((t) => t.id === openTaskId) ?? null) : null),
@@ -277,6 +305,20 @@ export function AgentCenterView() {
         ]}
         action={
           <Stack direction="row" spacing={1} alignItems="center">
+            {showAdminGroup && (
+              <Tooltip title="Nhóm tin nhắn nhận thẻ duyệt, câu hỏi và kết quả của đội agent">
+                <span>
+                  <LoadingButton
+                    color="inherit"
+                    loading={openingGroup}
+                    onClick={handleOpenAdminGroup}
+                    startIcon={<Iconify icon="solar:chat-round-dots-bold" />}
+                  >
+                    Nhóm quản trị
+                  </LoadingButton>
+                </span>
+              </Tooltip>
+            )}
             <Button
               component={RouterLink}
               href={paths.dashboard.agent.approvals}

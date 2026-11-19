@@ -12,6 +12,7 @@ import {
   fetchUsers,
   markRead,
 } from 'src/api/messenger';
+import type { DirectMessage, MessageUpdatedEvent } from 'src/api/messenger';
 import { useMessengerStore } from 'src/store/messenger-store';
 import { incomingMessageNotice } from 'src/utils/messenger-system';
 
@@ -78,9 +79,10 @@ export default function MessengerProvider({ children }: Props) {
       .build();
 
     // ── Event handlers ─────────────────────────────────────────────────
-    conn.on('message', (ev: { id: string; conversationId: string; senderId: string; content: string; createdAt: string }) => {
+    // Payload như DirectMessage; tin thẻ hành động (nhóm "Quản trị – Đội agent") có thêm `card`.
+    conn.on('message', (ev: DirectMessage) => {
       const s = useMessengerStore.getState();
-      s.addMessage(ev as any);
+      s.addMessage(ev);
       s.setTyping(ev.conversationId, ev.senderId, false);
 
       const uid = currentUserIdRef.current;
@@ -116,6 +118,12 @@ export default function MessengerProvider({ children }: Props) {
           // Notification API may be unavailable in some browser configurations
         }
       }
+    });
+
+    // Thẻ đổi trạng thái (đã duyệt / từ chối / yêu cầu sửa / đã trả lời / dừng) → thay thẻ của tin tại chỗ.
+    conn.on('messageUpdated', (ev: MessageUpdatedEvent) => {
+      if (!ev?.id || !ev.conversationId) return;
+      useMessengerStore.getState().updateMessageCard(ev.conversationId, ev.id, ev.card ?? null);
     });
 
     conn.on('conversationTouched', (ev: any) => {

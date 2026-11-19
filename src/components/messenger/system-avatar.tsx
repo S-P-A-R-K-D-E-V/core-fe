@@ -3,9 +3,12 @@ import { forwardRef } from 'react';
 import Avatar, { AvatarProps } from '@mui/material/Avatar';
 
 import {
+  AGENT_ADMIN_ICON,
   SYSTEM_USER_ICON,
   SYSTEM_USER_NAME,
   SYSTEM_CHANNEL_ICON,
+  AGENT_ADMIN_GROUP_NAME,
+  AGENT_ADMIN_SYSTEM_KEY,
 } from 'src/utils/messenger-system';
 
 import Iconify from 'src/components/iconify';
@@ -38,24 +41,34 @@ export const SystemSenderAvatar = forwardRef<HTMLDivElement, Props>(
   )
 );
 
-/** Avatar của kênh cảnh báo của hệ thống (hội thoại có systemKey): icon chuông. */
-export const SystemChannelAvatar = forwardRef<HTMLDivElement, Props>(
-  ({ size = 40, sx, ...other }, ref) => (
+/**
+ * Avatar của nhóm hệ thống (hội thoại có systemKey): kênh cảnh báo = icon chuông; nhóm "Quản trị – Đội agent"
+ * (systemKey "agent-admin") = icon robot.
+ */
+export const SystemChannelAvatar = forwardRef<
+  HTMLDivElement,
+  Props & { systemKey?: string | null }
+>(({ size = 40, sx, systemKey, ...other }, ref) => {
+  const agentAdmin = systemKey === AGENT_ADMIN_SYSTEM_KEY;
+  return (
     <Avatar
       ref={ref}
       role="img"
-      aria-label="Kênh cảnh báo hệ thống"
+      aria-label={agentAdmin ? AGENT_ADMIN_GROUP_NAME : 'Kênh cảnh báo hệ thống'}
       sx={{
         width: size,
         height: size,
         flexShrink: 0,
         color: 'common.white',
-        bgcolor: 'warning.main',
+        bgcolor: agentAdmin ? 'primary.main' : 'warning.main',
         ...sx,
       }}
       {...other}
     >
-      <Iconify icon={SYSTEM_CHANNEL_ICON} width={Math.round(size * 0.58)} />
+      <Iconify
+        icon={agentAdmin ? AGENT_ADMIN_ICON : SYSTEM_CHANNEL_ICON}
+        width={Math.round(size * 0.58)}
+      />
     </Avatar>
-  )
-);
+  );
+});

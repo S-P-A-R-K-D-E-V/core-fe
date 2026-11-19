@@ -147,6 +147,8 @@ export const endpoints = {
     schedule: (id: string) => `/agent-center/schedules/${id}`,
     occurrences: '/agent-center/schedules/occurrences',
     usage: '/agent-center/usage',
+    // Nhóm Messenger "Quản trị – Đội agent" (A1): GET (agent.approve) xem đã có chưa, POST (agent.manage) tạo / lấy lại.
+    adminGroup: '/agent-center/admin-group',
   },
   users: {
     list: '/users',

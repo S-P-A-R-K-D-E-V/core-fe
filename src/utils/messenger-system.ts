@@ -38,6 +38,42 @@ export function isSystemConversation(
   return !!conversation?.systemKey;
 }
 
+// ----------------------------------------------------------------------
+// Nhóm "Quản trị – Đội agent" (A1): nhóm hệ thống systemKey "agent-admin" — Trợ lý hệ thống đăng thẻ duyệt / câu hỏi /
+// kết quả của đội agent. Khác kênh cảnh báo: có biểu tượng robot, người có agent.manage thêm / gỡ thành viên.
+// ----------------------------------------------------------------------
+
+export const AGENT_ADMIN_SYSTEM_KEY = 'agent-admin';
+export const AGENT_ADMIN_GROUP_NAME = 'Quản trị – Đội agent';
+export const AGENT_ADMIN_ICON = 'solar:cpu-bolt-bold-duotone';
+
+export function isAgentAdminConversation(
+  conversation: { systemKey?: string | null } | null | undefined
+): boolean {
+  return conversation?.systemKey === AGENT_ADMIN_SYSTEM_KEY;
+}
+
+/** Tên của nhóm hệ thống: nhóm quản trị luôn có tên (máy chủ chưa đặt thì dùng tên mặc định); còn lại theo `name`. */
+export function systemConversationName(
+  conversation: { systemKey?: string | null; name?: string | null } | null | undefined
+): string | null {
+  if (isAgentAdminConversation(conversation)) {
+    return conversation?.name?.trim() || AGENT_ADMIN_GROUP_NAME;
+  }
+  return conversation?.name ?? null;
+}
+
+/** Dòng phụ dưới tên nhóm hệ thống. Trợ lý hệ thống chỉ là người gửi, không tính vào số người. */
+export function systemConversationSubtitle(conversation: {
+  systemKey?: string | null;
+  participantIds: string[];
+}): string {
+  const people = conversation.participantIds.filter((id) => !isSystemUserId(id)).length;
+  return isAgentAdminConversation(conversation)
+    ? `Đội agent · ${people} thành viên`
+    : `Cảnh báo tự động · ${people} người nhận`;
+}
+
 /** Bỏ người gửi hệ thống khỏi danh sách người để chọn (nhắn tin mới, thêm thành viên, đang online…). */
 export function excludeSystemUsers<T extends Pick<InternalUser, 'id' | 'isSystem'>>(
   users: T[]

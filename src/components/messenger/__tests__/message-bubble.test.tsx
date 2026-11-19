@@ -19,6 +19,13 @@ vi.mock('src/components/iconify', () => ({
   default: ({ icon }: any) => <span data-icon={icon} />,
 }));
 
+// Thẻ hành động (message-card) dùng snackbar + phiên đăng nhập — tin trong file này không có thẻ.
+vi.mock('src/components/snackbar', () => ({ useSnackbar: () => ({ enqueueSnackbar: vi.fn() }) }));
+const authUser: { current: any } = { current: null };
+vi.mock('src/auth/hooks', () => ({ useAuthContext: () => ({ user: authUser.current }) }));
+const routerPush = vi.fn();
+vi.mock('src/routes/hooks', () => ({ useRouter: () => ({ push: routerPush }) }));
+
 // Imported after the mock above so the component picks up the mocked module.
 import MessageBubble from '../message-bubble';
 
@@ -126,5 +133,63 @@ describe('MessageBubble — người thường không đổi', () => {
 
     expect(screen.getByText('abc-123')).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'Trợ lý hệ thống' })).not.toBeInTheDocument();
+  });
+});
+
+describe('MessageBubble — thẻ hành động (nhóm "Quản trị – Đội agent")', () => {
+  const card = {
+    kind: 'approval',
+    refId: 'a1',
+    title: 'Marketing Threads xin duyệt: Tạo bài đăng mạng xã hội',
+    lines: ['Kênh: Threads CiCi'],
+    link: '/dashboard/agent/approvals?id=a1',
+    status: 'open',
+    statusText: null,
+    expiresAt: '2999-01-01T00:00:00Z',
+    actions: [
+      { key: 'approve', label: 'Duyệt', style: 'primary' },
+      { key: 'reject', label: 'Từ chối', style: 'danger' },
+      { key: 'open', label: 'Mở phiếu', style: 'default' },
+    ],
+  } as const;
+
+  it('thẻ thay bong bóng chữ; người có agent.approve thấy nút duyệt + xem trước', () => {
+    authUser.current = { id: 'me', roles: ['Manager'], permissions: ['agent.approve'] };
+    const { container } = renderBubble({
+      message: message({ card: { ...card, actions: [...card.actions] } }),
+    });
+
+    expect(container.querySelector('.messenger-bubble')).toBeNull();
+    expect(screen.getByText(card.title)).toBeInTheDocument();
+    expect(screen.getByText('Kênh: Threads CiCi')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Duyệt' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Từ chối' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Xem trước' })).toBeInTheDocument();
+  });
+
+  it('không có agent.approve → chỉ còn nút Mở phiếu', () => {
+    authUser.current = { id: 'me', roles: ['Staff'], permissions: [] };
+    renderBubble({ message: message({ card: { ...card, actions: [...card.actions] } }) });
+
+    expect(screen.queryByRole('button', { name: 'Duyệt' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Xem trước' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mở phiếu' })).toBeInTheDocument();
+  });
+
+  it('thẻ done hiện statusText, ẩn nút quyết định', () => {
+    authUser.current = { id: 'me', roles: ['Admin'] };
+    renderBubble({
+      message: message({
+        card: {
+          ...card,
+          actions: [...card.actions],
+          status: 'done',
+          statusText: 'Đã duyệt bởi Xuân Bình · 10:42',
+        },
+      }),
+    });
+
+    expect(screen.getByText('Đã duyệt bởi Xuân Bình · 10:42')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Duyệt' })).not.toBeInTheDocument();
   });
 });

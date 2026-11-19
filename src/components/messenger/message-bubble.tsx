@@ -11,6 +11,7 @@ import { fTimeShort } from 'src/utils/format-time';
 import { getStorageUrl } from 'src/utils/storage';
 import { resolveMessengerUser } from 'src/utils/messenger-system';
 
+import MessageCardView from './message-card';
 import { SystemSenderAvatar } from './system-avatar';
 
 import type { DirectMessage, InternalUser, MessageAttachment } from 'src/api/messenger';
@@ -137,29 +138,34 @@ export default function MessageBubble({ message, mine, senderUser, showName, com
           </Typography>
         )}
 
-        {/* Bubble — chữ thuần: giữ xuống dòng (tin cảnh báo nhiều dòng), dòng dài tự ngắt trong bong bóng */}
-        <Box
-          className="messenger-bubble"
-          sx={{
-            px: compact ? 1.25 : 1.5,
-            py: compact ? 0.75 : 1,
-            borderRadius: mine ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-            bgcolor: mine ? 'primary.main' : 'background.paper',
-            color: mine ? 'primary.contrastText' : 'text.primary',
-            boxShadow: 1,
-            wordBreak: 'break-word',
-            whiteSpace: 'pre-wrap',
-          }}
-        >
-          {message.content ? (
-            <Typography variant={compact ? 'caption' : 'body2'}>
-              {message.isDeleted ? <em style={{ opacity: 0.6 }}>Tin nhắn đã bị xoá</em> : message.content}
-            </Typography>
-          ) : null}
-          {(message.attachments ?? []).map((att, i) => (
-            <AttachmentItem key={att.objectKey + i} att={att} mine={mine} />
-          ))}
-        </Box>
+        {/* Tin có thẻ hành động (nhóm "Quản trị – Đội agent") → thẻ thay bong bóng chữ */}
+        {message.card && !message.isDeleted ? (
+          <MessageCardView message={{ ...message, card: message.card }} compact={compact} />
+        ) : (
+          /* Bubble — chữ thuần: giữ xuống dòng (tin cảnh báo nhiều dòng), dòng dài tự ngắt trong bong bóng */
+          <Box
+            className="messenger-bubble"
+            sx={{
+              px: compact ? 1.25 : 1.5,
+              py: compact ? 0.75 : 1,
+              borderRadius: mine ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+              bgcolor: mine ? 'primary.main' : 'background.paper',
+              color: mine ? 'primary.contrastText' : 'text.primary',
+              boxShadow: 1,
+              wordBreak: 'break-word',
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {message.content ? (
+              <Typography variant={compact ? 'caption' : 'body2'}>
+                {message.isDeleted ? <em style={{ opacity: 0.6 }}>Tin nhắn đã bị xoá</em> : message.content}
+              </Typography>
+            ) : null}
+            {(message.attachments ?? []).map((att, i) => (
+              <AttachmentItem key={att.objectKey + i} att={att} mine={mine} />
+            ))}
+          </Box>
+        )}
 
         {/* Timestamp + Seen */}
         <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.25, opacity: 0.65 }}>
