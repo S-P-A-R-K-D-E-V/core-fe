@@ -1,6 +1,6 @@
 'use client';
 
-import type { SocialChannel } from 'src/lib/social';
+import type { SocialChannel, SocialChannelList } from 'src/lib/social';
 
 import { useState, useEffect } from 'react';
 
@@ -9,10 +9,13 @@ import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
+import Switch from '@mui/material/Switch';
+import Divider from '@mui/material/Divider';
 import Skeleton from '@mui/material/Skeleton';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
+import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
@@ -23,12 +26,20 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
-import { channelUrl, channelLabel, PLATFORM_ICON, PLATFORM_LABEL } from 'src/lib/social';
+import {
+  channelUrl,
+  channelLabel,
+  PLATFORM_ICON,
+  PLATFORM_LABEL,
+  subscriptionSummary,
+} from 'src/lib/social';
 import {
   useSocialChannels,
   startThreadsConnect,
   startFacebookConnect,
+  setSocialChannelInbox,
   disconnectSocialChannel,
+  resubscribeSocialChannel,
 } from 'src/api/social';
 
 import Label from 'src/components/label';
@@ -43,6 +54,7 @@ import CustomBreadcrumbs from 'src/components/custom-breadcrumbs';
 // lại trang này với ?threads=… hoặc ?facebook=connected|denied|failed|expired|nopages (&account=…). Kết nối lại cùng tài
 // khoản / page = thay token. Threads đăng nhập bằng tài khoản đang mở trên threads.com; Facebook cho chọn page ngay trong
 // màn đồng ý (mọi page được chọn mà tài khoản có quyền đăng bài đều được nối).
+// Fanpage có thêm công tắc Hộp thư khách (nhận tin + bình luận) / Agent CSKH, nút Đăng ký lại nhận tin và mốc webhook gần nhất.
 
 const OUTCOME: Record<string, { variant: 'success' | 'warning' | 'error'; message: string }> = {
   connected: { variant: 'success', message: 'Đã kết nối kênh Threads' },
@@ -139,6 +151,33 @@ export function SocialChannelsView() {
   };
 
   const hasThreads = channels.some((c) => c.platform === 'threads');
+  const hasFacebook = channels.some((c) => c.platform === 'facebook' && c.status !== 'disconnected');
+
+  const handleInboxChange = async (channel: SocialChannel, input: { inboxEnabled: boolean; agentEnabled: boolean }) => {
+    try {
+      const saved = await setSocialChannelInbox(channel.id, input);
+      refresh(
+        (data: SocialChannelList | undefined) =>
+          data && {
+            ...data,
+            items: data.items.map((c) =>
+              c.id === channel.id ? { ...c, inboxEnabled: saved.inboxEnabled, agentEnabled: saved.agentEnabled } : c
+            ),
+          },
+        { revalidate: false }
+      );
+      enqueueSnackbar(
+        !saved.inboxEnabled
+          ? `Đã tắt hộp thư cho ${channelLabel(channel)} — page chỉ để đăng bài`
+          : saved.agentEnabled
+            ? `Agent CSKH sẽ trả lời khách của ${channelLabel(channel)}`
+            : `Tin nhắn và bình luận của ${channelLabel(channel)} vào Hộp thư khách`
+      );
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không lưu được cài đặt hộp thư'), { variant: 'error' });
+      throw err;
+    }
+  };
   const connectButton = (
     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
       <LoadingButton
@@ -221,6 +260,27 @@ export function SocialChannelsView() {
         </Stack>
       </Alert>
 
+      {hasFacebook && (
+        <Alert
+          severity="info"
+          sx={{ mb: 3 }}
+          action={
+            <LoadingButton
+              color="inherit"
+              size="small"
+              loading={busy}
+              disabled={!facebookConfigured}
+              onClick={handleConnectFacebook}
+            >
+              Kết nối lại
+            </LoadingButton>
+          }
+        >
+          Để Hộp thư khách nhận và trả lời bình luận, bấm <strong>Kết nối lại</strong> fanpage một lần (chọn đủ các page) để token
+          có thêm quyền đọc / trả lời bình luận (<code>pages_read_user_content</code>, <code>pages_manage_engagement</code>).
+        </Alert>
+      )}
+
       {error && <Alert severity="error">{apiErrorMessage(error, 'Không tải được danh sách kênh')}</Alert>}
 
       {loading && (
@@ -296,6 +356,10 @@ export function SocialChannelsView() {
                   </Button>
                 </Stack>
               </Stack>
+
+              {channel.platform === 'facebook' && channel.status !== 'disconnected' && (
+                <FacebookInboxControls channel={channel} onChange={handleInboxChange} />
+              )}
             </Card>
           );
         })}
@@ -303,5 +367,117 @@ export function SocialChannelsView() {
 
       {confirmDialog}
     </Container>
+  );
+}
+
+// ----------------------------------------------------------------------
+// Fanpage: nhận tin + bình luận vào Hộp thư khách, Agent CSKH trả lời (chỉ khi hộp thư bật), đăng ký lại nhận tin.
+
+type InboxControlsProps = {
+  channel: SocialChannel;
+  /** Ném lỗi = công tắc về như cũ (nơi gọi đã báo). */
+  onChange: (channel: SocialChannel, input: { inboxEnabled: boolean; agentEnabled: boolean }) => Promise<void>;
+};
+
+function FacebookInboxControls({ channel, onChange }: InboxControlsProps) {
+  const [saving, setSaving] = useState<'inbox' | 'agent' | null>(null);
+  const [resubscribing, setResubscribing] = useState(false);
+  const [result, setResult] = useState<ReturnType<typeof subscriptionSummary> | null>(null);
+  const { enqueueSnackbar } = useSnackbar();
+
+  const inboxEnabled = channel.inboxEnabled ?? true;
+  const agentEnabled = inboxEnabled && (channel.agentEnabled ?? false);
+
+  const save = async (which: 'inbox' | 'agent', input: { inboxEnabled: boolean; agentEnabled: boolean }) => {
+    setSaving(which);
+    try {
+      await onChange(channel, input);
+    } catch {
+      // đã báo
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleResubscribe = async () => {
+    setResubscribing(true);
+    setResult(null);
+    try {
+      const summary = subscriptionSummary(await resubscribeSocialChannel(channel.id));
+      setResult(summary);
+      enqueueSnackbar(summary.message, { variant: summary.severity });
+    } catch (err) {
+      const message = apiErrorMessage(err, 'Không đăng ký lại được nhận tin');
+      setResult({ severity: 'error', message });
+      enqueueSnackbar(message, { variant: 'error' });
+    } finally {
+      setResubscribing(false);
+    }
+  };
+
+  return (
+    <>
+      <Divider sx={{ my: 2, borderStyle: 'dashed' }} />
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={{ xs: 1, md: 2 }}
+        alignItems={{ md: 'center' }}
+        flexWrap="wrap"
+        useFlexGap
+      >
+        <FormControlLabel
+          control={
+            <Switch
+              checked={inboxEnabled}
+              disabled={!!saving}
+              onChange={(_, checked) =>
+                save('inbox', { inboxEnabled: checked, agentEnabled: checked ? agentEnabled : false })
+              }
+            />
+          }
+          label={<Typography variant="body2">Nhận tin &amp; bình luận vào hộp thư</Typography>}
+          sx={{ mx: 0 }}
+        />
+        <FormControlLabel
+          control={
+            <Switch
+              color="info"
+              checked={agentEnabled}
+              disabled={!inboxEnabled || !!saving}
+              onChange={(_, checked) => save('agent', { inboxEnabled: true, agentEnabled: checked })}
+            />
+          }
+          label={<Typography variant="body2">Agent CSKH trả lời</Typography>}
+          sx={{ mx: 0 }}
+        />
+        <Stack direction="row" sx={{ flex: 1 }} />
+        <LoadingButton
+          size="small"
+          variant="soft"
+          loading={resubscribing}
+          disabled={!inboxEnabled || channel.status !== 'connected'}
+          onClick={handleResubscribe}
+          startIcon={<Iconify icon="solar:refresh-bold" />}
+        >
+          Đăng ký lại nhận tin
+        </LoadingButton>
+      </Stack>
+
+      <Typography variant="caption" component="div" sx={{ color: 'text.secondary', mt: 0.5 }}>
+        {inboxEnabled
+          ? 'Tin nhắn Messenger và bình luận trên bài của page vào Hộp thư khách.'
+          : 'Đang tắt — page chỉ dùng để đăng bài, tin nhắn và bình luận không vào hộp thư.'}
+        {channel.lastWebhookAt ? ` Webhook gần nhất: ${fDateTime(channel.lastWebhookAt)}.` : ''}
+        {!channel.lastWebhookAt && channel.webhookSubscribedAt
+          ? ` Đã đăng ký nhận tin ${fDateTime(channel.webhookSubscribedAt)}, chưa có sự kiện nào.`
+          : ''}
+      </Typography>
+
+      {result && (
+        <Alert severity={result.severity} onClose={() => setResult(null)} sx={{ mt: 1.5 }}>
+          {result.message}
+        </Alert>
+      )}
+    </>
   );
 }

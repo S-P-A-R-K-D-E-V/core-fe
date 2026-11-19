@@ -5,23 +5,36 @@ import { it, expect, describe } from 'vitest';
 import {
   fVnd,
   toSummary,
+  isPriority,
+  appendSlash,
+  insertAtCursor,
+  kindUnreadCount,
+  togglePriorityTag,
+  needsTimeSeparator,
+  conversationBadgeIcon,
+  outgoingSenderCaption,
   matchesBox,
   holderLabel,
   windowState,
   isHeldByMe,
   mergeDetail,
+  maxImagesFor,
+  matchesFilter,
   normalizeTags,
   isValidShortcut,
   applyQuickReply,
   parseSlashQuery,
   flattenMessages,
+  facebookPostUrl,
   formatDurationVi,
   normalizeShortcut,
   addMessageToPages,
   filterQuickReplies,
   lastMessagePreview,
   updateMessageInPages,
+  conversationKindIcon,
   conversationListQuery,
+  canToggleCommentHidden,
   upsertConversationPages,
 } from '../inbox';
 
@@ -37,6 +50,7 @@ function conv(id: string, patch: Partial<ConversationSummary> = {}): Conversatio
     channelName: 'CiCi Fanpage',
     platform: 'facebook',
     kind: 'dm',
+    postId: null,
     customer: { id: null, name: `Khách ${id}`, avatarUrl: null, phone: null, code: null },
     lastMessage: null,
     unreadCount: 0,
@@ -230,7 +244,10 @@ describe('danh sách hội thoại', () => {
     expect(lastMessagePreview(conv('a'))).toBe('Chưa có tin nhắn');
     expect(
       lastMessagePreview(conv('a', { lastMessage: { text: 'Ok ạ', direction: 'out', senderType: 'agent', at: '' } }))
-    ).toBe('Agent: Ok ạ');
+    ).toBe('Bạn: Ok ạ');
+    expect(
+      lastMessagePreview(conv('a', { lastMessage: { text: 'Dạ', direction: 'out', senderType: 'user', at: '' } }))
+    ).toBe('Bạn: Dạ');
     expect(
       lastMessagePreview(conv('a', { lastMessage: { text: '', direction: 'in', senderType: 'customer', at: '' } }))
     ).toBe('[Ảnh / tệp]');
@@ -267,5 +284,143 @@ describe('tiền', () => {
   it('định dạng VND', () => {
     expect(fVnd(125000)).toBe('125.000đ');
     expect(fVnd(null)).toBe('—');
+  });
+});
+
+describe('bình luận fanpage (F5)', () => {
+  const comment = (id: string, patch: Partial<ConversationSummary> = {}) =>
+    conv(id, { kind: 'comment', postId: '1234_5678', ...patch });
+
+  it('query: kind chỉ gửi khi có lọc', () => {
+    expect(conversationListQuery({ box: 'all', kind: 'comment' })).toBe('kind=comment&status=open&take=30');
+    expect(conversationListQuery({ box: 'all', kind: null })).toBe('status=open&take=30');
+  });
+
+  it('lọc loại: dòng khác loại không khớp', () => {
+    expect(matchesFilter(comment('a'), { box: 'all', kind: 'comment' }, ME)).toBe(true);
+    expect(matchesFilter(conv('b'), { box: 'all', kind: 'comment' }, ME)).toBe(false);
+    expect(matchesFilter(comment('a'), { box: 'all', kind: 'dm' }, ME)).toBe(false);
+    expect(matchesFilter(comment('a'), { box: 'all' }, ME)).toBe(true);
+    // Khác loại thắng cả khi đang tìm theo chữ (máy khách biết chắc không khớp).
+    expect(matchesFilter(conv('b'), { box: 'all', kind: 'comment', q: 'lan' }, ME)).toBe(false);
+  });
+
+  it('cập nhật trực tiếp: không thêm hội thoại khác loại, bỏ dòng đổi sang loại khác', () => {
+    const pages: ConversationPage[] = [{ items: [comment('a')], nextBefore: null }];
+    const filter = { box: 'all' as const, kind: 'comment' as const };
+    expect(upsertConversationPages(pages, conv('dm-1', { lastMessageAt: '2026-11-19T12:00:00Z' }), filter, ME)).toBe(
+      pages
+    );
+    const added = upsertConversationPages(pages, comment('b', { lastMessageAt: '2026-11-19T12:00:00Z' }), filter, ME)!;
+    expect(added[0].items.map((c) => c.id)).toEqual(['b', 'a']);
+    const dmFilter = { box: 'all' as const, kind: 'dm' as const };
+    const dmPages: ConversationPage[] = [{ items: [conv('x')], nextBefore: null }];
+    expect(upsertConversationPages(dmPages, comment('c'), dmFilter, ME)).toBe(dmPages);
+  });
+
+  it('link bài Facebook', () => {
+    expect(facebookPostUrl('1234_5678')).toBe('https://www.facebook.com/1234_5678');
+    expect(facebookPostUrl(' 1234_5678 ')).toBe('https://www.facebook.com/1234_5678');
+    expect(facebookPostUrl(null)).toBeNull();
+    expect(facebookPostUrl('')).toBeNull();
+  });
+
+  it('biểu tượng loại + số ảnh tối đa', () => {
+    expect(conversationKindIcon('comment')).toBe('solar:chat-square-like-bold');
+    expect(conversationKindIcon('dm')).not.toBe(conversationKindIcon('comment'));
+    expect(maxImagesFor('comment')).toBe(1);
+    expect(maxImagesFor('dm')).toBe(10);
+    expect(maxImagesFor(undefined)).toBe(10);
+  });
+
+  it('ẩn / hiện lại chỉ cho bình luận của khách', () => {
+    const inbound = msg('m1', '2026-11-19T08:00:00Z');
+    expect(canToggleCommentHidden(inbound, 'comment')).toBe(true);
+    expect(canToggleCommentHidden({ ...inbound, status: 'hidden' }, 'comment')).toBe(true);
+    expect(canToggleCommentHidden(inbound, 'dm')).toBe(false);
+    expect(canToggleCommentHidden({ ...inbound, direction: 'out', status: 'sent' }, 'comment')).toBe(false);
+    expect(canToggleCommentHidden({ ...inbound, isInternalNote: true }, 'comment')).toBe(false);
+  });
+});
+
+describe('bố cục kiểu Meta Business Suite', () => {
+  it('số chưa đọc theo tab loại', () => {
+    const summary = {
+      unassigned: 1,
+      mine: 0,
+      agent: 0,
+      external: 0,
+      unread: 5,
+      open: 9,
+      unreadMessages: 3,
+      unreadComments: 2,
+    };
+    expect(kindUnreadCount(summary, null)).toBe(5);
+    expect(kindUnreadCount(summary, 'dm')).toBe(3);
+    expect(kindUnreadCount(summary, 'comment')).toBe(2);
+    expect(kindUnreadCount(undefined, null)).toBe(0);
+  });
+
+  it('query: unread=true chỉ khi bật lọc Chưa đọc', () => {
+    expect(conversationListQuery({ box: 'all', unread: true, tag: 'Ưu tiên' })).toBe(
+      'tag=%C6%AFu+ti%C3%AAn&unread=true&status=open&take=30'
+    );
+    expect(conversationListQuery({ box: 'agent', unread: false })).toBe('box=agent&status=open&take=30');
+  });
+
+  it('lọc Chưa đọc: hội thoại vừa đọc giữ chỗ, không tự thêm hội thoại đã đọc', () => {
+    const filter = { box: 'all' as const, unread: true };
+    expect(matchesFilter(conv('a', { unreadCount: 2 }), filter, ME)).toBe(true);
+    expect(matchesFilter(conv('a', { unreadCount: 0 }), filter, ME)).toBeNull();
+
+    const pages: ConversationPage[] = [{ items: [conv('a', { unreadCount: 2 })], nextBefore: null }];
+    const read = upsertConversationPages(pages, conv('a', { unreadCount: 0 }), filter, ME)!;
+    expect(read[0].items.map((c) => [c.id, c.unreadCount])).toEqual([['a', 0]]);
+    expect(upsertConversationPages(pages, conv('b', { unreadCount: 0 }), filter, ME)).toBe(pages);
+  });
+
+  it('Ưu tiên: nhận ra + bật / tắt giữ nhãn khác', () => {
+    expect(isPriority(conv('a', { tags: ['VIP', 'Ưu tiên'] }))).toBe(true);
+    expect(isPriority(conv('a', { tags: ['VIP'] }))).toBe(false);
+    expect(togglePriorityTag(['VIP'])).toEqual(['Ưu tiên', 'VIP']);
+    expect(togglePriorityTag(['VIP', 'ưu tiên'])).toEqual(['VIP']);
+    const ten = Array.from({ length: 10 }, (_, i) => `n${i}`);
+    const toggled = togglePriorityTag(ten);
+    expect(toggled).toHaveLength(10);
+    expect(toggled[0]).toBe('Ưu tiên');
+  });
+
+  it('dấu kênh ở ảnh đại diện', () => {
+    expect(conversationBadgeIcon({ platform: 'facebook', kind: 'dm' })).toBe('logos:messenger');
+    expect(conversationBadgeIcon({ platform: 'facebook', kind: 'comment' })).toBe('logos:facebook');
+    expect(conversationBadgeIcon({ platform: 'test', kind: 'dm' })).toBe('solar:test-tube-bold');
+  });
+
+  it('Người gửi dưới tin đi', () => {
+    expect(outgoingSenderCaption({ senderType: 'agent', senderName: 'Agent CSKH' })).toBe(
+      'Người gửi: Trợ lý CiCi (AI)'
+    );
+    expect(outgoingSenderCaption({ senderType: 'user', senderName: 'Trà My' })).toBe('Người gửi: Trà My');
+    expect(outgoingSenderCaption({ senderType: 'external', senderName: null })).toBe(
+      'Người gửi: Nhân viên (trên Facebook)'
+    );
+  });
+
+  it('mốc giờ giữa khung chat', () => {
+    const at = (iso: string) => ({ sentAt: iso });
+    expect(needsTimeSeparator(null, at('2026-11-19T08:00:00Z'))).toBe(true);
+    expect(needsTimeSeparator(at('2026-11-19T08:00:00Z'), at('2026-11-19T08:10:00Z'))).toBe(false);
+    expect(needsTimeSeparator(at('2026-11-19T08:00:00Z'), at('2026-11-19T08:16:00Z'))).toBe(true);
+    expect(needsTimeSeparator(at('2026-11-18T08:00:00'), at('2026-11-19T08:01:00'))).toBe(true);
+  });
+
+  it('chèn biểu tượng cảm xúc + nút mẫu nhanh', () => {
+    expect(insertAtCursor('Chào ạ', '😊', 4)).toEqual({ text: 'Chào😊 ạ', caret: 6 });
+    expect(insertAtCursor('abc', '!', null)).toEqual({ text: 'abc!', caret: 4 });
+    expect(insertAtCursor('abcdef', 'X', 1, 3)).toEqual({ text: 'aXdef', caret: 2 });
+    expect(appendSlash('')).toBe('/');
+    expect(appendSlash('Dạ ')).toBe('Dạ /');
+    expect(appendSlash('Dạ')).toBe('Dạ /');
+    expect(appendSlash('Dạ /gi')).toBe('Dạ /gi');
   });
 });

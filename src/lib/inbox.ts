@@ -9,6 +9,9 @@ export type ConversationStatus = 'open' | 'closed' | 'spam';
 
 export type SenderType = 'customer' | 'agent' | 'user' | 'external' | 'system';
 
+/** dm = tin nhắn Messenger; comment = bình luận trên một bài của fanpage (một bài + một người bình luận). */
+export type ConversationKind = 'dm' | 'comment';
+
 export type ConversationHolder = {
   type: HolderType;
   userId: string | null;
@@ -22,7 +25,9 @@ export type ConversationSummary = {
   /** Tên page / "Kênh thử". */
   channelName: string;
   platform: 'facebook' | 'test' | string;
-  kind: 'dm' | 'comment';
+  kind: ConversationKind;
+  /** Bài Facebook (`{pageId}_{postId}`) của hội thoại bình luận; null với tin nhắn. */
+  postId: string | null;
   customer: {
     id: string | null;
     name: string;
@@ -50,8 +55,11 @@ export type MessageAttachment = {
   name: string | null;
 };
 
-/** suggested = gợi ý agent CSKH soạn cho nhân viên (ghi chú nội bộ, chưa gửi khách — bấm "Dùng gợi ý" để sửa rồi gửi). */
-export type MessageStatus = 'sending' | 'sent' | 'failed' | 'received' | 'suggested';
+/**
+ * suggested = gợi ý agent CSKH soạn cho nhân viên (ghi chú nội bộ, chưa gửi khách — bấm "Dùng gợi ý" để sửa rồi gửi).
+ * hidden = bình luận của khách đã bị ẩn trên Facebook (hiện lại → received).
+ */
+export type MessageStatus = 'sending' | 'sent' | 'failed' | 'received' | 'suggested' | 'hidden';
 
 export type ConversationMessage = {
   id: string;
@@ -109,6 +117,10 @@ export type InboxSummary = {
   external: number;
   unread: number;
   open: number;
+  /** Hội thoại tin nhắn (đang mở) còn tin chưa đọc. */
+  unreadMessages: number;
+  /** Hội thoại bình luận (đang mở) còn bình luận chưa đọc. */
+  unreadComments: number;
 };
 
 export type ConversationPage = { items: ConversationSummary[]; nextBefore: string | null };
@@ -161,6 +173,10 @@ export type ConversationListFilter = {
   q?: string | null;
   tag?: string | null;
   status?: ConversationStatus | null;
+  /** Loại hội thoại; bỏ trống = cả tin nhắn lẫn bình luận. */
+  kind?: ConversationKind | null;
+  /** Chỉ hội thoại còn tin chưa đọc. */
+  unread?: boolean;
 };
 
 // ----------------------------------------------------------------------
@@ -168,6 +184,8 @@ export type ConversationListFilter = {
 
 export const MESSAGE_MAX_LENGTH = 2000;
 export const MESSAGE_MAX_IMAGES = 10;
+/** Trả lời công khai dưới bình luận: Facebook chỉ nhận 1 ảnh. */
+export const COMMENT_MAX_IMAGES = 1;
 export const TAG_MAX_COUNT = 10;
 export const TAG_MAX_LENGTH = 30;
 export const SHORTCUT_MAX_LENGTH = 30;
@@ -181,6 +199,41 @@ export const INBOX_BOXES: { value: InboxBox; label: string; countKey: keyof Inbo
   { value: 'external', label: 'Trên Facebook', countKey: 'external' },
   { value: 'all', label: 'Tất cả', countKey: 'open' },
 ];
+
+/** Tab trên cùng của hộp thư (kiểu Meta Business Suite) — lọc theo loại hội thoại. */
+export const INBOX_KIND_TABS: { value: ConversationKind | null; label: string; icon: string }[] = [
+  { value: null, label: 'Tất cả tin nhắn', icon: 'solar:inbox-bold' },
+  { value: 'dm', label: 'Messenger', icon: 'logos:messenger' },
+  { value: 'comment', label: 'Bình luận trên Facebook', icon: 'logos:facebook' },
+];
+
+export function isConversationKind(value: string | null | undefined): value is ConversationKind {
+  return value === 'dm' || value === 'comment';
+}
+
+/** Số hội thoại chưa đọc của một tab loại (null = cả hai). */
+export function kindUnreadCount(summary: InboxSummary | undefined, kind: ConversationKind | null): number {
+  if (!summary) return 0;
+  const messages = summary.unreadMessages ?? 0;
+  const comments = summary.unreadComments ?? 0;
+  if (kind === 'dm') return messages;
+  if (kind === 'comment') return comments;
+  return messages + comments;
+}
+
+/** Nhãn "Ưu tiên" (ngôi sao ở thanh đầu hội thoại, chip lọc ở danh sách). */
+export const PRIORITY_TAG = 'Ưu tiên';
+
+export function isPriority(conv: Pick<ConversationSummary, 'tags'>): boolean {
+  return conv.tags.some((t) => t.toLowerCase() === PRIORITY_TAG.toLowerCase());
+}
+
+/** Bật / tắt nhãn "Ưu tiên" (giữ các nhãn khác; quá 10 nhãn thì bỏ nhãn cuối để chừa chỗ). */
+export function togglePriorityTag(tags: readonly string[]): string[] {
+  const has = tags.some((t) => t.toLowerCase() === PRIORITY_TAG.toLowerCase());
+  if (has) return tags.filter((t) => t.toLowerCase() !== PRIORITY_TAG.toLowerCase());
+  return normalizeTags([PRIORITY_TAG, ...tags]);
+}
 
 export const STATUS_LABEL: Record<ConversationStatus, string> = {
   open: 'Đang mở',
@@ -202,6 +255,48 @@ export function platformIcon(platform: string): string {
   if (platform === 'facebook') return 'logos:facebook';
   if (platform === 'test') return 'solar:test-tube-bold';
   return 'solar:chat-round-dots-bold';
+}
+
+/** Biểu tượng phân biệt hội thoại bình luận với tin nhắn ở danh sách. */
+export function conversationKindIcon(kind: ConversationKind | string): string {
+  return kind === 'comment' ? 'solar:chat-square-like-bold' : 'solar:chat-round-line-bold';
+}
+
+export function conversationKindLabel(kind: ConversationKind | string): string {
+  return kind === 'comment' ? 'Bình luận' : 'Tin nhắn';
+}
+
+/** Biểu tượng nhỏ ở góc ảnh đại diện: Messenger / bình luận Facebook / kênh thử. */
+export function conversationBadgeIcon(conv: Pick<ConversationSummary, 'platform' | 'kind'>): string {
+  if (conv.platform === 'test') return 'solar:test-tube-bold';
+  if (conv.kind === 'comment') return 'logos:facebook';
+  if (conv.platform === 'facebook') return 'logos:messenger';
+  return platformIcon(conv.platform);
+}
+
+/** Link bài Facebook của hội thoại bình luận (`{pageId}_{postId}`); null khi không có. */
+export function facebookPostUrl(postId: string | null | undefined): string | null {
+  const id = postId?.trim();
+  if (!id) return null;
+  return `https://www.facebook.com/${encodeURIComponent(id)}`;
+}
+
+/** Số ảnh tối đa mỗi lần gửi: bình luận công khai 1 ảnh, tin nhắn 10. */
+export function maxImagesFor(kind: ConversationKind | string | null | undefined): number {
+  return kind === 'comment' ? COMMENT_MAX_IMAGES : MESSAGE_MAX_IMAGES;
+}
+
+/** Bình luận của khách ẩn / hiện lại được (tin vào, không phải ghi chú, đã nhận hoặc đang ẩn). */
+export function canToggleCommentHidden(
+  message: Pick<ConversationMessage, 'direction' | 'isInternalNote' | 'status'>,
+  kind: ConversationKind | string | null | undefined
+): boolean {
+  return (
+    kind === 'comment' &&
+    message.direction === 'in' &&
+    !message.isInternalNote &&
+    (message.status === 'received' || message.status === 'hidden')
+  );
 }
 
 export function platformLabel(platform: string): string {
@@ -399,6 +494,8 @@ export function conversationListQuery(filter: ConversationListFilter, before?: s
   const q = filter.q?.trim();
   if (q) params.set('q', q);
   if (filter.tag) params.set('tag', filter.tag);
+  if (filter.kind) params.set('kind', filter.kind);
+  if (filter.unread) params.set('unread', 'true');
   params.set('status', filter.status ?? 'open');
   if (before) params.set('before', before);
   params.set('take', String(take));
@@ -431,7 +528,10 @@ export function matchesFilter(
   if ((filter.status ?? 'open') !== conv.status) return false;
   if (filter.channelId && conv.channelId !== filter.channelId) return false;
   if (filter.tag && !conv.tags.includes(filter.tag)) return false;
+  if (filter.kind && conv.kind !== filter.kind) return false;
   if (filter.q?.trim()) return null;
+  // Lọc "Chưa đọc": hội thoại vừa đọc vẫn giữ chỗ (đang mở thì không biến mất), nhưng không tự thêm.
+  if (filter.unread && conv.unreadCount <= 0) return null;
   return true;
 }
 
@@ -539,12 +639,65 @@ export function fVnd(value: number | null | undefined): string {
   return `${Math.round(value).toLocaleString('vi-VN')}đ`;
 }
 
-/** Tóm tắt tin cuối ở danh sách: "Bạn: …" khi tin đi, "[Ảnh]" khi không có chữ. */
+/** Tóm tắt tin cuối ở danh sách: "Bạn: …" khi tin đi (shop / agent), "[Ảnh / tệp]" khi không có chữ. */
 export function lastMessagePreview(conv: Pick<ConversationSummary, 'lastMessage'>): string {
   const last = conv.lastMessage;
   if (!last) return 'Chưa có tin nhắn';
   const text = last.text?.trim() || '[Ảnh / tệp]';
   if (last.direction === 'in') return text;
-  const who = last.senderType === 'agent' ? 'Agent' : 'Shop';
-  return `${who}: ${text}`;
+  return `Bạn: ${text}`;
+}
+
+export const AGENT_SENDER_NAME = 'Trợ lý CiCi (AI)';
+
+/** Dòng nhỏ dưới tin đi: "Người gửi: Trà My" / "Người gửi: Trợ lý CiCi (AI)". */
+export function outgoingSenderCaption(
+  message: Pick<ConversationMessage, 'senderType' | 'senderName'>,
+  agentName: string = AGENT_SENDER_NAME
+): string {
+  if (message.senderType === 'agent') return `Người gửi: ${agentName}`;
+  return `Người gửi: ${senderLabel(message)}`;
+}
+
+/** Khoảng cách tối thiểu giữa hai tin để chèn mốc giờ ở giữa khung chat. */
+export const TIME_SEPARATOR_GAP_MS = 15 * 60 * 1000;
+
+/** Chèn mốc giờ trước tin `current`: tin đầu, khác ngày, hoặc cách tin trước > 15 phút. */
+export function needsTimeSeparator(
+  previous: Pick<ConversationMessage, 'sentAt'> | null | undefined,
+  current: Pick<ConversationMessage, 'sentAt'>,
+  gapMs: number = TIME_SEPARATOR_GAP_MS
+): boolean {
+  if (!previous) return true;
+  const a = new Date(previous.sentAt);
+  const b = new Date(current.sentAt);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return false;
+  if (a.toDateString() !== b.toDateString()) return true;
+  return b.getTime() - a.getTime() > gapMs;
+}
+
+/** Biểu tượng cảm xúc hay dùng (ô chọn trong ô gõ — không thêm thư viện). */
+export const QUICK_EMOJIS = [
+  '😀', '😁', '😂', '🤣', '😊', '😍', '🥰', '😘', '😉', '😎',
+  '🤗', '🤔', '😅', '😢', '😭', '😡', '😱', '🙏', '👍', '👌',
+  '👏', '💪', '🙌', '❤️', '💖', '🎉', '🎁', '🔥', '✨', '🌸',
+];
+
+/** Chèn chuỗi vào vị trí con trỏ (selection) của ô gõ → { text, caret }. */
+export function insertAtCursor(
+  text: string,
+  insert: string,
+  selectionStart: number | null | undefined,
+  selectionEnd?: number | null
+): { text: string; caret: number } {
+  const start = Math.max(0, Math.min(selectionStart ?? text.length, text.length));
+  const end = Math.max(start, Math.min(selectionEnd ?? start, text.length));
+  return { text: text.slice(0, start) + insert + text.slice(end), caret: start + insert.length };
+}
+
+/** Bấm nút "Mẫu trả lời nhanh": thêm "/" vào cuối (có khoảng trắng nếu cần) để mở ô chọn mẫu. */
+export function appendSlash(text: string): string {
+  if (parseSlashQuery(text)) return text;
+  if (!text || /\s$/.test(text)) return `${text}/`;
+  return `${text} /`;
 }
