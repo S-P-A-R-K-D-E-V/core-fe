@@ -41,6 +41,7 @@ export function useSocialChannels() {
     () => ({
       channels: data?.items ?? [],
       threadsConfigured: data?.threadsConfigured ?? false,
+      facebookConfigured: data?.facebookConfigured ?? false,
       loading: isLoading && !data,
       error,
       refresh: mutate,
@@ -75,6 +76,12 @@ export function useSocialPost(id: string | null) {
 /** Bắt đầu kết nối Threads → URL màn đồng ý của Threads (trình duyệt chuyển sang đó). */
 export async function startThreadsConnect(returnPath: string): Promise<string> {
   const res = await axios.post<{ authorizeUrl: string }>(`${ROOT}/channels/threads/connect`, { returnPath });
+  return res.data.authorizeUrl;
+}
+
+/** Bắt đầu kết nối fanpage → URL màn đồng ý của Facebook (người dùng chọn page trong màn đó). */
+export async function startFacebookConnect(returnPath: string): Promise<string> {
+  const res = await axios.post<{ authorizeUrl: string }>(`${ROOT}/channels/facebook/connect`, { returnPath });
   return res.data.authorizeUrl;
 }
 
@@ -116,8 +123,9 @@ export async function rescheduleSocialPost(id: string, scheduledAt: string) {
   return (await axios.post<SocialPost>(`${ROOT}/posts/${id}/schedule`, { scheduledAt })).data;
 }
 
-export function useThreadsApp() {
-  const { data, isLoading, error, mutate } = useSWR<SocialAppSettings>(`${ROOT}/apps/threads`, fetcher, {
+/** Meta app của cửa hàng cho một nền tảng (threads | facebook). */
+export function useSocialApp(platform: 'threads' | 'facebook') {
+  const { data, isLoading, error, mutate } = useSWR<SocialAppSettings>(`${ROOT}/apps/${platform}`, fetcher, {
     revalidateOnFocus: false,
   });
   return useMemo(
@@ -126,13 +134,28 @@ export function useThreadsApp() {
   );
 }
 
-/** Lưu Threads app ID / secret của cửa hàng; secret để trống = giữ secret cũ (chỉ khi không đổi app ID). */
+export function useThreadsApp() {
+  return useSocialApp('threads');
+}
+
+/** Lưu app ID / secret của cửa hàng; secret để trống = giữ secret cũ (chỉ khi không đổi app ID). */
+export async function saveSocialApp(
+  platform: 'threads' | 'facebook',
+  input: { clientId: string; clientSecret: string | null }
+) {
+  return (await axios.put<SocialAppSettings>(`${ROOT}/apps/${platform}`, input)).data;
+}
+
+export async function deleteSocialApp(platform: 'threads' | 'facebook') {
+  await axios.delete(`${ROOT}/apps/${platform}`);
+}
+
 export async function saveThreadsApp(input: { clientId: string; clientSecret: string | null }) {
-  return (await axios.put<SocialAppSettings>(`${ROOT}/apps/threads`, input)).data;
+  return saveSocialApp('threads', input);
 }
 
 export async function deleteThreadsApp() {
-  await axios.delete(`${ROOT}/apps/threads`);
+  await deleteSocialApp('threads');
 }
 
 export async function disconnectSocialChannel(id: string) {

@@ -37,7 +37,7 @@ import { fDate, fDateTime } from 'src/utils/format-time';
 import { apiErrorMessage } from 'src/utils/api-error';
 import { fNumber, fCurrency } from 'src/utils/format-number';
 
-import { engagementRate, SOCIAL_DASHBOARD_DAYS } from 'src/lib/social';
+import { channelUrl, engagementRate, SOCIAL_DASHBOARD_DAYS } from 'src/lib/social';
 import { useSocialDashboard } from 'src/api/social';
 
 import Label from 'src/components/label';
@@ -268,14 +268,14 @@ function ChannelsTable({ channels }: { channels: SocialDashboardChannel[] }) {
                     </Avatar>
                     <Stack sx={{ minWidth: 0 }}>
                       <Link
-                        href={`https://www.threads.com/@${c.username}`}
+                        href={channelUrl(c)}
                         target="_blank"
                         rel="noopener noreferrer"
                         variant="subtitle2"
                         color="inherit"
                         noWrap
                       >
-                        @{c.username}
+                        {c.platform === 'facebook' ? c.username : `@${c.username}`}
                       </Link>
                       {c.insightsError && (
                         <Label color="warning" sx={{ alignSelf: 'flex-start', mt: 0.5 }}>

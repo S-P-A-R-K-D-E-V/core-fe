@@ -188,7 +188,7 @@ export function SocialPostPreview({ post }: { post: IAgentSocialPostPreview }) {
                     {ch.username ? (
                       <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>
                         {' '}
-                        @{ch.username}
+                        {ch.platform === 'facebook' ? '· Fanpage' : `@${ch.username}`}
                       </Box>
                     ) : null}
                   </Typography>

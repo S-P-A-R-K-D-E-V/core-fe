@@ -1,12 +1,15 @@
 // ----------------------------------------------------------------------
-// Bán hàng online (core-be /social): kênh mạng xã hội của cửa hàng (Threads) và bài đăng bán hàng.
+// Bán hàng online (core-be /social): kênh mạng xã hội của cửa hàng (Threads, fanpage Facebook) và bài đăng bán hàng.
 // ----------------------------------------------------------------------
 
 export type SocialChannelStatus = 'connected' | 'expired' | 'disconnected';
 
+export type SocialPlatform = 'threads' | 'facebook';
+
 export type SocialChannel = {
   id: string;
-  platform: 'threads' | string;
+  /** threads: username = tên tài khoản; facebook: username = tên trang (hoặc page id), displayName = tên page. */
+  platform: SocialPlatform | string;
   username: string;
   displayName: string | null;
   avatarUrl: string | null;
@@ -16,11 +19,26 @@ export type SocialChannel = {
   connectedAt: string;
 };
 
-export type SocialChannelList = { threadsConfigured: boolean; items: SocialChannel[] };
+export type SocialChannelList = { threadsConfigured: boolean; facebookConfigured?: boolean; items: SocialChannel[] };
+
+/** Tên hiển thị của kênh: fanpage dùng tên page, Threads dùng @tài khoản. */
+export function channelLabel(channel: Pick<SocialChannel, 'platform' | 'username' | 'displayName'>) {
+  return channel.platform === 'facebook' ? (channel.displayName ?? channel.username) : `@${channel.username}`;
+}
+
+/** Link mở trang của kênh trên nền tảng. */
+export function channelUrl(channel: Pick<SocialChannel, 'platform' | 'username'>) {
+  return channel.platform === 'facebook'
+    ? `https://www.facebook.com/${encodeURIComponent(channel.username)}`
+    : `https://www.threads.com/@${encodeURIComponent(channel.username)}`;
+}
+
+export const PLATFORM_LABEL: Record<string, string> = { threads: 'Threads', facebook: 'Fanpage Facebook' };
+export const PLATFORM_ICON: Record<string, string> = { threads: 'ri:threads-fill', facebook: 'logos:facebook' };
 
 /** Meta app của cửa hàng (không bao giờ có secret). source: store = cửa hàng tự nhập, platform = app dự phòng, none. */
 export type SocialAppSettings = {
-  platform: 'threads' | string;
+  platform: SocialPlatform | string;
   clientId: string | null;
   hasSecret: boolean;
   source: 'store' | 'platform' | 'none';

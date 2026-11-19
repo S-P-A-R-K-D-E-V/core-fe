@@ -35,7 +35,15 @@ import { fDateTime, toDatetimeLocalStr, parseDatetimeLocalStr } from 'src/utils/
 import { useDebounce } from 'src/hooks/use-debounce';
 
 import { storefrontProductListKey } from 'src/api/product-keys';
-import { countLinks, SOCIAL_TEXT_MAX, SOCIAL_MAX_LINKS, SOCIAL_MAX_IMAGES, SOCIAL_MAX_PRODUCTS } from 'src/lib/social';
+import {
+  countLinks,
+  channelLabel,
+  PLATFORM_ICON,
+  SOCIAL_TEXT_MAX,
+  SOCIAL_MAX_LINKS,
+  SOCIAL_MAX_IMAGES,
+  SOCIAL_MAX_PRODUCTS,
+} from 'src/lib/social';
 import {
   useSocialAi,
   useSocialQueue,
@@ -459,8 +467,8 @@ export function SocialPostForm({ post }: Props) {
                 }
                 label={
                   <Stack direction="row" spacing={0.5} alignItems="center">
-                    <Iconify icon="ri:threads-fill" width={16} />
-                    <span>@{c.username}</span>
+                    <Iconify icon={PLATFORM_ICON[c.platform] ?? 'ri:threads-fill'} width={16} />
+                    <span>{channelLabel(c)}</span>
                     {c.status !== 'connected' && (
                       <Typography variant="caption" sx={{ color: 'warning.main' }}>
                         (cần kết nối lại)
