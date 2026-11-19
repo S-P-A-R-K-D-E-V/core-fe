@@ -21,6 +21,7 @@ import DialogContent from '@mui/material/DialogContent';
 
 import Iconify from 'src/components/iconify';
 
+import { previewImages } from './agent-action-preview';
 import { appendNote, REVISION_QUICK_NOTES } from './agent-action-utils';
 
 // ----------------------------------------------------------------------
@@ -48,8 +49,7 @@ export function AgentRevisionDialog({ action, submitting, error, onClose, onSubm
     }
   }, [action]);
 
-  const post = action?.preview?.kind === 'social_post' ? action.preview.socialPost : null;
-  const images = post?.imageUrls ?? [];
+  const images = previewImages(action?.preview);
   const revisionsLeft = action?.revisionsLeft ?? null;
   const canSubmit = note.trim().length > 0 || selected.length > 0;
 
