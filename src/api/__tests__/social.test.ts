@@ -1,7 +1,15 @@
 // @vitest-environment node
 import { it, expect, describe } from 'vitest';
 
-import { countLinks, isEditable, type SocialPost, engagementRate, isValidThreadsAppId } from 'src/lib/social';
+import {
+  countLinks,
+  channelUrl,
+  isEditable,
+  channelLabel,
+  type SocialPost,
+  engagementRate,
+  isValidThreadsAppId,
+} from 'src/lib/social';
 import { requiredPermissionsFor } from 'src/auth/route-roles';
 import { paths } from 'src/routes/paths';
 
@@ -61,5 +69,14 @@ describe('social api / helpers', () => {
     expect(isValidThreadsAppId(' 2418901455589871 ')).toBe(true);
     expect(isValidThreadsAppId('1234')).toBe(false);
     expect(isValidThreadsAppId('abc123456')).toBe(false);
+  });
+
+  it('Tên + link kênh theo nền tảng: fanpage dùng tên page, Threads dùng @tài khoản', () => {
+    const page = { platform: 'facebook', username: 'cici21chualang', displayName: 'CiCi Accessories' };
+    const threads = { platform: 'threads', username: 'cici21chualang', displayName: 'CiCi' };
+    expect(channelLabel(page)).toBe('CiCi Accessories');
+    expect(channelLabel(threads)).toBe('@cici21chualang');
+    expect(channelUrl(page)).toBe('https://www.facebook.com/cici21chualang');
+    expect(channelUrl(threads)).toBe('https://www.threads.com/@cici21chualang');
   });
 });

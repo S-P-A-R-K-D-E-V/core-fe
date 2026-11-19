@@ -28,7 +28,7 @@ import { apiErrorMessage } from 'src/utils/api-error';
 
 import { useConfirmDialog } from 'src/hooks/use-confirm-dialog';
 
-import { isEditable, SOCIAL_POST_STATUS, SOCIAL_TARGET_STATUS } from 'src/lib/social';
+import { isEditable, PLATFORM_ICON, SOCIAL_POST_STATUS, SOCIAL_TARGET_STATUS } from 'src/lib/social';
 import { useSocialPosts, deleteSocialPost, retrySocialPost, useSocialChannels } from 'src/api/social';
 
 import Label from 'src/components/label';
@@ -262,8 +262,10 @@ function SocialPostCard({ post, onChanged }: { post: SocialPost; onChanged: () =
               const ts = SOCIAL_TARGET_STATUS[t.status];
               return (
                 <Stack key={t.id} direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                  <Iconify icon="ri:threads-fill" width={16} />
-                  <Typography variant="body2">@{t.channelUsername}</Typography>
+                  <Iconify icon={PLATFORM_ICON[t.platform] ?? 'ri:threads-fill'} width={16} />
+                  <Typography variant="body2">
+                    {t.platform === 'facebook' ? t.channelUsername : `@${t.channelUsername}`}
+                  </Typography>
                   <Label color={ts.color} variant="soft">
                     {ts.label}
                   </Label>
