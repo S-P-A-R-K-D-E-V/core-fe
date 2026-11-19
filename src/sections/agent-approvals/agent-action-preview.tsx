@@ -5,6 +5,7 @@ import type {
   IAgentActionPrevious,
   IAgentSocialBatchItem,
   IAgentSocialPostPreview,
+  IAgentConversationOrderPreview,
 } from 'src/api/agent-actions';
 
 import { useMemo, useState } from 'react';
@@ -15,8 +16,14 @@ import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Collapse from '@mui/material/Collapse';
 import ButtonBase from '@mui/material/ButtonBase';
+import Alert from '@mui/material/Alert';
+import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 
+import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
+
+import Label from 'src/components/label';
 import Iconify from 'src/components/iconify';
 import Lightbox, { useLightBox } from 'src/components/lightbox';
 
@@ -293,6 +300,96 @@ export function SocialBatchPreview({ items }: { items: IAgentSocialBatchItem[] }
 }
 
 /** Ảnh của mọi bài trong phiếu (bài lẻ hoặc cả lịch) — để chọn ảnh cần làm lại / so bản trước. */
+/** Phiếu "Chốt đơn cho khách": khách, cách nhận / trả, từng món (ảnh, SL × giá, cảnh báo tồn), phí ship, tổng. */
+export function ConversationOrderPreview({ order }: { order: IAgentConversationOrderPreview }) {
+  if (order.missing) {
+    return (
+      <Alert severity="info">
+        Hội thoại không còn đơn nháp (đã chốt hoặc đã bỏ) — duyệt phiếu này sẽ không gửi gì thêm cho khách.
+      </Alert>
+    );
+  }
+  return (
+    <Stack spacing={1.5}>
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+        <Iconify icon="solar:cart-large-2-bold" width={18} sx={{ color: 'text.secondary' }} />
+        <Typography variant="subtitle2">{order.customerName}</Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          {order.phone}
+        </Typography>
+        <Label color="info" variant="soft">
+          {order.delivery === 'pickup' ? 'Nhận tại cửa hàng' : 'Giao tận nơi'}
+        </Label>
+        <Label color="default" variant="soft">
+          {order.payment === 'pay_at_store' ? 'Trả tại quầy' : 'Chuyển khoản QR'}
+        </Label>
+        {order.code && (
+          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+            {order.code}
+          </Typography>
+        )}
+      </Stack>
+      {order.delivery !== 'pickup' && order.address && (
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          Giao tới: {order.address}
+          {order.carrier ? ` · ${order.carrier}` : ''}
+        </Typography>
+      )}
+      <Stack spacing={1}>
+        {order.lines.map((line) => {
+          const short = !line.inStock || (line.onHand != null && line.onHand < line.quantity);
+          return (
+            <Stack key={line.productId} direction="row" spacing={1.5} alignItems="center">
+              <Avatar variant="rounded" src={line.imageUrl ?? undefined} sx={{ width: 40, height: 40 }}>
+                <Iconify icon="solar:box-bold" />
+              </Avatar>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" noWrap>
+                  {line.name}
+                </Typography>
+                <Typography variant="caption" sx={{ color: short ? 'error.main' : 'text.secondary' }}>
+                  {line.code ? `${line.code} · ` : ''}
+                  {line.quantity} × {fVnd(line.price)}
+                  {short ? ' · không đủ hàng' : line.onHand != null ? ` · còn ${line.onHand}` : ''}
+                </Typography>
+              </Box>
+              <Typography variant="subtitle2">{fVnd(line.amount)}</Typography>
+            </Stack>
+          );
+        })}
+      </Stack>
+      <Stack spacing={0.5} sx={{ borderTop: 1, borderColor: 'divider', pt: 1 }}>
+        <Stack direction="row" justifyContent="space-between">
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Tiền hàng
+          </Typography>
+          <Typography variant="body2">{fVnd(order.subtotal)}</Typography>
+        </Stack>
+        {order.delivery !== 'pickup' && (
+          <Stack direction="row" justifyContent="space-between">
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Phí ship
+            </Typography>
+            <Typography variant="body2">{order.shippingFee > 0 ? fVnd(order.shippingFee) : 'Miễn phí'}</Typography>
+          </Stack>
+        )}
+        <Stack direction="row" justifyContent="space-between">
+          <Typography variant="subtitle2">Tổng khách trả</Typography>
+          <Typography variant="subtitle2">{fVnd(order.total)}</Typography>
+        </Stack>
+      </Stack>
+      {order.note && (
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          Ghi chú: {order.note}
+        </Typography>
+      )}
+      <Link component={RouterLink} href={paths.dashboard.inbox.conversation(order.conversationId)} variant="body2">
+        Mở hội thoại để xem / sửa đơn
+      </Link>
+    </Stack>
+  );
+}
+
 export function previewImages(preview: IAgentActionPreview | null | undefined): string[] {
   if (!preview) return [];
   if (preview.kind === 'social_post') return preview.socialPost?.imageUrls ?? [];
@@ -307,6 +404,7 @@ export function hasActionPreview(preview: IAgentActionPreview | null | undefined
   if (!preview) return false;
   if (preview.kind === 'social_post') return !!preview.socialPost;
   if (preview.kind === 'social_batch') return (preview.socialBatch?.items?.length ?? 0) > 0;
+  if (preview.kind === 'conversation_order') return !!preview.conversationOrder;
   return (preview.fields?.length ?? 0) > 0;
 }
 
@@ -318,6 +416,9 @@ export function ActionPreview({ preview }: { preview: IAgentActionPreview | null
   }
   if (preview.kind === 'social_batch' && preview.socialBatch) {
     return <SocialBatchPreview items={preview.socialBatch.items} />;
+  }
+  if (preview.kind === 'conversation_order' && preview.conversationOrder) {
+    return <ConversationOrderPreview order={preview.conversationOrder} />;
   }
   const fields = preview.fields ?? [];
   if (fields.length === 0) return null;

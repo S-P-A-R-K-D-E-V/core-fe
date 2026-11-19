@@ -26,10 +26,11 @@ import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
 import { useSnackbar } from 'src/components/snackbar';
 
+import InboxOrderCard from './inbox-order-card';
+
 // ----------------------------------------------------------------------
 // Cột thông tin khách: sửa tên / SĐT / địa chỉ / ghi chú (PUT customer — SĐT trùng đúng một khách cũ thì máy chủ gộp vào
-// khách đó), nhãn hội thoại (PUT tags), lịch sử mua, thẻ "Trạng thái đơn đặt hàng" (5 hoá đơn gần nhất; nút Tạo đơn đặt
-// hàng chờ F4 — chốt đơn trong hội thoại).
+// khách đó), nhãn hội thoại (PUT tags), lịch sử mua, thẻ đơn trong hội thoại (F4 — InboxOrderCard), 5 hoá đơn gần nhất.
 // ----------------------------------------------------------------------
 
 type Props = {
@@ -252,11 +253,17 @@ export default function InboxCustomerPanel({ detail, canEdit, tagOptions, onSave
             )}
           </Box>
 
+          <InboxOrderCard
+            conversationId={detail.id}
+            isComment={detail.kind === 'comment'}
+            customerAddress={panel?.address ?? null}
+          />
+
           <Card variant="outlined" sx={{ p: 1.5 }}>
             <Stack direction="row" alignItems="center" spacing={1}>
-              <Iconify icon="solar:cart-large-2-bold" width={18} sx={{ color: 'text.secondary' }} />
+              <Iconify icon="solar:bill-list-bold" width={18} sx={{ color: 'text.secondary' }} />
               <Typography variant="subtitle2" sx={{ flex: 1 }}>
-                Trạng thái đơn đặt hàng
+                Hoá đơn gần đây
               </Typography>
             </Stack>
 
@@ -290,18 +297,6 @@ export default function InboxCustomerPanel({ detail, canEdit, tagOptions, onSave
               </Typography>
             )}
 
-            <Button
-              fullWidth
-              variant="outlined"
-              disabled
-              startIcon={<Iconify icon="mingcute:add-line" />}
-              sx={{ mt: 1.5 }}
-            >
-              Tạo đơn đặt hàng
-            </Button>
-            <Typography variant="caption" component="div" sx={{ color: 'text.disabled', mt: 0.5, textAlign: 'center' }}>
-              Sắp có (chốt đơn trong hội thoại — F4)
-            </Typography>
           </Card>
         </Stack>
       </Scrollbar>

@@ -75,6 +75,40 @@ export interface IAgentActionPreview {
   fields: { label: string; value: string }[];
   /** Chỉ có khi kind = social_batch: các bài theo giờ đăng. */
   socialBatch?: { items: IAgentSocialBatchItem[] } | null;
+  /** Chỉ có khi kind = conversation_order: đơn nháp LÚC ĐỌC phiếu (duyệt = chốt đúng bản này). */
+  conversationOrder?: IAgentConversationOrderPreview | null;
+}
+
+export interface IAgentConversationOrderLine {
+  productId: string;
+  code: string | null;
+  name: string;
+  imageUrl: string | null;
+  quantity: number;
+  price: number;
+  amount: number;
+  inStock: boolean;
+  /** Tồn tổng các chi nhánh; null = không theo dõi tồn. */
+  onHand: number | null;
+}
+
+export interface IAgentConversationOrderPreview {
+  conversationId: string;
+  orderId: string | null;
+  code: string | null;
+  /** Hội thoại không còn đơn nháp (đã chốt / đã bỏ). */
+  missing: boolean;
+  customerName: string;
+  phone: string;
+  delivery: 'ship' | 'pickup' | null;
+  payment: 'transfer' | 'pay_at_store';
+  address: string | null;
+  lines: IAgentConversationOrderLine[];
+  subtotal: number;
+  shippingFee: number;
+  total: number;
+  carrier: string | null;
+  note: string | null;
 }
 
 /** Bản trước của cùng việc (phiếu đã bị "Yêu cầu sửa") — để so chữ / ảnh cũ và mới. */
@@ -134,6 +168,8 @@ export interface IAgentAutonomyPolicy {
   endpoints: string[];
   /** Lệnh vốn cần người xác nhận (confirm) khi khoá ở chế độ người dùng tự xác nhận. */
   requiresConfirmation: boolean;
+  /** Luôn chờ người duyệt (chốt đơn trong hội thoại) — chỉ chọn được "chờ duyệt" hoặc "cấm". */
+  locked?: boolean;
 }
 
 export interface IAgentAutonomyPolicies {

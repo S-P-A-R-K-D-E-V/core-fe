@@ -14,6 +14,8 @@ import type {
   ConversationMessage,
   ConversationSettings,
   ConversationListFilter,
+  ConversationOrder,
+  ConversationOrderInput,
 } from 'src/lib/inbox';
 
 import useSWR from 'swr';
@@ -260,4 +262,35 @@ export async function deleteQuickReply(id: string) {
 
 export async function saveConversationSettings(input: ConversationSettings) {
   return (await axios.put<ConversationSettings>(SETTINGS, input)).data;
+}
+
+// ----------------------------------------------------------------------
+// Đơn trong hội thoại (F4).
+
+export const conversationOrderKey = (id: string) => `${ROOT}/${id}/order`;
+
+export function useConversationOrder(id: string | null, enabled = true) {
+  const { data, isLoading, error, mutate } = useSWR<{ order: ConversationOrder | null }>(
+    id && enabled ? conversationOrderKey(id) : null,
+    fetcher,
+    { refreshInterval: POLL_MS, revalidateOnFocus: true }
+  );
+  return useMemo(
+    () => ({ order: data?.order ?? null, orderLoading: isLoading, orderError: error, mutateOrder: mutate }),
+    [data, isLoading, error, mutate]
+  );
+}
+
+export async function saveConversationOrder(id: string, input: ConversationOrderInput) {
+  const res = await axios.put<ConversationOrder>(conversationOrderKey(id), input);
+  return res.data;
+}
+
+export async function confirmConversationOrder(id: string, orderId: string) {
+  const res = await axios.post<ConversationOrder>(`${conversationOrderKey(id)}/confirm`, { orderId });
+  return res.data;
+}
+
+export async function discardConversationOrder(id: string) {
+  await axios.delete(conversationOrderKey(id));
 }

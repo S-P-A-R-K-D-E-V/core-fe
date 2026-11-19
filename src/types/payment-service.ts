@@ -470,7 +470,7 @@ export type IPaymentIntentQuery = {
 
 // ---------------------------------------------------------------------- Đơn online (Admin, Manager)
 
-export type OnlineOrderStatus = 'pending_payment' | 'paid' | 'cancelled' | 'expired';
+export type OnlineOrderStatus = 'pending_payment' | 'paid' | 'cancelled' | 'expired' | 'draft';
 
 export type IOnlineOrderLine = {
   productId: string;
@@ -549,6 +549,11 @@ export type IOnlineOrder = {
   /** "Khách huỷ" | "Cửa hàng huỷ" | "Quá hạn thanh toán" — còn giữ khi tiền về sau lúc huỷ */
   cancelReason?: string | null;
   cancelledAt?: string | null;
+  /** "storefront" | "conversation" (F4: chốt trong tin nhắn fanpage). */
+  origin?: string | null;
+  /** Đơn từ hội thoại: mở lại hộp thư đúng hội thoại. */
+  conversationId?: string | null;
+  customerId?: string | null;
 };
 
 export type IOnlineOrderQuery = {
