@@ -277,6 +277,7 @@ function InboxViewInner() {
                 tagOptions={tagOptions}
                 panelMode={lgUp ? 'inline' : 'drawer'}
                 onBack={mdUp ? undefined : () => setQuery({ c: null })}
+                onErased={() => setQuery({ c: null })}
                 onMarkedUnread={() => setQuery({ c: null })}
                 poll={poll}
               />

@@ -57,6 +57,7 @@ import {
   sendConversationMessage,
   useConversationMessages,
   updateConversationCustomer,
+  eraseConversationCustomerData,
 } from 'src/api/inbox';
 
 import Label from 'src/components/label';
@@ -96,6 +97,8 @@ type Props = {
   poll: boolean;
   /** Đã đánh dấu chưa đọc → rời hội thoại (không thì mở ra là tự đánh dấu đã đọc lại). */
   onMarkedUnread?: VoidFunction;
+  /** Đã xoá dữ liệu khách → hội thoại không còn, rời khỏi. */
+  onErased?: VoidFunction;
 };
 
 type Busy = 'take' | 'release-none' | 'release-agent' | 'status' | 'priority' | 'unread' | null;
@@ -111,6 +114,7 @@ export default function InboxThread({
   onBack,
   poll,
   onMarkedUnread,
+  onErased,
 }: Props) {
   const { enqueueSnackbar } = useSnackbar();
   const { mutate } = useSWRConfig();
@@ -377,6 +381,14 @@ export default function InboxThread({
     return panel;
   };
 
+  const doEraseCustomerData = async () => {
+    const result = await eraseConversationCustomerData(conversationId);
+    // Danh sách / đếm hộp thư hỏi lại (hội thoại đã biến mất).
+    mutate((key) => typeof key === 'string' && key.startsWith('/conversations'), undefined, { revalidate: true });
+    onErased?.();
+    return result;
+  };
+
   const doSaveTags = async (tags: string[]) => {
     applySummary(await setConversationTags(conversationId, tags));
   };
@@ -411,7 +423,9 @@ export default function InboxThread({
     <InboxCustomerPanel
       detail={detail}
       canEdit={permissions.reply}
+      canManage={permissions.manage}
       tagOptions={tagOptions}
+      onEraseCustomerData={doEraseCustomerData}
       onSaveCustomer={doSaveCustomer}
       onSaveTags={doSaveTags}
       onClose={panelMode === 'drawer' ? () => setPanelOpen(false) : undefined}

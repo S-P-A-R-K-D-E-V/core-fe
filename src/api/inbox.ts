@@ -294,3 +294,22 @@ export async function confirmConversationOrder(id: string, orderId: string) {
 export async function discardConversationOrder(id: string) {
   await axios.delete(conversationOrderKey(id));
 }
+
+// ----------------------------------------------------------------------
+// Xoá dữ liệu khách (yêu cầu xoá dữ liệu — trang /data-deletion). Chỉ quản trị (conversation.manage).
+
+export type CustomerDataErasure = {
+  conversations: number;
+  messages: number;
+  identities: number;
+  webhookEvents: number;
+  agentTasks: number;
+  notifications: number;
+  customerDeleted: boolean;
+  ordersKept: number;
+};
+
+export async function eraseConversationCustomerData(id: string) {
+  const res = await axios.delete<CustomerDataErasure>(`${ROOT}/${id}/customer-data`);
+  return res.data;
+}

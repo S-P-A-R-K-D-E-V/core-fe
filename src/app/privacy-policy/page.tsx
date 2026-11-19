@@ -80,7 +80,20 @@ const SECTIONS = [
     ],
   },
   {
-    title: '5. Bảo mật dữ liệu',
+    title: '5. Tin nhắn, bình luận trên Fanpage Facebook và đơn hàng qua tin nhắn',
+    content: [
+      'Khi bạn nhắn tin hoặc bình luận trên Fanpage Facebook của CiCi (Cici Accessories), CiCi dùng ứng dụng Meta "CiCi Sales" để nhận và trả lời trong hộp thư khách của cửa hàng:',
+      '• Dữ liệu nhận từ Facebook: mã người dùng theo trang (PSID), tên và ảnh đại diện công khai, nội dung tin nhắn / bình luận và ảnh bạn gửi, thời điểm gửi.',
+      '• Thông tin bạn tự cung cấp khi mua hàng: họ tên, số điện thoại, địa chỉ nhận hàng, món hàng — dùng để tư vấn, lên đơn, giao hàng và thanh toán.',
+      '• Trợ lý tự động: một phần tin nhắn được trợ lý AI của cửa hàng đọc để trả lời câu hỏi về sản phẩm, giá, tình trạng còn hàng và lên đơn nháp. Nội dung hội thoại được gửi tới nhà cung cấp mô hình AI (Anthropic, Hoa Kỳ) qua cổng AI của SPARK DEV chỉ để tạo câu trả lời, không dùng để quảng cáo. Mọi đơn hàng đều do nhân viên cửa hàng xác nhận; bạn có thể nhắn "gặp người" để nói chuyện trực tiếp với nhân viên.',
+      '• Bình luận có số điện thoại có thể được tự động ẩn để bảo vệ thông tin của bạn, sau đó cửa hàng nhắn riêng cho bạn.',
+      '• Chúng tôi KHÔNG nhắn tin quảng cáo cho người chưa nhắn tới trang, không bán hay chia sẻ dữ liệu này cho bên thứ ba ngoài các nhà cung cấp vận hành (lưu trữ, thanh toán, giao hàng, AI) và theo yêu cầu pháp luật.',
+      '• Thời gian lưu: hội thoại được giữ trong suốt thời gian bạn còn là khách của cửa hàng; dữ liệu nhận thô từ Facebook (webhook) tự xoá sau 30 ngày. Hoá đơn / đơn hàng được giữ theo quy định kế toán.',
+      '• Yêu cầu xoá dữ liệu: xem hướng dẫn tại https://cici21chualang.vn/data-deletion — cửa hàng xoá hội thoại, tin nhắn và thông tin Facebook của bạn trong vòng 7 ngày làm việc.',
+    ],
+  },
+  {
+    title: '6. Bảo mật dữ liệu',
     content: [
       'Chúng tôi áp dụng các biện pháp kỹ thuật và tổ chức phù hợp để bảo vệ thông tin của bạn:',
       '• Mã hóa dữ liệu truyền tải bằng HTTPS/TLS.',
@@ -90,7 +103,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: '6. Lưu trữ và xóa dữ liệu',
+    title: '7. Lưu trữ và xóa dữ liệu',
     content: [
       '• Dữ liệu tài khoản được lưu trữ trong suốt thời gian tài khoản còn hoạt động.',
       '• Ảnh xác thực khuôn mặt và vị trí chấm công được lưu trữ phục vụ đối soát công và giải quyết tranh chấp chấm công, gắn liền với thời gian lưu trữ dữ liệu chấm công/bảng lương liên quan.',
@@ -99,7 +112,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: '7. Quyền của người dùng',
+    title: '8. Quyền của người dùng',
     content: [
       'Bạn có quyền:',
       '• Truy cập và xem lại thông tin cá nhân chúng tôi lưu trữ về bạn.',
@@ -110,7 +123,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: '8. Cookie và công nghệ theo dõi',
+    title: '9. Cookie và công nghệ theo dõi',
     content: [
       '• Chúng tôi sử dụng cookie phiên (session cookie) để duy trì trạng thái đăng nhập.',
       '• Chúng tôi có thể sử dụng các công cụ phân tích ẩn danh để hiểu cách người dùng tương tác với ứng dụng.',
@@ -118,13 +131,13 @@ const SECTIONS = [
     ],
   },
   {
-    title: '9. Thay đổi chính sách',
+    title: '10. Thay đổi chính sách',
     content: [
       'Chúng tôi có thể cập nhật Chính sách quyền riêng tư này theo thời gian. Khi có thay đổi quan trọng, chúng tôi sẽ thông báo qua email hoặc thông báo nổi bật trong ứng dụng. Việc tiếp tục sử dụng dịch vụ sau khi thay đổi có hiệu lực đồng nghĩa với việc bạn chấp nhận chính sách mới.',
     ],
   },
   {
-    title: '10. Liên hệ',
+    title: '11. Liên hệ',
     content: [
       'Nếu bạn có câu hỏi hoặc khiếu nại liên quan đến chính sách này, vui lòng liên hệ:',
       '• Email: support@cici21chualang.vn',
@@ -202,7 +215,7 @@ export default function PrivacyPolicyPage() {
             Chính sách quyền riêng tư
           </Typography>
           <Typography variant="body1" sx={{ color: 'text.secondary' }}>
-            Cập nhật lần cuối: 24 tháng 6, 2026
+            Cập nhật lần cuối: 20 tháng 11, 2026
           </Typography>
         </Box>
 
@@ -220,7 +233,8 @@ export default function PrivacyPolicyPage() {
           <Typography variant="body1">
             CiCi (<strong>cici21chualang.vn</strong>) cam kết bảo vệ quyền riêng tư của bạn. Chính
             sách này mô tả cách chúng tôi thu thập, sử dụng và bảo vệ thông tin cá nhân khi bạn sử
-            dụng nền tảng quản lý nhân sự và ca làm việc của chúng tôi.
+            dụng nền tảng quản lý nhân sự và ca làm việc của chúng tôi, cũng như khi bạn nhắn tin / mua hàng qua
+            Fanpage Facebook của CiCi.
           </Typography>
         </Box>
 

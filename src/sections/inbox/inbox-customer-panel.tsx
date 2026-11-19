@@ -1,5 +1,6 @@
 'use client';
 
+import type { CustomerDataErasure } from 'src/api/inbox';
 import type { CustomerPanel, ConversationDetail, CustomerUpdateInput } from 'src/lib/inbox';
 
 import { useState, useEffect } from 'react';
@@ -26,6 +27,8 @@ import Iconify from 'src/components/iconify';
 import Scrollbar from 'src/components/scrollbar';
 import { useSnackbar } from 'src/components/snackbar';
 
+import { ConfirmDialog } from 'src/components/custom-dialog';
+
 import InboxOrderCard from './inbox-order-card';
 
 // ----------------------------------------------------------------------
@@ -37,6 +40,9 @@ type Props = {
   detail: ConversationDetail;
   /** Có quyền conversation.reply. */
   canEdit: boolean;
+  /** Có quyền conversation.manage — hiện "Xoá dữ liệu khách". */
+  canManage?: boolean;
+  onEraseCustomerData?: () => Promise<CustomerDataErasure>;
   /** Nhãn gợi ý (đã dùng ở các hội thoại khác). */
   tagOptions: string[];
   onSaveCustomer: (input: CustomerUpdateInput) => Promise<CustomerPanel>;
@@ -56,7 +62,16 @@ function formFrom(detail: ConversationDetail): Form {
   };
 }
 
-export default function InboxCustomerPanel({ detail, canEdit, tagOptions, onSaveCustomer, onSaveTags, onClose }: Props) {
+export default function InboxCustomerPanel({
+  detail,
+  canEdit,
+  canManage,
+  onEraseCustomerData,
+  tagOptions,
+  onSaveCustomer,
+  onSaveTags,
+  onClose,
+}: Props) {
   const { enqueueSnackbar } = useSnackbar();
   const panel = detail.customerPanel;
 
@@ -64,6 +79,26 @@ export default function InboxCustomerPanel({ detail, canEdit, tagOptions, onSave
   const [saving, setSaving] = useState(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [savingTags, setSavingTags] = useState(false);
+  const [erasing, setErasing] = useState(false);
+  const [eraseOpen, setEraseOpen] = useState(false);
+
+  const handleErase = async () => {
+    if (!onEraseCustomerData) return;
+    setErasing(true);
+    try {
+      const r = await onEraseCustomerData();
+      enqueueSnackbar(
+        `Đã xoá ${r.conversations} hội thoại, ${r.messages} tin nhắn` +
+          (r.customerDeleted ? ', hồ sơ khách' : '') +
+          (r.ordersKept > 0 ? ` — giữ ${r.ordersKept} đơn (kế toán)` : '')
+      );
+      setEraseOpen(false);
+    } catch (err) {
+      enqueueSnackbar(apiErrorMessage(err, 'Không xoá được dữ liệu khách'), { variant: 'error' });
+    } finally {
+      setErasing(false);
+    }
+  };
 
   // Đổi hội thoại / máy chủ trả hồ sơ mới → nạp lại form.
   const formKey = `${detail.id}|${panel?.id ?? ''}|${panel?.name ?? ''}|${panel?.phone ?? ''}|${panel?.address ?? ''}|${panel?.note ?? ''}`;
@@ -298,8 +333,37 @@ export default function InboxCustomerPanel({ detail, canEdit, tagOptions, onSave
             )}
 
           </Card>
+          {canManage && onEraseCustomerData && (
+            <Box>
+              <Button
+                fullWidth
+                size="small"
+                color="error"
+                variant="text"
+                startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
+                onClick={() => setEraseOpen(true)}
+              >
+                Xoá dữ liệu khách
+              </Button>
+              <Typography variant="caption" component="div" sx={{ color: 'text.disabled', textAlign: 'center' }}>
+                Khi khách yêu cầu xoá dữ liệu (trang /data-deletion)
+              </Typography>
+            </Box>
+          )}
         </Stack>
       </Scrollbar>
+
+      <ConfirmDialog
+        open={eraseOpen}
+        onClose={() => setEraseOpen(false)}
+        title={`Xoá dữ liệu của ${detail.customer.name}?`}
+        content="Xoá mọi hội thoại + tin nhắn của khách này (mọi kênh), tên / ảnh / mã Facebook, nhật ký trợ lý đã đọc hội thoại và thông báo liên quan. Hồ sơ khách tạo từ fanpage chưa mua gì cũng bị xoá; hoá đơn / đơn đã mua được giữ (kế toán). Không hoàn tác được. Tin trên Messenger vẫn do Facebook giữ."
+        action={
+          <LoadingButton variant="contained" color="error" loading={erasing} onClick={handleErase}>
+            Xoá vĩnh viễn
+          </LoadingButton>
+        }
+      />
     </Stack>
   );
 }
