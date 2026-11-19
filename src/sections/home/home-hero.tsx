@@ -233,6 +233,8 @@ function ProductCard({ product, index, placeholder, cards, motion }: ProductCard
                 top: 8,
                 left: 8,
                 bgcolor: 'rgba(255,255,255,0.9)',
+                // Chữ tối cố định: thẻ kế thừa màu chữ trắng → nhãn trắng trên nền trắng (nhất là ô chưa có ảnh).
+                color: 'grey.800',
                 fontSize: '0.6rem',
                 height: 18,
                 fontWeight: 700,
@@ -282,6 +284,8 @@ type Props = BoxProps & {
   products?: StorefrontProduct[];
   branding?: TenantBranding | null;
   categories?: string[];
+  /** products là hàng bán chạy 14 ngày (core-be đã xếp hạng) → tiêu đề "… bán chạy" thay "… nổi bật". */
+  bestSellers?: boolean;
 };
 
 export default function HomeHero({
@@ -289,6 +293,7 @@ export default function HomeHero({
   products = [],
   branding,
   categories = [],
+  bestSellers = false,
   ...other
 }: Props) {
   const storeName = branding?.storeName ?? 'CiCi Accessories';
@@ -569,7 +574,7 @@ export default function HomeHero({
             letterSpacing: 2,
           }}
         >
-          {`${words.items} nổi bật`}
+          {`${words.items} ${bestSellers ? 'bán chạy' : 'nổi bật'}`}
         </Typography>
       </m.div>
 

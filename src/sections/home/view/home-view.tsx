@@ -12,6 +12,7 @@ import ScrollProgress from 'src/components/scroll-progress';
 import Iconify from 'src/components/iconify';
 
 import { CICI_TENANT } from 'src/lib/store-seo';
+import { pickHeroProducts, bestSellersFirst } from 'src/lib/store-best-sellers';
 import { SEASONS, type SeasonKey } from 'src/lib/store-season';
 import type { StorePostListItem } from 'src/lib/store-posts';
 import type { TenantBranding, StorefrontProduct } from 'src/lib/tenant-branding';
@@ -34,6 +35,8 @@ type Props = {
   branding: TenantBranding | null;
   /** Sản phẩm đang bán của cửa hàng — app/page.tsx đọc sẵn phía server (HTML đã có tên, giá, nhóm hàng). */
   products: StorefrontProduct[];
+  /** Hàng bán chạy 14 ngày đã xếp hạng (GET /public/storefront/products/best-sellers) — null khi core-be chưa có / lỗi. */
+  bestSellers?: StorefrontProduct[] | null;
   productTotal: number;
   /** Nhóm hàng có nhiều sản phẩm nhất (src/lib/store-seo.ts topCategories). */
   categories: string[];
@@ -48,6 +51,7 @@ type Props = {
 export default function HomeView({
   branding,
   products,
+  bestSellers = null,
   productTotal,
   categories,
   description,
@@ -67,11 +71,9 @@ export default function HomeView({
   // Đánh giá khách hàng và "Tại sao chọn…" là câu chữ viết riêng cho CiCi — cửa hàng khác không hiện nội dung
   // không phải của mình. Không đọc được branding (máy dev) thì coi như CiCi như trước.
   const isCiCi = !branding || branding.tenantCode === CICI_TENANT;
-  // Hero ưu tiên sản phẩm có ảnh.
-  const featured = [
-    ...products.filter((p) => !!p.imageUrl),
-    ...products.filter((p) => !p.imageUrl),
-  ].slice(0, 4);
+  // Hero: hàng bán chạy 14 ngày (có ảnh hệ thống trước); core-be cũ chưa có → danh sách thường như trước.
+  const featured = pickHeroProducts(bestSellers, products);
+  const hasBestSellers = !!bestSellers?.length;
 
   return (
     <SeasonProvider value={season}>
@@ -83,7 +85,12 @@ export default function HomeView({
       >
         <ScrollProgress scrollYProgress={scrollYProgress} />
 
-        <HomeHero products={featured} branding={branding} categories={categories} />
+        <HomeHero
+          products={featured}
+          branding={branding}
+          categories={categories}
+          bestSellers={hasBestSellers}
+        />
 
         {/* overflow "clip" thay "hidden": vẫn cắt phần tràn ngang nhưng không tạo khung cuộn riêng (không làm hỏng
           position: sticky nếu sau này có mục dùng). */}
@@ -104,7 +111,11 @@ export default function HomeView({
             description={description}
           />
 
-          <HomeFeatures products={products} categories={categories} branding={branding} />
+          <HomeFeatures
+            products={bestSellersFirst(bestSellers, products)}
+            categories={categories}
+            branding={branding}
+          />
 
           {isCiCi && <HomeCleanInterfaces branding={branding} />}
 

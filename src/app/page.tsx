@@ -8,6 +8,7 @@ import {
   getRequestOrigin,
   getTenantBranding,
   getStorefrontProducts,
+  getStorefrontBestSellers,
 } from 'src/lib/tenant-branding';
 import {
   absoluteUrl,
@@ -31,14 +32,17 @@ function onAuthHost(): boolean {
  * tìm kiếm đọc được, không chờ JavaScript). fetch() trong generateMetadata và trang dùng chung bộ nhớ đệm của Next.
  */
 async function loadHome() {
-  const [branding, products] = await Promise.all([
+  const [branding, products, bestSellers] = await Promise.all([
     getTenantBranding(),
     getStorefrontProducts(1, 60),
+    // Khối đầu trang chủ: bán chạy 14 ngày (null khi core-be chưa có API → hero dùng danh sách thường).
+    getStorefrontBestSellers(12),
   ]);
   const categories = topCategories(products.items, 6);
   return {
     branding,
     products,
+    bestSellers: bestSellers?.items ?? null,
     categories,
     title: storeHomeTitle(branding, categories),
     description: storeHomeDescription(branding, categories, products.total),
@@ -80,7 +84,7 @@ type HomePageProps = { searchParams?: Record<string, string | string[] | undefin
 export default async function HomePage({ searchParams }: HomePageProps) {
   if (onAuthHost()) return <HubLoginPage />;
 
-  const [{ branding, products, categories, description }, news] = await Promise.all([
+  const [{ branding, products, bestSellers, categories, description }, news] = await Promise.all([
     loadHome(),
     getPublishedPosts({ page: 1, pageSize: 3 }),
   ]);
@@ -102,6 +106,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <HomeView
         branding={branding}
         products={products.items}
+        bestSellers={bestSellers}
         productTotal={products.total}
         categories={categories}
         description={description}
