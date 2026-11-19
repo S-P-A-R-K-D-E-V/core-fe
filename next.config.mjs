@@ -59,6 +59,8 @@ const BACKEND_API_PREFIXES = [
   'agent-actions',
   // Trung tâm Agent (K4): agent, bảng việc, lịch chạy, chi phí. Cập nhật trực tiếp đi hub /hubs/agent-board (ingress).
   'agent-center',
+  // Hộp thư khách (F2): hội thoại, mẫu trả lời nhanh, cấu hình hộp thư. Cập nhật trực tiếp đi hub /hubs/inbox (ingress).
+  'conversations', 'conversation-quick-replies', 'conversation-settings',
 ];
 
 const nextConfig = {

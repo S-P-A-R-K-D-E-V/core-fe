@@ -51,6 +51,10 @@ export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   { prefix: paths.dashboard.social.root, roles: null, permissions: [PERMISSIONS.social.posts] },
   { prefix: paths.dashboard.social.channels, roles: null, permissions: [PERMISSIONS.social.channels] },
   { prefix: paths.dashboard.social.settings, roles: null, permissions: [PERMISSIONS.social.channels] },
+  // Hộp thư khách (ConversationsController): xem theo conversation.read; Kênh thử cần conversation.reply (đóng vai khách).
+  // Trang Cấu hình mở với read (xem mẫu nhanh), sửa cần conversation.manage — trang tự khoá.
+  { prefix: paths.dashboard.inbox.root, roles: null, permissions: [PERMISSIONS.conversation.read] },
+  { prefix: paths.dashboard.inbox.test, roles: null, permissions: [PERMISSIONS.conversation.reply] },
   // Thiết bị cửa hàng: quản lý xem / ghép / thu hồi máy quầy, kiosk của chi nhánh mình (server lọc theo chi nhánh).
   { prefix: paths.dashboard.storeSettings.devices, roles: MANAGER_ROLES },
   // Mẫu in hoá đơn / tem mã: theo quyền sales.print-template.manage (PrintTemplatesController; mặc định Admin, Manager).

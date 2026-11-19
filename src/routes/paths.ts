@@ -201,6 +201,13 @@ export const paths = {
       // Meta app (Threads app ID / secret) của cửa hàng — mỗi cửa hàng dùng app riêng.
       settings: `${ROOTS.DASHBOARD}/ban-hang-online/cau-hinh`,
     },
+    // Hộp thư khách (F2): tin nhắn khách từ fanpage + Kênh thử + mẫu trả lời nhanh. Thông báo mở `?c={conversationId}`.
+    inbox: {
+      root: `${ROOTS.DASHBOARD}/inbox`,
+      conversation: (id: string) => `${ROOTS.DASHBOARD}/inbox?c=${id}`,
+      test: `${ROOTS.DASHBOARD}/inbox/test`,
+      settings: `${ROOTS.DASHBOARD}/inbox/settings`,
+    },
     storeSettings: {
       root: `${ROOTS.DASHBOARD}/store-settings`,
       // Thiết bị cửa hàng: máy quầy (app / web), kiosk chấm công, camera — chủ cửa hàng + quản lý.
