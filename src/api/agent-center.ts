@@ -166,6 +166,8 @@ export interface IAgentSchedule {
   deliverTelegram?: boolean;
   /** Xong → hệ thống đăng thẻ kết quả (task_result) vào nhóm Messenger "Quản trị – Đội agent" (A1). */
   deliverAdminGroup?: boolean;
+  /** Xong → hệ thống gửi đủ báo cáo (chữ thường, ≤ 3 tin) tới mọi người nhận Zalo Bot (cấu hình loại zalo-bot). */
+  deliverZalo?: boolean;
 }
 
 export interface IAgentScheduleInput {
@@ -176,6 +178,7 @@ export interface IAgentScheduleInput {
   enabled: boolean;
   deliverTelegram?: boolean;
   deliverAdminGroup?: boolean;
+  deliverZalo?: boolean;
 }
 
 /** Nhóm Messenger hệ thống "Quản trị – Đội agent" (A1): conversationId null = chưa tạo; enabled false = tính năng tắt. */

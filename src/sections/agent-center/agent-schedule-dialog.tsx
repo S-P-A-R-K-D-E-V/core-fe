@@ -68,6 +68,7 @@ export default function AgentScheduleDialog({
   const [enabled, setEnabled] = useState(true);
   const [deliverTelegram, setDeliverTelegram] = useState(false);
   const [deliverAdminGroup, setDeliverAdminGroup] = useState(false);
+  const [deliverZalo, setDeliverZalo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -82,6 +83,7 @@ export default function AgentScheduleDialog({
     setEnabled(schedule?.enabled ?? true);
     setDeliverTelegram(schedule?.deliverTelegram ?? false);
     setDeliverAdminGroup(schedule?.deliverAdminGroup ?? false);
+    setDeliverZalo(schedule?.deliverZalo ?? false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, schedule]);
 
@@ -98,6 +100,7 @@ export default function AgentScheduleDialog({
       enabled,
       deliverTelegram,
       deliverAdminGroup,
+      deliverZalo,
     };
     setSaving(true);
     setError(null);
@@ -224,7 +227,7 @@ export default function AgentScheduleDialog({
                   <Typography variant="body2">Gửi kết quả qua Telegram</Typography>
                   <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                     Gửi vào chat báo cáo riêng (Cài đặt → Thông báo, loại &quot;Telegram – báo cáo riêng&quot;), không
-                    vào nhóm nhân viên. Lỗi cũng báo một dòng.
+                    vào nhóm nhân viên. Mọi lỗi của agent luôn báo về chat này, kể cả khi tắt ô này.
                   </Typography>
                 </Stack>
               }
@@ -244,6 +247,25 @@ export default function AgentScheduleDialog({
                   <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                     Chạy xong thì đăng thẻ kết quả vào nhóm Tin nhắn &quot;Quản trị – Đội
                     agent&quot; (chỉ khi nhóm quản trị đang bật).
+                  </Typography>
+                </Stack>
+              }
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={deliverZalo}
+                  onChange={(e) => setDeliverZalo(e.target.checked)}
+                  disabled={readOnly}
+                />
+              }
+              label={
+                <Stack spacing={0}>
+                  <Typography variant="body2">Gửi báo cáo qua Zalo</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Gửi đủ nội dung (tối đa 3 tin) tới mọi người nhận Zalo Bot (Cài đặt → Thông báo, loại &quot;Zalo
+                    Bot&quot;). Giờ yên lặng 22:30–07:00 giữ lại tới sáng. Kết quả bắt đầu bằng [không báo] thì không gửi.
                   </Typography>
                 </Stack>
               }
